@@ -64,6 +64,68 @@ def tiled_offset_body() -> str:
     return match.group(1)
 
 
+def reference_tiled_offset_body() -> str:
+    """The body of tiled_byte_offset, taken from the sibling that works.
+
+    ../PS5_Vulkan/src/demo_renderer.cpp is the renderer whose diagnostic pattern
+    the console's owner has watched appear on this console's television. Its
+    addressing is therefore the one formula in this project with evidence behind
+    it, and the port's copy has to be the same function - not a similar one.
+
+    Read from the file rather than restated, for the same reason as the port's:
+    a test that carries its own copy of the formula agrees with itself.
+    """
+    source = (ROOT.parent / "PS5_Vulkan" / "src" / "demo_renderer.cpp").read_text(
+        encoding="utf-8")
+    match = re.search(
+        r"tiled_byte_offset\(unsigned x, unsigned y\) noexcept\s*\{(.*?)\n\}", source, re.S)
+    if match is None:
+        raise AssertionError(
+            "../PS5_Vulkan/src/demo_renderer.cpp no longer defines tiled_byte_offset(x, y); "
+            "the reference this test pins against has moved")
+    return match.group(1)
+
+
+def build_full_offset_table(body: str) -> bytes:
+    """Every offset of a 1920x1080 frame, as little-endian 64-bit words.
+
+    The whole frame, not a sample: a sampled comparison is what the two formulas
+    already had, and it cannot see a disagreement that starts at a pixel nobody
+    sampled. 2,073,600 offsets is 16 MiB of stdout, which is cheap next to the
+    alternative of noticing the difference on a television.
+    """
+    program = f"""
+#include <cstdint>
+#include <cstdio>
+#include <cstddef>
+namespace {{
+constexpr unsigned frame_width = {FRAME_WIDTH};
+[[nodiscard]] constexpr std::size_t tiled(unsigned x, unsigned y) noexcept
+{{{body}}}
+}}
+int main()
+{{
+    for (unsigned y = 0; y < {FRAME_HEIGHT}; ++y)
+        for (unsigned x = 0; x < {FRAME_WIDTH}; ++x)
+        {{
+            const std::uint64_t offset = tiled(x, y);
+            std::fwrite(&offset, sizeof(offset), 1, stdout);
+        }}
+    return 0;
+}}
+"""
+    with tempfile.TemporaryDirectory() as work:
+        directory = Path(work)
+        (directory / "probe.cpp").write_text(program, encoding="utf-8")
+        binary = directory / "probe"
+        done = subprocess.run([cxx(), "-std=c++20", "-O2", "-o", str(binary),
+                               str(directory / "probe.cpp")],
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            raise AssertionError(f"the full-frame offset probe did not compile:\n{done.stderr}")
+        return subprocess.run([str(binary)], capture_output=True, check=True).stdout
+
+
 def build_offset_table() -> dict[tuple[int, int], int]:
     """Compile the real formula and dump it for a sample of the frame."""
     body = tiled_offset_body()
@@ -105,6 +167,20 @@ int main()
     return table
 
 
+def frontend_defines() -> list[str]:
+    """The -D flags the frontend archive is compiled with, from its own build.
+
+    Asked of tools/retroarch-flags.sh, which reads them from the command `make`
+    would run, rather than restated here - a list written by hand is the fault this
+    test exists to catch.
+    """
+    done = subprocess.run(["bash", str(ROOT / "tools" / "retroarch-flags.sh")],
+                          capture_output=True, text=True)
+    if done.returncode != 0:
+        raise unittest.SkipTest(f"tools/retroarch-flags.sh failed: {done.stderr.strip()}")
+    return [flag for flag in done.stdout.split() if flag.startswith("-D")]
+
+
 class DriverTable(unittest.TestCase):
     """video_ps5 is really in RetroArch's driver table, in the object that ships."""
 
@@ -137,12 +213,129 @@ class DriverTable(unittest.TestCase):
         self.assertEqual(count, 2, "the table is NULL-terminated; its size is part of it")
 
 
+class DriverTableAbi(unittest.TestCase):
+    """The title and the frontend agree on what video_driver_t is.
+
+    This is the fault that cost the menu. `src/` was compiled with no -DHAVE_*
+    flags at all, so its copy of RetroArch's headers had HAVE_OVERLAY and
+    HAVE_GFX_WIDGETS off and the struct it defined was 8 bytes shorter than the
+    frontend's. video_ps5 - the table this project hands over - was therefore laid
+    out to one size and read at another, and every member after overlay_interface
+    came back as the member before it: poke_interface and wrap_type_to_enum both
+    read as NULL. The driver still opened the display and presented 1500 frames;
+    what it could not do was receive RGUI's framebuffer, because the frontend calls
+    poke_interface only when it is not NULL. The menu rendered every frame into its
+    own buffer and had nowhere to put it, and nothing in the trace said so.
+
+    The check is the size of the struct and the offset of the member the hand-over
+    needs, taken the same way from both sides: compiled from the configured tree's
+    header with the frontend's own defines, and read out of the object the title
+    actually links.
+    """
+
+    obj = ROOT / "build" / "obj" / "src_video_ps5.cpp.o"
+
+    def setUp(self) -> None:
+        if not self.obj.is_file():
+            self.skipTest(f"{self.obj} is not built; run tools/build-title.sh")
+
+    def frontend_layout(self) -> dict[str, int]:
+        defines = frontend_defines()
+        program = """
+#include <cstddef>
+#include <cstdio>
+#include <gfx/video_driver.h>
+int main()
+{
+    std::printf("size %zu poke %zu wrap %zu ident %zu\\n",
+          sizeof(video_driver_t), offsetof(video_driver_t, poke_interface),
+          offsetof(video_driver_t, wrap_type_to_enum), offsetof(video_driver_t, ident));
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as work:
+            directory = Path(work)
+            (directory / "layout.cpp").write_text(program, encoding="utf-8")
+            binary = directory / "layout"
+            done = subprocess.run(
+                [cxx(), "-std=c++20", "-O0", "-I", str(ROOT / "build" / "ra-conf"),
+                 "-I", str(ROOT / "vendor" / "retroarch"),
+                 "-I", str(ROOT / "vendor" / "retroarch" / "libretro-common" / "include"),
+                 *defines, "-o", str(binary), str(directory / "layout.cpp")],
+                capture_output=True, text=True)
+            if done.returncode != 0:
+                raise AssertionError(
+                    f"the header did not compile with the frontend's own defines, which is "
+                    f"itself the fault this test looks for:\n{done.stderr}")
+            output = subprocess.run([str(binary)], capture_output=True, text=True, check=True).stdout
+        fields = output.split()
+        return {fields[i]: int(fields[i + 1]) for i in range(0, len(fields), 2)}
+
+    def test_the_title_table_is_as_large_as_the_frontend_struct(self) -> None:
+        layout = self.frontend_layout()
+        done = subprocess.run(["nm", "-S", "--defined-only", str(self.obj)],
+                              capture_output=True, text=True, check=True)
+        match = re.search(r"^([0-9a-f]+)\s+([0-9a-f]+)\s+\S+\s+video_ps5$", done.stdout, re.M)
+        self.assertIsNotNone(match, "the title object no longer defines video_ps5")
+        size = int(match.group(2), 16)
+        self.assertEqual(
+            size, layout["size"],
+            f"video_ps5 is {size} bytes in the title's object and video_driver_t is "
+            f"{layout['size']} bytes in the frontend. The two are compiled with different "
+            f"feature defines, so every member after the first difference is read from the "
+            f"wrong offset - which is how poke_interface came back NULL and the menu had "
+            f"nowhere to hand its framebuffer")
+
+    def test_the_member_that_carries_the_menu_is_at_the_right_offset(self) -> None:
+        """Where the hand-over function sits in the table, in the object's own bytes.
+
+        The size test above says the two layouts agree in length; this says they
+        agree on where poke_interface is. ps5_get_poke_interface is internal and
+        cannot be looked up by name, so the table's relocations are read instead:
+        each 64-bit slot that points into the driver's own code is a member the
+        compiler filled in, and their offsets are the members' offsets. One of them
+        has to be the offset the frontend will use to make the menu's hand-over
+        work, and the member after it must be the never-called one - a table whose
+        members are shifted by even one slot has both wrong.
+        """
+        layout = self.frontend_layout()
+        done = subprocess.run(["readelf", "-rW", str(self.obj)], capture_output=True,
+                              text=True, check=True)
+        section = re.search(
+            r"Relocation section '\.rela\.data\.video_ps5' at.*?\n(.*?)\n\n", done.stdout, re.S)
+        self.assertIsNotNone(section, "the title object no longer defines a video_ps5 table")
+        filled = {}
+        for line in section.group(1).splitlines():
+            fields = line.split()
+            if len(fields) >= 5 and fields[2] == "R_X86_64_64":
+                filled[int(fields[0], 16)] = fields[4]
+
+        self.assertIn(
+            layout["poke"], filled,
+            f"nothing is written at the offset the frontend reads poke_interface from "
+            f"({layout['poke']:#x}); the members this table does fill are "
+            f"{sorted(hex(offset) for offset in filled)}. The menu hands its framebuffer over "
+            f"through that member and nowhere else")
+        self.assertIn("ps5_get_poke_interface", filled[layout["poke"]],
+                      "the member at the frontend's poke_interface offset is not this driver's "
+                      "hand-over function")
+        self.assertNotIn(
+            layout["wrap"], filled,
+            "wrap_type_to_enum is documented as never called and must stay NULL, so a value "
+            "there means the frontend is reading a different member than this table was "
+            "written for")
+
+
 class FrameLayout(unittest.TestCase):
     """The tiled frame addressing maps every pixel somewhere of its own."""
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.table = build_offset_table()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.table = None
 
     def test_no_two_pixels_share_an_offset(self) -> None:
         offsets = list(self.table.values())
@@ -153,6 +346,27 @@ class FrameLayout(unittest.TestCase):
         for (x, y), offset in self.table.items():
             self.assertLess(offset, FRAME_BYTES,
                             f"pixel ({x}, {y}) writes past the frame at {offset:#x}")
+
+    def test_the_whole_frame_matches_the_renderer_that_works(self) -> None:
+        """The port's addressing is the sibling's addressing, pixel for pixel.
+
+        The readback on the console cannot answer this question: it reads the
+        frame back through the same function that wrote it, so it reports zero
+        wrong pixels whether the formula is right or wrong. Only a comparison
+        against a formula whose output has been seen on the screen can, and that
+        is ../PS5_Vulkan's. Every one of the 2,073,600 offsets is compared, so a
+        disagreement that starts at one pixel cannot hide.
+        """
+        port = build_full_offset_table(tiled_offset_body())
+        reference = build_full_offset_table(reference_tiled_offset_body())
+        self.assertEqual(len(port), len(reference))
+        if port != reference:
+            offenders = [i for i, (a, b) in enumerate(zip(port, reference)) if a != b]
+            first = offenders[0] // 8
+            x, y = first % FRAME_WIDTH, first // FRAME_WIDTH
+            raise AssertionError(
+                f"the frame layout disagrees with ../PS5_Vulkan's at {len(offenders)} byte "
+                f"positions; the first is pixel ({x}, {y})")
 
     def test_sampled_values_are_pinned(self) -> None:
         """The exact arithmetic, pinned.

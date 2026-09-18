@@ -42,12 +42,18 @@ extern "C" int sceKernelUsleep(std::uint32_t microseconds);
  * drawing into. gfx/video_driver.c is C and this is C++. */
 extern "C" void video_driver_set_size(unsigned width, unsigned height);
 
+/* This file's own driver table, defined at the bottom. Named here so ps5_init can
+ * look at what the frontend will see of it. */
+extern "C" video_driver_t video_ps5;
+
 namespace
 {
 using ps5::display::Display;
 
-/* The probe paints the frame itself; see ps5_frame. */
-constexpr bool probe_paint = true;
+/* The console's frame, which is what the display registers and what everything
+ * here is scaled into. */
+constexpr unsigned screen_width = 1920;
+constexpr unsigned screen_height = 1080;
 
 struct DriverState
 {
@@ -62,15 +68,101 @@ struct DriverState
     /* The menu framebuffer's format, as the frontend declared it: RGUI sends
      * RGB565 (rgb32 = false), a core may send RGB8888. */
     bool menu_rgb32 = false;
-    /* The trace is a development aid; one line per fact is enough. */
+    /* What the driver has actually been handed, reported once so the trace says
+     * which of the two sources is real instead of leaving it to be inferred. */
     bool trace_texture_frame_done = false;
-    /* The buffer readback is reported once; see ps5_frame. */
-    bool trace_readback_done = false;
+    bool seen_core_frame = false;
+    bool seen_menu_frame = false;
+    bool trace_sources_done = false;
 };
 
 DriverState *state_of(void *data) noexcept
 {
     return static_cast<DriverState *>(data);
+}
+
+/* Draws `source` into one whole frame of the console's display, scaled to fill it,
+ * through the display layer's tiled addressing.
+ *
+ * Nearest-neighbour on purpose: the sources are a 4x4 dummy frame and RGUI's
+ * 320x240 framebuffer, and smooth scaling would cost pixels of work per output
+ * pixel for an image that is going to be blocky either way. The source is 4 bytes
+ * per pixel when the frontend says rgb32 and 2 when it does not, so the two
+ * formats are read where they are - a 16-bit frame read as 32-bit is a picture
+ * made of the wrong halves of the right pixels, which looks like corruption rather
+ * than like a format mistake. */
+void blit_whole_frame(ps5::display::Surface surface, const void *source, unsigned source_width,
+                      unsigned source_height, unsigned source_pitch, bool source_rgb32) noexcept
+{
+    if (source == nullptr || source_width == 0 || source_height == 0 || source_pitch == 0)
+        return;
+
+    const unsigned source_bytes = source_rgb32 ? 4u : 2u;
+    const auto *bytes = static_cast<const std::uint8_t *>(source);
+
+    for (unsigned y = 0; y < surface.height; ++y)
+    {
+        const unsigned source_y = (y * source_height) / surface.height;
+        const auto *row = bytes + static_cast<std::size_t>(source_y) * source_pitch;
+        if (source_rgb32)
+        {
+            for (unsigned x = 0; x < surface.width; ++x)
+            {
+                const auto *pixel =
+                    row +
+                    static_cast<std::size_t>((x * source_width) / surface.width) * source_bytes;
+                std::uint32_t colour = 0;
+                std::memcpy(&colour, pixel, sizeof(colour));
+                Display::write(surface, x, y, colour);
+            }
+            continue;
+        }
+        /* RGB565. Expanded to 8 bits per channel, then to the console's
+         * 0xAARRGGBB with full alpha. Many output pixels in a row share one source
+         * pixel - about six to one for RGUI's 320 columns - so the expander runs
+         * when the source pixel changes, not once per output pixel. */
+        unsigned previous_source_x = ~0u;
+        std::uint32_t colour = 0;
+        for (unsigned x = 0; x < surface.width; ++x)
+        {
+            const unsigned source_x = (x * source_width) / surface.width;
+            if (source_x != previous_source_x)
+            {
+                previous_source_x = source_x;
+                const auto *pixel = row + static_cast<std::size_t>(source_x) * source_bytes;
+                std::uint16_t rgb565 = 0;
+                std::memcpy(&rgb565, pixel, sizeof(rgb565));
+                const std::uint32_t r = (rgb565 >> 11) & 0x1fu;
+                const std::uint32_t g = (rgb565 >> 5) & 0x3fu;
+                const std::uint32_t b = rgb565 & 0x1fu;
+                colour = 0xff000000u | ((r << 3 | r >> 2) << 16) | ((g << 2 | g >> 4) << 8) |
+                         (b << 3 | b >> 2);
+            }
+            Display::write(surface, x, y, colour);
+        }
+    }
+}
+
+/* The three vertical bands, in the console's own primary colours.
+ *
+ * They are the instrument, not the picture. They were the first thing this
+ * project ever saw come out of its own display path, and they are what tells a
+ * run apart from another: while they are on the screen the driver is presenting
+ * and whatever else is supposed to be there is not, which is a distinction a
+ * blank screen cannot make. They are replaced on screen the moment a real source
+ * exists, and this whole function goes when the menu does. */
+void paint_probe_bands(ps5::display::Surface surface) noexcept
+{
+    const unsigned band = surface.width / 3 ? surface.width / 3 : 1;
+    for (unsigned y = 0; y < surface.height; ++y)
+        for (unsigned x = 0; x < surface.width; ++x)
+        {
+            const unsigned which = (x / band) % 3;
+            const std::uint32_t colour = which == 0   ? 0xffff0000u
+                                         : which == 1 ? 0xff00ff00u
+                                                      : 0xff0000ffu;
+            Display::write(surface, x, y, colour);
+        }
 }
 
 /* --- video_driver_t ------------------------------------------------------- */
@@ -88,26 +180,49 @@ void *ps5_init(const video_info_t *video, input_driver_t **input, void **input_d
         return nullptr;
     }
 
-    state->out_width = video->width ? video->width : 1920;
-    state->out_height = video->height ? video->height : 1080;
+    state->out_width = screen_width;
+    state->out_height = screen_height;
 
     /* The console's frame size is fixed by the registration in the display layer;
      * a request for another size is refused rather than silently scaled, so the
      * mismatch is visible here instead of on the screen. */
-    if (!state->display.open(1920, 1080))
+    if (!state->display.open(screen_width, screen_height))
     {
         ps5::debug::mark("ps5_init: display.open refused the frame size");
         delete state;
         return nullptr;
     }
-    ps5::debug::mark_value("ps5_init: display opened, back_surface width",
-                           static_cast<long long>(state->display.back_surface().width));
 
-    /* The display's size is reported from ps5_set_viewport, not here: calling
-     * video_driver_set_size during init was measured to leave the title dead a
-     * quarter of a second after EXEC, with no signal line in the console's log at
-     * all. set_viewport is where the frontend asks, so it is where the answer
-     * belongs. */
+    /* Tell the frontend how big this display is, because it cannot find out any
+     * other way and it hands the answer to the menu. runloop.c calls the menu's
+     * render with video_st->width and video_st->height, and both were zero until
+     * this call existed: rgui_render was entered every frame with 0,0 and returned
+     * at its own guard after its first instruction, so the menu - which was alive,
+     * had its fonts and had a framebuffer - contributed no pixels at all. An
+     * earlier round had this call and lost the title a quarter of a second after
+     * EXEC; that build also had the Vulkan driver switched on, and every run in
+     * that state failed before ps5_init was reached, so the two are not the same
+     * experiment. It is retried here, and the trace says whether it is reached. */
+    video_driver_set_size(screen_width, screen_height);
+    ps5::debug::mark("ps5_init: told the frontend the display is 1920x1080");
+
+    /* What the frontend can see of this driver's table, from inside this driver's
+     * own init. A driver whose poke_interface member is NULL there is a table
+     * laying its members out in an order the frontend does not agree with, and
+     * that is a fault no other run of this project could see: the driver still
+     * opens the display and presents frames, and only the menu's hand-over dies -
+     * silently, because the frontend only calls poke_interface when it is not
+     * NULL. */
+    {
+        char line[224];
+        std::snprintf(line, sizeof(line),
+                      "ps5_init: own table ident=%s poke_interface=%p set_viewport=%p "
+                      "wrap_type_to_enum=%p",
+                      video_ps5.ident, reinterpret_cast<const void *>(video_ps5.poke_interface),
+                      reinterpret_cast<const void *>(video_ps5.set_viewport),
+                      reinterpret_cast<const void *>(video_ps5.wrap_type_to_enum));
+        ps5::debug::mark(line);
+    }
 
     /* The driver owns no input: leaving these untouched hands input back to the
      * frontend's own driver, which is what this step is meant to test. */
@@ -123,10 +238,6 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
     (void)frame_count;
     (void)msg;
     (void)video_info;
-    // Cheap and decisive: if this line is on the console, the frontend reached
-    // its first frame with this driver, and the question becomes what it drew.
-    if (frame_count <= 1)
-        ps5::debug::mark_value("ps5_frame first call, count", static_cast<long long>(frame_count));
     DriverState *state = state_of(data);
     if (state == nullptr)
         return false;
@@ -134,13 +245,21 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
     const ps5::display::Surface surface = state->display.back_surface();
 
     /* What to show, in order of preference: the menu's framebuffer if RGUI has
-     * handed one over, else the core's frame. The menu wins because at this step
-     * the menu is the thing being proven. */
+     * handed one over, else the core's frame, else the bands. The menu wins because
+     * at this step the menu is the thing being proven.
+     *
+     * The core's frame is a 4x4 dummy whenever no game is loaded - video_driver.c
+     * sets frame_cache_width/height to 4 and pitch to 8 for exactly that case - so
+     * a driver that shows the "core frame" while the menu is up is showing four
+     * pixels stretched across the screen. Which of the two this run is being handed
+     * is a fact about the frontend and is measured, not assumed; see the trace
+     * line at the end of this function. */
     const void *source = nullptr;
     unsigned source_width = 0;
     unsigned source_height = 0;
     unsigned source_pitch = 0;
     bool source_rgb32 = true;
+    const char *source_name = "none";
 
     if (state->have_menu_frame && state->menu_frame != nullptr)
     {
@@ -149,6 +268,8 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
         source_height = state->menu_height;
         source_pitch = state->menu_width * (state->menu_rgb32 ? 4u : 2u);
         source_rgb32 = state->menu_rgb32;
+        source_name = "menu";
+        state->seen_menu_frame = true;
     }
     else if (frame != nullptr && width != 0 && height != 0 && pitch != 0)
     {
@@ -159,133 +280,59 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
         /* A frame from a core is in the pixel format video_info_t asked for,
          * which this driver asks for as RGB8888. */
         source_rgb32 = true;
+        source_name = "core";
+        state->seen_core_frame = true;
     }
 
-    /* The probe frame is drawn here, in the body, and not inside the
-     * `source == nullptr` branch, which is where it used to be and why it never ran:
-     * the frontend hands this driver a real 4x4 frame on every call (trace:
-     * "frame=present w=4 h=4 pitch=8"), so the code takes the core-frame branch every
-     * time. A readback that never printed was read as a display fault for two rounds
-     * instead of as code that never ran. The unconditional log at the top of this
-     * function is what settled it, and it is the pattern to keep: the branch a driver
-     * takes is a fact about the frontend, and it has to be measured first. */
-    if (probe_paint)
+    /* The bands go down first and the real source over the top of them. They cost
+     * one frame of paint and they are the difference between "the menu has no
+     * pixels yet" and "the display has no pixels at all" - the second of which
+     * this project has already spent several console runs unable to tell from the
+     * first. Once the menu has ever been drawn they are never painted again, so
+     * the screen is the menu's and not the instrument's. */
+    if (state->seen_menu_frame)
     {
-        const std::uint32_t probe_band = surface.width / 3 ? surface.width / 3 : 1;
-        for (unsigned y = 0; y < surface.height; ++y)
-            for (unsigned x = 0; x < surface.width; ++x)
-            {
-                const unsigned which = (x / probe_band) % 3;
-                const std::uint32_t colour = which == 0   ? 0xffe03030u
-                                             : which == 1 ? 0xff30e030u
-                                                          : 0xff3030e0u;
-                Display::write(surface, x, y, colour);
-            }
-
-        /* Painted - are they in the buffer? Read back through the same tiled
-         * addressing that wrote them and count the pixels that differ. Near zero
-         * means the bands are in memory and the display half is at fault; near the
-         * frame size means the write never landed. One number tells them apart. */
-        if (!state->trace_readback_done)
-        {
-            state->trace_readback_done = true;
-            const auto *bytes = static_cast<const std::uint8_t *>(surface.base);
-            std::size_t wrong = 0;
-            for (unsigned y = 0; y < surface.height; ++y)
-                for (unsigned x = 0; x < surface.width; ++x)
-                {
-                    const unsigned which = (x / probe_band) % 3;
-                    const std::uint32_t colour = which == 0   ? 0xffe03030u
-                                                 : which == 1 ? 0xff30e030u
-                                                              : 0xff3030e0u;
-                    std::uint32_t found = 0;
-                    std::memcpy(&found, bytes + Display::offset_of(x, y), sizeof(found));
-                    if (found != colour)
-                        ++wrong;
-                }
-            char line[224];
-            std::snprintf(line, sizeof(line),
-                          "readback: base=%p %ux%u wrong=%zu of %u (%.1f%% wrong)", surface.base,
-                          surface.width, surface.height, wrong, surface.width * surface.height,
-                          100.0 * static_cast<double>(wrong) /
-                              static_cast<double>(surface.width * surface.height));
-            ps5::debug::mark(line);
-        }
-
-        return state->display.present();
+        blit_whole_frame(surface, source, source_width, source_height, source_pitch, source_rgb32);
     }
-
-    if (source == nullptr)
+    else if (source != nullptr)
     {
-        /* Nothing to show yet. Rather than a black frame - which cannot be told
-         * apart from a display that never received one - this paints a moving
-         * pattern: three vertical bands whose widths change with the frame count,
-         * so a still image means the display is holding one frame and a moving
-         * one means frames are arriving. It is the cheapest possible answer to
-         * "are my pixels reaching the television", which is a question this
-         * project spent a long time unable to answer. */
-        const std::uint32_t phase = static_cast<std::uint32_t>(frame_count / 30) % 3;
-        const std::uint32_t band = surface.width / 3;
-        for (unsigned y = 0; y < surface.height; ++y)
-            for (unsigned x = 0; x < surface.width; ++x)
-            {
-                unsigned which = x / (band ? band : 1);
-                which = (which + phase) % 3;
-                const std::uint32_t colour = which == 0   ? 0xffe03030u
-                                             : which == 1 ? 0xff30e030u
-                                                          : 0xff3030e0u;
-                Display::write(surface, x, y, colour);
-            }
-
-        return state->display.present();
+        /* No menu yet, but the frontend is handing something over - the 4x4 dummy
+         * frame while no game is loaded. Shown as what it is, in its own corner of
+         * the screen, over the bands, which keep saying the display is alive. */
+        paint_probe_bands(surface);
+        const ps5::display::Surface corner{surface.base, surface.width / 4, surface.height / 4};
+        blit_whole_frame(corner, source, source_width, source_height, source_pitch, source_rgb32);
     }
-
-    /* Nearest-neighbour scale into the console's frame, row by row through the
-     * display layer's tiled addressing. The source is 4 bytes per pixel when the
-     * frontend says rgb32 and 2 when it does not, so the two formats are read
-     * where they are - a 16-bit frame read as 32-bit is a picture made of the
-     * wrong halves of the right pixels, which looks like corruption rather than
-     * like a format mistake. */
-    const unsigned source_bytes = source_rgb32 ? 4u : 2u;
-    for (unsigned y = 0; y < surface.height; ++y)
+    else
     {
-        const unsigned source_y = (y * source_height) / surface.height;
-        const auto *row = static_cast<const std::uint8_t *>(source) +
-                          static_cast<std::size_t>(source_y) * source_pitch;
-        for (unsigned x = 0; x < surface.width; ++x)
-        {
-            const unsigned source_x = (x * source_width) / surface.width;
-            const auto *pixel = row + static_cast<std::size_t>(source_x) * source_bytes;
-            std::uint32_t colour;
-            if (source_rgb32)
-            {
-                colour = *reinterpret_cast<const std::uint32_t *>(pixel);
-            }
-            else
-            {
-                const auto rgb565 = *reinterpret_cast<const std::uint16_t *>(pixel);
-                const std::uint32_t r = (rgb565 >> 11) & 0x1fu;
-                const std::uint32_t g = (rgb565 >> 5) & 0x3fu;
-                const std::uint32_t b = rgb565 & 0x1fu;
-                colour = 0xff000000u | ((r << 3 | r >> 2) << 16) | ((g << 2 | g >> 4) << 8) |
-                         (b << 3 | b >> 2);
-            }
-            Display::write(surface, x, y, colour);
-        }
+        paint_probe_bands(surface);
     }
+
     const bool presented = state->display.present();
-    /* One line every few hundred frames: enough to see, from the console's own
-     * file, that frames are being drawn, which branch they come from, and at what
-     * size - without the trace growing with the frame count. Later rounds read
-     * this to tell "the menu is up" from "the loop is spinning on a black frame"
-     * without anyone needing to look at the television. */
-    if (frame_count <= 2 || frame_count % 300 == 0)
+
+    /* The first few frames, unconditionally: what the frontend is handing over,
+     * what this driver decided to draw from it, and whether the display took it.
+     * The round that assumed the branch instead of measuring it lost two console
+     * runs to a readback that never printed. */
+    if (frame_count <= 3)
     {
         char line[176];
-        std::snprintf(line, sizeof(line), "ps5_frame %llu: %s %ux%u present=%d",
+        std::snprintf(line, sizeof(line), "ps5_frame %llu: %s %ux%u pitch=%u present=%d",
+                      static_cast<unsigned long long>(frame_count), source_name, source_width,
+                      source_height, source_pitch, presented ? 1 : 0);
+        ps5::debug::mark(line);
+    }
+
+    /* And once, later, the two facts that decide everything after this point: has
+     * the menu ever handed over a framebuffer, and did it take longer than the
+     * first frames to do it. */
+    if (!state->trace_sources_done && frame_count >= 60)
+    {
+        state->trace_sources_done = true;
+        char line[176];
+        std::snprintf(line, sizeof(line), "ps5_frame %llu: sources so far: menu=%s core=%s",
                       static_cast<unsigned long long>(frame_count),
-                      state->have_menu_frame ? "menu" : "no-menu-source", source_width,
-                      source_height, presented ? 1 : 0);
+                      state->seen_menu_frame ? "yes" : "no", state->seen_core_frame ? "yes" : "no");
         ps5::debug::mark(line);
     }
     return presented;
@@ -339,17 +386,24 @@ void ps5_set_texture_frame(void *data, const void *frame, bool rgb32, unsigned w
      * recorded instead, and ps5_frame converts from it. */
     if (state == nullptr)
         return;
+    /* The first hand-over and every change of state are recorded, and the state
+     * being recorded is "the menu is now the thing to draw": when RGUI commits a
+     * framebuffer, that is the fact the whole menu milestone rests on, and when it
+     * stops committing one the trace says at which frame that happened. */
+    const bool was_available = state->have_menu_frame;
     state->menu_frame = frame;
     state->menu_width = width;
     state->menu_height = height;
     state->menu_rgb32 = rgb32;
     state->have_menu_frame = frame != nullptr && width != 0 && height != 0;
-    if (!state->trace_texture_frame_done)
+    if (!state->trace_texture_frame_done || was_available != state->have_menu_frame)
     {
         state->trace_texture_frame_done = true;
         char line[176];
-        std::snprintf(line, sizeof(line), "ps5_set_texture_frame: rgb32=%d %ux%u frame=%s",
-                      rgb32 ? 1 : 0, width, height, frame ? "present" : "NULL");
+        std::snprintf(line, sizeof(line),
+                      "ps5_set_texture_frame: rgb32=%d %ux%u frame=%s have=%d (was %d)",
+                      rgb32 ? 1 : 0, width, height, frame ? "present" : "NULL",
+                      state->have_menu_frame ? 1 : 0, was_available ? 1 : 0);
         ps5::debug::mark(line);
     }
 }
@@ -361,7 +415,15 @@ void ps5_set_texture_enable(void *data, bool enable, bool full_screen) noexcept
     if (state == nullptr)
         return;
     /* RGUI turns the texture off when a core is presenting its own frame. */
+    const bool was_available = state->have_menu_frame;
     state->have_menu_frame = enable && state->have_menu_frame;
+    if (was_available != state->have_menu_frame)
+    {
+        char line[176];
+        std::snprintf(line, sizeof(line), "ps5_set_texture_enable: enable=%d have=%d",
+                      enable ? 1 : 0, state->have_menu_frame ? 1 : 0);
+        ps5::debug::mark(line);
+    }
 }
 
 void ps5_viewport_info(void *data, video_viewport_t *vp) noexcept
@@ -430,6 +492,12 @@ static const video_poke_interface_t ps5_poke = {
 void ps5_get_poke_interface(void *data, const video_poke_interface_t **iface) noexcept
 {
     (void)data;
+    /* Recorded because a run was spent on a menu that never reached this driver:
+     * the frontend's own structures said the poke interface was NULL while RGUI
+     * was drawing the menu into its framebuffer and trying to hand it over. A
+     * function that is never called and a function that is called and does nothing
+     * look identical from the other side. */
+    ps5::debug::mark("ps5_get_poke_interface entered");
     *iface = &ps5_poke;
 }
 } // namespace

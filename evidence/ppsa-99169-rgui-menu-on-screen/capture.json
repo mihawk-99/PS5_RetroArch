@@ -1,0 +1,28 @@
+{
+  "step": "ppsa-99169-rgui-menu-on-screen",
+  "recorded": "2026-09-18T21:37:29Z",
+  "console_run": "PPSA99169 launched by the resident control payload; klog captured on port 3232; the title's own /app0/trace.txt read back over FTP after the run",
+  "revision": "the commit that adds this record",
+  "command": "bash tools/run-title.sh --watch 20",
+  "raw_capture": "klog/trace-final-menu.txt",
+  "raw_lines": 16,
+  "raw_bytes": 924,
+  "lines": [
+    "ps5_init entered (video=present width=960 height=720)",
+    "display: virtual=200200000 physical=0x200000 bytes=0x2000000 two buffers at +0 and +0x1000000 registered from 0 set 0, 1920x1080, format=0x8000000022000000",
+    "ps5_init: told the frontend the display is 1920x1080",
+    "ps5_init: own table ident=ps5 poke_interface=4015d0 set_viewport=401590 wrap_type_to_enum=0",
+    "ps5_get_poke_interface entered",
+    "display: flip 1 of buffer 0, status=0 marker=1",
+    "ps5_frame 0: core 4x4 pitch=8 present=1",
+    "ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1 (was 0)",
+    "ps5_frame 1: menu 320x240 pitch=640 present=1",
+    "ps5_frame 2: menu 320x240 pitch=640 present=1",
+    "ps5_frame 3: menu 320x240 pitch=640 present=1",
+    "ps5_frame 60: sources so far: menu=yes core=yes",
+    "display: flip 300 of buffer 1, status=0 marker=1",
+    "display: flip 600 of buffer 1, status=0 marker=1",
+    "display: flip 900 of buffer 1, status=0 marker=1",
+    "display: flip 1200 of buffer 1, status=0 marker=1"
+  ]
+}

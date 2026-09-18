@@ -52,11 +52,53 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
 
+# The title's own sources are compiled with the same feature defines as the
+# frontend, because the two share a header full of #ifdefs and a struct whose
+# member order those #ifdefs decide. This is not a nicety; it was a bug with no
+# symptom except a menu that never appeared. Compiled without these, src/'s copy of
+# RetroArch's headers had HAVE_OVERLAY and HAVE_GFX_WIDGETS off, so video_ps5 - the
+# driver table this project hands the frontend - was laid out 8 bytes shorter than
+# the frontend's own view of the same struct. Everything the frontend reads after
+# overlay_interface was therefore the member before it: poke_interface and
+# wrap_type_to_enum both read as NULL. The driver still opened the display and
+# presented 1500 frames, alive() was still the right function by luck, and the only
+# consequence was that RGUI - which renders the menu into its own 320x240
+# framebuffer and hands it over through poke->set_texture_frame - had nowhere to
+# hand it. The frontend calls poke_interface only when it is not NULL, so the
+# hand-over died in silence.
+#
+# The list is not written here: tools/retroarch-flags.sh reads it from the command
+# `make` itself would run, tools/build-retroarch.sh compiles the archive with it,
+# and this passes the same list to the title. Defining a feature the archive does
+# not compile, or omitting one it does, reintroduces exactly this class of fault.
+mapfile -t title_defines < <("$root/tools/retroarch-flags.sh" | tr ' ' '\n' | grep -E '^-D' || true)
+(( ${#title_defines[@]} > 0 )) || { echo "error: no compile flags from tools/retroarch-flags.sh" >&2; exit 2; }
+# tools/build.sh takes the names without the -D and validates each one, so the
+# path-valued flags (quoted string literals) cannot go through it; the paths this
+# title uses are passed to that build separately and point at /app0.
+title_definition_names=()
+for define in "${title_defines[@]}"; do
+    [[ $define == -D*_DIR=* ]] && continue
+    title_definition_names+=("${define#-D}")
+done
+(( ${#title_definition_names[@]} > 0 )) || { echo "error: no feature defines to pass" >&2; exit 2; }
+echo "==> [title] compiling src/ with ${#title_definition_names[@]} frontend defines"
+
+# RetroArch's headers reach their generated config as "../../config.h", a relative
+# path that resolves to <tree>/config.h because the frontend is compiled with the
+# configured tree as the working directory. src/ is compiled from the repository
+# root, so that same include looks for build/config.h. Without the defines it never
+# got that far - the include is inside HAVE_OVERLAY's block. The copy is written
+# from the configured tree's own config.h rather than kept by hand, so the two
+# cannot disagree about what this build is.
+cp -f -- "$root/build/ra-conf/config.h" "$root/build/config.h"
+
 echo "==> [title] step 2/3: the title"
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
 PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
-APP_INCLUDE_PATHS="build/ra-conf vendor/retroarch vendor/retroarch/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
+APP_DEFINITIONS="${title_definition_names[*]}" \
+APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch vendor/retroarch/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
     make app
 

@@ -38,11 +38,8 @@ extern "C"
                                       std::int64_t *physical_address);
     int sceKernelMapDirectMemory(void **address, std::size_t length, int protection, int flags,
                                  std::int64_t physical_address, std::size_t alignment);
-    /* The AGC entry point that brings up the GPU command-processor context, with
-     * the ABI ../PS5_Vulkan's native runtime uses: sceAgcInit(uint32_t version).
-     * Submitting a command buffer without it is what faulted this port with a
-     * write to 0x202210000. */
-    std::int32_t sceAgcInit(std::uint32_t version);
+    /* Used only to hold a presented frame still; see Display::present. */
+    int sceKernelUsleep(std::uint32_t microseconds);
     /* The shell's startup splash covers the top of the framebuffer until a title
      * asks for it to go. ../PS5_Vulkan's M2 renderer, which is the template this
      * path follows, calls this before it opens the display (src/demo_renderer.cpp)
@@ -71,9 +68,6 @@ constexpr std::size_t frame_bytes = 0x1000000;
 /* sceVideoOutGetFlipStatus fills 16 64-bit words; the fourth carries the
  * marker of the latest flip the display has shown. Confirmed by measurement
  * against ../PS5_Vulkan/driver/ps5vk_queue.c, which reads the same word. */
-/* The version the sibling project's native runtime passes to sceAgcInit. */
-constexpr std::uint32_t agc_version = 8;
-
 constexpr unsigned flip_status_words = 16;
 constexpr unsigned flip_status_marker_word = 3;
 
@@ -164,13 +158,15 @@ bool Display::open(unsigned width, unsigned height) noexcept
      * sits over the frame this title is about to present into. */
     (void)sceSystemServiceHideSplashScreen();
 
-    /* The GPU command-processor context, before anything is submitted to it.
-     * ../PS5_Vulkan initialises AGC before its first submission
-     * (driver/ps5vk_device.c), and a submission without it is what faulted this
-     * port with a write to 0x202210000. A failure here is not fatal for the
-     * present path below, so it is recorded rather than returned: the flip itself
-     * is what reports whether the display took the frame. */
-    agc_ready_ = sceAgcInit(agc_version) == 0;
+    /* Nothing else from the GPU is brought up here. ../PS5_Vulkan's M2 renderer,
+     * which has put a CPU-written 1920x1080 pattern on this console's television,
+     * calls HideSplashScreen, opens VideoOut and presents - it never initialises
+     * AGC, because presenting a CPU-written buffer does not go through the command
+     * processor at all (src/demo_renderer.cpp, which contains no sceAgc call).
+     * This port used to call sceAgcInit(8) here, left over from the round that
+     * submitted flips through an AGC command buffer; that round is gone and the
+     * call is the one GPU subsystem this port touches that the working sequence
+     * does not. It is removed rather than left in as a possibly-null control. */
 
     handle_ = sceVideoOutOpen(0xff, 0, 0, nullptr);
     if (handle_ < 0)
@@ -207,6 +203,7 @@ bool Display::open(unsigned width, unsigned height) noexcept
         return false;
     }
     mapped_ = mapped;
+    physical_ = static_cast<long long>(physical);
 
     auto *base = static_cast<std::uint8_t *>(mapped_);
     frames_[0] = base;
@@ -230,6 +227,20 @@ bool Display::open(unsigned width, unsigned height) noexcept
     }
     registered_[0] = 0;
     registered_[1] = 1;
+
+    /* The mapping and the physical range it stands for, in the same line: the one
+     * thing no comparison of values against the working reference can settle is
+     * whether the memory that was written is the memory the display reads, and the
+     * physical address is the handle on that question. */
+    {
+        char line[224];
+        std::snprintf(line, sizeof(line),
+                      "display: virtual=%p physical=0x%llx bytes=0x%zx two buffers at +0 and "
+                      "+0x%zx registered from 0 set 0, %ux%u, format=0x%llx",
+                      mapped_, physical_, memory_bytes, frame_bytes, width_, height_,
+                      static_cast<unsigned long long>(pixel_format_rgba8_srgb));
+        ps5::debug::mark(line);
+    }
 
     back_ = 0;
     error_ = "";
@@ -288,47 +299,49 @@ bool Display::present() noexcept
         return false;
     }
 
-    /* One flip of buffer 0, once, and then nothing - the smallest probe that can
-     * answer "do this title's pixels reach the screen".
+    /* Present the back buffer, wait for the display to take it, then hand the
+     * other buffer back to the caller. Nothing here holds the display: the frame
+     * stays on the screen because it is the frame the display was last given, and
+     * the next one is drawn into the buffer the display is not reading.
      *
-     * Every detail here is copied from ../PS5_Vulkan/src/demo_renderer.cpp, which
-     * has put a 1920x1080 CPU-written pattern on this console's television: it
-     * flushes the frame, calls sceVideoOutSubmitFlip(video, 0, 1, 1) - buffer index
-     * zero, mode 1, argument 1 - waits a vblank, and then holds that frame forever
-     * in a loop. It never rotates buffers and it never asks for the flip status.
-     *
-     * This port did all three of those differently, and one of them is why its
-     * frames never appeared. Rather than guess which, present() now does exactly
-     * what the working one does and stops. If the bands below appear, the three
-     * differences go back one at a time until the screen goes black again, and the
-     * last one added is the fault.
-     *
-     * The hold matters as much as the flip: re-flipping the same buffer every frame
-     * is a different thing from presenting once and leaving it, and only the second
-     * one is known to work. So after the first present this returns without
-     * touching the display at all. */
-    if (probe_flipped_)
-    {
-        error_ = "";
-        return true;
-    }
+     * The sequence is ../PS5_Vulkan/src/demo_renderer.cpp's, which has put a
+     * CPU-written 1920x1080 pattern on this console's television: flush the frame
+     * out of the CPU's cache, sceVideoOutSubmitFlip(handle, index, 1, 1), then
+     * sceVideoOutWaitVblank. What that renderer does differently is that it stops
+     * there - one flip and a sleep loop - and for a while this port did the same,
+     * because a run that held the first frame was the first one whose pixels
+     * appeared. That turned out not to be the reason; see docs/FINDINGS.md. The
+     * one difference that was real is recorded there too: this driver used to
+     * bring up the GPU command processor (sceAgcInit) before opening the display,
+     * and the renderer whose output has actually been seen never does. */
+    const int index = back_;
+    flush_frame_cache(frames_[index], frame_bytes);
 
-    flush_frame_cache(frames_[0], frame_bytes);
-
-    if (sceVideoOutSubmitFlip(handle_, 0, 1, 1) < 0)
+    if (sceVideoOutSubmitFlip(handle_, registered_[index], 1, 1) < 0)
     {
         error_ = "sceVideoOutSubmitFlip refused the frame";
         return false;
     }
     (void)sceVideoOutWaitVblank(handle_);
-    probe_flipped_ = true;
+    ++flips_;
 
+    /* The display is on this buffer now, so the other one is this driver's to
+     * write. */
+    back_ = 1 - index;
+
+    /* The first flip of a run, and one line every few hundred after it: the flip
+     * status is the only instrument this project has that says a frame reached the
+     * display at all, and a marker that stops advancing is what a stalled display
+     * looks like from inside the title. */
     const int status = sceVideoOutGetFlipStatus(handle_, flip_status_);
-    char line[176];
-    std::snprintf(line, sizeof(line),
-                  "probe: flipped buffer 0 once, status=%d marker=%llu (then holding)", status,
-                  static_cast<unsigned long long>(flip_status_[flip_status_marker_word]));
-    ps5::debug::mark(line);
+    if (flips_ == 1 || flips_ % 300 == 0)
+    {
+        char line[176];
+        std::snprintf(line, sizeof(line), "display: flip %llu of buffer %d, status=%d marker=%llu",
+                      flips_, index, status,
+                      static_cast<unsigned long long>(flip_status_[flip_status_marker_word]));
+        ps5::debug::mark(line);
+    }
 
     error_ = "";
     return true;

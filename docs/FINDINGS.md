@@ -1389,3 +1389,87 @@ screen: `video_st->width/height` are zero because nothing ever called
 probe sidesteps it by painting the display's own frame directly. Fixing the size is
 the next thing for the real path, and `ps5_set_viewport` is where the driver can
 report it.
+
+## The menu was in the framebuffer all along, and the hand-over died on a struct size
+
+**Measured, and the goal of this milestone.** `tools/run-title.sh --watch 20` runs
+the title unattended, the console reports no fatal signal, and the console's owner
+watched **RetroArch's RGUI menu on the television**. `/app0/trace.txt` from that run
+(`evidence/ppsa-99169-rgui-menu-on-screen/`):
+
+    ps5_init: own table ident=ps5 poke_interface=4015d0 set_viewport=401590 wrap_type_to_enum=0
+    ps5_get_poke_interface entered
+    ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1 (was 0)
+    ps5_frame 1: menu 320x240 pitch=640 present=1
+    ps5_frame 60: sources so far: menu=yes core=yes
+    display: flip 1200 of buffer 1, status=0 marker=1
+
+**The fault was one line of the build, and it was invisible from every direction
+this project had been looking.** `src/` was compiled with **no `-DHAVE_*` flags at
+all**. The frontend archive is compiled with fifty of them
+(`tools/retroarch-flags.sh`). RetroArch declares its driver interface as a struct
+full of `#ifdef HAVE_OVERLAY` / `#ifdef HAVE_GFX_WIDGETS` members, so the two sides
+disagreed about the struct: `video_ps5` was laid out **136 bytes** long while the
+frontend read it as **144**. Everything after `overlay_interface` was read one
+member late - `poke_interface` and `wrap_type_to_enum` both came back NULL, and
+`alive()` was the right function only by luck.
+
+**Why it looked like a display fault.** A NULL `poke_interface` is not an error
+anywhere: `video_driver_init_internal` calls it only `if (...->poke_interface)`, so
+nothing failed, nothing logged, and the driver opened the display and presented
+1500 frames. RGUI rendered the menu into its 320x240 framebuffer on every frame and
+handed it to `rgui_set_texture_frame`, which checks `video_st->poke` and returns
+when it is NULL. The hand-over was dropped in silence, once per frame, for as long
+as the title ran.
+
+**Two instruments found it, and both are worth keeping.**
+
+1. A probe at RGUI's own commit point printed what the frontend could see:
+   `probe commit upscale=0 fb=320x240 data=1 poke=0 fn=0`. The framebuffer was
+   allocated and the menu had been drawn into it; the poke was NULL.
+2. `ps5_init` now logs its own table's members from inside the driver:
+   `poke_interface=4015d0`. The two lines together say "this table has the function"
+   and "the frontend cannot see it", which is a layout disagreement and nothing
+   else.
+
+**The check that keeps it fixed.** `tests/test_frontend.py` compiles RetroArch's
+header with the frontend's own defines and compares `sizeof(video_driver_t)` against
+the size of `video_ps5` in the object the title links, then reads the table's
+relocations to confirm the member at the frontend's `poke_interface` offset is this
+driver's hand-over function. Built without the defines it fails with
+`video_ps5 is 136 bytes in the title's object and video_driver_t is 144 bytes in the
+frontend` - verified by doing exactly that.
+
+## The frame the display keeps is the frame it was given, and the runloop does not take it back
+
+**Measured, and it corrects the lead this round started from.** The band probe was
+made to hold its frame for 8 seconds inside `present()` instead of returning into
+RetroArch's frame loop, with the flip status sampled every 500 ms. The console's
+owner reported that the bands appeared **almost immediately** - not after the hold
+began - and were **still on screen when the title closed**, twelve seconds after the
+hold ended and `present()` had returned into the runloop.
+
+So the behavioural difference between this port and `../PS5_Vulkan`'s renderer -
+that the renderer flips once and then blocks forever while this port returns to
+RetroArch's frame loop - is **not** what made the screen black. The runloop does not
+undo a presented frame: it does not flip (the probe's `present()` returned early
+after its first call), it does not clear the buffer, and the display stayed on
+frame 1 (`marker=1`) for the whole 8-second hold with nothing else touching it.
+
+**What was left, and it was the only other difference.** The port called
+`sceAgcInit(8)` in `Display::open`, left over from the round that submitted flips
+through an AGC command buffer. The renderer whose output has been seen on this
+console contains no `sceAgc` call at all (`../PS5_Vulkan/src/demo_renderer.cpp`).
+Removing it, together with the hold, is what produced the first pixels this port
+ever put on the screen. Two changes went in together, so the attribution is not
+separated by a clean A/B - what is ruled out is the runloop, by the timing above,
+and what is left with no other candidate is the AGC initialisation. The clean test,
+if it ever matters, is to restore `sceAgcInit` alone and watch for the bands.
+
+**Two process notes, because both cost runs.** A probe left inside the configured
+upstream tree does not disappear when you stop adding it: after deleting
+`build/ra-conf` and reconfiguring, `tools/build-retroarch.sh` still reused the stale
+`build/ra/obj/menu_drivers_rgui.c.o` from earlier in the day and shipped its probes
+into `eboot.bin`. Deleting the object directory is what makes a probe really gone.
+And a trace file that is appended to for every run stops being readable: this
+session's `/app0/trace.txt` reached 72,904 lines because every run appends to it.

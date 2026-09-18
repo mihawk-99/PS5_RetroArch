@@ -1,0 +1,18 @@
+{
+  "step": "ppsa-99169-rgui-menu-on-screen",
+  "note": "The RGUI menu reaches the console's screen from this title. The driver opens VideoOut at 1920x1080, tells the frontend the size, presents every frame by alternating the two registered buffers, and receives RGUI's 320x240 RGB565 framebuffer through poke->set_texture_frame, which it scales into the console frame. The line that matters is ps5_get_poke_interface entered: before this run the frontend never called it, because src/ was compiled without the frontend's feature defines and this driver's table was 8 bytes shorter than the struct the frontend reads it through.",
+  "must_contain": [
+    "ps5_init: own table ident=ps5",
+    "ps5_get_poke_interface entered",
+    "ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1",
+    "ps5_frame 1: menu 320x240 pitch=640 present=1",
+    "ps5_frame 60: sources so far: menu=yes core=yes",
+    "display: flip 1200 of buffer 1, status=0 marker=1"
+  ],
+  "must_not_contain": [
+    "fatal signal",
+    "fault address",
+    "calls exit"
+  ],
+  "human_check": "The console's owner confirmed the RetroArch menu was on screen during this run."
+}

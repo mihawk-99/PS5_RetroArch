@@ -67,7 +67,8 @@ class Display final
     /** Fills the whole frame. */
     static void clear(Surface surface, std::uint32_t colour) noexcept;
 
-    /** Submits the back buffer and waits for the display to take it. */
+    /** Presents the back buffer, waits for the display to take it, and makes the
+     * other buffer the back one. */
     bool present() noexcept;
 
     /** The last failure, for one log line; never null. */
@@ -81,10 +82,17 @@ class Display final
     void *mapped_ = nullptr;
     void *frames_[2] = {nullptr, nullptr};
     std::uint64_t flip_status_[16] = {0};
-    bool agc_ready_ = false;
-    /* One flip has been made and the frame is being held; see Display::present. */
-    bool probe_flipped_ = false;
+    /* The physical address the direct-memory allocation returned, kept so a log
+     * line can say which 16 MiB the registered buffers live in. Nothing else here
+     * needs it. */
+    long long physical_ = 0;
+    /* Flips submitted, for the trace line that would otherwise be the only way to
+     * know whether the display is being driven at all. */
+    unsigned long long flips_ = 0;
     int registered_[2] = {-1, -1};
+    /* The buffer the next frame is drawn into. The two alternate: after a flip to
+     * the back buffer is shown, that one is on the screen and the other becomes the
+     * one this driver may write. */
     int back_ = 0;
     unsigned width_ = 0;
     unsigned height_ = 0;

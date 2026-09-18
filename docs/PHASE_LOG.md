@@ -713,3 +713,65 @@ committed as it stands rather than reverted, and flagged here so it is not a
 silent change.
 
 **Commit.** `4e91e35` — Automate the console loop, fix the null joypad crash, bundle the RGUI fonts.
+
+## 2026-09-18: The RGUI menu is on the console's screen, and the fault was a struct size
+
+**The milestone.** `bash tools/run-title.sh --watch 20` — one unattended command that
+builds, publishes, verifies, listens, launches, watches and closes the title — ran
+to completion with **no fatal signal**, and the console's owner watched RetroArch's
+RGUI menu on the television during it. The title's own trace from that run is
+committed as `evidence/ppsa-99169-rgui-menu-on-screen/`: the display opens at
+1920x1080, the frontend is told the size, RGUI's 320x240 RGB565 framebuffer arrives
+through `poke->set_texture_frame`, and the driver presents it every frame by
+alternating the two registered buffers (`display: flip 1200 of buffer 1, status=0
+marker=1`).
+
+**Two faults had to go, and they were independent.**
+
+The first was that **the title and the frontend disagreed about the size of
+RetroArch's driver interface struct**. `src/` was compiled with no `-DHAVE_*` flags
+while the archive was compiled with fifty, so `HAVE_OVERLAY` and `HAVE_GFX_WIDGETS`
+were off on one side only: `video_ps5` was 136 bytes where the frontend read 144, and
+every member after `overlay_interface` was read one slot late. `poke_interface` came
+back NULL, the frontend therefore never called it, and RGUI's hand-over was dropped
+in silence on every frame while the driver happily presented 1500 frames of its own
+probe pattern. `tools/build-title.sh` now asks `tools/retroarch-flags.sh` for the
+frontend's own defines and passes them to the title's sources, and writes the
+configured tree's `config.h` where RetroArch's headers look for it relative to the
+repository root. `tests/test_frontend.py` gained a class that compares
+`sizeof(video_driver_t)`, compiled with the frontend's defines, against the size of
+`video_ps5` in the object the title links, and checks the member at the frontend's
+`poke_interface` offset against the table's relocations; built without the defines it
+fails with the two numbers, which was verified by doing it.
+
+The second was that the port initialised the **GPU command processor**
+(`sceAgcInit(8)`) before opening the display, left over from the round that submitted
+flips through an AGC command buffer. `../PS5_Vulkan/src/demo_renderer.cpp`, whose
+output has been seen on this console, contains no `sceAgc` call at all. Removing it
+produced the first pixels this port ever put on the screen.
+
+**A correction to the lead this round started from.** The hypothesis was that
+returning into RetroArch's runloop after a flip was what undid the frame, because the
+working reference blocks forever after its one flip. That is now measured false: with
+the probe's frame held for 8 seconds inside `present()`, the bands appeared
+immediately - before the hold could be the reason - and were still on screen twelve
+seconds after `present()` had returned into the runloop, with the display's flip
+status reading `marker=1` for every one of the sixteen samples taken during the hold.
+The runloop does not take a presented frame back. The two candidate causes went in
+together in one build, so what the run is evidence for is the pair's effect and the
+elimination of the runloop; the AGC call is what remains with no other candidate.
+
+**What also changed in the driver, and why.** `present()` is a real driver now: it
+flushes the back buffer, submits a flip to that buffer's registered index, waits a
+vblank, and alternates buffers so the next frame is drawn into the one the display is
+not reading. The probe paint, the readback and the hold are gone. The core's frame is
+4x4 because upstream hardcodes a dummy frame when no game is loaded
+(`video_driver.c` sets the cache to 4x4 for exactly that case), so the menu's
+framebuffer takes precedence when it exists and the bands remain underneath as the
+instrument that says "the display is alive but the menu is not drawing".
+
+**Verification.** `bash tools/verify.sh` → **PASS (format unit build integration
+evidence)**, including the 11 host tests and the three replayed evidence records.
+The probes are gone from the configured tree: `build/ra-conf` was deleted,
+regenerated from `vendor/retroarch`, and diffed - only the four files
+`patches/series` names differ from upstream.
