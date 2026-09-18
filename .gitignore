@@ -9,9 +9,10 @@
 vendor/
 RetroArch-*/
 
-# Cross-build output and the staged title folder.
+# Cross-build output, the prepared upstream tree, and the staged title folder.
 build/
 dist/
+work/
 
 # Fetched dependencies (host test framework, graphics SDK packages).
 .deps/

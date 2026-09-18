@@ -191,3 +191,87 @@ the recipe is kept read-only so a later change to it is a visible step.
 **Boundary.** websrv commit `1afd476` (2026-08-10) and the local SDK unpack of
 2026-09-17. If a ports image is installed into the sysroot, the SDL2 half of this
 finding stops being true and is superseded rather than edited.
+
+---
+
+## 2026-09-18: Building for this console on this host needs four host-side facts
+
+**Measured.** Four things had to be true before the vendored recipe would build
+here, each established by a failing build and then a passing one:
+
+1. **The toolchain resolves an absolute include against the host filesystem, not
+   its sysroot.** `-I/user/homebrew/include/SDL2` fails with `-isysroot $SDK/target`
+   and fails with `--sysroot=$SDK/target`; it succeeds only when the path exists
+   on the host. Verified by compiling a one-line file that includes `SDL.h` three
+   ways. `prospero-clang` adds no sysroot rewriting of its own for `-I`.
+2. **The ports prefix must be reached by a host path.** A pkg-config wrapper that
+   exports `PKG_CONFIG_LIBDIR=<ports>/libdata/pkgconfig` with
+   `PKG_CONFIG_SYSROOT_DIR=<ports>` produces a doubled path, because the `.pc`
+   file already records `prefix=/user/homebrew`. `PKG_CONFIG_SYSROOT_DIR` must be
+   empty when the `.pc` is read straight from the ports tree.
+3. **The SDK's pkg-config and the SDK's compiler look in different places, and
+   both must be offered the ports.** `prospero-pkg-config` searches only
+   `$PS5_SYSROOT/user/homebrew/{lib,libdata}/pkgconfig`; the compiler needs the
+   host path. The build satisfies both.
+4. **`/user` cannot be created here without root**, and an unprivileged mount
+   namespace cannot create it either: `unshare -Urm` gives a private namespace but
+   `mkdir /user` still fails with EACCES because the root mount is not writable,
+   and `bwrap --tmpfs /user` fails the same way. Overlay-mounting `/` is refused.
+   So the console's own prefix cannot be spelled on the host, and the build must
+   be told the host spelling instead.
+
+**Consequence.** `tools/build-baseline.sh` carries all four as measured facts
+rather than as guesses: a pkg-config of its own for the ports, a rewrite of the
+generated `config.mk` include paths, and `-j` with ccache. None of it changes what
+the payload links against at runtime — those paths stay the console's own.
+
+**Boundary.** This host (CachyOS, no `/user`, unprivileged), this SDK unpack, and
+the v0.40.2 ports prefix. A host that happens to have `/user/homebrew` populated
+would not need points 1, 2 or 4.
+
+---
+
+## 2026-09-18: The recipe's build is 34 s from cache, against about five minutes cold
+
+**Measured.** With the pinned tarball cached in `.deps/cache/`, the prepared
+upstream tree kept in `work/baseline/`, every compile routed through ccache 4.14
+and `MAKEFLAGS=-j14` on this 14-core host, a full build takes **33–35 s**, and an
+incremental build after editing a frontend source file takes **35 s**. The first
+cold build, which downloaded the tarball, extracted it and compiled with neither
+cache, took about five minutes. Three fixes were needed to get there: the recipe
+moves the upstream icon out of the source tree, which broke every rebuild until
+the extraction guard learned to re-extract when the icon is missing; the log
+directory was created before the recipe's files were copied over it; and the
+recipe's own log is enormous, because it passes `V=1` to make, so the build
+captures it to `work/baseline/logs/build.log` instead of the terminal.
+
+**Consequence.** The console run is now the slow part of the loop, not the build,
+which is what makes the "one step per commit, verified on the target" workflow
+practical. `docs/ACTIVE.md` records the numbers so a later regression is visible.
+
+**Boundary.** Measured on this host with a warm ccache. A `--clean` build clears
+the ccache and returns to the cold path.
+
+---
+
+## 2026-09-18: This console's FTP service has three behaviours a deploy must respect
+
+**Measured.** Against ftpsrv v0.21.1 on the console:
+
+- it answers a successful `DELE` with **226** rather than 250, which `ftplib`
+  raises `error_reply` on, so a naive delete looks like a failure after it has
+  happened;
+- it ignores the path argument of a listing command: `MLSD /some/dir` returns the
+  **root** listing, and only an explicit `MLSD .` after a successful `CWD` lists
+  the intended directory. That silently defeated a verification check and reported
+  a correctly uploaded file as missing;
+- a nested relative `CWD` can fail with 550 while the same directory opens fine by
+  absolute path.
+
+**Consequence.** `tools/deploy.py` navigates by absolute path, verifies every
+uploaded file's size on the console before publishing it under its real name, and
+treats the 226 delete as success. It also refuses to remove anything but this
+project's own remote directory.
+
+**Boundary.** ftpsrv v0.21.1 on this console. Another service, or a later version,
+may answer differently, and the size check is what would catch it.

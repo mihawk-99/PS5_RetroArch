@@ -83,3 +83,41 @@ the message early and fed it the script instead. Nothing was pushed, and the
 commit was amended in place to `0d8a225` with no change to a single file. The
 lesson is in the command, not in the tooling: one message per command, written
 from a file, never a here-document inside a chain.
+
+---
+
+## 2026-09-18: The baseline payload builds from cache in 34 seconds and reaches the console
+
+`tools/fetch-ports.sh` and `tools/build-baseline.sh` now build the Option 1
+baseline end to end, and `tools/deploy.py` publishes it to the console under this
+project's own folder name. It exists because a console run of something we did
+not write is what makes the later runs of our own build interpretable, and it
+unblocks the move to the Vulkan driver: the frontend, its configuration seed and
+its launcher are now known-good.
+
+**The evidence.** `tools/build-baseline.sh` returned PASS in 34 s and staged four
+files in `dist/baseline/` with a digest manifest; the payload check found
+`libkernel_web.sprx` in its imports and no `libkernel_sys.sprx`. A rebuild after
+appending a line to `menu/menu_driver.c` returned PASS in 35 s, which is the
+measurement that matters for the edit-test loop. `tools/fetch-ports.sh` verified
+PacBrew v0.40.2 against its SHA-256 and resolved SDL2 2.30.12. The staged tree was
+uploaded and then listed back from the console: `retroarch.elf` at 70,642,656
+bytes beside `retroarch.cfg`, `homebrew.js` and the manifest.
+
+**What was tried first.** Three approaches to the toolchain's prefix failed before
+the fourth worked, and all four are recorded in `docs/FINDINGS.md`: rewriting
+`PS5_HBROOT` before the recipe sources `prospero.sh` (it exports the value
+unconditionally), a private mount namespace (`unshare -Urm` cannot create `/user`
+without root), and bubblewrap (`--tmpfs /user` fails the same way). What works is
+to give the build both spellings: a pkg-config of ours that answers with the host
+path, and a rewrite of the generated `config.mk`. The recipe's own build script
+was never edited — the changes are injected into the copy under `work/`, so
+`reference/ps5-retroarch/` stays the baseline it was measured against.
+
+**Still open.** The launch run has not happened: the console's FTP service began
+answering `550 Read-only filesystem` to writes during the last deploy, while
+reads and the control payload stayed healthy. `sce_sys/icon0.png` is therefore
+still at the folder root. Both are the first item in `docs/ACTIVE.md`'s Next
+list, and neither is being treated as done.
+
+**Commit.** `{{SHA}}` — Build and deploy the Option 1 baseline.
