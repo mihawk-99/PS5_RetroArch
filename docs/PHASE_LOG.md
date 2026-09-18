@@ -448,4 +448,4 @@ live in `../ps5-opengl-sdk-0.2.0/third_party/Vulkan-Headers`. Both are reached
 through `APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, which is exactly how the
 sibling project already consumes them.
 
-**Commit.** `{{SHA}}` — Prove the native pipeline on the console and scope the RetroArch swap.
+**Commit.** `1da48f0` — Prove the native pipeline on the console and scope the RetroArch swap.
