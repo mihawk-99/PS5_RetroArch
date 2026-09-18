@@ -381,3 +381,33 @@ why the project pins Clang 18 (`extra/clang18 18.1.8-2` is available). Installin
 it needs administrator rights, so the build waits on that.
 
 **Commit.** `80dc8d4` — Change route: build a native title on the pipeline that works.
+
+---
+
+## 2026-09-18: ProsperoLight builds here, on Clang 22, and its title is staged
+
+The plan is now: prove the whole console path with a complete, known-good title,
+then replace its sources with a fresh RetroArch. This entry records the first
+half — ProsperoLight builds on this machine and produces a valid title.
+
+**What it took, four things, each found by a failed build.** The project's own
+vendored SDK rather than the one in `$HOME`; `PS5_CLANG=/usr/bin/clang`, because
+its wrapper defaults to a `clang-18` that is not installed while the sibling
+project that works uses plain `clang`; a minimal, documented `jsonschema`
+stand-in at `tooling/pystub/`, because mbedTLS regenerates a source file with a
+script that imports it; and a verified `runtime/libc.prx`, which the project ships
+only as a manifest — the boilerplate's copy carries the same digest. All four are
+in `tools/build-native-app.sh`, and none of them edits the project's sources.
+
+**The evidence.** `make app` completed and the converter's own inspector reports
+`container: signed, plaintext`, twelve segments, `integrity: valid` for
+`dist/PPSA99002/eboot.bin`. The title folder is staged at `handoff/PPSA99002/`
+with its identity `PPSA99002`, `UP9000-PPSA99002_00-PROSPEROLIGHT000`,
+"ProsperoLight".
+
+**What is not proven.** That it runs on the console. Placement is the console
+owner's step, because writes from this machine do not reach the console's title
+folders, and a title also has to be registered with the shell before its launch is
+anything but `is not registered`.
+
+**Commit.** `{{SHA}}` — Build ProsperoLight on this machine and stage its title.

@@ -1,0 +1,180 @@
+<rml>
+    <head>
+        <title>ProsperoLight</title>
+        <link type="text/rcss" href="styles/app.rcss" />
+    </head>
+    <body>
+        <div id="app-shell">
+            <header id="header">
+                <span id="brand-mark"><img class="prosperolight-brand-icon" src="icons/prosperolight-icon.tga" width="56" height="56" alt=""/></span>
+                <span id="brand-name">ProsperoLight</span>
+                <span id="brand-version">v01.000.060</span>
+                <span id="page-title">Your PCs</span>
+                <span id="header-mode">H.264 / 1080P60</span>
+            </header>
+
+            <nav id="sidebar">
+                <button id="nav-hosts" class="nav-button active focused"><img class="button-chrome nav-chrome nav-normal" src="chrome/nav-normal.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-active" src="chrome/nav-active.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-focused" src="chrome/nav-focused.tga" width="304" height="72" alt=""/><span>PCs</span></button>
+                <button id="nav-games" class="nav-button"><img class="button-chrome nav-chrome nav-normal" src="chrome/nav-normal.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-active" src="chrome/nav-active.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-focused" src="chrome/nav-focused.tga" width="304" height="72" alt=""/><span>Games</span></button>
+                <button id="nav-settings" class="nav-button"><img class="button-chrome nav-chrome nav-normal" src="chrome/nav-normal.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-active" src="chrome/nav-active.tga" width="304" height="72" alt=""/><img class="button-chrome nav-chrome nav-focused" src="chrome/nav-focused.tga" width="304" height="72" alt=""/><span>Settings</span></button>
+                <span id="sidebar-rule"></span>
+                <span class="sidebar-section-label">SELECTED PC</span>
+                <span id="sidebar-host-name">Searching...</span>
+                <span id="sidebar-host-address">Discovering local network</span>
+            </nav>
+
+            <main id="content">
+                <section id="screen-hosts" class="screen">
+                    <span class="screen-heading">Your PCs</span>
+                    <span class="screen-copy">Connect, pair, and manage your Sunshine PC.</span>
+                    <button id="host-card" class="host-card focused">
+                        <img class="button-chrome host-chrome base-chrome" src="chrome/host-normal.tga" width="820" height="246" alt=""/>
+                        <img class="button-chrome host-chrome focused-chrome" src="chrome/host-focused.tga" width="820" height="246" alt=""/>
+                        <span class="host-monogram"><img class="host-medallion" src="icons/host-medallion.tga" width="150" height="150" alt=""/><span class="host-monogram-label">PC</span></span>
+                        <span id="host-name" class="host-name">Searching...</span>
+                        <span id="host-address" class="host-address">Local network discovery</span>
+                        <span id="host-status-dot" class="status-dot online"><img class="status-icon status-online-icon" src="icons/status-online.tga" width="18" height="18" alt=""/><img class="status-icon status-offline-icon" src="icons/status-offline.tga" width="18" height="18" alt=""/></span>
+                        <span id="host-status" class="host-status">ONLINE / PAIRED</span>
+                        <span id="host-card-action" class="host-action">OPEN</span>
+                        <span id="host-position" class="host-position">SEARCHING FOR PCS</span>
+                    </button>
+                    <aside class="detail-panel">
+                        <img class="panel-chrome detail-panel-chrome" src="chrome/panel-detail.tga" width="530" height="478" alt=""/>
+                        <span class="detail-kicker">SELECTED HOST</span>
+                        <span id="host-detail-title" class="detail-title">Searching...</span>
+                        <span class="detail-line detail-line-0">Address</span>
+                        <span id="host-detail-address" class="detail-value detail-value-0">Discovering</span>
+                        <span class="detail-line detail-line-1">Connection</span>
+                        <span id="host-detail-connection" class="detail-value detail-value-1">Local network</span>
+                        <span class="detail-line detail-line-2">Pairing</span>
+                        <span id="host-detail-pairing" class="detail-value detail-value-2">Client certificate</span>
+                        <span class="detail-rule"></span>
+                        <img class="panel-chrome ready-panel-chrome" src="chrome/panel-ready.tga" width="474" height="68" alt=""/>
+                        <span id="host-detail-ready" class="detail-ready">READY</span>
+                    </aside>
+                    <button id="refresh-hosts" class="action-button action-primary"><img class="button-chrome action-chrome base-chrome" src="chrome/action-primary.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome focused-chrome" src="chrome/action-focused.tga" width="250" height="72" alt=""/><span>Refresh</span></button>
+                    <button id="pair-host" class="action-button action-secondary"><img class="button-chrome action-chrome base-chrome" src="chrome/action-secondary.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome focused-chrome" src="chrome/action-focused.tga" width="250" height="72" alt=""/><span id="pair-host-label">Unpair PC</span></button>
+                    <button id="add-host" class="action-button action-secondary"><img class="button-chrome action-chrome base-chrome" src="chrome/action-secondary.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome focused-chrome" src="chrome/action-focused.tga" width="250" height="72" alt=""/><span>Add PC</span></button>
+                    <span id="host-action-status" class="action-status">Discovering Sunshine PCs on the local network...</span>
+                </section>
+
+                <section id="screen-games" class="screen hidden">
+                    <span class="screen-heading">Games</span>
+                    <span class="screen-copy">Apps advertised by Sunshine on the selected PC.</span>
+                    <span id="games-page">REFRESHING APPLICATIONS...</span>
+                    <button id="app-card-0" class="game-card game-card-0 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-0" class="app-index">APP 01</span><img id="app-art-0" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-0" class="app-name">Desktop</span><span id="app-meta-0" class="app-meta">ID 1</span><span id="app-state-0" class="app-state">READY</span>
+                    </button>
+                    <button id="app-card-1" class="game-card game-card-1 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-1" class="app-index">APP 02</span><img id="app-art-1" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-1" class="app-name">App</span><span id="app-meta-1" class="app-meta">ID 2</span><span id="app-state-1" class="app-state">READY</span>
+                    </button>
+                    <button id="app-card-2" class="game-card game-card-2 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-2" class="app-index">APP 03</span><img id="app-art-2" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-2" class="app-name">App</span><span id="app-meta-2" class="app-meta">ID 3</span><span id="app-state-2" class="app-state">READY</span>
+                    </button>
+                    <button id="app-card-3" class="game-card game-card-3 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-3" class="app-index">APP 04</span><img id="app-art-3" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-3" class="app-name">App</span><span id="app-meta-3" class="app-meta">ID 4</span><span id="app-state-3" class="app-state">READY</span>
+                    </button>
+                    <button id="app-card-4" class="game-card game-card-4 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-4" class="app-index">APP 05</span><img id="app-art-4" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-4" class="app-name">App</span><span id="app-meta-4" class="app-meta">ID 5</span><span id="app-state-4" class="app-state">READY</span>
+                    </button>
+                    <button id="app-card-5" class="game-card game-card-5 hidden">
+                        <img class="button-chrome app-chrome base-chrome" src="chrome/app-normal.tga" width="260" height="340" alt=""/><img class="button-chrome app-chrome focused-chrome" src="chrome/app-focused.tga" width="260" height="340" alt=""/>
+                        <span id="app-index-5" class="app-index">APP 06</span><img id="app-art-5" class="app-placeholder" src="icons/app-placeholder.tga" width="144" height="204" alt=""/><span id="app-name-5" class="app-name">App</span><span id="app-meta-5" class="app-meta">ID 6</span><span id="app-state-5" class="app-state">READY</span>
+                    </button>
+                    <aside class="game-detail-panel">
+                        <img class="panel-chrome detail-panel-chrome" src="chrome/panel-detail.tga" width="530" height="478" alt=""/>
+                        <span class="detail-kicker">SELECTED APP</span>
+                        <span id="selected-app-name" class="detail-title">Refreshing applications</span>
+                        <span id="selected-app-position">Waiting for Sunshine</span>
+                        <span class="app-detail-label app-detail-line-0">STREAM</span><span id="selected-app-stream" class="app-detail-value app-detail-line-0">1920 x 1080 / 60 FPS</span>
+                        <span class="app-detail-label app-detail-line-1">VIDEO</span><span id="profile-video-value" class="app-detail-value app-detail-line-1">H.264 / 20 Mbps</span>
+                        <span class="app-detail-label app-detail-line-2">PATH</span><span class="app-detail-value app-detail-line-2">Videodec2 to AGC</span>
+                        <img class="panel-chrome ready-panel-chrome" src="chrome/panel-ready.tga" width="474" height="68" alt=""/>
+                        <span id="selected-app-state" class="detail-ready offline">REFRESHING</span>
+                    </aside>
+                    <button id="stop-app" class="action-button action-danger games-stop disabled"><img class="button-chrome action-chrome base-chrome" src="chrome/action-danger.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome disabled-chrome" src="chrome/action-disabled.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome focused-chrome" src="chrome/action-focused.tga" width="250" height="72" alt=""/><span id="stop-app-label">Nothing running</span></button>
+                    <button id="back-hosts" class="action-button action-secondary games-back"><img class="button-chrome action-chrome base-chrome" src="chrome/action-secondary.tga" width="250" height="72" alt=""/><img class="button-chrome action-chrome focused-chrome" src="chrome/action-focused.tga" width="250" height="72" alt=""/><span>Back to PCs</span></button>
+                    <span id="launch-status" class="action-status games-status">Refreshing the Sunshine application list...</span>
+                </section>
+
+                <section id="screen-settings" class="screen hidden">
+                    <span class="screen-heading">Settings</span>
+                    <span class="screen-copy">Recommended local-network values are selected.</span>
+                    <button id="setting-codec" class="setting-row setting-row-0">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Video codec</span><span id="setting-codec-help" class="setting-help">H.264 High hardware decode</span>
+                        <span id="setting-codec-value" class="setting-value">H.264 High</span>
+                    </button>
+                    <button id="setting-resolution" class="setting-row setting-row-1">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Stream resolution</span><span class="setting-help">Cross cycles 1080p / 1440p / 4K beta</span>
+                        <span id="setting-resolution-value" class="setting-value">1920 x 1080</span>
+                    </button>
+                    <button id="setting-framerate" class="setting-row setting-row-2">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Stream frame rate</span><span class="setting-help">60 / 90 / 120 FPS; HFR uses PS5 high-refresh output</span>
+                        <span id="setting-framerate-value" class="setting-value">60 FPS</span>
+                    </button>
+                    <button id="setting-bitrate" class="setting-row setting-row-3">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Video bitrate</span><span class="setting-help">Cross cycles local-network presets up to 500 Mbps</span>
+                        <span id="setting-bitrate-value" class="setting-value">20 Mbps</span>
+                    </button>
+                    <button id="setting-display-area" class="setting-row setting-row-4">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Display area</span><span class="setting-help">TV safe preserves edges; Edge to edge may be cropped by TVs</span>
+                        <span id="setting-display-area-value" class="setting-value">TV safe</span>
+                    </button>
+                    <button id="setting-hdr" class="setting-row setting-row-5">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">HDR</span><span id="setting-hdr-help" class="setting-help">HEVC Main10 / BT.2020 PQ at the selected resolution</span>
+                        <span id="setting-hdr-value" class="setting-value">Off / SDR</span>
+                    </button>
+                    <button id="setting-audio" class="setting-row setting-row-6">
+                        <img class="button-chrome setting-chrome base-chrome" src="chrome/setting-normal.tga" width="1380" height="88" alt=""/>
+                        <img class="button-chrome setting-chrome focused-chrome" src="chrome/setting-focused.tga" width="1380" height="88" alt=""/>
+                        <span class="setting-name">Audio</span><span class="setting-help">48 kHz Opus; surround uses PS5 multichannel AudioOut</span>
+                        <span id="setting-audio-value" class="setting-value">Stereo</span>
+                    </button>
+                    <span id="settings-note" class="settings-note">Stream shortcuts: Select+Triangle keyboard; Select+Square mouse; Select+R1 stats; Select+L1 return.</span>
+                </section>
+
+            </main>
+
+            <footer id="controller-footer">
+                <span class="controller-hint hint-select"><img src="icons/cross.tga" width="40" height="40" alt=""/><span>Select</span></span>
+                <span class="controller-hint hint-back"><img src="icons/circle.tga" width="40" height="40" alt=""/><span>Back</span></span>
+                <span class="controller-hint hint-stop"><img src="icons/square.tga" width="40" height="40" alt=""/><span>Stop</span></span>
+                <span class="controller-hint hint-refresh"><img src="icons/triangle.tga" width="40" height="40" alt=""/><span>Refresh</span></span>
+                <span class="controller-hint hint-options"><img src="icons/options.tga" width="40" height="40" alt=""/><span>Settings</span></span>
+                <span class="controller-hint hint-nav"><span>L1 / R1</span><em>Sections</em></span>
+                <span id="footer-status-dot" class="status-dot online"><img class="status-icon status-online-icon" src="icons/status-online.tga" width="18" height="18" alt=""/><img class="status-icon status-offline-icon" src="icons/status-offline.tga" width="18" height="18" alt=""/></span>
+                <span id="footer-status">SUNSHINE READY</span>
+            </footer>
+
+            <div id="pair-modal" class="hidden">
+                <div id="pair-dialog">
+                    <img class="pair-dialog-chrome" src="chrome/panel-detail.tga" width="530" height="478" alt=""/>
+                    <span class="pair-dialog-kicker">PAIR WITH SUNSHINE</span>
+                    <span class="pair-dialog-title">Enter this PIN on your PC</span>
+                    <span id="pair-modal-pin">----</span>
+                    <span class="pair-dialog-time-label">TIME REMAINING</span>
+                    <span id="pair-modal-timer">2:00</span>
+                    <span id="pair-modal-status">Preparing a secure PIN...</span>
+                </div>
+            </div>
+            <div id="startup-splash"><img src="startup-background.tga" width="1920" height="1080" alt=""/></div>
+        </div>
+    </body>
+</rml>
