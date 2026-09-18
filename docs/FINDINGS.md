@@ -327,3 +327,47 @@ Either way it is a small, well-defined change rather than an open question.
 **Boundary.** The converter as it stands in `../ps5-native-app-boilerplate-main`
 on 2026-09-18, and RetroArch 1.21.0 as the recipe links it. A converter that
 gains export publishing removes the third requirement.
+
+---
+
+## 2026-09-18: The application image needs the SDK startup object, and three symbols no stub can supply
+
+**Measured.** With the layout accepted and the weak `__dl*` references satisfied,
+the converter produced `eboot.bin` — and then revealed that the earlier
+"missing symbol" errors had a single root cause and a different set of
+consequences than they appeared to have.
+
+The root cause: going straight to the linker skips what the compiler driver adds
+by itself. `prospero-clang -###` shows it passing `-l:crt1.o`, `-l:crti.o`,
+`-l:crtbegin.o`, `-l:crtend.o`, `-l:crtn.o`. Without `crt1.o` there is no
+`_start`, so the image's entry point stayed 0 and the console would have had
+nothing to call — and `crt1.o` is also what defines `kernel_mprotect` and the
+`__dl*` family, which is why the converter complained about them. Naming those
+objects in the linker invocation resolved both: `_start` is now at 0x10 and the
+entry point points at it. The `platform/ps5_dl_stubs.c` written before this was
+found was redundant and has been deleted; the record of why is kept here.
+
+Three symbols remain, and they are of a different kind: `__bss_start`,
+`__bss_end`, `__image_start` and `__image_end` describe the image's own layout, so
+no stub library can export them and the compiler driver never adds them either.
+They are defined in `platform/ps5_image_symbols.S` and linked into the image,
+which is where they belong. With them the conversion completes:
+
+```text
+wrote 51870448 bytes: build/eboot.elf
+wrote 49968821 bytes: build/eboot.bin
+container: signed, plaintext; segments: 12
+authority: 0x3100000000000002; program type 0x1; integrity: valid
+```
+
+**Consequence.** The PPSA folder is complete: `dist/PPSA99005/` holds the signed
+application image, the loader module, the title's identity and icon, the
+configuration seed, the payload beside them and a digest manifest. Two further
+things were needed and are now in the link: `--exclude-libs=ALL`, without which
+the linker exports about 185 symbols pulled out of static libraries and the
+converter refuses the image for publishing exports.
+
+**Boundary.** The converter and SDK as they stand on 2026-09-18. The layout
+requirement, the startup objects and the layout symbols are all properties of
+this image format, not of RetroArch, so any large application built this way
+needs the same three.

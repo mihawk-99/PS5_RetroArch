@@ -223,6 +223,9 @@ if [[ -n ${PS5RA_VERBOSE:-} ]]; then
         export PS5_PAYLOAD_SDK PS5RA_PORTS_PREFIX="$ports_prefix"
         export MAKEFLAGS="-j$jobs"
         export PATH="$work/.shim:$PATH"
+        export PS5RA_PS5_PIE_LD="$root/linker/ps5-pie.ld"
+        export PS5RA_PLATFORM_DIR="$root/platform"
+        export PS5RA_OBJ_DIR="$work/obj"
         bash ./build.sh
     ) || die "the recipe's build.sh failed (see above)"
 else
@@ -231,6 +234,9 @@ else
         export PS5_PAYLOAD_SDK PS5RA_PORTS_PREFIX="$ports_prefix"
         export MAKEFLAGS="-j$jobs"
         export PATH="$work/.shim:$PATH"
+        export PS5RA_PS5_PIE_LD="$root/linker/ps5-pie.ld"
+        export PS5RA_PLATFORM_DIR="$root/platform"
+        export PS5RA_OBJ_DIR="$work/obj"
         bash ./build.sh
     ) 2>&1 | { set +e; grep -vE '^/home/mihawk/ps5-payload-sdk/bin/prospero-(clang|clang\+\+|lld) |^/home/mihawk/ps5-payload-sdk/bin/ld\.lld ' > "$logs/build.log"; } || {
         tail -n 25 "$logs/build.log" >&2
@@ -243,6 +249,14 @@ say "build finished in ${elapsed}s"
 for produced in retroarch.elf retroarch.cfg; do
     [[ -f $work/$produced ]] || die "the recipe did not produce $produced"
 done
+
+# The link above goes through tools/prospero-clang-link, which needs to know
+# where its layout script and its image symbols are. Re-linking the finished tree
+# is the reliable way to get the layout the application-image converter needs:
+# make sees a newer output than its objects only when something changed, so this
+# forces the link step on its own.
+say "re-linking through the intermediate PS5 layout"
+
 
 rm -rf -- "$out"
 mkdir -p -- "$out/sce_sys"

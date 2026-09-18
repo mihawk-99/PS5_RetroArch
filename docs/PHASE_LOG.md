@@ -191,3 +191,40 @@ fix in the build: the converter refuses to publish application exports
 payload has exports because `-rdynamic` asks for them.
 
 **Commit.** `4cea907` — Stage the PPSA title folder and clear two of the three converter requirements.
+
+---
+
+## 2026-09-18: The PPSA title folder is complete, eboot.bin included
+
+`dist/PPSA99005/` is now a complete PPSA title folder: the signed application
+image, `sce_module/libc.prx`, the title's identity and icon, the configuration
+seed, the payload and a digest manifest. It exists because the objective is a
+PPSA homebrew, and a payload folder is not one — the console lists a payload only
+while a launcher runs, and installs a title as an application in its own right.
+
+**The evidence.** `tools/stage-ppsa.sh` exits 0 with six files staged. The
+converter's own inspection of the image reports `container: signed, plaintext`,
+`segments: 12`, `authority: 0x3100000000000002`, `program type 0x1` and
+`integrity: valid`; the digests are in the folder's `manifest.sha256`, with
+`eboot.bin` at 49,968,821 bytes and SHA-256
+`88b2b02ded8a4bd00b2505aa01f70c8cfcf8150c927e1ccad5d9abfd0ce974f2`.
+
+**What was tried first.** Four rejections from the converter, each recorded
+because each one is a property of this image format rather than of RetroArch.
+The layout had to leave room for the console's process parameters, which is what
+`linker/ps5-pie.ld` and one page boundary fix. Linking straight to the linker
+skipped the startup objects the compiler driver adds, so there was no `_start`
+and the entry point stayed 0 while the converter complained about symbols that
+`crt1.o` defines — a stub file written before that was understood turned out to
+be redundant and was deleted rather than kept as ballast. The image's own
+boundary symbols (`__bss_start`, `__bss_end`, `__image_start`, `__image_end`)
+cannot come from any library, so they are defined in
+`platform/ps5_image_symbols.S`. And `--exclude-libs=ALL` was needed because the
+linker otherwise exports symbols pulled out of static libraries, which both
+bloats the dynamic table and trips the converter's export rule.
+
+**Still open.** No part of this has been on the console: the folder is built and
+validated here. Installing and running it is the next step and needs a console
+window, which is asked for rather than taken.
+
+**Commit.** `{{SHA}}` — Complete the PPSA title folder with a signed application image.

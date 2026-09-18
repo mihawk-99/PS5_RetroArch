@@ -69,17 +69,30 @@ for arg in "$@"; do
     args+=("$arg")
 done
 
-# Extra objects this project defines, compiled here so the link stays a single
-# command: platform/ps5_dl_stubs.c supplies the __dl* symbols that the target's
-# libc does not provide and the image converter requires to be resolved
-# (that file's comment has the full reason).
-extra=()
-if [[ -n ${PS5RA_PLATFORM_DIR:-} && -f $PS5RA_PLATFORM_DIR/ps5_dl_stubs.c ]]; then
-    stub_obj="${PS5RA_OBJ_DIR:-/tmp}/ps5_dl_stubs.o"
-    "$compiler" -c "$PS5RA_PLATFORM_DIR/ps5_dl_stubs.c" -o "$stub_obj"
-    extra=("$stub_obj")
+# Symbols that describe this image's own layout cannot come from a stub library,
+# so they are compiled from platform/ps5_image_symbols.S and linked in. Without
+# them the image converter refuses the result by name.
+image_symbols=()
+if [[ -n ${PS5RA_PLATFORM_DIR:-} && -f $PS5RA_PLATFORM_DIR/ps5_image_symbols.S ]]; then
+    symbols_obj="${PS5RA_OBJ_DIR:-/tmp}/ps5_image_symbols.o"
+    "$compiler" -c "$PS5RA_PLATFORM_DIR/ps5_image_symbols.S" -o "$symbols_obj"
+    image_symbols=("$symbols_obj")
 fi
 
-exec "$linker" -T "$script" --eh-frame-hdr -e _start \
-    -L "$stub_dir" -o "${PS5RA_LINK_OUT:-retroarch}" "${args[@]}" "${extra[@]}" \
+# The compiler driver adds the startup and teardown objects by itself, and going
+# straight to the linker skips them: without crt1.o there is no _start, the entry
+# point stays 0 and the console would have nothing to call. They are named here
+# in the order the driver uses.
+crt=()
+for object in crt1.o crti.o crtbegin.o; do
+    [[ -f $stub_dir/$object ]] && crt+=("$stub_dir/$object")
+done
+teardown=()
+for object in crtend.o crtn.o; do
+    [[ -f $stub_dir/$object ]] && teardown+=("$stub_dir/$object")
+done
+
+exec "$linker" -T "$script" --eh-frame-hdr -e _start --exclude-libs=ALL \
+    -L "$stub_dir" -o "${PS5RA_LINK_OUT:-retroarch}" \
+    "${crt[@]}" "${args[@]}" "${image_symbols[@]}" "${teardown[@]}" \
     --as-needed "$stub_dir"/*.so

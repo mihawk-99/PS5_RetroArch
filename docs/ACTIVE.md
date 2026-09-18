@@ -9,46 +9,44 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The PPSA title folder exists and is one file short.** `tools/stage-ppsa.sh`
-assembles `dist/PPSA99005/` — the title id, the 512x512 launcher icon, the
-loader's compatibility module `sce_module/libc.prx`, the configuration seed, the
-payload beside it, and a digest manifest. Evidence: the staged folder and its
-`manifest.sha256`; the identity is `title/sce_sys/param.json`, checked for a
-valid id, content id, version and launch intent before anything is written. What
-it still owes: `eboot.bin`. Without it the console will not list the title, and
-the script says so and exits 3 rather than pretending the folder is complete.
+**The PPSA title folder is complete: `dist/PPSA99005/`.** It holds the signed
+application image `eboot.bin` (49,968,821 bytes), the loader module
+`sce_module/libc.prx`, the title's identity and 512x512 icon under `sce_sys/`,
+the configuration seed, the payload beside them and a digest manifest.
+`tools/stage-ppsa.sh` assembles it and exits 0 only when every piece is there.
+Evidence: the folder's `manifest.sha256` and the converter's own inspection of
+the image — `container: signed, plaintext; segments: 12; authority:
+0x3100000000000002; program type 0x1; integrity: valid`. What it still owes: a
+console run. The folder is built and validated here, not yet installed.
 
-**Getting `eboot.bin` is now down to one known limitation.** The image converter
-in `../ps5-native-app-boilerplate-main` rejected three things in turn, and two
-are solved here: the linked layout now reserves room for the console's process
-parameters (`linker/ps5-pie.ld` applied by `tools/prospero-clang-link`), and the
-symbols this target references but no SDK stub defines are now provided
-(`platform/ps5_dl_stubs.c`). The third is the converter's own limit — it refuses
-to publish application exports, and our payload has them:
-`error: native converter does not yet publish application exports`. All three are
-recorded with their exact text in `docs/FINDINGS.md`.
+**Getting there took three image-format requirements, all now satisfied and
+recorded.** The link is not the compiler driver's link any more: it goes through
+`linker/ps5-pie.ld` (the layout that leaves room for the console's process
+parameters), the SDK's startup objects (without them there is no `_start` and the
+entry point stays 0), `platform/ps5_image_symbols.S` (the image's own boundary
+symbols, which no stub can export) and `--exclude-libs=ALL` (without it the
+linker exports symbols pulled from static libraries and the converter refuses the
+image). `tools/prospero-clang-link` is the shim that applies all of it, and
+`docs/FINDINGS.md` carries each requirement with the exact error that revealed it.
 
 **The Option 1 baseline remains verified.** `evidence/m1-baseline-loads/` holds
 the console run: payload started under the homebrew launcher, menu on screen,
-configuration written into the title folder. That is unchanged by the work above,
-which is about the PPSA packaging path rather than the payload.
+configuration written into the title folder.
 
-**The console is shared with the PS5_Vulkan session; every launch and upload is
-asked for first** (`docs/DEPLOYMENT.md`). Nothing is touched without a go-ahead.
+**The console is shared with the PS5_Vulkan session; every launch, upload and
+install is asked for first** (`docs/DEPLOYMENT.md`). Nothing has been sent.
 
 ## Next
 
-1. Decide where the export limitation is fixed: relax the converter's
-   `symbol.undefined()` requirement, or link the payload with an export list
-   that hides RetroArch's own symbols while keeping the ones the loader needs.
-   The first is a change in the sibling project, the second is a change here.
-2. Produce `eboot.bin` and let `tools/stage-ppsa.sh` finish the folder.
-3. Ask for a console window, deploy the PPSA folder and install it so the home
-   screen lists it, then capture the run as `evidence/m-ppsa/`.
-4. Option 2 proper: the Vulkan driver. `../PS5_Vulkan` already implements every
-   WSI entry point RetroArch's display-based Vulkan path needs, so the open
-   questions are the consumer package and what RetroArch's renderer asks for
-   beyond it.
+1. Ask for a console window, then install `dist/PPSA99005/` on the console and
+   capture the run as `evidence/m-ppsa/`: the home screen listing the title, the
+   title starting from it, and the menu on screen.
+2. If the installed title does not start, the first thing to check is the
+   loader's own message: it names the reason rather than failing silently
+   (`docs/TROUBLESHOOTING.md`).
+3. Option 2: the Vulkan driver. `../PS5_Vulkan` implements every WSI entry point
+   RetroArch's display-based Vulkan path calls, so the remaining questions are
+   the driver's consumer package and what RetroArch's renderer needs beyond it.
 
 ## Working notes
 
@@ -74,8 +72,8 @@ asked for first** (`docs/DEPLOYMENT.md`). Nothing is touched without a go-ahead.
 | Console listing of `/data/homebrew/PS5_RetroArch/` | payload, config, manifest and launcher present; icon still at the folder root |
 | Console FTP writes | FAILED: `550 Read-only filesystem` on the last attempt; reads fine |
 | Console run of the baseline, `evidence/m1-baseline-loads/` | PASS: payload started under the homebrew launcher (pid 151), menu on screen, config written to the title folder |
-| `tools/stage-ppsa.sh` | assembles `dist/PPSA99005/` with 5 files and a digest manifest; exits 3 with `eboot.bin` absent, by design |
-| Image conversion | layout requirement solved (`linker/ps5-pie.ld`), symbol requirement solved (`platform/ps5_dl_stubs.c`), blocked on the converter not publishing exports |
+| `tools/stage-ppsa.sh` | PASS: `dist/PPSA99005/` holds 6 files with a digest manifest |
+| Image conversion | PASS: `eboot.bin` 49,968,821 bytes, `signed, plaintext`, 12 segments, `integrity: valid` |
 | `tools/verify.sh` (all gates) | not yet green: the gate scripts it names still have to be written |
 
 ## Open findings
