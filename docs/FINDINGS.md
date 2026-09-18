@@ -601,3 +601,40 @@ one-line test: `eboot.bin magic: 4f153d1d`.
 **Boundary.** ftpsrv v0.21.1 on this console, under repeated large writes to one
 title folder. The round-trip evidence above is what bounds the claim: this is not
 a general statement that the service cannot store a file.
+
+---
+
+## 2026-09-18: Both loader inputs on the console are the wrong artefacts, and encryption is not the difference
+
+**Measured.** Ours and the working sibling title's application images are the
+same container, checked with the converter's own inspector rather than by eye:
+
+| | `dist/PPSA99005/eboot.bin` | `PS5_Vulkan/dist/PPSA99988/eboot.bin` |
+| --- | --- | --- |
+| magic | `4f153d1d` | `4f153d1d` |
+| container | signed, plaintext | signed, plaintext |
+| segments | 12 | 12 |
+| authority | `0x3100000000000002` | `0x3100000000000002` |
+| program type | `0x0000000000000001` | `0x0000000000000001` |
+| integrity | valid | valid |
+| size | 49,968,821 | 16,979,781 |
+
+Neither is retail-encrypted; both are development containers. So the console does
+not need an encrypted image, and encryption cannot be why one title starts and the
+other does not.
+
+The loader module is where the two titles genuinely differ. Ours and the sibling's
+are the **same file** — 1,284,674 bytes, sha256 `e6ff45d16adf6878` — but the
+console holds a different one for this title: 1,335,962 bytes, sha256
+`7e82ce9a4259d0db`, which is the module's *raw* ELF rather than its signed
+container (the two sizes differ by 51,288 bytes, the container's own overhead).
+That is the module named in the crash capture.
+
+**Consequence.** The title is two file replacements away from a fair test, and both
+replacements are of the same kind: an unsigned intermediate where a converted
+artefact belongs. The correct module already exists twice on this machine, in
+`dist/PPSA99005/sce_module/` and in `../PS5_Vulkan/runtime/`, and they are
+byte-identical.
+
+**Boundary.** This console and these two titles. The claim is about what the
+loader is handed, not about the signing chain a retail title would carry.
