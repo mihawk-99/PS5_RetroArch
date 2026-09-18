@@ -513,3 +513,48 @@ compiled: 6,056 bytes, no warnings
 ```
 
 **Commit.** `74e22bd` — Write the PS5 video driver for the RetroArch frontend.
+
+---
+
+## 2026-09-18: Websrv removed, and the frontend compiles from RetroArch's own build
+
+Two things in one step: the websrv-derived material is gone, and the frontend now
+compiles from a source list that comes from RetroArch itself.
+
+**Removed.** `reference/ps5-retroarch/` (already empty), the Option 1 baseline
+build tree under `work/baseline/`, its artefacts in `dist/baseline/` and
+`dist/PPSA99005/`, the pacbrew ports cache, and the tools that existed only for
+the conversion route (`build-baseline.sh`, `prospero-clang-link`, `stage-ppsa.sh`,
+`fetch-ports.sh`). The intention was to start from ProsperoLight's foundation, and
+none of that is part of it.
+
+**The source list now comes from RetroArch's own build.** The previous build script
+took a 264-object list from the deleted websrv tree. That dependency is gone:
+`tools/retroarch-sources.sh` runs RetroArch's own `./configure` and `make info`,
+and prints exactly the objects a link needs. Its `OBJ` list is grown from 248
+conditional `OBJ +=` lines in `Makefile.common`, so only make can produce it for a
+given configuration; configure runs in a copy under `build/ra-conf/`, so
+`vendor/retroarch` is never touched. The configure flags are this project's — RGUI,
+no graphics API, nothing that needs a library the SDK does not ship.
+
+**The evidence.** `tools/build-retroarch.sh` compiled **225 of 244** sources with
+the pipeline's own compiler. What remains is Linux-only and correctly out of scope
+for this console: `udev_joypad.c`, `udev_input.c`, `linuxraw_input.c`,
+`keyboard_event_xkb.c` and `libchdr_zstd.c`. Four fixes got there, each found by a
+compile rather than guessed:
+
+- the generated `config.h`, placed where RetroArch's relative includes
+  (`../config.h`, `../../config.h`, `../../../config.h`) resolve;
+- `-D_GNU_SOURCE`, which RetroArch's own build passes — `_POSIX_C_SOURCE` alone
+  hid `strlcpy` and broke sixty more sources than it fixed;
+- `-DCLOCK_REALTIME=0 -DCLOCK_MONOTONIC=4`, the header's own values, because this
+  SDK's `time.h` hides the clock ids under the standard the pipeline compiles with;
+- RetroArch's vendored zlib (`--enable-builtinzlib`) with its compatibility headers
+  on the include path.
+
+**Still to do for RGUI on screen.** Two pieces, both now unblocked:
+register `&video_ps5` in `video_drivers[]`, and reconcile the entry point, since
+`retroarch.c` defines its own `main` and the pipeline's builder supplies a `_start`.
+Then link with the pipeline's CRT and runtime, stage, deploy and launch.
+
+**Commit.** `{{SHA}}` — Delete the websrv material and compile the frontend from RetroArch's own build.
