@@ -227,4 +227,4 @@ bloats the dynamic table and trips the converter's export rule.
 validated here. Installing and running it is the next step and needs a console
 window, which is asked for rather than taken.
 
-**Commit.** `{{SHA}}` — Complete the PPSA title folder with a signed application image.
+**Commit.** `c8f60e7` — Complete the PPSA title folder with a signed application image.
