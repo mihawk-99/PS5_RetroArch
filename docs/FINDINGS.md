@@ -152,3 +152,42 @@ not by reading headers.
 **Boundary.** The PS5_Vulkan checkout at `5fd2626` (2026-09-18) and RetroArch
 1.22.2. Rung 1.0 is the point at which this becomes a support statement rather
 than a fit between two interfaces.
+
+---
+
+## 2026-09-18: The existing PS5 RetroArch payload is a build recipe, and its first prerequisite is missing here
+
+**Measured.** `homebrew/RetroArch/` in `ps5-payload-dev/websrv` at commit
+`1afd476` is twelve files and 48 KB: `build.sh`, seven per-core recipes
+(`build-fbneo.sh`, `build-fceumm.sh`, `build-genesis_plus_gx.sh`,
+`build-mednafen_gba.sh`, `build-puae2021.sh`, `build-snes9x2010.sh`,
+`build-vice.sh`), `fetch-assets.sh`, `fetch-databases.sh`, `homebrew.js` and a
+`.gitignore`. `build.sh` downloads the upstream RetroArch **1.21.0** tarball,
+rewrites `SDL_RENDERER_ACCELERATED` to `SDL_RENDERER_SOFTWARE` in
+`gfx/drivers/sdl2_gfx.c`, drops `md5.o` from `Makefile.common`, configures with
+`OS=BSD`, `CROSS_COMPILE=$PS5_PAYLOAD_SDK/bin/prospero-` and `LDFLAGS=-rdynamic`
+plus `--enable-sdl2 --enable-mmap --enable-dylib` and every GL and Vulkan switch
+disabled, then stages `retroarch.elf`, `retroarch.cfg`, `sce_sys/icon0.png` and
+three appended config keys. `fetch-assets.sh` pins retroarch-assets 1.20.0 and
+`fetch-databases.sh` pins libretro-database 1.21.1.
+
+The recipe's first requirement does not hold on this host: it enables SDL2, and
+SDL2 is not visible to the build. `$PS5_SYSROOT/user/homebrew/` contains only an
+empty `include/`, there is no SDL2 header anywhere under the sysroot, and
+`prospero-pkg-config --exists sdl2` exits 1. Measured by sparse-cloning that path
+(`git clone --filter=blob:none --no-checkout`, `sparse-checkout set
+homebrew/RetroArch`), reading the files, and probing the local SDK.
+
+**Consequence.** The recipe is the right shape to build on — fetch a pinned
+tarball, patch it, configure, build, stage — and it already solves two pieces of
+the PPSA packaging problem (the `icon0.png` from the upstream tree, and the
+config seed). It is not runnable as it stands, and its graphics switches are the
+opposite of what this project wants. Adopting it therefore means: supply the
+ports the recipe needs or drop the SDL2 switch for ours, replace the graphics
+flags with the Vulkan ones, and take the staging and packaging from here.
+`reference/ps5-retroarch/PROVENANCE.txt` records the copy and its file digests;
+the recipe is kept read-only so a later change to it is a visible step.
+
+**Boundary.** websrv commit `1afd476` (2026-08-10) and the local SDK unpack of
+2026-09-17. If a ports image is installed into the sysroot, the SDL2 half of this
+finding stops being true and is superseded rather than edited.

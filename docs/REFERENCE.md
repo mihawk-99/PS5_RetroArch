@@ -150,16 +150,19 @@ blocking dependency for a presented frame.
 ## Shipping as a PPSA title
 
 The console needs an `eboot.bin` in a title folder with `sce_sys/param.json`
-carrying a `PPSA#####` id. Two local projects produce that shape, and the choice
-is made by the scale of what is being packaged, not by taste:
+carrying a `PPSA#####` id. An existing PS5 RetroArch payload already produces
+most of that folder, so the starting point is not a blank page:
 
-| Route | Who wraps RetroArch | Reach for it when |
+| Source | What it already gives us | What it does not |
 | --- | --- | --- |
-| A small signer of our own, in `tools/`, driven by our `Makefile` | our build links `retroarch.elf` with the SDK's `prospero-lld`, and a converter turns it into the development FSELF `eboot.bin` | the default: RetroArch is one large program with its own build system, and it needs our own flags (dynamic symbol export, the backend's link inputs, a heap wrap set) |
-| `../ps5-native-app-boilerplate-main` | its `tools/build.sh` compiles and wraps the app | a step that wants its loader-validated wrapping, metadata validation and FTP deployment as-is, and only after the differences below are resolved |
+| `reference/ps5-retroarch/` — the payload recipe from `ps5-payload-dev/websrv` at `1afd476`, kept read-only with its digests in `PROVENANCE.txt` | a working way to fetch and patch the upstream tarball, the configure switch set, the title's `icon0.png` taken from the upstream tree, a config seed, and seven per-core recipes | it launches through that project's loader with its own launcher manifest, it renders through a software SDL2 driver with every GPU path switched off, and it needs ports this host does not have (`docs/FINDINGS.md`) |
+| A small signer of our own, in `tools/`, driven by our `Makefile` | the `eboot.bin` and title folder the console reads as a PPSA title | it is the piece we still write |
+| `../ps5-native-app-boilerplate-main` | its `tools/build.sh` compiles and wraps an app end to end | it is not a drop-in host for a program of RetroArch's shape; the differences are below |
 
-The boilerplate is not a drop-in host for this project, and the differences are
-recorded so a step does not discover them halfway:
+So the default route is: build RetroArch with **our** patched tree and **our**
+graphics flags, stage the folder with the recipe's two solved pieces, and wrap it
+with our own signer. The boilerplate's differences are recorded so a step does
+not discover them halfway:
 
 - it compiles **only** `src/*.c`, `src/*.cc` and `src/*.cpp`, with fixed flags
   (`-std=c11` / `-std=c++20`, `-O2 -Wall -Wextra -ffunction-sections`,
@@ -168,8 +171,8 @@ recorded so a step does not discover them halfway:
 - it links a fixed set — its own CRT and C++ runtime, two AGC link stubs, the
   static archives passed through `APP_STATIC_ARCHIVES`, the PacBrew archives, and
   `$PS5_PAYLOAD_SDK/target/lib/*.so` under `--as-needed` — and exposes no hook
-  for extra linker flags. The OpenGL backend needs `-Wl,-u,ps5_agc_gate2_run`
-  and a heap wrap set for its consumer contract;
+  for extra linker flags. A graphics backend needs its own link inputs, and the
+  OpenGL one also needs `-Wl,-u,ps5_agc_gate2_run` and a heap wrap set;
 - it links against payload SDK **v0.42** through its own `prospero-clang18`
   wrapper, which requires a `clang-18` binary on the host. This host's toolchain
   is clang 22.1.8 from the SDK's own `prospero-clang`;
@@ -182,6 +185,19 @@ line: the same RetroArch revision builds and loads through its pipeline, and the
 differences above are answered in that step's evidence rather than worked around
 in `vendor/`.
 
+## Reference material
+
+Two directories hold material this project did not write, and they are different
+kinds of thing:
+
+| Path | Committed | Rule |
+| --- | --- | --- |
+| `reference/` | yes, with a `PROVENANCE.txt` naming the source, the revision and every file's digest | read-only. It is what a claim was measured against; a change to it is its own step, and the digests are re-recorded in that step |
+| `vendor/` | no, ignored | build-time only. `tools/fetch-upstream.sh` recreates it from the pin on every clean build, so nothing in it can be relied on to persist |
+
+Neither is edited to get a step unblocked. A change we want in either one is a
+patch in `patches/` or a documented decision, never a quiet edit.
+
 ## Style
 
 - C and C++ follow the upstream RetroArch style inside `platform/` and the
@@ -192,4 +208,6 @@ in `vendor/`.
   convention the console tools in `../PS5_Vulkan` already use.
 - Generated code, vendored dependencies and build output are never edited by
   hand and never reformatted: `vendor/`, `build/`, `dist/`, `.deps/`, `*.elf`,
-  `*.so`, and everything under a git-ignored capture directory.
+  `*.so`, and everything under a git-ignored capture directory. `reference/` is
+  committed but equally read-only: it is the baseline a measurement was taken
+  against.

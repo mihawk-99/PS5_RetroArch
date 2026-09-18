@@ -12,14 +12,15 @@ the evidence behind each claim is in [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md).
 
 ## How it fits together
 
-Everything about this console's platform layer already has an owner, and it is
-not this repository:
+Everything about this console's platform layer already has an owner. This
+repository supplies the RetroArch side of it and consumes the rest:
 
 | Project | What it provides | How this project uses it |
 | --- | --- | --- |
 | [`ps5-payload-sdk`](https://github.com/ps5-payload-dev/sdk) | the PS5 compiler, sysroot, and the console's public APIs (`ScePad`, `SceAudioOut`, `SceVideoOut`, `SceUserService`, networking) | `$PS5_PAYLOAD_SDK/toolchain/prospero.sh` supplies the toolchain for every PS5 compile |
 | `../ps5-opengl-sdk-0.2.0` | a relocatable OpenGL 3.3 Core stack with a hardware acceptance run, consumed through a `.mk`, a `.pc` or CMake | the first graphics backend a rendering step can link against |
 | `../PS5_Vulkan` | the Vulkan driver being built for this console, with vendored Vulkan headers | the backend the shipped application targets once the driver reaches rung 1.0 |
+| `reference/ps5-retroarch/` | the existing PS5 RetroArch payload recipe from `ps5-payload-dev/websrv`, kept read-only with its provenance and digests | the starting point for fetching, patching, building and staging, and the source of the title's icon and config seed |
 
 RetroArch itself is upstream, unmodified on disk and patched by a committed
 series: the pinned release tarball is fetched into `vendor/`, which is never

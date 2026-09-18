@@ -4,7 +4,8 @@
 
 # Fetched upstream tree, patched by tools/fetch-upstream.sh. Never committed and
 # never edited: changes live in patches/. A manually extracted tarball next to
-# the repository root is ignored under its own name too.
+# the repository root is ignored under its own name too. The committed baseline
+# in reference/ is not covered by this rule and is always tracked.
 vendor/
 RetroArch-*/
 

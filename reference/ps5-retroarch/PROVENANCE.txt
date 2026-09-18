@@ -1,0 +1,26 @@
+PS5 RetroArch payload recipe - provenance
+
+Source:  https://github.com/ps5-payload-dev/websrv.git
+Path:    homebrew/RetroArch/
+Commit:  1afd476c5044d68df4e45dc773769e5de3b2cdd6
+Date:    2026-08-10
+Subject: pc: disable smb for now, its having some upstream issues
+Fetched: 2026-09-18 by sparse checkout of that path only
+Licence: GPL-3.0-or-later (see the source repository's LICENSE)
+
+This directory is a read-only record of that recipe. It is not edited here:
+any change we make to it is a step of its own, recorded in docs/PHASE_LOG.md,
+and the recipe stays as the baseline it was measured against.
+
+File digests as copied (sha256):
+  382c44d19828cf493e323071a1aab6181edd339394adf30ca369066338c0dae6  build-fbneo.sh
+  35387a07d994dd5d6fcc3264687f2fa3e0b079fe80209e84bd679bbe3d22a7d2  build-fceumm.sh
+  f6074b192ebbeb878f6fdbce79412782469748fdec20428853f08efb1c6dd767  build-genesis_plus_gx.sh
+  c01810adffc0cd79fc1f4143524391255923bba47537d43460a750355927e225  build-mednafen_gba.sh
+  bd272f2f846cedfb77ecfd79b5be607da17a578c7fcfae577f7cb1c27bebfba4  build-puae2021.sh
+  57c21b49546ce0f5643e5606ac549ea52b80a07c14bc4e1080246271f26686bb  build.sh
+  1ea2badb7926006b8b0b7bf772577cf1a4148759cf711089f0d23de7b1ee345f  build-snes9x2010.sh
+  db21b4570b64864d9773f879df4ba9908c3859fa01d11bb17db37259bb41d82e  build-vice.sh
+  7ffd69b79e88fb819a9d8b187fa580d3e4717fd004fb3e0a06a88d071beb9815  fetch-assets.sh
+  80c94ea668f921e2a226ccc3e71f3b4f06a9144a6dc44324c8f82a4af0c54725  fetch-databases.sh
+  4c5d96e433c7a35deb7d241ae04011c8ecbad9310f6182104d200259d2a17811  homebrew.js

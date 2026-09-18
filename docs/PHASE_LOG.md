@@ -42,3 +42,36 @@ does not rediscover it.
 
 **Commit.** `3dfc3dd` — Instantiate the agent documentation contract for PS5
 RetroArch.
+
+---
+
+## 2026-09-18: The existing PS5 RetroArch payload recipe joins the repository as a baseline
+
+`reference/ps5-retroarch/` now holds `ps5-payload-dev/websrv`'s
+`homebrew/RetroArch/` at commit `1afd476`, copied by sparse checkout and kept
+read-only, with `PROVENANCE.txt` recording the source, the revision, the fetch
+date and a SHA-256 for every file. It exists because that recipe already turns
+the upstream RetroArch tarball into a loadable PS5 payload, so this project
+starts from a known baseline instead of from nothing, and it unblocks the
+packaging work: the recipe's staging step already produces the title's
+`icon0.png` and its `retroarch.cfg` seed.
+
+**The evidence.** The clone is reproducible with
+`git clone --filter=blob:none --no-checkout --depth 1
+https://github.com/ps5-payload-dev/websrv.git` followed by
+`git sparse-checkout set homebrew/RetroArch`; it returned twelve files totalling
+48 KB, and `sha256sum` of each is committed in the recipe's `PROVENANCE.txt`.
+Reading `build.sh` shows it pins upstream **1.21.0** and configures with
+`OS=BSD`, `--enable-sdl2 --enable-mmap --enable-dylib` and every GPU switch
+disabled, which is what `docs/FINDINGS.md` records.
+
+**What was tried first.** The recipe was expected to be a drop-in build, and it
+is not: `prospero-pkg-config --exists sdl2` exits 1 on this host and
+`$PS5_SYSROOT/user/homebrew/` holds an empty `include/`, so the SDL2 the recipe
+enables is not present. That measurement is in `docs/FINDINGS.md` and is the
+first item in `docs/ACTIVE.md`'s Next list. The recipe was not modified to work
+around it: it is committed as it was fetched, and any change to it is a step of
+its own.
+
+**Commit.** `{{SHA}}` — Vendor the existing PS5 RetroArch payload recipe as a
+baseline.
