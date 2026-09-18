@@ -282,3 +282,35 @@ under `/data/homebrew/PS5_RetroArch/`), so nothing was lost that cannot be
 rebuilt.
 
 **Commit.** `e1c0dfa` — Watch the kernel log, launch the title, and record why it crashes.
+
+---
+
+## 2026-09-18: The deployment path is rebuilt from the project that already solved it
+
+`tools/deploy-title.py` and `tools/ps5_ftp.py` now publish the PPSA folder, and
+they are modelled on `../PS5_Vulkan/tools/deploy.sh` — the deployment path that
+already works against this console. It exists because my own FTP client kept
+reporting success while the console kept the previous bytes, and the reason was
+three server quirks the sibling project had already written down: a successful
+delete is answered with 226, which `ftplib.delete()` rejects; paths resolve from
+the root; and a listing with a path argument behaves inconsistently.
+
+**The evidence.** `tools/deploy-title.py --check` reports the console's actual
+state, including the image's magic bytes — `eboot.bin magic: 7f454c46 (NOT a
+converted image)`. A deploy verifies every stored file's size and exits non-zero
+when one does not match; that is what caught `libc.prx` reverting. Separately,
+freshly generated blobs uploaded to the same folder round-trip byte-for-byte at
+2 MB, 8 MB and 60 MB, which rules the server out as the limit.
+
+**What was tried first.** Several hand-rolled FTP paths, including one that
+replaced `eboot.bin` and a `libc.prx` and appeared to succeed at every step. The
+useful lesson is in the tooling, not the effort: a transfer that is not verified
+by reading back or by checking the stored size is not evidence, and this server
+is exactly the case where that distinction matters.
+
+**Still open.** The console's `eboot.bin` and `sce_module/libc.prx` are still the
+other session's build; the two files in `dist/PPSA99005/` are the converted ones.
+Replacing them needs either the console's owner or a moment when no other session
+is publishing that title.
+
+**Commit.** `{{SHA}}` — Publish the PPSA folder with the deployment path this console needs.

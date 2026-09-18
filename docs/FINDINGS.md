@@ -459,3 +459,43 @@ wrote.
 and ignores the path argument of a listing command. Rewriting a file in place is
 not a safe operation on this service; writing a whole directory and checking it
 is.
+
+---
+
+## 2026-09-18: The title's eboot.bin and libc.prx could not be replaced over FTP
+
+**Measured.** Publishing the converted folder through the deployment path that
+works on this console — the helpers from `../PS5_Vulkan/tools/deploy.sh`, which
+handle this server's 226-on-delete and root-relative paths — the image and the
+loader module never changed:
+
+```text
+==> [deploy] 7 files to /data/homebrew/PPSA99005/
+sce_module/libc.prx: the console did not store the whole file
+```
+
+Five consecutive attempts, each an upload to a temporary name followed by a
+delete and a rename, all reported success with `226 File deleted` and
+`226 Path renamed`, and every read-back returned the previous file:
+`libc.prx` 1,335,962 bytes where the local file is 1,284,674, and `eboot.bin`
+51,870,448 bytes where the local file is 49,968,821 — the latter still starting
+`7f454c46` (ELF) rather than `4f153d1d` (the converted image).
+
+The server itself is not the limit, which was established separately in the same
+folder: uploading freshly generated blobs and hashing them back round-trips
+exactly at 2 MB, 8 MB and **60 MB**. A neutral file name made no difference —
+`neutral.img` also read back as the 51,870,448-byte image. Files whose names the
+folder does not already contain do persist (a 40 KB marker written earlier was
+still listed and read back correctly).
+
+**Consequence.** The remaining difference between this folder and a working
+title is exactly two files, and they cannot be replaced from here while they keep
+reverting. `tools/deploy-title.py` and `tools/ps5_ftp.py` do the job correctly —
+they verify every stored size and refuse to call it done when one does not match,
+which is why this was detected rather than believed — so the tooling is ready for
+whoever can write those two paths. The likely cause is outside this repository:
+the other session working on this console recreates the title's image and module,
+and its writes win.
+
+**Boundary.** This console, ftpsrv v0.21.1, while a second session is publishing
+the same title. A console with one writer does not show this.
