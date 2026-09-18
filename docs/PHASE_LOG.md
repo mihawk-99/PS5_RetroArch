@@ -73,5 +73,13 @@ first item in `docs/ACTIVE.md`'s Next list. The recipe was not modified to work
 around it: it is committed as it was fetched, and any change to it is a step of
 its own.
 
-**Commit.** `{{SHA}}` — Vendor the existing PS5 RetroArch payload recipe as a
+**Commit.** `0d8a225` — Vendor the existing PS5 RetroArch payload recipe as a
 baseline.
+
+**A correction to this entry's own landing.** It first landed as commit
+`107dbae`, whose message was a stray shell fragment rather than the text above:
+the command that wrote it chained a nested here-document, so the shell closed
+the message early and fed it the script instead. Nothing was pushed, and the
+commit was amended in place to `0d8a225` with no change to a single file. The
+lesson is in the command, not in the tooling: one message per command, written
+from a file, never a here-document inside a chain.
