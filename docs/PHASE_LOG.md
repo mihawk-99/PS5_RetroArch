@@ -314,3 +314,33 @@ Replacing them needs either the console's owner or a moment when no other sessio
 is publishing that title.
 
 **Commit.** `a80417a` — Publish the PPSA folder with the deployment path this console needs.
+
+---
+
+## 2026-09-18: The deployment is one step from working, and the blocker is measured
+
+The user asked for the deployment, so it was run with the helpers taken from
+`../PS5_Vulkan/tools/deploy.sh`. The result is specific: the folder is writable
+and stays written, but the converted image will not take.
+
+**The evidence.** `sce_sys/icon0.png` (512x512) published and verified. Test blobs
+of 2 MB, 8 MB and 60 MB, a 49,968,821-byte zero blob, a pattern blob of exactly
+the converted image's size, and a 40 KB marker all round-tripped byte-for-byte
+under `/data/homebrew/PPSA99005`. The converted image did not: written under its
+own name, under an unused name, in place, and through a temporary name with a
+rename, the listing and the read-back both returned 51,870,448 bytes starting
+`7f454c46`. A file created under a fresh name received `eboot.bin`'s bytes.
+
+**What was tried first, and corrected.** The first explanation recorded in
+`docs/FINDINGS.md` blamed the second session working on this console. The user
+pointed out that session publishes `PPSA99988`, not this title, and the entry has
+been superseded by a correction with the measurement that rules it out. The same
+correction records that `/data/homebrew/PPSA99005` and
+`/system_ex/app/PPSA99005` are separate trees, not one storage seen two ways — a
+marker written through one is absent from the other.
+
+**Still open.** Placing those two files needs a route other than this FTP
+service. Everything around it is ready and verified; the check that names success
+is `tools/deploy-title.py --check` reporting `eboot.bin magic: 4f153d1d`.
+
+**Commit.** `{{SHA}}` — Correct the deployment diagnosis and record what the console actually stores.

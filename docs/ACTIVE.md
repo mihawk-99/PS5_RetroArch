@@ -9,41 +9,39 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The title's folder is correct here and wrong on the console, and the two files
-that differ cannot be replaced from this machine.** `dist/PPSA99005/` holds the
-converted, signed `eboot.bin` (49,968,821 bytes, magic `4f153d1d`), the signed
-`sce_module/libc.prx` (1,284,674 bytes), the identity, the icon, the
-configuration and the payload. The console's copies of those two files are the
-other session's build and revert on every attempt. Evidence: `magic 7f454c46
-(NOT a converted image)` from `tools/deploy-title.py --check`, and the run
-captured in `evidence/ppsa-99005-startup-crash/` where the loader faults at
-`rip=0x1`.
+**One step from working: two files on the console are the wrong ones.** The title
+crashes because `/data/homebrew/PPSA99005/eboot.bin` is a raw link ELF
+(51,870,448 bytes, starts `7f454c46`) rather than the converted application image,
+and `sce_module/libc.prx` is likewise the raw 1,335,962-byte module rather than
+the signed 1,284,674-byte one. The correct pair sits in `dist/PPSA99005/` here,
+and the working sibling title shows what a converted image looks like:
+`PS5_Vulkan/dist/PPSA99988/eboot.bin` starts `4f153d1d`.
 
-**The deployment path itself now works and is honest.** `tools/deploy-title.py`
-with `tools/ps5_ftp.py` — the helpers from `../PS5_Vulkan/tools/deploy.sh` that
-handle this server's 226-on-delete and root-relative paths — publishes the whole
-folder, verifies every stored size, and refuses to report success when one does
-not match. That is how the revert was caught rather than believed.
+**The FTP route cannot place them, and the reason is recorded rather than
+guessed.** The folder accepts everything else — markers, blobs of 2 MB, 8 MB,
+60 MB, a blob of exactly the converted image's size, and the 512x512 icon, all
+round-tripping byte-for-byte — but the converted image is returned as the other
+file's bytes under its own name, an unused name, in place, and via a rename. A
+fresh name receives `eboot.bin`'s bytes, which no ordering explanation covers.
+The service also began refusing reads with `550 Broken pipe` under this load.
+`docs/FINDINGS.md` carries the measurements and the two corrections to earlier
+conclusions — including that the second session publishes `PPSA99988`, not this
+title, which rules out the hypothesis first recorded here.
 
-**The server is not the limit.** Uploaded blobs round-trip byte-for-byte at 2 MB,
-8 MB and 60 MB in the same folder, and a neutral file name made no difference.
-The likely cause is outside this repository: a second session publishes the same
-title's image and module and its writes win. `docs/FINDINGS.md` records the
-measurement and that boundary.
-
-**The artwork changed.** `title/assets/retroarch.png` is now 512x512 (was
-640x640); the staging script resamples whatever is there, so the folder carries
-`icon0.png` at 512x512, sha256 `473fc429…`.
+**Everything else is ready.** `tools/deploy-title.py` publishes and verifies,
+`tools/console-launch.sh` launches and captures, `tools/evidence.py` replays the
+two committed records, and the folder in `dist/PPSA99005/` is complete and
+digest-checked.
 
 ## Next
 
-1. Replace the console's `eboot.bin` and `sce_module/libc.prx` for PPSA99005 with
-   the two from `dist/PPSA99005/` — the console owner can do it directly, and
-   `tools/deploy-title.py` will do it and verify once no other writer is active.
-   The signature of success is `magic 4f153d1d` in `--check`.
-2. Launch it with the kernel log captured and record the outcome next to
-   `evidence/ppsa-99005-startup-crash/`: the same capture, after the change,
-   says whether the fault moved.
+1. Place `dist/PPSA99005/eboot.bin` and `dist/PPSA99005/sce_module/libc.prx` on
+   the console by a route other than this FTP service — the console owner's own
+   tooling, USB, or kstuff. Verify with `tools/deploy-title.py --check`: the line
+   to look for is `eboot.bin magic: 4f153d1d`.
+2. Launch it with the kernel log captured and record the outcome beside
+   `evidence/psa-99005-startup-crash/`; the same capture after the change says
+   whether the fault moved.
 3. Then Option 2, the Vulkan driver, for which `../PS5_Vulkan` already implements
    every display entry point RetroArch's Vulkan path calls.
 

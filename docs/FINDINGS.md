@@ -562,3 +562,42 @@ win a race against another writer. The check to run when that writer stops is
 
 **Boundary.** This console, while a second session publishes PPSA99005. A console
 with one writer does not show this.
+
+---
+
+## 2026-09-18: Correcting the record: the second session is not the cause, and the folder is writable
+
+**Measured.** Two earlier conclusions in this file were wrong and are corrected
+here rather than edited away.
+
+1. **The second session does not publish this title.** It publishes `PPSA99988`.
+   The suspicion recorded in the previous entry was wrong, and the evidence that
+   looked like support for it — a raw link ELF appearing where a converted image
+   should be — is a property of the file that was placed, not of who placed it.
+
+2. **`/data/homebrew/PPSA99005` and `/system_ex/app/PPSA99005` are not the same
+   storage.** A 1 KB marker written through the `/system_ex` path is listed there
+   and **not** listed under `/data/homebrew`. They are separate trees that happen
+   to hold copies of the same title.
+
+The folder accepts writes and keeps them: a 40 KB marker, 2 MB, 8 MB and 60 MB
+blobs, a 49,968,821-byte zero blob and a pattern blob of exactly the size of the
+converted image, and the 512x512 icon, all round-tripped byte-for-byte under
+`/data/homebrew/PPSA99005`. What does not take is the converted image itself:
+written under its own name, under an unused name, in place, and through a
+temporary name with a rename, the listing and the read-back both return
+51,870,448 bytes beginning `7f454c46`. A fresh file name receives the same bytes
+as `eboot.bin`, which no ordering explanation covers.
+
+The service also degrades under this load: reads began timing out and one
+connection ended with `550 Broken pipe`.
+
+**Consequence.** The deployment path in this repository is correct and verified,
+and the remaining difference between this title and a working one is two files
+that must be placed by another route — the console owner's own tooling, USB, or
+`kstuff`, rather than this FTP service. `tools/deploy-title.py --check` names the
+one-line test: `eboot.bin magic: 4f153d1d`.
+
+**Boundary.** ftpsrv v0.21.1 on this console, under repeated large writes to one
+title folder. The round-trip evidence above is what bounds the claim: this is not
+a general statement that the service cannot store a file.
