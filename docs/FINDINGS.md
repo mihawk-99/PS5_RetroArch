@@ -1,0 +1,100 @@
+# Findings
+
+Append-only measurements. What the platform, the dependency, the customer or the
+data actually does — as opposed to what the documentation says — and what each
+one forces the code to do. A finding is written the moment it is measured,
+because it is the thing that is expensive to rediscover and impossible to guess.
+
+Never rewrite an entry. If a later measurement contradicts one, append a new
+entry that names the old one and says what changed.
+
+## 2026-09-18: Upstream RetroArch has no PS5 platform code
+
+**Measured.** The pinned tree carries the PS4/Orbis port only:
+`frontend/drivers/platform_orbis.c`, `gfx/drivers_context/orbis_ctx.c` and
+`Makefile.orbis` are present, and no `platform_ps5.c`, no `Makefile.ps5` and no
+PS5 context driver exist. `grep -ril ps5` over the 1.22.2 tree returns
+`CHANGES.md` and binary art, nothing in the sources. Measured by directory listing
+and grep over `vendor/retroarch` (`docs/REFERENCE.md`, "The environment").
+
+**Consequence.** The platform work is ours: a context driver, a platform driver,
+an input driver and an audio driver, each behind our own seam in `platform/`,
+plus whatever `configure` flags the frontend needs. It also means the port is a
+patch series on a pinned tarball, never a fork we maintain file by file —
+`docs/PLAN.md`, invariant "Upstream stays upstream".
+
+**Boundary.** True for 1.22.2 and every earlier tag. If upstream ships a PS5
+platform driver, the patches that only add one are dropped rather than ported,
+and this entry is superseded by a new one.
+
+---
+
+## 2026-09-18: The payload SDK ships no Vulkan and no SDL2, but it does ship the console APIs
+
+**Measured.** `$PS5_PAYLOAD_SDK/target/include` holds 322 entries including
+`EGL/` and `GLES2/` and no `vulkan/` and no `SDL2/`; `target/lib` holds
+`libScePad.so`, `libSceAudioOut.so`, `libSceVideoOut.so`, `libSceUserService.so`,
+`libSceSysmodule.so`, `libSceNet.so`, `libSceHttp.so` and `libSceSsl.so` among
+others. Measured by listing the sysroot of the SDK unpacked 2026-09-17
+(`docs/REFERENCE.md`, "The environment").
+
+**Consequence.** Controller input, audio output, display, user selection and
+networking come from public console APIs — no third-party port is needed for
+them. GPU access and windowing do not: the EGL/GLES2 headers are the SDK's own,
+and a full OpenGL stack or a Vulkan driver comes from a sibling project.
+Padding in a build script cannot fix this; the missing pieces have to be
+linked from `../ps5-opengl-sdk-0.2.0` or `../PS5_Vulkan` (`docs/REFERENCE.md`,
+"The graphics backend").
+
+**Boundary.** The SDK's own sysroot, as unpacked on 2026-09-17. A later SDK
+release could add either, in which case this entry is superseded rather than
+edited.
+
+---
+
+## 2026-09-18: Cross-compiling with the toolchain works and is cheap to check
+
+**Measured.** `source $PS5_PAYLOAD_SDK/toolchain/prospero.sh` followed by
+`$CC -o t.elf t.c` on a hello-world C file produced an ELF 64-bit LSB
+pie executable, x86-64, version 1 (FreeBSD), 110,712 bytes, `prospero-clang`
+version 22.1.8 with target `x86_64-sie-ps5`. Measured in this session from a
+temporary directory; the SDK also ships `prospero-nm`, `prospero-objcopy`,
+`prospero-strip`, `prospero-cmake`, `prospero-meson` and
+`prospero-pkg-config`.
+
+**Consequence.** The `build` gate can prove the toolchain and the platform code
+without a console, and every PS5 compile belongs in that gate rather than in a
+spontaneous command. "It is FreeBSD-flavoured x86-64 ELF" is also why
+`check-ps5-object.sh` cannot use the ABI to tell our output from a host Linux
+object: the import table is the only reliable signal
+(`docs/TROUBLESHOOTING.md`).
+
+**Boundary.** This host, this SDK unpack, clang 22.1.8. A toolchain bump is a
+pin change and gets its own line in `docs/PHASE_LOG.md`.
+
+---
+
+## 2026-09-18: The OpenGL backend is relocatable; the Vulkan backend is not yet consumable
+
+**Measured.** `../ps5-opengl-sdk-0.2.0` describes a relocatable package under
+`build/sdk/ps5-opengl-core33` with `share/ps5-opengl-core33/ps5-opengl-core33.mk`,
+`lib/pkgconfig/ps5-opengl-core33.pc` and a CMake config; its published
+`libps5_opengl_core33.pc` links `-lPS5OpenGLCore33 -lSceAgc -lSceAgcDriver
+-lSceVideoOut -lkernel_web -lSceSystemService` and records 344 Core exports
+(`docs/consumer-build.md`, `docs/validation.md`). `../PS5_Vulkan` holds driver
+sources and static archives (`build/driver/ps5/libps5vk.ps5.a`, 14.8 MB,
+2026-09-18) and vendored Vulkan headers at
+`third_party/Vulkan-Headers/include`, but no installed consumer package.
+Measured by reading those two checkouts; neither was modified.
+
+**Consequence.** M2 starts by linking against the OpenGL package, because it is
+the only backend with a consumer contract and a recorded hardware acceptance
+run on this machine. RetroArch resolves its GL entry points through `glsym`, so
+the open question is not the header but the export list: M2.1 compares the
+driver's request list with the backend's export list and records the difference
+before any rendering step is planned (`docs/REFERENCE.md`, "The graphics
+backend").
+
+**Boundary.** The 0.2.0 package and the PS5_Vulkan checkout as they stand on
+2026-09-18. When PS5_Vulkan reaches rung 1.0 and publishes a consumer package,
+this entry is superseded by the measurement that switches the default backend.
