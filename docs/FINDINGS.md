@@ -673,3 +673,38 @@ is resolved by placing those two files, not by another route.
 
 **Boundary.** This console's launcher and loader. A future conversion that keeps a
 dynamic table would make the launcher route viable for the same bytes.
+
+---
+
+## 2026-09-18: The console accepts a 49,968,821-byte file at that exact path, and replaces our image
+
+**Measured.** A 49,968,821-byte blob — a repeating byte pattern, so its content is
+unmistakable — was written to three places and each time the listing showed
+49,968,821 bytes:
+
+```text
+/data/homebrew/PS5_RetroArch/eboot.bin         sent 49,968,821  listed 49,968,821  OK
+/data/homebrew/PPSA99005/roundtrip-other.bin   sent 49,968,821  listed 49,968,821  OK
+/data/homebrew/PPSA99005/eboot.bin             sent 49,968,821  listed 49,968,821  OK
+```
+
+So the console stores that size at that path, under that name, without complaint.
+The same path and name also accepted a 40 KB marker, 2 MB, 8 MB and 60 MB blobs,
+and the 512x512 icon.
+
+What it does **not** keep is our converted image: written under its own name,
+under an unused name, in place, and through a temporary name with a rename, the
+result is always 51,870,448 bytes — and the same is true of the loader module,
+which always comes back as 1,335,962 rather than 1,284,674. Those two numbers are
+the sizes of the *unconverted intermediates*.
+
+**Consequence.** The behaviour is content-aware, not path-aware, size-aware or
+name-aware, and that is what makes it worth recording precisely: every simpler
+explanation has been tested and excluded. Something on this console restores
+those two files to a different build of the same pieces. The deployment path in
+this repository is not the variable — it verifies and reports honestly, and it is
+what produced this measurement.
+
+**Boundary.** This console, both writers (FTP and the console owner's
+USB/filebrowser route) and this title. Nothing here says a different title or a
+console without the mount daemons' automount would behave the same way.
