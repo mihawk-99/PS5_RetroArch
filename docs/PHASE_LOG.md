@@ -478,3 +478,38 @@ taken from that project with the reason written down in `src/display.cpp`, becau
 none of them is derivable by reasoning.
 
 **Commit.** `b18e203` — Run this project's own title on the console.
+
+---
+
+## 2026-09-18: The PS5 video driver is written and compiles
+
+`src/video_ps5.cpp` implements both interfaces RetroArch asks of a video driver:
+the `video_driver_t` itself and the `video_poke_interface_t` that RGUI needs. It
+presents through `src/display.cpp`, which has already run on the console.
+
+**Why this is the right first target, measured rather than assumed.** RGUI
+references the menu display context **zero** times; XMB references it 72 times, and
+every backend in `gfx_display_ctx_drivers[]` is a GPU API — OpenGL, Vulkan, Metal,
+Direct3D, or a console-specific one — with no software entry. So RGUI is the only
+menu that can run over VideoOut alone, and XMB needs a GPU context over
+`../PS5_Vulkan` later.
+
+**What the interface actually requires.** Six members: `init`,
+`suppress_screensaver`, `alive`, `frame`, `ident`, `poke_interface`. Verified on
+the interface report and by compiling: `suppress_screensaver` returns **bool**, not
+void, and the table is filled positionally with `overlay_interface` (inside
+`#ifdef HAVE_OVERLAY`) before `poke_interface`, plus `wrap_type_to_enum` after it.
+`ps5_frame` prefers the menu's framebuffer when RGUI has handed one over, else the
+core's frame, and scales nearest-neighbour through the display layer's tiled
+addressing.
+
+**Evidence.** The driver compiles through the pipeline's own compiler against
+RetroArch's headers:
+
+```text
+tooling/prospero-clang18 -std=c++20 -Isrc -Ivendor/retroarch \
+    -Ivendor/retroarch/libretro-common/include -c src/video_ps5.cpp
+compiled: 6,056 bytes, no warnings
+```
+
+**Commit.** `{{SHA}}` — Write the PS5 video driver for the RetroArch frontend.

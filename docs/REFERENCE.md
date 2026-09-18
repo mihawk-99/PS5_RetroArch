@@ -211,3 +211,31 @@ patch in `patches/` or a documented decision, never a quiet edit.
   `*.so`, and everything under a git-ignored capture directory. `reference/` is
   committed but equally read-only: it is the baseline a measurement was taken
   against.
+
+## The port
+
+RetroArch on this console is a video driver of this repository's own, presented
+through the display layer in `src/display.cpp`. Two menus are available and the
+choice is a backend choice, not a preference:
+
+| Menu | Display context | What it needs |
+| --- | --- | --- |
+| RGUI | none — `menu/drivers/rgui.c` references `dispctx` **zero** times | `poke->set_texture_frame`, `viewport_info`, `video_driver_supports_rgba` |
+| XMB, Ozone, MaterialUI | required — XMB dereferences `dispctx` 72 times | a GPU backend: every entry in `gfx_display_ctx_drivers[]` is a GPU API and there is no software one |
+
+So RGUI is the first target: it rasterises the menu into its own framebuffer and
+hands that one texture to the video driver, which means it runs over VideoOut with
+no GPU stack at all. XMB comes after, over `../PS5_Vulkan`
+(284 `ps5vk_` symbols in `libps5vk.ps5.a`) once the frontend is already proven.
+
+The mandatory surface is small, and the rest is optional:
+
+| Interface | Mandatory | Notes |
+| --- | --- | --- |
+| `video_driver_t` | `init`, `suppress_screensaver`, `alive`, `frame`, `ident`, `poke_interface` | `suppress_screensaver` is called with no NULL check; the rest are NULL-guarded |
+| `video_poke_interface_t` | `set_texture_frame` | RGUI pushes its menu framebuffer through it |
+| `gfx_ctx_driver_t` | not needed at all | `video_driver_init_internal` never touches one |
+
+Field order matters: the struct is initialised positionally, and `overlay_interface`
+sits inside `#ifdef HAVE_OVERLAY` before `poke_interface`, so an initialiser has to
+account for it.
