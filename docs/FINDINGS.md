@@ -98,3 +98,57 @@ backend").
 **Boundary.** The 0.2.0 package and the PS5_Vulkan checkout as they stand on
 2026-09-18. When PS5_Vulkan reaches rung 1.0 and publishes a consumer package,
 this entry is superseded by the measurement that switches the default backend.
+
+---
+
+## 2026-09-18: The menu cannot be drawn without a GPU context, so "menu first" is a graphics milestone
+
+**Measured.** RetroArch 1.22.2 has no software menu path. `gfx/gfx_display.c`
+registers display-context drivers for Direct3D, OpenGL, OpenGL1, OpenGL3,
+Vulkan, Metal, vita2d, ctr, wiiu, rsx and gdi only, and
+`gfx_display_init_first_driver()` selects one by matching `dispctx->ident`
+against the video driver's identity, skipping entries whose type is
+`GFX_VIDEO_DRIVER_GENERIC`. No entry is generic, and the generic video drivers —
+`sdl2_gfx.c` among them — register no display context at all. All four menu
+drivers (`rgui`, `xmb`, `ozone`, `materialui`) draw through that context.
+Measured by reading `RetroArch-1.22.2` (`gfx/gfx_display.c:50`,
+`gfx/gfx_display.c:1215`, `menu/menu_driver.c:333`); XMB itself contains no
+GLSL, so it is the display context and not XMB that needs the GPU.
+
+**Consequence.** A PS5 video driver presenting a CPU-drawn framebuffer is not a
+shortcut to a visible menu: it produces no display context and therefore no
+menu. The first visible menu requires one of the registered backends — for this
+console, the Vulkan path (`gfx/drivers_context/khr_display_ctx.c`) or the
+OpenGL3 path — and the platform work is the same driver plus context pair either
+way. `docs/REFERENCE.md`, M2.2, now says so instead of treating presentation as
+a later step.
+
+**Boundary.** RetroArch 1.22.2. A future release that adds a software display
+context changes this, and the entry is then superseded rather than edited.
+
+---
+
+## 2026-09-18: RetroArch's khr_display context matches what PS5_Vulkan exposes
+
+**Measured.** RetroArch's `gfx/drivers_context/khr_display_ctx.c` creates its
+surface through `vulkan_surface_create(..., VULKAN_WSI_DISPLAY, ...)`, which
+`gfx/common/vulkan_common.c` serves by requiring `VK_KHR_display` and calling
+`vkCreateDisplayPlaneSurfaceKHR`. `../PS5_Vulkan`'s instance extension table
+declares `.KHR_surface` and `.KHR_display`, its device extension table declares
+`.KHR_swapchain`, its instance `apiVersion` is `VK_API_VERSION_1_3` and its
+device `apiVersion` is `VK_API_VERSION_1_0` with `driverVersion` 0.2.0
+(`driver/ps5vk_instance.c:25`, `driver/ps5vk_physical_device.c:56`,
+`driver/ps5vk_private.h:51`), and `driver/ps5vk_wsi.c` presents to VideoOut.
+Measured by reading both checkouts.
+
+**Consequence.** The two halves fit: RetroArch's display-based Vulkan context
+driver is the right seam for this console, and the driver's own VideoOut
+presentation is what fills it. A barebones frontend therefore does not need a
+new windowing layer — it needs the driver's consumer package and its remaining
+Vulkan surface. Whether RetroArch's Vulkan renderer asks for more than the
+driver implements is the open question, and it is answered by loading the menu,
+not by reading headers.
+
+**Boundary.** The PS5_Vulkan checkout at `5fd2626` (2026-09-18) and RetroArch
+1.22.2. Rung 1.0 is the point at which this becomes a support statement rather
+than a fit between two interfaces.

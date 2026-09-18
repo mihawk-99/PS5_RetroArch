@@ -29,11 +29,10 @@ those are `docs/ACTIVE.md` and `docs/PHASE_LOG.md`.
 | Step | What | Acceptance |
 | --- | --- | --- |
 | M2.1 | Choose the backend with evidence: build against the installed OpenGL 3.3 Core package and list the entry points RetroArch's GL driver resolves against what the package exports | `tools/check-gl-exports.sh` prints the resolved and the missing lists; either the missing list is empty, or it is quoted in full in `docs/FINDINGS.md` and the step closes as a decision to wait for PS5_Vulkan's rung |
-| M2.2 | A platform context driver of our own: it opens the console's display through the backend's public entry points and gives RetroArch a context, with no GPU calls anywhere else in this repository | The console run shows RetroArch's own driver identity line and the resolution it received; the capture is committed under `evidence/m2.2/` |
-| M2.3 | Headless bring-up of the frontend on the target: RetroArch runs its menu loop with the video driver's null output and reaches its own command handling | The capture holds the frontend's version line, the driver name and one handled command, and the host build of the same revision passes `tools/verify.sh` |
-| M2.4 | Presentation: the menu is drawn through the backend and flipped to the display, and the frame is captured | A console run presents the menu; the capture holds the swapchain or framebuffer extent, the present count and a frame digest |
-| M2.5 | Controller input through the payload SDK's pad API into RetroArch's input driver | The capture records the buttons pressed and the menu's reaction, from the mapping table written in this file |
-| M2.6 | A libretro core loads and runs one frame of content, headless first and then presented | The core's own identification line, the frame digest and the present count sit in one capture under `evidence/m2.6/` |
+| M2.2 | A platform video driver and its matching display context: the console's display is opened, the swapchain or context is created from the backend's public entry points, and nothing else in this repository touches the GPU | The console run shows RetroArch's own driver identity line and the resolution it received; the capture is committed under `evidence/m2.2/` |
+| M2.3 | The menu is drawn: the first visible interface, on whichever backend the driver provides | A console run presents a menu frame; the capture holds the driver name, the swapchain extent, the present count and a frame digest. A framebuffer-only driver cannot satisfy this — `docs/FINDINGS.md` records why the display context is what draws a menu |
+| M2.4 | Controller input through the payload SDK's pad API into RetroArch's input driver | The capture records the buttons pressed and the menu's reaction, from the mapping table written in this file |
+| M2.5 | A libretro core loads and runs one frame of content, headless first and then presented | The core's own identification line, the frame digest and the present count sit in one capture under `evidence/m2.5/` |
 
 ## M3: cores and storage
 
@@ -147,6 +146,41 @@ time. `tools/check-gl-exports.sh` compares the backend's exported symbol list
 with the driver's request list and reports the difference; if the difference is
 not empty, that difference is the M2 finding and PS5_Vulkan's rung becomes the
 blocking dependency for a presented frame.
+
+## Shipping as a PPSA title
+
+The console needs an `eboot.bin` in a title folder with `sce_sys/param.json`
+carrying a `PPSA#####` id. Two local projects produce that shape, and the choice
+is made by the scale of what is being packaged, not by taste:
+
+| Route | Who wraps RetroArch | Reach for it when |
+| --- | --- | --- |
+| A small signer of our own, in `tools/`, driven by our `Makefile` | our build links `retroarch.elf` with the SDK's `prospero-lld`, and a converter turns it into the development FSELF `eboot.bin` | the default: RetroArch is one large program with its own build system, and it needs our own flags (dynamic symbol export, the backend's link inputs, a heap wrap set) |
+| `../ps5-native-app-boilerplate-main` | its `tools/build.sh` compiles and wraps the app | a step that wants its loader-validated wrapping, metadata validation and FTP deployment as-is, and only after the differences below are resolved |
+
+The boilerplate is not a drop-in host for this project, and the differences are
+recorded so a step does not discover them halfway:
+
+- it compiles **only** `src/*.c`, `src/*.cc` and `src/*.cpp`, with fixed flags
+  (`-std=c11` / `-std=c++20`, `-O2 -Wall -Wextra -ffunction-sections`,
+  `-fno-exceptions -fno-rtti`). RetroArch's tree is dozens of directories with
+  per-file flags and its own configure step, so it cannot be dropped into `src/`;
+- it links a fixed set — its own CRT and C++ runtime, two AGC link stubs, the
+  static archives passed through `APP_STATIC_ARCHIVES`, the PacBrew archives, and
+  `$PS5_PAYLOAD_SDK/target/lib/*.so` under `--as-needed` — and exposes no hook
+  for extra linker flags. The OpenGL backend needs `-Wl,-u,ps5_agc_gate2_run`
+  and a heap wrap set for its consumer contract;
+- it links against payload SDK **v0.42** through its own `prospero-clang18`
+  wrapper, which requires a `clang-18` binary on the host. This host's toolchain
+  is clang 22.1.8 from the SDK's own `prospero-clang`;
+- it produces a directory-style homebrew application that a homebrew loader
+  picks up from `/data/homebrew/<TITLE_ID>/`. It does not register a title with
+  the shell, and it says so in its own deployment document.
+
+If a later step adopts it anyway, the adoption is one step with one acceptance
+line: the same RetroArch revision builds and loads through its pipeline, and the
+differences above are answered in that step's evidence rather than worked around
+in `vendor/`.
 
 ## Style
 

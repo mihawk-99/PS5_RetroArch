@@ -20,10 +20,10 @@ first commit, and the gate scripts those commands name — `tools/doctor.sh`,
 and `tools/evidence.py` are specified in `docs/REFERENCE.md` and
 `docs/TESTING.md` and do not exist yet.
 
-**The build gate is a placeholder until those scripts exist.** It checks the
-makefile's syntax with `make -n` rather than cross-compiling, because there is
-no makefile to run yet. It is red on a clean tree on purpose — a fresh project
-whose gates all pass proves nothing — and M0.3 replaces it with the real
+**The build gate is a placeholder until that makefile exists.** It requires a
+`Makefile` and runs `make app`, so today it fails naming the missing file
+rather than building anything. It is red on a clean tree on purpose — a fresh
+project whose gates all pass proves nothing — and M0.3 replaces it with the real
 cross-compile. Named here so no later reader mistakes it for a passing gate.
 
 ## Next
@@ -33,9 +33,13 @@ cross-compile. Named here so no later reader mistakes it for a passing gate.
    upstream tarball digest and `patches/series`.
 3. M0.3: the cross-compile of `libretro-common` plus `tools/check-ps5-object.sh`.
 4. M0.4: the staged title skeleton and its manifest.
-5. M2.1's measurement is the first step that needs a decision, not work: read
+5. The packaging decision (`docs/REFERENCE.md`, "Shipping as a PPSA title"):
+   our own signer in `tools/` is the default, and adopting the boilerplate's
+   pipeline is a step of its own if it is ever taken.
+6. M2.1's measurement is the first step that needs a decision, not work: read
    the OpenGL package's export list and compare it with what RetroArch's GL
-   driver asks for.
+   driver asks for. It needs the OpenGL SDK built first — no archive exists in
+   `../ps5-opengl-sdk-0.2.0` yet, only the source and the recipes.
 
 ## Working notes
 
