@@ -9,47 +9,41 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The console path is proven end to end.** ProsperoLight — built on this machine
-from the native pipeline — was placed on the console and **started flawlessly**.
-That closes the question the last several hours were circling: sources compiled
-for the title pipeline produce a title the console runs. Evidence: the owner
-observed it running; the kernel log for the run contains **zero** fatal signals
-(`klog/PPSA99002-134510.log`), and the converter's inspector reports
-`container: signed, plaintext`, twelve segments, `integrity: valid`.
+**The frontend compiles from RetroArch's own build.** `tools/retroarch-sources.sh`
+runs RetroArch's `./configure` and `make info` and prints the objects a link needs;
+`tools/build-retroarch.sh` compiled **225 of 244** with the pipeline's compiler. The
+remainder is Linux-only (udev, xkb, linuxraw input) plus zstd, and is out of scope
+for this console. Evidence: the object files under `build/ra/obj/`.
 
-**The build recipe is one command.** `tools/build-native-app.sh <project>`
-captures everything it took: the project's own vendored SDK, `PS5_CLANG=/usr/bin/clang`
-(the wrapper's `clang-18` default is not installed and is not needed), the
-`jsonschema` stand-in in `tooling/pystub/`, and a verified `runtime/libc.prx`.
+**The scaffold title runs on the console.** This repository's own title —
+the pipeline's scaffolding, `src/display.cpp` and `src/main.cpp` — was deployed by
+FTP and launched, and stayed up: the capture holds zero fatal signals and the
+control payload reported it running. That is the display path RGUI will present
+through.
 
-**What the swap targets, measured on both sides.** RetroArch 1.22.2 is cloned
-fresh here, and the pipeline's graphics layer is not a GPU stack at all: the
-boilerplate's renderer calls `sceVideoOutOpen`, `sceVideoOutRegisterBuffers`,
-`sceVideoOutSetBufferAttribute`, `sceVideoOutSetFlipRate` and
-`sceVideoOutSubmitFlip` against its own direct memory. That is enough for a CPU
-framebuffer and not enough for RetroArch's menu, which draws through a GPU display
-context — so the frontend milestone has to be paired with a video driver.
+**The video driver is written.** `src/video_ps5.cpp` implements the
+`video_driver_t` and the `video_poke_interface_t` RGUI needs, and compiles against
+RetroArch's headers.
 
-**The graphics backend exists and is linkable.** `../PS5_Vulkan` provides
-`build/driver/ps5/libps5vk.ps5.a` with `ps5vk_CreateInstance`,
-`ps5vk_GetInstanceProcAddr`, `ps5vk_EnumerateInstanceExtensionProperties` and
-`ps5vk_CreateDevice` defined, and the Vulkan headers live in
-`../ps5-opengl-sdk-0.2.0/third_party/Vulkan-Headers/include/vulkan`. Both are
-reached the same way the sibling project does it: `APP_INCLUDE_PATHS` for the
-headers and `APP_STATIC_ARCHIVES` for the archive.
+**RGUI is the target, and that is a measured choice.** RGUI references the menu
+display context zero times; XMB references it 72 times and every backend in
+`gfx_display_ctx_drivers[]` is a GPU API with no software entry. So RGUI runs over
+VideoOut alone, and XMB waits for `../PS5_Vulkan`'s driver.
+
+**Everything websrv-derived is deleted.** The Option 1 baseline tree, its
+artifacts, the ports cache and the conversion tools are gone, and the docs no
+longer describe that route.
 
 ## Next
 
-1. Stand up the RetroArch project: the native pipeline's scaffolding plus
-   RetroArch 1.22.2's sources reached by include path, with the project's own
-   `runtime/`, `tooling/` and `tools/build.sh` unchanged. First acceptance is that
-   it *compiles* in that shape and links, with the frontend entering its main loop
-   under a null video driver.
-2. Write the video driver pair — a `gfx_ctx_driver_t` and the `video_driver_t`
-   around it — against `libps5vk.ps5.a`, so the menu has a GPU context. That is the
-   step that turns "it links" into "it draws".
-3. Place and launch under its own title id, with `tools/console-run.sh`.
-4. Only then bring the pad and audio drivers across.
+1. Register `&video_ps5` in RetroArch's `video_drivers[]` as a patch under
+   `patches/`, and reconcile the entry point — `retroarch.c` defines its own `main`
+   and the pipeline supplies `_start`.
+2. Link the 225 objects with `src/` through the pipeline's CRT and runtime, so the
+   title builds the way ProsperoLight's does.
+3. Deploy by FTP, launch with `tools/console-run.sh`, read the console's log, fix,
+   repeat — until RGUI is on screen.
+4. Then XMB, which needs a Vulkan-backed display context over `../PS5_Vulkan`.
 
 ## Working notes
 

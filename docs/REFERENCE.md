@@ -150,40 +150,29 @@ blocking dependency for a presented frame.
 ## Shipping as a PPSA title
 
 The console needs an `eboot.bin` in a title folder with `sce_sys/param.json`
-carrying a `PPSA#####` id. An existing PS5 RetroArch payload already produces
-most of that folder, so the starting point is not a blank page:
+carrying a `PPSA#####` id. This project produces one through
+`../ps5-native-app-boilerplate-main`'s pipeline, which is the path already proven
+on this console: ProsperoLight, built the same way, starts when placed.
 
-| Source | What it already gives us | What it does not |
-| --- | --- | --- |
-| `reference/ps5-retroarch/` — the payload recipe from `ps5-payload-dev/websrv` at `1afd476`, kept read-only with its digests in `PROVENANCE.txt` | a working way to fetch and patch the upstream tarball, the configure switch set, the title's `icon0.png` taken from the upstream tree, a config seed, and seven per-core recipes | it launches through that project's loader with its own launcher manifest, it renders through a software SDL2 driver with every GPU path switched off, and it needs ports this host does not have (`docs/FINDINGS.md`) |
-| A small signer of our own, in `tools/`, driven by our `Makefile` | the `eboot.bin` and title folder the console reads as a PPSA title | it is the piece we still write |
-| `../ps5-native-app-boilerplate-main` | its `tools/build.sh` compiles and wraps an app end to end | it is not a drop-in host for a program of RetroArch's shape; the differences are below |
+| Piece | Where it comes from |
+| --- | --- |
+| the tooling that converts and signs `eboot.bin` | `tooling/`, copied by `tools/scaffold-native.sh` |
+| the loader-visible runtime module | `runtime/libc.prx`, checked against its own digest manifest |
+| the title's identity and launcher assets | `sce_sys/`, written by the scaffold from `title/` |
+| the application | RetroArch's sources, compiled by `tools/build-retroarch.sh`, linked with `src/` |
 
-So the default route is: build RetroArch with **our** patched tree and **our**
-graphics flags, stage the folder with the recipe's two solved pieces, and wrap it
-with our own signer. The boilerplate's differences are recorded so a step does
-not discover them halfway:
+The pipeline's builder compiles `src/**/*.{c,cc,cpp}` with fixed flags
+(`-std=c11`, `-std=c++20`, `-O2 -Wall -Wextra -ffunction-sections
+-fdata-sections`) and links the result with its own CRT, C++ runtime, AGC link
+stubs and version script. Two consequences shape this project:
 
-- it compiles **only** `src/*.c`, `src/*.cc` and `src/*.cpp`, with fixed flags
-  (`-std=c11` / `-std=c++20`, `-O2 -Wall -Wextra -ffunction-sections`,
-  `-fno-exceptions -fno-rtti`). RetroArch's tree is dozens of directories with
-  per-file flags and its own configure step, so it cannot be dropped into `src/`;
-- it links a fixed set — its own CRT and C++ runtime, two AGC link stubs, the
-  static archives passed through `APP_STATIC_ARCHIVES`, the PacBrew archives, and
-  `$PS5_PAYLOAD_SDK/target/lib/*.so` under `--as-needed` — and exposes no hook
-  for extra linker flags. A graphics backend needs its own link inputs, and the
-  OpenGL one also needs `-Wl,-u,ps5_agc_gate2_run` and a heap wrap set;
-- it links against payload SDK **v0.42** through its own `prospero-clang18`
-  wrapper, which requires a `clang-18` binary on the host. This host's toolchain
-  is clang 22.1.8 from the SDK's own `prospero-clang`;
-- it produces a directory-style homebrew application that a homebrew loader
-  picks up from `/data/homebrew/<TITLE_ID>/`. It does not register a title with
-  the shell, and it says so in its own deployment document.
-
-If a later step adopts it anyway, the adoption is one step with one acceptance
-line: the same RetroArch revision builds and loads through its pipeline, and the
-differences above are answered in that step's evidence rather than worked around
-in `vendor/`.
+- **RetroArch is reached by include path, not copied in.** Its tree is dozens of
+  directories with its own configure step, so `tools/build-retroarch.sh` compiles
+  it separately with the same compiler and the generated `config.h`, and `src/`
+  holds only this project's code — the entry point and the video driver.
+- **Extra link inputs arrive through `APP_STATIC_ARCHIVES`.** That is how a
+  graphics backend is added when a step needs one; the Vulkan driver's archive is
+  the intended first use.
 
 ## Reference material
 
