@@ -49,4 +49,3 @@ void mark_init(const char *step, bool have_video, int width, int height) noexcep
     write(line);
 }
 } // namespace ps5::debug
-
