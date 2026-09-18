@@ -1,0 +1,29 @@
+#!/bin/sh
+# ps5-native-app-boilerplate - PS5 Clang target wrapper.
+# Copyright (C) 2026 BlackBearReloaded
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Applies the repository's proven compiler target and selected SDK paths.
+
+if [ -z "${PS5_PAYLOAD_SDK:-}" ]; then
+    echo "PS5_PAYLOAD_SDK is not set; run make deps or the dependency bootstrap." >&2
+    exit 2
+fi
+sdk_root=$PS5_PAYLOAD_SDK
+compiler=${PS5_CLANG:-}
+if [ -z "$compiler" ]; then
+    compiler=$(command -v clang-18 || true)
+fi
+if [ -z "$compiler" ]; then
+    echo "clang-18 was not found; set PS5_CLANG to the Clang 18 executable." >&2
+    exit 2
+fi
+
+exec "$compiler" \
+    -target x86_64-sie-ps5 \
+    -fvisibility-nodllstorageclass=default \
+    -isysroot "$sdk_root" \
+    -isystem "$sdk_root/target/include/c++/v1" \
+    -isystem "$sdk_root/target/include" \
+    -fno-stack-protector -fno-plt -femulated-tls \
+    "$@"

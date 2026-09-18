@@ -1,0 +1,13 @@
+/*
+ * ps5-native-app-boilerplate - Application symbol visibility policy.
+ * Copyright (C) 2026 BlackBearReloaded
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Keeps replacement C++ allocation operators internal to the executable.
+ */
+
+{
+    local:
+        _Zn*;
+        _Zd*;
+};
