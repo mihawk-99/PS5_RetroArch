@@ -343,4 +343,4 @@ marker written through one is absent from the other.
 service. Everything around it is ready and verified; the check that names success
 is `tools/deploy-title.py --check` reporting `eboot.bin magic: 4f153d1d`.
 
-**Commit.** `{{SHA}}` — Correct the deployment diagnosis and record what the console actually stores.
+**Commit.** `4ad48bf` — Correct the deployment diagnosis and record what the console actually stores.
