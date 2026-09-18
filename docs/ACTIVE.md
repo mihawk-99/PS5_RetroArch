@@ -9,51 +9,47 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The decision has changed: stop converting the payload, build a native title.**
-The vendored-recipe route has been abandoned by the project owner. The reason is
-measured, not a preference: a title's `eboot.bin` must be a *converted* image and
-the conversion strips the dynamic symbols the homebrew launcher needs, so one set
-of sources cannot serve both routes, and every step of converting the finished
-payload produced a new failure on the console
-(`docs/FINDINGS.md`, the loader-route entries).
+**The console path is proven end to end.** ProsperoLight — built on this machine
+from the native pipeline — was placed on the console and **started flawlessly**.
+That closes the question the last several hours were circling: sources compiled
+for the title pipeline produce a title the console runs. Evidence: the owner
+observed it running; the kernel log for the run contains **zero** fatal signals
+(`klog/PPSA99002-134510.log`), and the converter's inspector reports
+`container: signed, plaintext`, twelve segments, `integrity: valid`.
 
-**The new foundation is the pipeline that already produces working titles.**
-`../ps5-native-app-boilerplate-main` (and the project built on it,
-`../ProsperoLight`) compiles application sources with a fixed toolchain, links
-them through its own CRT, runtime and `ps5-pie.ld`, and signs the result with its
-own tool — the exact path that produces the `PPSA99988` image which starts on this
-console. Building RetroArch *inside* that pipeline is a different job from
-converting a finished payload into it: the sources are compiled for it rather than
-adapted afterwards.
+**The build recipe is one command.** `tools/build-native-app.sh <project>`
+captures everything it took: the project's own vendored SDK, `PS5_CLANG=/usr/bin/clang`
+(the wrapper's `clang-18` default is not installed and is not needed), the
+`jsonschema` stand-in in `tooling/pystub/`, and a verified `runtime/libc.prx`.
 
-**What the new pipeline requires, measured from its build script.** Sources are
-collected from `src/` only, matching `src/**/*.{c,cc,cpp}`, and compiled with
-fixed flags — `-std=c11` for C, `-std=c++20` for C++, `-O2 -Wall -Wextra
--ffunction-sections -fdata-sections`. Include paths and static archives are passed
-through `APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, and the result is linked
-with the project's own `app_crt.o`, `app_cpp_runtime.o`, stub objects and version
-script. A tree of RetroArch's shape has to be reached by include path rather than
-dropped into `src/` one file at a time.
+**What the swap targets, measured on both sides.** RetroArch 1.22.2 is cloned
+fresh here, and the pipeline's graphics layer is not a GPU stack at all: the
+boilerplate's renderer calls `sceVideoOutOpen`, `sceVideoOutRegisterBuffers`,
+`sceVideoOutSetBufferAttribute`, `sceVideoOutSetFlipRate` and
+`sceVideoOutSubmitFlip` against its own direct memory. That is enough for a CPU
+framebuffer and not enough for RetroArch's menu, which draws through a GPU display
+context — so the frontend milestone has to be paired with a video driver.
 
-**Its one hard prerequisite is not installed here.** The build needs **Clang 18**:
-the SDK's `math.h` defines `isnan` unconditionally, and Clang 22's libc++ headers
-call `std::isnan`, so the two cannot be mixed (`error: expected unqualified-id`).
-The package is available — `extra/clang18 18.1.8-2` — and installing it needs
-administrator rights, which this session does not have and does not ask for.
+**The graphics backend exists and is linkable.** `../PS5_Vulkan` provides
+`build/driver/ps5/libps5vk.ps5.a` with `ps5vk_CreateInstance`,
+`ps5vk_GetInstanceProcAddr`, `ps5vk_EnumerateInstanceExtensionProperties` and
+`ps5vk_CreateDevice` defined, and the Vulkan headers live in
+`../ps5-opengl-sdk-0.2.0/third_party/Vulkan-Headers/include/vulkan`. Both are
+reached the same way the sibling project does it: `APP_INCLUDE_PATHS` for the
+headers and `APP_STATIC_ARCHIVES` for the archive.
 
 ## Next
 
-1. Install Clang 18 (`sudo pacman -S clang18`), then build
-   `../ps5-native-app-boilerplate-main` with
-   `PS5_CLANG=/usr/bin/clang18 PS5_PAYLOAD_SDK=$PS5_PAYLOAD_SDK make app` — the
-   known-good image that proves the pipeline end to end on this machine.
-2. Place that image on the console under its **own** title id (PPSA99999) and
-   launch it. That answers whether a native-pipeline image boots here, without
-   touching PPSA99005 or any other title.
-3. If it boots, bring RetroArch's sources into the pipeline behind a symlinked
-   `src/` tree: a first milestone is the frontend initialising with a null video
-   driver, the second a frame through the Vulkan driver in `../PS5_Vulkan`.
-4. Retire the conversion path once (3) holds, and say so in `docs/REFERENCE.md`.
+1. Stand up the RetroArch project: the native pipeline's scaffolding plus
+   RetroArch 1.22.2's sources reached by include path, with the project's own
+   `runtime/`, `tooling/` and `tools/build.sh` unchanged. First acceptance is that
+   it *compiles* in that shape and links, with the frontend entering its main loop
+   under a null video driver.
+2. Write the video driver pair — a `gfx_ctx_driver_t` and the `video_driver_t`
+   around it — against `libps5vk.ps5.a`, so the menu has a GPU context. That is the
+   step that turns "it links" into "it draws".
+3. Place and launch under its own title id, with `tools/console-run.sh`.
+4. Only then bring the pad and audio drivers across.
 
 ## Working notes
 

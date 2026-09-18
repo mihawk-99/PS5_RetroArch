@@ -411,3 +411,41 @@ folders, and a title also has to be registered with the shell before its launch 
 anything but `is not registered`.
 
 **Commit.** `d1165a2` — Build ProsperoLight on this machine and stage its title.
+
+---
+
+## 2026-09-18: The native pipeline is proven on the console, and the swap is scoped
+
+ProsperoLight, built on this machine through the native pipeline, was placed on
+the console by its owner and **started flawlessly**. This is the milestone the
+route change was made for: sources compiled for the title pipeline produce a title
+the console runs, so the conversion fight is behind us.
+
+**The evidence.** The owner observed the title running. The kernel capture for the
+attempt contains zero fatal signals (`klog/PPSA99002-134510.log`), and the
+converter's own inspector reports `container: signed, plaintext`, twelve segments,
+`integrity: valid` for `dist/PPSA99002/eboot.bin`. A note on reading those logs
+honestly: an earlier pass of this session read `is not registered` lines as being
+about this title, when they were the console's AutoMounter talking about other app
+ids (0x2019, 0x18) — and `tools/console-run.sh` printed "still running" from a
+condition that is always true. Both are corrected here; the observation that
+matters is the owner's.
+
+**What it took, and it is now one command.** `tools/build-native-app.sh` carries
+the four things that had to be right: the project's own vendored SDK,
+`PS5_CLANG=/usr/bin/clang` (the wrapper default of `clang-18` is neither installed
+nor needed, as the owner pointed out), the documented `jsonschema` stand-in under
+`tooling/pystub/`, and a verified `runtime/libc.prx`.
+
+**The swap, scoped by measurement.** RetroArch 1.22.2 is cloned fresh. The
+pipeline's graphics layer is not a GPU stack: its renderer drives VideoOut
+directly (`sceVideoOutOpen`, `RegisterBuffers`, `SetBufferAttribute`,
+`SetFlipRate`, `SubmitFlip`) from its own direct memory — enough for a CPU
+framebuffer, not enough for RetroArch's menu, which draws through a GPU display
+context. The backend that can serve it exists in `../PS5_Vulkan`
+(`libps5vk.ps5.a`, with `ps5vk_CreateInstance` and friends defined) and its headers
+live in `../ps5-opengl-sdk-0.2.0/third_party/Vulkan-Headers`. Both are reached
+through `APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, which is exactly how the
+sibling project already consumes them.
+
+**Commit.** `{{SHA}}` — Prove the native pipeline on the console and scope the RetroArch swap.
