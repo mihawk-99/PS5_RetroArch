@@ -281,4 +281,4 @@ replace, so an install must write a whole folder and then verify it.
 under `/data/homebrew/PS5_RetroArch/`), so nothing was lost that cannot be
 rebuilt.
 
-**Commit.** `{{SHA}}` — Watch the kernel log, launch the title, and record why it crashes.
+**Commit.** `e1c0dfa` — Watch the kernel log, launch the title, and record why it crashes.
