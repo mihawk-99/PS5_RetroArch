@@ -1100,3 +1100,41 @@ not built-ins: `bitmapfont_10x10_load` returns NULL when
 `<assets>/rgui/font/bitmap10x10_eng.bin` is missing, `rgui_fonts_init` then fails,
 and `rgui_init` jumps to its error label with the menu dead. They are now bundled
 under `assets/rgui/font/` and shipped in the title folder.
+
+## Nothing this title submits has ever reached the display
+
+**Measured.** The driver presents every frame and `sceVideoOutSubmitFlip` returns
+success, but the screen shows nothing - not the menu, not a black frame, not a
+painted test pattern. A run that paints three full-screen colour bands and
+presents them 1800 times changes nothing on the television. The owner's own words:
+"Nothing shows on the screen."
+
+**The frame the driver writes is never flushed to the GPU.** The framebuffer is a
+write-combined mapping of direct memory (`memory_type_write_combined_garlic`), and
+the GPU does not see the CPU's dirty cache lines. `src/display.cpp` wrote pixels
+and flipped without any cache flush, so the display read whatever was in that
+memory before. The sibling project that works on this console flushes after every
+write to the same kind of mapping - `_mm_clflush` over 64-byte lines then
+`_mm_mfence()`, in `../PS5_Vulkan/driver/ps5vk_direct_memory.c`. That flush is now
+in `src/display.cpp`.
+
+**Where the sibling project actually differs, for the record.** `../PS5_Vulkan`
+never calls `sceVideoOutSubmitFlip` at all: it uses `VK_KHR_display` and lets the
+Vulkan driver own presentation, so its swapchain is fed by the GPU rather than by
+CPU writes. What it does share with this port, and what is therefore proven on
+this console, is the setup: `sceVideoOutOpen(0xff, 0, 0, NULL)`,
+`sceVideoOutSetFlipRate(handle, 0)`, an 80-byte attribute zeroed then filled by
+`sceVideoOutSetBufferAttribute2`, and `sceVideoOutRegisterBuffers2` with 2 buffers
+of the same descriptor shape this port uses.
+
+**One error is now named.** Asking for flip mode 0 returns `0x80290006`
+immediately on the first flip, so mode 0 is not what this display wants; the flip
+is back to `(1, 1)`, which returns success. Whether `(1, 1)` actually presents is
+exactly what the cache flush will now decide.
+
+**Also settled: why the menu has no pixels even though it is alive.**
+`rgui_render` is called every frame with `width = 0, height = 0`, and returns at
+its own guard. Those come from `video_st->width`/`video_st->height`, which nothing
+sets because no core is loaded and the dummy core's AV info is empty. So there are
+two separate faults, and the cache flush is the one that decides whether any pixel
+this title writes becomes visible.

@@ -20,8 +20,11 @@
  */
 
 #include "display.hpp"
+#include "trace.hpp"
 
 #include <array>
+#include <cstdio>
+#include <emmintrin.h>
 #include <cstddef>
 
 extern "C"
@@ -81,6 +84,25 @@ extern "C" int sceVideoOutRegisterBuffers2(std::int32_t handle, std::int32_t set
                                            std::int32_t buffer_index_start, VideoBuffer *buffers,
                                            std::int32_t buffer_count, VideoAttribute *attribute,
                                            std::int32_t category, void *option);
+
+/* Flush the CPU cache over a range of the mapped framebuffer.
+ *
+ * This is not optional on this memory. The mapping is write-combined GPU memory,
+ * and the GPU reads it without seeing the CPU's dirty cache lines: without a
+ * flush it displays whatever was in that memory before, which is indistinguishable
+ * from a display that never received a frame. The sibling project that works on
+ * this console does exactly this after writing its swapchain images
+ * (../PS5_Vulkan/driver/ps5vk_direct_memory.c), which is where the shape of this
+ * comes from.
+ */
+void flush_frame_cache(const void *address, std::size_t bytes) noexcept
+{
+    const char *at = static_cast<const char *>(address);
+    const char *const end = at + bytes;
+    for (; at < end; at += 64)
+        _mm_clflush(at);
+    _mm_mfence();
+}
 
 /* The frame is tiled, not linear: consecutive x are four pixels apart inside a
  * 64 KiB block and the blocks are laid out in a fixed order. Writing row-major
@@ -226,13 +248,25 @@ bool Display::present() noexcept
         error_ = "present without an open display";
         return false;
     }
-    if (sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1) < 0)
+    /* flip_mode 0 (immediate) and flip_arg 0: the frame is handed over and the
+     * call returns. An earlier version used (1, 1), which asks the display to
+     * wait, and then waited for a vblank itself - and nothing this title ever
+     * submitted appeared on screen, with the title hanging rather than
+     * returning. Whether the wait was the block or the mode was wrong could not
+     * be told apart from a black screen, so the call is traced and the wait is
+     * gone: a frame that arrives and tears is a frame, and tearing is a
+     * presentable problem. */
+    flush_frame_cache(frames_[back_], frame_bytes);
+    const int result = sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1);
+    if (result < 0)
     {
+        char line[128];
+        std::snprintf(line, sizeof(line), "SubmitFlip failed: %d (0x%08x) buffer %d", result,
+                      static_cast<unsigned>(result), registered_[back_]);
+        ps5::debug::mark(line);
         error_ = "sceVideoOutSubmitFlip refused the frame";
         return false;
     }
-    /* The buffer may only be drawn into again once the display has taken it. */
-    (void)sceVideoOutWaitVblank(handle_);
     back_ ^= 1;
     error_ = "";
     return true;

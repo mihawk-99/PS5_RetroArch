@@ -49,3 +49,12 @@ void mark_init(const char *step, bool have_video, int width, int height) noexcep
     write(line);
 }
 } // namespace ps5::debug
+
+/* TEMPORARY PROBE - removed before commit. */
+extern "C" void rarch_probe(const char *step, long long a, long long b, long long c,
+                            long long d) noexcept
+{
+    char line[256];
+    std::snprintf(line, sizeof(line), "probe %s a=%lld b=%lld c=%lld d=%lld", step, a, b, c, d);
+    ps5::debug::mark(line);
+}

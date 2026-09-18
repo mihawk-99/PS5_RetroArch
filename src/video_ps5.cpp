@@ -147,15 +147,26 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
 
     if (source == nullptr)
     {
-        /* Nothing to show yet. A black frame still has to be presented, or the
-         * display keeps the previous one and the console looks hung. */
-        if (frame_count <= 2)
-            ps5::debug::mark("ps5_frame: no source yet, presenting black");
-        Display::clear(surface, 0xff000000u);
-        const bool ok = state->display.present();
-        if (frame_count <= 2)
-            ps5::debug::mark_value("ps5_frame: black present returned", ok ? 1 : 0);
-        return ok;
+        /* Nothing to show yet. Rather than a black frame - which cannot be told
+         * apart from a display that never received one - this paints a moving
+         * pattern: three vertical bands whose widths change with the frame count,
+         * so a still image means the display is holding one frame and a moving
+         * one means frames are arriving. It is the cheapest possible answer to
+         * "are my pixels reaching the television", which is a question this
+         * project spent a long time unable to answer. */
+        const std::uint32_t phase = static_cast<std::uint32_t>(frame_count / 30) % 3;
+        const std::uint32_t band = surface.width / 3;
+        for (unsigned y = 0; y < surface.height; ++y)
+            for (unsigned x = 0; x < surface.width; ++x)
+            {
+                unsigned which = x / (band ? band : 1);
+                which = (which + phase) % 3;
+                const std::uint32_t colour = which == 0   ? 0xffe03030u
+                                             : which == 1 ? 0xff30e030u
+                                                          : 0xff3030e0u;
+                Display::write(surface, x, y, colour);
+            }
+        return state->display.present();
     }
 
     /* Nearest-neighbour scale into the console's frame, row by row through the
