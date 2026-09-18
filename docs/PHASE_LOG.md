@@ -557,4 +557,4 @@ register `&video_ps5` in `video_drivers[]`, and reconcile the entry point, since
 `retroarch.c` defines its own `main` and the pipeline's builder supplies a `_start`.
 Then link with the pipeline's CRT and runtime, stage, deploy and launch.
 
-**Commit.** `{{SHA}}` — Delete the websrv material and compile the frontend from RetroArch's own build.
+**Commit.** `b214c22` — Delete the websrv material and compile the frontend from RetroArch's own build.
