@@ -190,4 +190,4 @@ fix in the build: the converter refuses to publish application exports
 (`error: native converter does not yet publish application exports`), and the
 payload has exports because `-rdynamic` asks for them.
 
-**Commit.** `{{SHA}}` — Stage the PPSA title folder and clear two of the three converter requirements.
+**Commit.** `4cea907` — Stage the PPSA title folder and clear two of the three converter requirements.
