@@ -9,21 +9,46 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The console loop runs itself.** `bash tools/run-title.sh` builds, publishes,
-verifies what the console stored, listens, launches, watches, closes the title
-itself and prints the title's own trace. No upload needs a person any more.
+**The Vulkan path is prepared and waiting on one artefact.** RetroArch's Vulkan
+video driver is the way RGUI will reach the screen: it drives the menu itself,
+uploads RGUI's framebuffer as a texture, and loads the GPU side by filename
+(`libvulkan.so.1`, then `libvulkan.so`), so ../PS5_Vulkan's libps5vk drops in
+beside the title. RGUI needs no GPU context of its own - its render path
+references `gfx_display` eight times and every one is a type, not a call.
 
-**The title runs and stays up.** 1500+ frames in 25 s, closed by the script, after
-`patches/series` 0004 fixed a null joypad driver that killed the second pass
-through the runloop (see `docs/FINDINGS.md`).
+It builds with Vulkan on (268 of 278 sources, 8,227,775 bytes against 8,030,159)
+and everything Vulkan needed is in place: built-in glslang, `src/video_filters_stub.cpp`
+for the filter chain upstream does not ship, and three include paths. It is
+switched off in `tools/retroarch-sources.sh` for one measured reason: with it on,
+the title exits **1** within a second of EXEC, with no signal and no message,
+whatever `video_driver` the config names - including `"ps5"` - so a Vulkan build
+cannot fall back to another driver. Switching it on is one line there and one in
+`config/retroarch.cfg` once `libvulkan.so.1` is beside the title.
 
-**The menu does not draw yet, and the reason is measured.** RGUI initialises and
-holds a 320x240 framebuffer, but `GFX_DISP_FLAG_FB_DIRTY` is never set, so
-`rgui_set_texture` returns every frame and the driver reports `no-menu-source`.
-That flag is set at the end of `rgui_render`, which is only reached through
-`menu->driver_ctx->render` under `if (BIT64_GET(menu->state, MENU_STATE_BLIT))`.
-The menu's renderer never runs; finding which condition above that call is false
-is the next step, and `docs/FINDINGS.md` records the path there.
+**Without Vulkan the title runs and stays up.** 900+ frames in 20 s, no fatal
+signal, closed by `tools/run-title.sh`, which now builds, publishes, verifies,
+listens, launches, closes and reports without anyone touching it.
+
+**What is still not true: RGUI has no pixels, and the reason is measured.** The
+menu is alive, has fonts (bundled under `assets/rgui/font/`) and holds a 320x240
+framebuffer, but `rgui_render` is called with `width = 0, height = 0` and returns
+at its own guard. `video_st->width/height` are set from `ps5_set_viewport` now,
+and the flip reports success - but `video_driver_set_size` during init was
+measured to kill the title, so that half is only half wired.
+
+**And nothing this title submits has ever reached the display.** The frame path is
+a write-combined mapping, flushed with `_mm_clflush`, flipped with
+`sceVideoOutSubmitFlip` and confirmed with `sceVideoOutGetFlipStatus`; the display
+reports no flip, and the owner confirms the screen stays black. The AGC path
+PS5_Vulkan uses (`sceAgcDcbSetFlip` + `sceAgcDriverSubmitDcb` +
+`sceAgcSuspendPoint`) is now possible here - the three imports resolve through the
+stubs this project added, and `sceAgcInit(8)` is called before the display opens -
+but submitting a DCB without the GPU context that project builds faulted at
+0x202210000.
+
+**The two paths are the same work now.** A GPU context and a working submission
+are exactly what libps5vk provides, so the Vulkan route and the AGC route converge
+on ../PS5_Vulkan.
 
 ## Next
 
