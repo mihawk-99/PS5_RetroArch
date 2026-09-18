@@ -1,5 +1,7 @@
 {
-  "ageLevel": {"default": 0},
+  "ageLevel": {
+    "default": 0
+  },
   "applicationCategoryType": 0,
   "applicationDrmType": "free",
   "attribute": 0,
@@ -10,10 +12,18 @@
   "contentId": "UP9000-PPSA99169_00-RETROARCH0000001",
   "contentVersion": "01.000.000",
   "downloadDataSize": 256,
-  "gameIntent": {"permittedIntents": [{"intentType": "launchActivity"}]},
+  "gameIntent": {
+    "permittedIntents": [
+      {
+        "intentType": "launchActivity"
+      }
+    ]
+  },
   "localizedParameters": {
     "defaultLanguage": "en-US",
-    "en-US": {"titleName": "PS5 RetroArch"}
+    "en-US": {
+      "titleName": "RetroArch"
+    }
   },
   "masterVersion": "01.00",
   "pubtools": {
