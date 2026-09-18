@@ -708,3 +708,44 @@ what produced this measurement.
 **Boundary.** This console, both writers (FTP and the console owner's
 USB/filebrowser route) and this title. Nothing here says a different title or a
 console without the mount daemons' automount would behave the same way.
+
+---
+
+## 2026-09-18: A 67 KB title image comes back as 122,024 bytes, and my view of the console is not trustworthy
+
+**Measured.** A minimal converted title was built end to end to test the pipeline
+in isolation rather than through a 50 MB emulator:
+
+```text
+build/probe/hello.elf     127,456 bytes   linked with linker/ps5-pie.ld
+build/probe/hello.ps5     122,024 bytes   converted  (link --in hello.elf)
+build/probe/eboot.bin      67,526 bytes   signed     (self --sign)
+```
+
+The signed image validates — `container: signed, plaintext`, twelve segments,
+`integrity: valid` — and `tools/check-payload.sh` correctly refuses it for the
+launcher route.
+
+Written to `/data/homebrew/PPSA99005/eboot.bin`, the console listed **122,024**
+bytes on five consecutive fresh connections. That is not the size sent (67,526)
+and not the previous contents (the folder had no `eboot.bin` at all at that
+moment — a backup rename failed with `550 No such file or directory`, and the
+listing agreed). 122,024 is the size of the *intermediate* file, one step before
+signing, from a file that was never uploaded.
+
+**Consequence.** Something between the upload and the listing substitutes content
+this repository does not control, and it substituted a file that was never sent.
+That makes every size this session has read back from the console suspect,
+including the ones that "matched": the 40 KB marker, the 2/8/60 MB blobs, the icon
+and the same-size pattern blobs may equally have been served from somewhere else.
+
+The honest position is therefore narrower than the previous entries imply: the
+conversion pipeline is correct and reproducible, and what cannot be trusted yet is
+the observation channel. The console owner's own file browser reads the folder
+through a different path than this FTP session does, and comparing the two on one
+file is the cheapest way to find out which of them is lying.
+
+**Boundary.** This console, this FTP session (anonymous over port 2121) and this
+title folder. The measurements above do not say the console is broken; they say
+that one view of it is unreliable, and that view is the one this session has been
+reasoning from.
