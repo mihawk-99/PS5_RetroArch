@@ -1264,3 +1264,51 @@ into a single buffer, register it, flip index 0 once, wait a vblank, and hold.
 went from `marker=0` to `marker=1` - but it did not make the port's frames appear.
 The demo does call it too, so it is necessary and not sufficient, and the marker
 value is weaker evidence than this entry: an owner's eyes on a rendered pattern.
+
+## The fault is before presenting, and every static comparison matches
+
+**Measured.** `present()` was reduced to the working sequence exactly: paint the
+bands into buffer 0, `clflush` + `mfence`, `sceVideoOutSubmitFlip(handle, 0, 1, 1)`
+once, `sceVideoOutWaitVblank`, then hold and never touch the display again. The
+trace confirms the shape - `probe: flipped buffer 0 once, status=0 marker=1 (then
+holding)` - and the title stays up until the loop closes it. The screen is still
+black.
+
+**What that rules out.** All three differences this port had from the working
+sequence are gone from this build - buffer rotation, the `sceVideoOutGetFlipStatus`
+query, and re-flipping every frame - and the screen is unchanged. Presenting is not
+where the fault is.
+
+**What has been compared and matches**, so it is not where the fault is either:
+
+- allocation: `sceKernelAllocateDirectMemory(0, pool, 0x2000000, 0x200000,
+  /*type*/ 3, &physical)` and `sceKernelMapDirectMemory(&mapped, 0x2000000,
+  /*protection*/ 0x33, 0, physical, 0x200000)` - the same call, the same values;
+- layout: two 16 MiB frames at offsets 0 and `frame_bytes`, registered from the
+  mapping's base, exactly as `demo_renderer.cpp` builds its two `VideoBuffer`s;
+- format: `sceVideoOutSetBufferAttribute2(&attr, 0x8000000022000000, 0, 1920, 1080,
+  0, 0, 0)` and `RegisterBuffers2(handle, 0, 0, buffers, 2, &attr, 0, nullptr)`;
+- colour encoding: `0xAARRGGBB` on both sides. The working demo's own table says
+  so - its named colours are the giveaway that the order is B,G,R in bytes
+  (`cyan = 0xffffff00`, `yellow = 0x00ffff`), and this port composes
+  `0xff000000 | r<<16 | g<<8 | b`, which is the same;
+- pixel addressing: the working demo's `put_pixel_unchecked` writes through
+  `tiled_byte_offset(x, y)`, the same tiled layout this port's `Display::write`
+  uses through `tiled_offset(x, y)`;
+- and the arguments both sides pass to `sceVideoOutOpen(0xff, 0, 0, NULL)` and
+  `sceVideoOutSetFlipRate(handle, 0)`, and both call
+  `sceSystemServiceHideSplashScreen()` before opening the display.
+
+**So the next step is a comparison, not a deduction.** Two ways, both cheap:
+
+1. Read the first frame's buffer back on the CPU after the flip and compare it
+   against the same frame drawn by `demo_renderer.cpp`'s own `Canvas`. If this
+   port's buffer does not hold the bands, the write path is at fault and the
+   difference is in `Display::write` or the surface it is handed; if it does hold
+   them, then the memory being written is not the memory being displayed, and the
+   difference is in the registration or the mapping.
+2. Link `demo_renderer.cpp`'s `Canvas` code into this port unchanged, draw through
+   it instead of through `Display`, and present with the probe's single flip. If
+   that appears, the fault is in this port's own drawing; if it does not, the fault
+   is in this port's display setup - and either way the working code is right there
+   to bisect against.
