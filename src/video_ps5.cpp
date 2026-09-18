@@ -37,6 +37,10 @@
 
 extern "C" int sceKernelUsleep(std::uint32_t microseconds);
 
+/* RetroArch's own: how a driver tells the frontend the size of the display it is
+ * drawing into. gfx/video_driver.c is C and this is C++. */
+extern "C" void video_driver_set_size(unsigned width, unsigned height);
+
 namespace
 {
 using ps5::display::Display;
@@ -92,6 +96,17 @@ void *ps5_init(const video_info_t *video, input_driver_t **input, void **input_d
     }
     ps5::debug::mark_value("ps5_init: display opened, back_surface width",
                            static_cast<long long>(state->display.back_surface().width));
+
+    /* Tell the frontend the size of the display it is drawing into.
+     *
+     * Every video driver that has a display does this, and this one did not, so
+     * video_st->width and video_st->height stayed zero. The menu reads them: the
+     * runloop calls the menu's render with video_st->width/height, so rgui_render
+     * was entered every frame with 0,0 and returned at its own guard. That is why a
+     * menu which was alive, had fonts and had a 320x240 framebuffer still
+     * contributed no pixels. */
+    video_driver_set_size(state->display.back_surface().width,
+                          state->display.back_surface().height);
 
     /* The driver owns no input: leaving these untouched hands input back to the
      * frontend's own driver, which is what this step is meant to test. */
@@ -243,6 +258,17 @@ bool ps5_suppress_screensaver(void *data, bool enable) noexcept
     return false;
 }
 
+void ps5_set_viewport(void *data, unsigned width, unsigned height, bool force_full,
+                      bool allow_rotate) noexcept
+{
+    (void)force_full;
+    (void)allow_rotate;
+    (void)data;
+    /* A console's frame is fixed, so a request for another size is reported back as
+     * the size that exists rather than silently accepted. */
+    video_driver_set_size(width ? width : 1920, height ? height : 1080);
+}
+
 /* --- video_poke_interface_t ----------------------------------------------- */
 
 void ps5_set_texture_frame(void *data, const void *frame, bool rgb32, unsigned width,
@@ -367,7 +393,7 @@ extern "C" video_driver_t video_ps5 = {
     nullptr, /* set_shader */
     nullptr, /* free */
     "ps5",
-    nullptr, /* set_viewport */
+    ps5_set_viewport,
     nullptr, /* set_rotation */
     ps5_viewport_info,
     nullptr, /* read_viewport */
