@@ -247,4 +247,4 @@ source image was inspected at 640x640 before resampling, and the result was read
 back as an image to confirm it is the intended artwork rather than a blank or
 distorted tile.
 
-**Commit.** `{{SHA}}` — Generate the launcher icon from the project's artwork.
+**Commit.** `162f974` — Generate the launcher icon from the project's artwork.
