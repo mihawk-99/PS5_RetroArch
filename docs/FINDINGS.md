@@ -371,3 +371,25 @@ converter refuses the image for publishing exports.
 requirement, the startup objects and the layout symbols are all properties of
 this image format, not of RetroArch, so any large application built this way
 needs the same three.
+
+---
+
+## 2026-09-18: The launcher icon comes from the project's own artwork
+
+**Measured.** The title's icon is generated, not copied: `title/assets/retroarch.png`
+(640x640) resampled to 512x512 by `tools/stage-ppsa.sh` and again by
+`tools/build-baseline.sh`, so both the PPSA folder and the payload folder carry
+the same image. The 512x512 requirement is the console's, taken from the
+boilerplate's asset validator and confirmed against the sibling project's own
+title folder, where `icon0.png` is also 512x512.
+
+**Consequence.** One source image in the repository, two generated copies, and no
+hand-edited icon in either output. Before this the icon was the one the vendored
+recipe lifts out of the upstream RetroArch tree, which was a dependency of that
+recipe rather than a choice; the generated icon also removes the recipe's habit
+of *moving* that file out of its tree, which had broken incremental rebuilds
+until the extraction guard learned to repair it.
+
+**Boundary.** The artwork is the project's own file. A different source image
+needs only to be square; the scripts stretch to 512x512 rather than padding, so a
+non-square source would be distorted and should be rejected by whoever replaces it.

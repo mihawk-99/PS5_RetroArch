@@ -11,7 +11,8 @@ _Updated: 2026-09-18_
 
 **The PPSA title folder is complete: `dist/PPSA99005/`.** It holds the signed
 application image `eboot.bin` (49,968,821 bytes), the loader module
-`sce_module/libc.prx`, the title's identity and 512x512 icon under `sce_sys/`,
+`sce_module/libc.prx`, the title's identity and 512x512 icon under `sce_sys/` (generated from
+`title/assets/retroarch.png`),
 the configuration seed, the payload beside them and a digest manifest.
 `tools/stage-ppsa.sh` assembles it and exits 0 only when every piece is there.
 Evidence: the folder's `manifest.sha256` and the converter's own inspection of
@@ -74,6 +75,7 @@ install is asked for first** (`docs/DEPLOYMENT.md`). Nothing has been sent.
 | Console run of the baseline, `evidence/m1-baseline-loads/` | PASS: payload started under the homebrew launcher (pid 151), menu on screen, config written to the title folder |
 | `tools/stage-ppsa.sh` | PASS: `dist/PPSA99005/` holds 6 files with a digest manifest |
 | Image conversion | PASS: `eboot.bin` 49,968,821 bytes, `signed, plaintext`, 12 segments, `integrity: valid` |
+| Launcher icon | PASS: `title/assets/retroarch.png` (640x640) resampled to 512x512, sha256 `65dcb224d62da0427f17589f16922918` |
 | `tools/verify.sh` (all gates) | not yet green: the gate scripts it names still have to be written |
 
 ## Open findings

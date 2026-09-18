@@ -261,7 +261,17 @@ say "re-linking through the intermediate PS5 layout"
 rm -rf -- "$out"
 mkdir -p -- "$out/sce_sys"
 cp -a -- "$work/retroarch.elf" "$work/retroarch.cfg" "$out/"
-[[ -f $work/sce_sys/icon0.png ]] && cp -a -- "$work/sce_sys/icon0.png" "$out/sce_sys/"
+
+# One source image for both outputs: the project's artwork, resampled to the
+# 512x512 a launcher tile must be. The recipe's own smaller icon is not used.
+icon_source="$root/title/assets/retroarch.png"
+if [[ -f $icon_source ]] && command -v magick >/dev/null; then
+    magick "$icon_source" -resize 512x512! -strip "$out/sce_sys/icon0.png"
+elif [[ -f $icon_source ]] && command -v convert >/dev/null; then
+    convert "$icon_source" -resize 512x512! -strip "$out/sce_sys/icon0.png"
+elif [[ -f $work/sce_sys/icon0.png ]]; then
+    cp -a -- "$work/sce_sys/icon0.png" "$out/sce_sys/"
+fi
 cp -a -- "$root/title/homebrew.js" "$out/"
 
 # The check the whole gate exists for: a host Linux object stages just as

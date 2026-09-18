@@ -228,3 +228,23 @@ validated here. Installing and running it is the next step and needs a console
 window, which is asked for rather than taken.
 
 **Commit.** `c8f60e7` — Complete the PPSA title folder with a signed application image.
+
+---
+
+## 2026-09-18: The launcher icon is generated from the project's artwork
+
+The title's icon now comes from `title/assets/retroarch.png` — the RetroArch
+invader, 640x640 — resampled to the 512x512 a launcher tile must be. It exists
+because the icon is the first thing the console shows for this title, and until
+now it was whatever the vendored recipe happened to lift out of the upstream
+tree: a detail of that recipe rather than a decision of ours.
+
+**The evidence.** `tools/stage-ppsa.sh` regenerates `build/icon0.png` on every run
+and copies it into the folder; the staged `sce_sys/icon0.png` is 512x512 and its
+digest is in the folder's `manifest.sha256`. `tools/build-baseline.sh` generates
+the same image for the payload folder, so the two outputs cannot drift apart. The
+source image was inspected at 640x640 before resampling, and the result was read
+back as an image to confirm it is the intended artwork rather than a blank or
+distorted tile.
+
+**Commit.** `{{SHA}}` — Generate the launcher icon from the project's artwork.
