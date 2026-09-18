@@ -79,6 +79,8 @@ class Display final
     void *frames_[2] = {nullptr, nullptr};
     std::uint64_t flip_status_[16] = {0};
     bool agc_ready_ = false;
+    /* One flip has been made and the frame is being held; see Display::present. */
+    bool probe_flipped_ = false;
     int registered_[2] = {-1, -1};
     int back_ = 0;
     unsigned width_ = 0;

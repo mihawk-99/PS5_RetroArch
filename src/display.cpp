@@ -283,39 +283,49 @@ bool Display::present() noexcept
         return false;
     }
 
-    /* The CPU's dirty cache lines are invisible to the display, so the frame is
-     * flushed before the display is asked for it. */
-    flush_frame_cache(frames_[back_], frame_bytes);
+    /* One flip of buffer 0, once, and then nothing - the smallest probe that can
+     * answer "do this title's pixels reach the screen".
+     *
+     * Every detail here is copied from ../PS5_Vulkan/src/demo_renderer.cpp, which
+     * has put a 1920x1080 CPU-written pattern on this console's television: it
+     * flushes the frame, calls sceVideoOutSubmitFlip(video, 0, 1, 1) - buffer index
+     * zero, mode 1, argument 1 - waits a vblank, and then holds that frame forever
+     * in a loop. It never rotates buffers and it never asks for the flip status.
+     *
+     * This port did all three of those differently, and one of them is why its
+     * frames never appeared. Rather than guess which, present() now does exactly
+     * what the working one does and stops. If the bands below appear, the three
+     * differences go back one at a time until the screen goes black again, and the
+     * last one added is the fault.
+     *
+     * The hold matters as much as the flip: re-flipping the same buffer every frame
+     * is a different thing from presenting once and leaving it, and only the second
+     * one is known to work. So after the first present this returns without
+     * touching the display at all. */
+    if (probe_flipped_)
+    {
+        error_ = "";
+        return true;
+    }
 
-    /* Confirmed, not assumed. For several rounds this port could not tell a
-     * presented frame from one the display never took, because the only check was
-     * the call's return code. The status query is what an earlier version was
-     * missing, and it is the difference between "the driver thinks it drew" and
-     * "the display says it showed". */
-    if (sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1) < 0)
+    flush_frame_cache(frames_[0], frame_bytes);
+
+    if (sceVideoOutSubmitFlip(handle_, 0, 1, 1) < 0)
     {
         error_ = "sceVideoOutSubmitFlip refused the frame";
         return false;
     }
     (void)sceVideoOutWaitVblank(handle_);
+    probe_flipped_ = true;
 
     const int status = sceVideoOutGetFlipStatus(handle_, flip_status_);
-    /* Report what the display says it has shown, once, so the trace answers the
-     * question the return code cannot: a flip the display never took reads as
-     * success from SubmitFlip and as a marker of zero here. */
-    static unsigned reported = 0;
-    if (reported < 3 || (reported % 300) == 0)
-    {
-        reported++;
-        char line[160];
-        std::snprintf(line, sizeof(line), "flip status: call=%d marker=%llu shown=%llu", status,
-                      static_cast<unsigned long long>(flip_status_[flip_status_marker_word]),
-                      static_cast<unsigned long long>(flip_status_[0]));
-        ps5::debug::mark(line);
-    }
-    error_ = "";
+    char line[176];
+    std::snprintf(line, sizeof(line),
+                  "probe: flipped buffer 0 once, status=%d marker=%llu (then holding)", status,
+                  static_cast<unsigned long long>(flip_status_[flip_status_marker_word]));
+    ps5::debug::mark(line);
 
-    back_ ^= 1;
+    error_ = "";
     return true;
 }
 } // namespace ps5::display
