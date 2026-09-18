@@ -785,3 +785,73 @@ to copy back: the converted image at 49,968,821 bytes and the signed module at
 kept in the findings file because the cost was a wasted console run and a wrong
 diagnosis, and because the next session needs the rule more than it needs the
 apology.
+
+---
+
+## 2026-09-18: This session's writes go to a copy of the title folder that nothing reads
+
+**Measured.** The console owner replaced both loader files and their file browser
+shows the intended sizes:
+
+```text
+filebrowser: /data/homebrew/PPSA99005/eboot.bin      47.65 MiB = 49,968,821 bytes  (correct)
+filebrowser: /data/homebrew/PPSA99005/sce_module/libc.prx  1.23 MB = 1,284,674     (correct)
+```
+
+This session's FTP view of the same paths simultaneously reports 51,870,448 and
+1,335,962 — the *unconverted* sizes — and writing the converted image to either
+`/data/homebrew/PPSA99005/eboot.bin` or `/system_ex/app/PPSA99005/eboot.bin` six
+times changes neither view. The two views also differ structurally: `sce_module/`
+and `retroarch.elf` are visible in one and absent from the other, in both
+directions.
+
+**Consequence — and a correction to this file's earlier entries.** Every
+"round-trip" recorded here (the 40 KB marker, the 2/8/60 MB blobs, the
+same-size zero and pattern blobs, the icon) was read back through the same
+channel that wrote it. A channel that resolves to a private copy returns what was
+just written to that copy, so those results show only that the copy is writable
+and self-consistent. They do **not** show that the console's real title folder
+accepted anything, and the conclusions built on them — that the store was
+content-aware, that a second writer was restoring files, that the deployment path
+was proven — do not hold.
+
+What does hold, because it needs no trust in the channel: the console's own log
+says `Lack of a .prx file in /app0/sce_module is detected!!!`, and the folder the
+loader reads has no `sce_module/` directory at all.
+
+**Boundary.** This console, this FTP session (anonymous, port 2121). The rule it
+generalises to: a write path whose read path is the same path proves nothing about
+a system that has more than one view of the data.
+
+---
+
+## 2026-09-18: The loader's folder has no sce_module, and that is the current error
+
+**Measured.** The console's log for the last launch is unambiguous:
+
+```text
+# exception: 0xa0020102 (PRX_SCE_MODULE_LOAD_ERROR)
+# === Lack of a .prx file in /app0/sce_module is detected!!! ===
+# Copy the file (e.g. libc.prx) from target/sce_module.
+```
+
+`/app0` is the title's directory as the application sees it, and the folder being
+served there contains `eboot.bin` and nothing else the application needs — no
+`sce_module/` directory. A PS5 title that uses the standard runtime must carry
+`sce_module/libc.prx` inside its own folder; without it the loader fails before
+the application's first instruction.
+
+**Consequence.** The two remaining requirements are both placement, not build:
+
+1. `sce_module/libc.prx` — 1,284,674 bytes, sha256
+   `e6ff45d16adf687855cc3b33b0c8a4132b6504360b221e0a34c7e99fb3ba0036` — inside
+   the title folder the loader reads;
+2. `eboot.bin` — 49,968,821 bytes, starting `4f153d1d` — in the same folder.
+
+Both exist in `dist/PPSA99005/` and are byte-identical to the sibling project's
+copies. Neither can be placed from this session, whose writes do not reach that
+folder.
+
+**Boundary.** This title and layout. A title that does not use the standard
+runtime module would not need `sce_module/`, which is why the requirement is
+stated as a property of the layout rather than of the console.
