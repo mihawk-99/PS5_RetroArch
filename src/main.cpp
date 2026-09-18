@@ -17,6 +17,8 @@
  *   -f              fullscreen, which on a console is the only mode
  *   -c <path>       the config to read and write, inside the title's own folder
  *   --verbose       so the run is readable in the console's log
+ *   --menu          start with the menu up rather than waiting for content: this
+ *                   title has no content, and the menu is what is being proven
  *
  * Why this file writes a trace. The first run of this title on the console ended
  * with the kernel reporting `eboot.bin calls exit() exit_value=0` and nothing
@@ -54,8 +56,9 @@ int main()
     char arg_config[] = "-c";
     char arg_config_path[] = "/app0/retroarch.cfg";
     char arg_verbose[] = "--verbose";
+    char arg_menu[] = "--menu";
     char *argv[] = {
-        arg0, arg_fullscreen, arg_config, arg_config_path, arg_verbose, nullptr,
+        arg0, arg_fullscreen, arg_config, arg_config_path, arg_verbose, arg_menu, nullptr,
     };
     (void)config_path;
 
