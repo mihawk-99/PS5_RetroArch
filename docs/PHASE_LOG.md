@@ -313,4 +313,4 @@ other session's build; the two files in `dist/PPSA99005/` are the converted ones
 Replacing them needs either the console's owner or a moment when no other session
 is publishing that title.
 
-**Commit.** `{{SHA}}` — Publish the PPSA folder with the deployment path this console needs.
+**Commit.** `a80417a` — Publish the PPSA folder with the deployment path this console needs.
