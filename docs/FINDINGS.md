@@ -1350,3 +1350,42 @@ trace shows. The first thing the next round should do is log unconditionally at 
 top of `ps5_frame` whether `frame` is null, with its width, height and pitch. That
 one line says which branch the driver is actually taking, and the readback belongs
 in whichever branch it is.
+
+## The bands are provably in the buffer, the flip is accepted, and the screen is black
+
+**Measured.** With the probe painting the frame itself and reading it back through
+the same tiled addressing that wrote it:
+
+    readback: base=200200000 1920x1080 wrong=0 of 2073600 (0.0% wrong)
+    probe: flipped buffer 0 once, status=0 marker=1 (then holding)
+
+Zero wrong pixels: the buffer holds exactly the three bands that were painted, in
+the tiled layout the display is told about. The base is `0x200200000`. The flip of
+buffer 0 is accepted and the display reports marker 1.
+
+**And the screen stays black.**
+
+**So the write half is proven and the display half is not.** Every value this port
+passes to VideoOut matches `../PS5_Vulkan/src/demo_renderer.cpp` - the same
+allocation, protection, alignment, two-buffer registration from the mapping base,
+pixel format, `SetFlipRate(0)`, `HideSplashScreen` before open, and the same tiled
+addressing, checked numerically - and the memory holds the right pixels. What
+remains is the one thing no comparison of values can catch: whether the buffer that
+was written is the buffer the display reads.
+
+**A process lesson, and it cost two rounds.** The probe was left inside
+`if (source == nullptr)` while the frontend hands this driver a real 4x4 frame on
+every call, so the branch was never taken and none of the probe code ran. A
+readback that never printed was read as a display fault rather than as code that
+never ran. One unconditional log at the top of the frame callback - `frame=present
+w=4 h=4 pitch=8 menu_frame=no` - settled it in a single run. Measure which path a
+driver is on before building anything on top of it; do not infer it from a tag that
+happens to be printed nearby.
+
+**Also settled, and it explains a great deal.** The frontend asks this driver to
+draw a **4x4** frame, not 1920x1080. That is why the image was never scaled to the
+screen: `video_st->width/height` are zero because nothing ever called
+`video_driver_set_size`, so RetroArch is presenting into a degenerate frame. The
+probe sidesteps it by painting the display's own frame directly. Fixing the size is
+the next thing for the real path, and `ps5_set_viewport` is where the driver can
+report it.

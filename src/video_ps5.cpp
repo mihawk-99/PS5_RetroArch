@@ -46,6 +46,9 @@ namespace
 {
 using ps5::display::Display;
 
+/* The probe paints the frame itself; see ps5_frame. */
+constexpr bool probe_paint = true;
+
 struct DriverState
 {
     Display display;
@@ -158,6 +161,60 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
         source_rgb32 = true;
     }
 
+    /* The probe frame is drawn here, in the body, and not inside the
+     * `source == nullptr` branch, which is where it used to be and why it never ran:
+     * the frontend hands this driver a real 4x4 frame on every call (trace:
+     * "frame=present w=4 h=4 pitch=8"), so the code takes the core-frame branch every
+     * time. A readback that never printed was read as a display fault for two rounds
+     * instead of as code that never ran. The unconditional log at the top of this
+     * function is what settled it, and it is the pattern to keep: the branch a driver
+     * takes is a fact about the frontend, and it has to be measured first. */
+    if (probe_paint)
+    {
+        const std::uint32_t probe_band = surface.width / 3 ? surface.width / 3 : 1;
+        for (unsigned y = 0; y < surface.height; ++y)
+            for (unsigned x = 0; x < surface.width; ++x)
+            {
+                const unsigned which = (x / probe_band) % 3;
+                const std::uint32_t colour = which == 0   ? 0xffe03030u
+                                             : which == 1 ? 0xff30e030u
+                                                          : 0xff3030e0u;
+                Display::write(surface, x, y, colour);
+            }
+
+        /* Painted - are they in the buffer? Read back through the same tiled
+         * addressing that wrote them and count the pixels that differ. Near zero
+         * means the bands are in memory and the display half is at fault; near the
+         * frame size means the write never landed. One number tells them apart. */
+        if (!state->trace_readback_done)
+        {
+            state->trace_readback_done = true;
+            const auto *bytes = static_cast<const std::uint8_t *>(surface.base);
+            std::size_t wrong = 0;
+            for (unsigned y = 0; y < surface.height; ++y)
+                for (unsigned x = 0; x < surface.width; ++x)
+                {
+                    const unsigned which = (x / probe_band) % 3;
+                    const std::uint32_t colour = which == 0   ? 0xffe03030u
+                                                 : which == 1 ? 0xff30e030u
+                                                              : 0xff3030e0u;
+                    std::uint32_t found = 0;
+                    std::memcpy(&found, bytes + Display::offset_of(x, y), sizeof(found));
+                    if (found != colour)
+                        ++wrong;
+                }
+            char line[224];
+            std::snprintf(line, sizeof(line),
+                          "readback: base=%p %ux%u wrong=%zu of %u (%.1f%% wrong)", surface.base,
+                          surface.width, surface.height, wrong, surface.width * surface.height,
+                          100.0 * static_cast<double>(wrong) /
+                              static_cast<double>(surface.width * surface.height));
+            ps5::debug::mark(line);
+        }
+
+        return state->display.present();
+    }
+
     if (source == nullptr)
     {
         /* Nothing to show yet. Rather than a black frame - which cannot be told
@@ -180,45 +237,6 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
                 Display::write(surface, x, y, colour);
             }
 
-        /* The bands are painted. Are they in the buffer?
-         *
-         * Every static comparison against ../PS5_Vulkan's demo_renderer.cpp - the
-         * allocation, the registration, the format, the colour encoding, the tiled
-         * addressing - has been made and matches, and the screen is still black.
-         * The remaining question cannot be answered by reading: it is whether the
-         * pixels this code writes are the pixels the display reads. So they are
-         * read back here, through the same tiled addressing that wrote them, and
-         * counted against what was intended.
-         *
-         * A count near zero says the bands are in memory and the fault is in the
-         * display half. A count near the frame size says the write never landed and
-         * the fault is here. The two are told apart by one number. */
-        if (!state->trace_readback_done)
-        {
-            state->trace_readback_done = true;
-            const auto *bytes = static_cast<const std::uint8_t *>(surface.base);
-            std::size_t wrong = 0;
-            for (unsigned y = 0; y < surface.height; ++y)
-                for (unsigned x = 0; x < surface.width; ++x)
-                {
-                    unsigned which = x / (band ? band : 1);
-                    which = (which + phase) % 3;
-                    const std::uint32_t colour = which == 0   ? 0xffe03030u
-                                                 : which == 1 ? 0xff30e030u
-                                                              : 0xff3030e0u;
-                    std::uint32_t found = 0;
-                    std::memcpy(&found, bytes + Display::offset_of(x, y), sizeof(found));
-                    if (found != colour)
-                        ++wrong;
-                }
-            char line[224];
-            std::snprintf(line, sizeof(line),
-                          "readback: base=%p %ux%u wrong=%zu of %u (%.1f%% wrong)", surface.base,
-                          surface.width, surface.height, wrong, surface.width * surface.height,
-                          100.0 * static_cast<double>(wrong) /
-                              static_cast<double>(surface.width * surface.height));
-            ps5::debug::mark(line);
-        }
         return state->display.present();
     }
 
