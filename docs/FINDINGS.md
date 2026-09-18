@@ -1185,3 +1185,42 @@ in the title folder once `log_verbosity` is on.
 **What switching it on costs, when the ICD exists.** One line in
 `tools/retroarch-sources.sh` (`--enable-vulkan`) and one in the title's
 `retroarch.cfg` (`video_driver = "vulkan"`). Everything else is already there.
+
+## The shell's splash screen was covering every frame this title presented
+
+**Measured.** The display's own flip status says so. `sceVideoOutGetFlipStatus`
+fills sixteen 64-bit words and word 3 carries the marker of the latest flip the
+display has *shown*:
+
+    before:  flip status: call=0 marker=0 shown=0
+    after:   flip status: call=0 marker=1 shown=1
+
+`call=0` is a successful query in both. The marker is the difference: zero means
+the display had not shown a single flip, one means it has shown flip 1.
+
+**The change is one call.** `sceSystemServiceHideSplashScreen()`, before the
+display is claimed in `Display::open`. It is the shell's startup splash, it sits
+over the frame, and this port never asked for it to go. Nothing else changed: the
+same two registered buffers, the same flip mode, the same cache flush.
+
+**How it was found, because the route matters more than the fix.**
+../PS5_Vulkan's `src/demo_renderer.cpp` is a minimal CPU-to-VideoOut template -
+two frames drawn into direct memory, flush, register, one flip, one vblank wait,
+and **no** `sceVideoOutGetFlipStatus` at all. Its constants and its sequence are
+otherwise identical to this port's, character for character in the parts that
+matter (frame size, `frame_bytes` 0x1000000, alignment 0x200000, memory type 3,
+map protection 0x33, pixel format 0x8000000022000022's sibling
+0x8000000022000000, `sceVideoOutOpen(0xff, 0, 0, NULL)`, `SetFlipRate(handle, 0)`,
+the same 80-byte attribute, the same two-buffer registration, `SubmitFlip(...,
+1, 1)`). Diffing the two sequences and taking each difference in turn left the
+splash call as the one that mattered.
+
+**What this does and does not settle.** Frames written by the CPU now reach the
+screen through `sceVideoOutSubmitFlip` - a path this project had no evidence for
+and which the sibling's driver does not use at all. It does not settle the menu,
+which is the separate fault already recorded: `rgui_render` is called every frame
+with `width = 0, height = 0`.
+
+**The instrument that found it is the one to keep.** A flip status that says
+"shown" is the only evidence this project has ever had that a pixel arrived, and
+it is worth more than the return code of a submission call.

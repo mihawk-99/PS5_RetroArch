@@ -43,6 +43,12 @@ extern "C"
      * Submitting a command buffer without it is what faulted this port with a
      * write to 0x202210000. */
     std::int32_t sceAgcInit(std::uint32_t version);
+    /* The shell's startup splash covers the top of the framebuffer until a title
+     * asks for it to go. ../PS5_Vulkan's M2 renderer, which is the template this
+     * path follows, calls this before it opens the display (src/demo_renderer.cpp)
+     * and this port never has - which is one of the few differences left between a
+     * sequence that has put pixels on this console's screen and one that has not. */
+    int sceSystemServiceHideSplashScreen();
     int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
                         const void *param);
     int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
@@ -153,6 +159,10 @@ bool Display::open(unsigned width, unsigned height) noexcept
 
     width_ = width;
     height_ = height;
+
+    /* Out of the way before the display is claimed: the splash is the shell's and
+     * sits over the frame this title is about to present into. */
+    (void)sceSystemServiceHideSplashScreen();
 
     /* The GPU command-processor context, before anything is submitted to it.
      * ../PS5_Vulkan initialises AGC before its first submission
