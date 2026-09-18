@@ -275,3 +275,55 @@ project's own remote directory.
 
 **Boundary.** ftpsrv v0.21.1 on this console. Another service, or a later version,
 may answer differently, and the size check is what would catch it.
+
+---
+
+## 2026-09-18: The application-image converter has three requirements, and two are now met
+
+**Measured.** Getting from a working payload to an `eboot.bin` runs through the
+image converter in `../ps5-native-app-boilerplate-main`
+(`tooling/native/native_app_builder.cpp`, built as `build/host/ps5-native-tool`
+— its host half builds without the `clang-18` its full app build wants). Three
+requirements were found by running it, in this order:
+
+1. **The linked layout must leave room for the process parameters.** The
+   converter computes where the console's process-parameter record and its
+   parameter blocks go, and refuses the layout when that space would overlap the
+   writable data: `error: LLVM layout leaves no room for PS5 process parameters`
+   (`sce_module_writer.cpp:684`, which needs `relro_end <= data_start`). The
+   recipe links with the compiler driver and its default PIE layout, which fails
+   this. Linking instead through `prospero-lld` with the boilerplate's
+   `ps5-pie.ld`, plus one page-alignment between the RELRO and data segments,
+   produces a layout the converter accepts — verified twice: on a minimal
+   program, which converted to 121,536 bytes, and on the real 68 MB RetroArch
+   payload, which then failed at the next requirement instead of this one.
+   `linker/ps5-pie.ld` is that script and `tools/prospero-clang-link` is the
+   shim that applies it.
+2. **Every referenced symbol must be defined somewhere.** The converter refuses
+   to write an image while a referenced symbol has no definition:
+   `error: no public SDK stub exports required symbol __dlopen`, then
+   `... kernel_mprotect`. Compiling for this target makes clang take FreeBSD's
+   libc as its model, so every dlopen() user carries a **weak** reference to
+   `__dlopen` and its siblings — harmless to the linker, fatal to the converter
+   — and libretro-common's memory-mapping layer references `kernel_mprotect`.
+   Enumerating the difference between the payload's undefined symbols and the
+   definitions in every SDK stub left exactly one such symbol after `__dl*`:
+   `kernel_mprotect`. `platform/ps5_dl_stubs.c` defines all six, and forwards
+   `kernel_mprotect` to `mprotect` rather than stubbing it, because a failing
+   stub is precisely what denies a dynamic recompiler executable memory.
+3. **The converter does not yet publish application exports.** It requires every
+   dynamic symbol to be undefined: `error: native converter does not yet publish
+   application exports` (`sce_module_writer.cpp:698`). This is the current
+   blocker. Our payload defines exports — that is what `-rdynamic` is for — and
+   the converter's own tool is the thing that would have to change, or the
+   payload would have to be linked with an export list that hides them. This one
+   is a limitation of the tool, not of the payload.
+
+**Consequence.** Two of the three are solved in this repository and the third is
+named with its exact text. The remaining work is a decision about which side to
+change: relax the converter, or publish a narrowed export list from the link.
+Either way it is a small, well-defined change rather than an open question.
+
+**Boundary.** The converter as it stands in `../ps5-native-app-boilerplate-main`
+on 2026-09-18, and RetroArch 1.21.0 as the recipe links it. A converter that
+gains export publishing removes the third requirement.

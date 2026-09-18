@@ -190,15 +190,24 @@ sed -i -e 's|/user/homebrew|$p|g' config.mk" -i -- "$work/build.sh"
 # is enough, and a host without ccache still builds. The shim is named for each
 # compiler separately and calls the real one through the SDK path: ccache
 # resolves a bare compiler name on PATH, which would find this shim again.
+mkdir -p -- "$work/.shim"
+# One shim per compiler name, in front of the real one. It decides at run time
+# whether the invocation is a compile or a link: compiles go to ccache (when it
+# is installed) and then to the compiler, links go to the intermediate PS5
+# layout that the application-image converter requires
+# (tools/prospero-clang-link has the reason). This is the only place the
+# recipe's toolchain is intercepted.
+for name in prospero-clang prospero-clang++; do
+    {
+        printf '#!/bin/sh\n'
+        printf 'exec "%s/tools/prospero-clang-link" %s "$@"\n' "$root" "$name"
+    } > "$work/.shim/$name"
+    chmod +x "$work/.shim/$name"
+done
 if command -v ccache >/dev/null; then
-    mkdir -p -- "$work/.shim"
-    for name in prospero-clang prospero-clang++; do
-        printf '#!/bin/sh\nexec ccache "%s/bin/%s" "$@"\n' \
-            "$PS5_PAYLOAD_SDK" "$name" > "$work/.shim/$name"
-        chmod +x "$work/.shim/$name"
-    done
     say "compiling through ccache ($(ccache --version | head -n1))"
 fi
+say "linking through the intermediate PS5 layout (tools/prospero-clang-link)"
 
 jobs=$(nproc 2>/dev/null || echo 4)
 say "building RetroArch $upstream_version with -j$jobs; the log is $logs/build.log"

@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# PS5 RetroArch - linker shim for the cross build.
+#
+# The recipe compiles and links with one command: prospero-clang drives the
+# linker itself, with clang's default PIE layout. That layout cannot be turned
+# into a PSSA application image: the converter that produces eboot.bin needs the
+# process-parameter record to have room between the read-only and writable
+# segments, and it rejects the default layout with "LLVM layout leaves no room
+# for PS5 process parameters".
+#
+# So this shim is placed earlier on PATH than prospero-clang and does two things:
+#
+#   compile  --invocation, passed through unchanged;
+#   link     --invocation, handed to the linker directly with the intermediate
+#            layout that the converter expects (ps5-pie.ld, taken from the
+#            sibling project ../ps5-native-app-boilerplate-main, which is where
+#            the layout was validated on hardware).
+#
+# Only the layout of our own output changes. No source is touched, no flag of
+# the recipe is discarded, and the payload's imports and exports are the same
+# ones the converter checks for.
+#
+# Usage (only ever called by the build through PATH):
+#   prospero-clang-link [tool-name] <compiler arguments...>
+
+set -euo pipefail
+
+tool=${1:?the tool name is required (prospero-clang or prospero-clang++)}
+shift
+
+compiler="${PS5_PAYLOAD_SDK:?PS5_PAYLOAD_SDK is not set}/bin/$tool"
+# Compiles keep ccache when it is installed; links never go near it.
+if command -v ccache >/dev/null; then
+    compile_cmd=(ccache "$compiler")
+else
+    compile_cmd=("$compiler")
+fi
+linker="${PS5_PAYLOAD_SDK}/bin/prospero-lld"
+script="${PS5RA_PS5_PIE_LD:?PS5RA_PS5_PIE_LD is not set}"
+stub_dir="${PS5_PAYLOAD_SDK}/target/lib"
+
+# Is this a compile-only or a link? -c, -E and -S stop before the linker; -shared
+# is not something this project produces.
+link=yes
+for arg in "$@"; do
+    case "$arg" in
+        -c|-E|-S|-shared|-r) link=no ;;
+    esac
+done
+
+if [[ $link == no ]]; then
+    exec "${compile_cmd[@]}" "$@"
+fi
+
+# Translate the compiler's arguments into a linker invocation: keep everything
+# that describes the link, drop what describes the compiler, and add the layout.
+args=()
+for arg in "$@"; do
+    case "$arg" in
+        -std=*|-O0|-O1|-O2|-O3|-Os|-Ofast|-g|-g1|-g2|-g3|-pipe|-v|-###) continue ;;
+        # -rdynamic is a compiler-driver spelling for "export the dynamic
+        # symbols"; the linker has its own way to say that, and the recipe's
+        # spelling is not accepted by lld directly.
+        -rdynamic|-Wl,-rdynamic|-Wl,--export-dynamic) continue ;;
+        # -pthread is the compiler driver's spelling of "thread support"; the
+        # linker has no such flag and the symbols come from the stub libraries.
+        -pthread|-lpthread|-Wl,-pthread) continue ;;
+    esac
+    args+=("$arg")
+done
+
+# Extra objects this project defines, compiled here so the link stays a single
+# command: platform/ps5_dl_stubs.c supplies the __dl* symbols that the target's
+# libc does not provide and the image converter requires to be resolved
+# (that file's comment has the full reason).
+extra=()
+if [[ -n ${PS5RA_PLATFORM_DIR:-} && -f $PS5RA_PLATFORM_DIR/ps5_dl_stubs.c ]]; then
+    stub_obj="${PS5RA_OBJ_DIR:-/tmp}/ps5_dl_stubs.o"
+    "$compiler" -c "$PS5RA_PLATFORM_DIR/ps5_dl_stubs.c" -o "$stub_obj"
+    extra=("$stub_obj")
+fi
+
+exec "$linker" -T "$script" --eh-frame-hdr -e _start \
+    -L "$stub_dir" -o "${PS5RA_LINK_OUT:-retroarch}" "${args[@]}" "${extra[@]}" \
+    --as-needed "$stub_dir"/*.so

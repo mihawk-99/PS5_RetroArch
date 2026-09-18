@@ -157,3 +157,37 @@ Both behaviours are handled in `tools/deploy.py` and written up in
 `docs/FINDINGS.md`.
 
 **Commit.** `d869361` — Prove the Option 1 baseline on the console.
+
+---
+
+## 2026-09-18: The PPSA title folder, and what stands between it and eboot.bin
+
+`tools/stage-ppsa.sh` now assembles the PPSA title folder the objective asks
+for: `dist/PPSA99005/` with the title's identity (`title/sce_sys/param.json`,
+checked for a valid id, content id, version and launch intent), the 512x512
+launcher icon, `sce_module/libc.prx`, the configuration seed, the payload beside
+them and a digest manifest. It exists because a payload folder and a title folder
+are different things: the console lists the first only while a launcher is
+running, and installs the second as an application in its own right.
+
+**The evidence.** `tools/stage-ppsa.sh` stages five files into `dist/PPSA99005/`
+and writes `manifest.sha256`; with `eboot.bin` absent it prints that the folder is
+not complete and exits 3, which is the intended state rather than a silent
+success. The three converter requirements found on the way are written up with
+their exact messages in `docs/FINDINGS.md`.
+
+**What was tried first.** Three rejections in a row from the image converter, each
+one real and each one narrower than the last. The linker's default layout leaves
+no room for the console's process parameters, so the link now goes through
+`prospero-lld` with our `linker/ps5-pie.ld` and one extra page boundary; that was
+verified on a minimal program, which converted cleanly at 121,536 bytes, before
+being applied to the 68 MB payload. Weak `__dlopen` references — which clang
+emits because FreeBSD's libc declares both spellings — and a `kernel_mprotect`
+reference then had to be defined, which `platform/ps5_dl_stubs.c` does, including
+one that forwards to `mprotect` instead of failing, because a failing stub is what
+denies a dynamic recompiler executable memory. The third rejection is not ours to
+fix in the build: the converter refuses to publish application exports
+(`error: native converter does not yet publish application exports`), and the
+payload has exports because `-rdynamic` asks for them.
+
+**Commit.** `{{SHA}}` — Stage the PPSA title folder and clear two of the three converter requirements.

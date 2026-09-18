@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# PS5 RetroArch - assemble the PPSA title folder.
+#
+#   tools/stage-ppsa.sh            build dist/<TITLE_ID>/ from the staged payload
+#   tools/stage-ppsa.sh --check    validate the metadata and the inputs only
+#
+# A PPSA title is what the console's home screen lists and starts by itself. It
+# is a folder:
+#
+#   dist/<TITLE_ID>/
+#     eboot.bin                 the application image the console loads
+#     sce_module/libc.prx       the loader-visible compatibility module
+#     sce_sys/param.json        the title's identity: id, name, version
+#     sce_sys/icon0.png         the 512x512 launcher icon
+#     retroarch.cfg             the frontend's configuration seed
+#     retroarch.elf             the payload, kept beside it for the loader path
+#     manifest.sha256           a digest per file, so the folder is checkable
+#
+# This script produces everything except eboot.bin, which needs the image
+# converter (see "The application image" below); it refuses to call the folder
+# complete while that file is missing, and says so.
+#
+# Two owners are involved and are named here rather than copied silently:
+#   - the title identity in title/sce_sys/param.json is ours;
+#   - sce_module/libc.prx is the clean-room module from the sibling project
+#     ../ps5-native-app-boilerplate-main, used as it is because it is the
+#     hardware-validated one. It is never edited.
+#
+# Details: docs/REFERENCE.md ("Shipping as a PPSA title") and docs/DEPLOYMENT.md.
+
+set -euo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+
+param="$root/title/sce_sys/param.json"
+icon_src="$root/dist/baseline/sce_sys/icon0.png"
+payload="$root/dist/baseline/retroarch.elf"
+config="$root/dist/baseline/retroarch.cfg"
+libc_src="$root/../ps5-native-app-boilerplate-main/runtime/libc.prx"
+eboot_src="${PS5RA_EBOOT:-$root/build/eboot.bin}"
+
+mode=stage
+[[ ${1:-} == --check ]] && mode=check
+[[ $# -le 1 ]] || { echo "usage: ${0##*/} [--check]" >&2; exit 2; }
+
+say() { printf '==> [ppsa] %s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+# ---- the identity, checked rather than assumed ------------------------------
+command -v python3 >/dev/null || die "python3 is required"
+[[ -f $param ]] || die "missing $param"
+read -r title_id content_id content_version title_name < <(python3 - "$param" <<'PY'
+import json, re, sys
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+title_id = value.get("titleId", "")
+if not re.fullmatch(r"PPSA[0-9]{5}", title_id):
+    raise SystemExit(f"titleId is not PPSA plus five digits: {title_id!r}")
+if title_id not in value.get("contentId", ""):
+    raise SystemExit("contentId does not contain the titleId")
+if not re.fullmatch(r"[0-9]{2}\.[0-9]{3}\.[0-9]{3}", value.get("contentVersion", "")):
+    raise SystemExit("contentVersion is not NN.NNN.NNN")
+if not value.get("gameIntent", {}).get("permittedIntents"):
+    raise SystemExit("a game title must permit the launchActivity intent")
+name = value.get("localizedParameters", {}).get("en-US", {}).get("titleName", "")
+if not name:
+    raise SystemExit("the default language titleName is empty")
+print(title_id, value["contentId"], value["contentVersion"], name.replace(" ", "_"))
+PY
+) || die "the title identity is not usable"
+
+out="$root/dist/$title_id"
+say "title      $title_id  ($title_name)"
+say "content    $content_id  version $content_version"
+
+# ---- inputs -----------------------------------------------------------------
+missing=()
+[[ -f $payload ]]  || missing+=("$payload (run tools/build-baseline.sh)")
+[[ -f $config ]]   || missing+=("$config (run tools/build-baseline.sh)")
+[[ -f $icon_src ]] || missing+=("$icon_src (run tools/build-baseline.sh)")
+if (( ${#missing[@]} )); then
+    printf 'error: the PPSA folder cannot be assembled yet; missing:\n' >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    exit 1
+fi
+
+# The icon must be the size the console expects for a launcher tile.
+icon_size=$(python3 - "$icon_src" <<'PY'
+import struct, sys
+data = open(sys.argv[1], "rb").read()
+if data[:8] != b"\x89PNG\r\n\x1a\n":
+    raise SystemExit("not a PNG")
+width, height = struct.unpack(">II", data[16:24])
+print(f"{width}x{height}")
+PY
+) || die "$icon_src is not a readable PNG"
+[[ $icon_size == 512x512 ]] || die "icon0.png is $icon_size, the title icon must be 512x512"
+say "icon       $icon_src ($icon_size)"
+
+if [[ $mode == check ]]; then
+    if [[ -f $libc_src ]]; then
+        say "libc.prx   $libc_src ($(stat -c%s "$libc_src") bytes)"
+    else
+        say "libc.prx   MISSING at $libc_src"
+    fi
+    if [[ -f $eboot_src ]]; then
+        say "eboot.bin  $eboot_src ($(stat -c%s "$eboot_src") bytes)"
+    else
+        say "eboot.bin  missing: the application image has not been converted yet"
+    fi
+    say "check complete; nothing was written"
+    exit 0
+fi
+
+[[ -f $libc_src ]] || die \
+    "missing $libc_src; it is produced by ../ps5-native-app-boilerplate-main (make libc)"
+
+# ---- assemble ---------------------------------------------------------------
+rm -rf -- "$out"
+mkdir -p -- "$out/sce_sys" "$out/sce_module"
+cp -a -- "$param"          "$out/sce_sys/param.json"
+cp -a -- "$icon_src"       "$out/sce_sys/icon0.png"
+cp -a -- "$libc_src"       "$out/sce_module/libc.prx"
+cp -a -- "$config"         "$out/retroarch.cfg"
+cp -a -- "$payload"        "$out/retroarch.elf"
+
+if [[ -f $eboot_src ]]; then
+    cp -a -- "$eboot_src" "$out/eboot.bin"
+    say "application image copied from $eboot_src"
+else
+    say "the application image is not built yet: this folder has no eboot.bin"
+fi
+
+(
+    cd "$out"
+    find . -type f ! -name manifest.sha256 -print0 | sort -z \
+        | xargs -0 sha256sum > manifest.sha256
+)
+say "staged $(find "$out" -type f ! -name manifest.sha256 | wc -l) files in ${out#$root/}"
+cat "$out/manifest.sha256"
+
+if [[ ! -f $out/eboot.bin ]]; then
+    say "NOT COMPLETE: without eboot.bin the console will not list this title."
+    say "The converter that produces it is the next step (docs/REFERENCE.md)."
+    exit 3
+fi
+say "complete: ${out#$root/} is a PPSA title folder"
