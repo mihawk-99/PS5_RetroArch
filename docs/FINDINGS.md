@@ -957,3 +957,68 @@ available.
 **Boundary.** ftpsrv v0.21.1 on this console. This does not say the console is
 faulty; it says that one of its two file views reports another title's bytes for a
 path that did not exist a moment earlier.
+
+---
+
+## 2026-09-18: The title is unregistered and its image is not the one we built
+
+**Measured.** The launch of PPSA99169 was captured with the console's own log
+delimited from the moment of the launch, while no other title was running. The
+console states both problems itself:
+
+```text
+ClearSlotInfoCache() [PPSA99169] is not registered
+[sceProcessStarter] ProcessTerm() big/mini app title_id = [PPSA99169]
+[SceShellUI] E/Base.BgmController : invalid path /user/app/PPSA99169/sce_sys/snd0.at9
+```
+
+and the folder contents do not match what was deployed:
+
+```text
+/data/homebrew/PPSA99169/eboot.bin   73,648 bytes   (ours is 18,791)
+/data/homebrew/PPSA99988/eboot.bin   17,264,368     <- the title that runs
+```
+
+The registration *layout* is correct, though — compared folder by folder with the
+title that runs, ours has every piece in place:
+
+```text
+/user/app/PPSA99169/       icon0.png, mount.lnk, sce_sys/
+/user/appmeta/PPSA99169/   icon0.png, param.json, pic0.dds, pic1.dds, snd0.at9
+/data/homebrew/PPSA99169/  eboot.bin, assets/, sce_module/, sce_sys/
+/user/app/PPSA99988/       icon0.png, mount.lnk, sce_sys/          (identical shape)
+/user/appmeta/PPSA99988/   icon0.png, param.json, pic0.dds, ...    (identical shape)
+```
+
+**Consequence.** Two independent things remain, and both are outside this
+session's reach:
+
+1. **The image in the folder is not the built one.** Our `eboot.bin` is 18,791
+   bytes; the console's is 73,648. Every write path available here reports
+   success and leaves the old bytes, so the 18,791-byte image — staged in
+   `handoff/PPSA99169/` — has to be placed by the console's owner.
+2. **The title is not registered with the shell.** `is not registered` and the
+   missing `/user/app/PPSA99169/sce_sys/snd0.at9` say the title is absent from the
+   shell's app database. The folders exist, so the remaining step is whatever the
+   console's own installer does to register them — the console owner's route.
+
+**Boundary.** This console and these two titles. A console where the owner has run
+its installer for the title does not show the registration half.
+
+---
+
+## 2026-09-18: A launch is refused while another title is running
+
+**Measured.** With PPSA99988 running (`procs` reported `title=PPSA99988 count=1
+pids=214`), `launch PPSA99169` returned `0x80940010` and nothing started: the log
+shows no execution and no crash for the new title, and `procs` was empty
+afterwards.
+
+**Consequence.** This console runs one title at a time, so a launch attempted
+while another title is up proves nothing about the title being launched, and a
+crash read from an undelimited log cannot be attributed. `tools/console-run.sh`
+now checks the console first, refuses to launch into a busy console, records the
+listener's position before launching, and judges only the lines after that mark.
+
+**Boundary.** This console's launcher behaviour. `--force` exists for the case
+where demonstrating the refusal is the point.
