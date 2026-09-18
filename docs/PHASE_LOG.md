@@ -121,3 +121,39 @@ still at the folder root. Both are the first item in `docs/ACTIVE.md`'s Next
 list, and neither is being treated as done.
 
 **Commit.** `1036f50` — Build and deploy the Option 1 baseline.
+
+---
+
+## 2026-09-18: Option 1 is proved — the baseline loads on the console and draws its menu
+
+The vendored recipe's RetroArch 1.21.0 payload was started on the console through
+its own homebrew launcher, and the menu came up. It exists because a console run
+of something we did not write is the reference every later run of our own build
+is read against, and it unblocks the move to the Vulkan driver: the frontend, its
+configuration, its launcher manifest and the console's launcher path are all
+known-good now.
+
+**The evidence.** `tools/console-launch.sh --capture` started
+`/data/homebrew/PS5_RetroArch/retroarch.elf` through websrv's `/hbldr` endpoint
+with the arguments and environment the launcher manifest declares, and the
+capture is committed as `evidence/m1-baseline-loads/` with the run it came from
+and the expectation `tools/evidence.py compare` replays (exit 0, one capture,
+zero failures). The raw capture is `klog/launch-20260918-120546.log`. The
+console's control payload reported the run as the active application —
+`app=24600 pid=151` under the homebrew title — and the owner confirmed the menu
+was on screen. While it ran, RetroArch wrote `retroarch.cfg` (34 KB to 110 KB) and
+a `.config/retroarch/` tree into its own folder, which is independent proof that
+the frontend reached its main loop with a working storage path.
+
+**What was tried first.** The first launch captured a single line —
+`Fontconfig error: Cannot load default config file: No such file: (null)` — which
+looked like a failure and is not one: it is fontconfig falling back to its
+built-in defaults before any driver starts, and the menu renders anyway. It is
+now in `docs/TROUBLESHOOTING.md` with its exact text, so the next reader does not
+chase it. A second wrong turn is worth recording too: two deploys looked like
+failures while the files had in fact arrived, because this console's FTP service
+ignores the path argument of a listing command and answers deletes with 226.
+Both behaviours are handled in `tools/deploy.py` and written up in
+`docs/FINDINGS.md`.
+
+**Commit.** `{{SHA}}` — Prove the Option 1 baseline on the console.

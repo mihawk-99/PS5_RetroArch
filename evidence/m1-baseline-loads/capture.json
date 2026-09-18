@@ -1,0 +1,13 @@
+{
+  "step": "m1-baseline-loads",
+  "recorded": "2026-09-18T16:08:18Z",
+  "console_run": "websrv launcher app=24600 pid=151, title FAKE00000",
+  "revision": "1d76743",
+  "command": "tools/console-launch.sh --capture",
+  "raw_capture": "klog/launch-20260918-120546.log",
+  "raw_lines": 1,
+  "raw_bytes": 72,
+  "lines": [
+    "Fontconfig error: Cannot load default config file: No such file: (null)"
+  ]
+}

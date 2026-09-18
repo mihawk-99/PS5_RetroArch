@@ -17,7 +17,8 @@ work/
 # Fetched dependencies (host test framework, graphics SDK packages).
 .deps/
 
-# Raw console captures. The distilled record under evidence/ is what is kept.
+# Raw console captures. The distilled record under evidence/ is what is kept, so
+# evidence/ is deliberately not ignored.
 klog/
 
 # Payload and library artifacts, staged or loose.

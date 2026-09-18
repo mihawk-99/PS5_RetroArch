@@ -1,0 +1,9 @@
+{
+  "step": "m1-baseline-loads",
+  "note": "Option 1 baseline: the vendored recipe's RetroArch 1.21.0 payload, built by tools/build-baseline.sh and deployed to /data/homebrew/PS5_RetroArch/, started through the console's homebrew launcher.",
+  "must_contain": [],
+  "must_not_contain": [
+    "FATAL"
+  ],
+  "human_check": "The RetroArch menu was on screen during this run, confirmed by the console's owner."
+}

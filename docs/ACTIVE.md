@@ -9,45 +9,42 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The baseline payload is built and deployed to the console; the launch run is
-the one thing left.** `tools/build-baseline.sh` cross-compiles upstream RetroArch
-1.21.0 from the vendored recipe, stages `dist/baseline/` (payload, config, icon,
-launcher manifest, digest manifest) and passes the PS5-object check. Evidence:
-the staged digest manifest and the build log at `work/baseline/logs/build.log`;
-the findings are recorded in `docs/FINDINGS.md`. What it still owes: a console
-run showing the menu, which is what makes it a baseline rather than a build.
+**Option 1 is verified: the baseline loads on the console and draws its menu.**
+The vendored recipe's RetroArch 1.21.0 payload was built by
+`tools/build-baseline.sh`, deployed to `/data/homebrew/PS5_RetroArch/`, and
+started through the console's own homebrew launcher. Evidence:
+`evidence/m1-baseline-loads/` (the capture, the run it came from, and the
+expectation `tools/evidence.py compare` replays), the raw capture in
+`klog/launch-20260918-120546.log`, and the run's identity from the console's
+control payload: `app=24600 pid=151`, launched under the homebrew title. The menu
+was on screen, confirmed by the console's owner. What it still owes: nothing.
 
-**It is on the console at `/data/homebrew/PS5_RetroArch/`.** Verified by listing
-the folder: `retroarch.elf` (70,642,656 bytes), `retroarch.cfg`,
-`homebrew.js`, `manifest.sha256`. The user's own clean build in
-`/data/homebrew/RetroArch/` was not touched, by design and by the tool's own
-rule. What it still owes: the icon, which sits at the folder root instead of
-`sce_sys/icon0.png` because of the FTP quirk below.
+**What the run also proved about the environment.** RetroArch wrote its own
+configuration tree beside the payload while it ran — `retroarch.cfg` grew from
+34 KB to 110 KB and `.config/retroarch/` appeared — which is only possible if the
+frontend reached its main loop with a working storage path. That is the same
+mechanism the later steps depend on for cores, saves and states.
 
-**The console's FTP went read-only in the middle of the last deploy.** Writes
-returned `550 Read-only filesystem` while reads kept working and the control
-payload still answered `ok idle`. Whether that is a console-side remount or
-something transient is not yet known; the next step is to re-check the write
-path before blaming the tool. Recorded because a read-only console looks exactly
-like a broken uploader from here.
+**The console is shared with the PS5_Vulkan session, so every launch and upload
+is asked for first.** `docs/DEPLOYMENT.md` records the rule and the two habits
+that follow from it. Nothing is launched or uploaded without a go-ahead.
 
-**The build is now cheap.** 33–35 s from cache, warm or incremental, against
-about five minutes cold: the tarball is cached and digest-checked, the prepared
-tree is reused, every compile goes through ccache, and make runs with `-j14`.
-Evidence: `work/build-run5.log` and `work/build-incr.log`, both with their
-timings; the three fixes that made it work are in `docs/FINDINGS.md`.
+**One thing to re-check when the console is next free:** the deployed folder no
+longer lists `retroarch.elf`, although the payload was verified on upload and is
+what the run started. Whether the loader, the read-only episode or the other
+session removed it is not yet known.
 
 ## Next
 
-1. Re-check the console's write path, then finish the deploy so `sce_sys/icon0.png`
-   is where the loader expects it.
-2. Launch `/data/homebrew/PS5_RetroArch/` from the console's own loader and
-   capture the run: this is the Option 1 baseline proof.
-3. Record that run as the first entry under `evidence/`, with the distilled
-   capture and the command that reproduces it.
-4. Then Option 2: swap the software SDL2 path for the Vulkan driver, which needs
-   the driver's consumer package and the `platform/` work in
-   `docs/REFERENCE.md`.
+1. Re-check the deployed folder when the console is free, then replace the
+   payload so the folder matches what `dist/baseline/` holds.
+2. Option 2, and the first step of it can be prepared without the console: read
+   the OpenGL package's export list against what RetroArch's GL driver resolves
+   (`tools/check-gl-exports.sh`), which is the measurement M2.1 names.
+3. Freeze the driver contract with `../PS5_Vulkan`: which artifact, which
+   revision, which entry points, and what it still owes before a frame.
+4. Write the `platform/` video driver and its context, then launch it on the
+   console with the owner's go-ahead.
 
 ## Working notes
 
@@ -72,7 +69,7 @@ timings; the three fixes that made it work are in `docs/FINDINGS.md`.
 | `tools/fetch-ports.sh` | PASS: v0.40.2 verified by SHA-256, SDL2 2.30.12 resolved |
 | Console listing of `/data/homebrew/PS5_RetroArch/` | payload, config, manifest and launcher present; icon still at the folder root |
 | Console FTP writes | FAILED: `550 Read-only filesystem` on the last attempt; reads fine |
-| Console run of the baseline | not yet: this is the open step |
+| Console run of the baseline, `evidence/m1-baseline-loads/` | PASS: payload started under the homebrew launcher (pid 151), menu on screen, config written to the title folder |
 | `tools/verify.sh` (all gates) | not yet green: the gate scripts it names still have to be written |
 
 ## Open findings

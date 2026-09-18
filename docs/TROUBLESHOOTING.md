@@ -72,4 +72,5 @@ on this list is a real failure until it is understood.
 
 | Message | Why it is safe | Seen in |
 | --- | --- | --- |
+| `Fontconfig error: Cannot load default config file: No such file: (null)` | The payload starts with no font configuration file, so fontconfig falls back to its built-in defaults. Text still renders through the font this build loads directly, which is why the menu is readable. The message is printed once, at startup, before any driver line. | The Option 1 baseline run, `evidence/m1-baseline-loads/` |
 | An empty list of captures under `evidence/` | The evidence gate has nothing to replay before the first console run lands. The gate prints `0 captures replayed` and passes. | `tools/verify.sh evidence` during M0 |

@@ -99,3 +99,19 @@ do that either.
   restarts and means nothing on its own.
 - A capture is only kept when the run it describes is named by the step's
   acceptance line. Anything else is a scratch run and belongs in `klog/`.
+
+## Sharing the console
+
+The console runs one title at a time, and two sessions cannot both use it: a
+launch from a second session replaces whatever the first was running. This
+machine's console is shared with the PS5_Vulkan work, so **ask before every
+launch and every upload** — the rule the console's owner set, and the reason
+`tools/console-launch.sh` prints what it is about to do before it does it.
+
+Two habits follow from that:
+
+- Prepare everything that can be prepared offline — the build, the staged tree,
+  the checks — and touch the console only for the part that genuinely needs it.
+- Treat a run as a claim about the revision it was launched from. The launch
+  records the revision in `evidence/<step>/capture.json`, so a run that belongs
+  to a different revision is visible rather than implied.
