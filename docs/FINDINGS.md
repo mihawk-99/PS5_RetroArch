@@ -749,3 +749,39 @@ file is the cheapest way to find out which of them is lying.
 title folder. The measurements above do not say the console is broken; they say
 that one view of it is unreliable, and that view is the one this session has been
 reasoning from.
+
+---
+
+## 2026-09-18: A process rule this session broke, and the cost of breaking it
+
+**What happened.** Testing whether a small converted image would survive on the
+console, a 67,526-byte probe was written straight to
+`/data/homebrew/PPSA99005/eboot.bin` — over the image the console owner had put
+there. The backup step immediately before it failed (`550 No such file or
+directory`), and the test proceeded anyway. It then launched the title and
+reported the resulting `PRX_SCE_MODULE_LOAD_ERROR` as a finding about the module,
+when the folder had in fact been left holding a test binary. The owner spotted it;
+the diagnosis had been built on a state this session created.
+
+**The rule that was broken, stated so it is not broken again:**
+
+- A destructive step is never preceded by a test whose result decides whether to
+  continue. If the backup fails, the write does not happen. "The folder looked
+  empty anyway" is not a substitute for a verified backup: this session's view of
+  the console had already been shown to be stale, which is exactly when a failed
+  backup must stop the work rather than reassure it.
+- A shared console's title folder is the owner's, not the build's. A probe
+  belongs in a title of its own, never in a working one.
+- When a launch is about to be reported as evidence, confirm what is actually in
+  the folder first. Otherwise the finding describes the state of the experiment,
+  not of the project.
+
+**Recovery.** The image and module are reproducible here in one command
+(`tools/stage-ppsa.sh`), and `restore/PPSA99005/` holds the complete folder ready
+to copy back: the converted image at 49,968,821 bytes and the signed module at
+1,284,674 bytes, with the identity, icon, configuration and payload beside them.
+
+**Boundary.** This is a process record, not a measurement about the console. It is
+kept in the findings file because the cost was a wasted console run and a wrong
+diagnosis, and because the next session needs the rule more than it needs the
+apology.
