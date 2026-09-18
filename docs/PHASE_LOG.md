@@ -477,4 +477,4 @@ pointers) and the tiled pixel addressing. The constants and the tiling are now
 taken from that project with the reason written down in `src/display.cpp`, because
 none of them is derivable by reasoning.
 
-**Commit.** `{{SHA}}` — Run this project's own title on the console.
+**Commit.** `b18e203` — Run this project's own title on the console.
