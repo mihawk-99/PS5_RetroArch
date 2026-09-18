@@ -821,3 +821,33 @@ blocking every input path are named with their measurements.
 **Verification.** `bash tools/verify.sh` → PASS (format unit build integration
 evidence), 13 host tests. `bash tools/run-title.sh --watch 12` → title runs, menu
 visible, no fatal signal, `/app0/trace.txt` shows the same hand-over as before.
+
+## 2026-09-18: The config-path crash is reading the config, not any setting in it
+
+**Four runs, one change each, and the crash follows the `-c`.** With `-c` in the
+argument list the title dies with `SIGSEGV`, `rip=0`; with `-c` removed it runs and
+shows the menu. Dropping `--verbose` does not help, and dropping `-f` does not help,
+so neither of the two settings that would newly *take effect* is the cause - it is
+the config file being read at all. That is a narrower claim than the last entry
+could make.
+
+**The config parses.** Marking `config_load` before and after shows both probes, so
+defaults, file parse and `config_load_file` all return. The crash is after the read
+and before the first frame: no `ps5_frame 0`, and neither `runloop_iterate` site is
+reached. It is inside `retroarch_main_init`, between the config load and the first
+frame.
+
+**What remains ruled out.** `drivers_init` completes (overlay unload/init, context
+reset, display server, mouse cursor, audio init, core info all mark), and
+`ps5_input_init` is never entered, so the input driver is not involved. What is left
+in that stretch is the driver lookups, and that is where the next marker goes:
+`audio_driver_find_driver`, `video_driver_find_driver`, `input_driver_find_driver`,
+`camera_driver_find_driver`, `menu_driver_find_driver`, each indexing a table this
+build has stripped to almost nothing.
+
+**A process note that cost this round's last attempt.** Reading a marker line into
+the middle of a multi-line call split the call and produced
+`undefined symbol: rarch_main` at link time. Marker placement is an edit, not a
+substitution: the anchors have to be statements, and the brace and call structure
+has to be checked after every insertion. The input driver stays built, registered
+and unit-tested, and the title stays in its working state while this is chased.

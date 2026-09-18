@@ -1537,3 +1537,51 @@ then the driver that is already written and tested should initialise and the pad
 should work. The crash is a null call in the runloop after driver initialisation,
 and the fastest instrument is a marker on `runloop_iterate` and the content task,
 not more of the driver.
+
+## The config-path crash, narrowed: it is reading the config, not any setting in it
+
+**Measured, by elimination.** Four console runs, each differing in exactly one
+thing, and the title's own trace says which variant ran because the entry point
+marked it. All four used the same binary apart from that one change.
+
+| argv | config read | result |
+| --- | --- | --- |
+| `-f -c /app0/retroarch.cfg --verbose --menu` | yes | SIGSEGV, `rip=0` |
+| `-f -c /app0/retroarch.cfg --menu` (no `--verbose`) | yes | SIGSEGV, `rip=0` |
+| `-c /app0/retroarch.cfg --menu` (no `-f`, no `--verbose`) | yes | SIGSEGV, `rip=0` |
+| `-f --verbose --menu` (no `-c`) | no | runs, menu on screen, no signal |
+
+So it is not `--verbose` finally taking effect, and not `video_fullscreen` finally
+taking effect: dropping each of those leaves the crash. **It is the config file
+being read at all.** That is a much narrower statement than the previous entry could
+make, and it rules out the two things that change *behaviour* rather than
+*settings*.
+
+**And the config itself parses fine.** With `config_load` marked before and after:
+
+    probe C:before-config-load
+    probe C:after-config-load
+
+so `config_load` -> `config_set_defaults` -> `config_parse_file` -> `config_load_file`
+all complete. The crash is **after** the config is read and **before** the first
+frame: no `ps5_frame 0` line ever appears, and neither `runloop_iterate` call site
+in `rarch_main` is reached. It is inside `retroarch_main_init`, in the stretch
+between the config load and the first frame - which is where the driver lookups and
+`drivers_init` live.
+
+**What is still ruled out, from the earlier marker run.** `drivers_init` and
+`video_driver_init_internal` both complete: overlay unload, overlay init, context
+reset, display server init, mouse cursor check, audio init and core info all print
+their markers. And `ps5_input_init` is never entered, so the input driver is not
+involved.
+
+**The suspicion, stated as a suspicion.** With the config read, the frontend's
+driver *selections* are no longer the compiled defaults: those lookups
+(`audio_driver_find_driver`, `video_driver_find_driver`, `input_driver_find_driver`,
+`camera_driver_find_driver`, `menu_driver_find_driver`) are the next thing after the
+config load that behaves differently, and each of them indexes a driver table whose
+contents this build has stripped to almost nothing. A default that names a driver
+this build does not carry is the obvious candidate for a null call. That is where
+the next instrument goes - and it must be placed with the editor, not a script:
+reading a marker into the middle of a multi-line call is what produced
+`undefined symbol: rarch_main` in this round's last attempt.
