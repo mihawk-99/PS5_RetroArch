@@ -512,4 +512,4 @@ tooling/prospero-clang18 -std=c++20 -Isrc -Ivendor/retroarch \
 compiled: 6,056 bytes, no warnings
 ```
 
-**Commit.** `{{SHA}}` — Write the PS5 video driver for the RetroArch frontend.
+**Commit.** `74e22bd` — Write the PS5 video driver for the RetroArch frontend.
