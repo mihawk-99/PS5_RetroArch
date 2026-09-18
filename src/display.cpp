@@ -303,10 +303,10 @@ bool Display::present() noexcept
     /* Report what the display says it has shown, once, so the trace answers the
      * question the return code cannot: a flip the display never took reads as
      * success from SubmitFlip and as a marker of zero here. */
-    static bool reported = false;
-    if (!reported)
+    static unsigned reported = 0;
+    if (reported < 3 || (reported % 300) == 0)
     {
-        reported = true;
+        reported++;
         char line[160];
         std::snprintf(line, sizeof(line), "flip status: call=%d marker=%llu shown=%llu", status,
                       static_cast<unsigned long long>(flip_status_[flip_status_marker_word]),

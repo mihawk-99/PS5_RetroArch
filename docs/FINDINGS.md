@@ -1224,3 +1224,43 @@ with `width = 0, height = 0`.
 **The instrument that found it is the one to keep.** A flip status that says
 "shown" is the only evidence this project has ever had that a pixel arrived, and
 it is worth more than the return code of a submission call.
+
+## A CPU-written 1920x1080 frame from a title does reach this console's screen
+
+**Measured, by the console's owner.** The `../PS5_Vulkan` demo renderer
+(`src/demo_renderer.cpp`, built as PPSA99999 "PS5 Vulkan Compatibility Probe") was
+deployed and launched, and its diagnostic pattern appeared on the television:
+three panels, a white rule, a cyan circle, a yellow square, a magenta triangle and
+the text "PS5 DIAGNOSTIC HARNESS".
+
+This settles the question this port has been circling for several rounds. A title
+on this console can allocate direct memory, write 1920x1080 pixels into it with the
+CPU, flush, register the buffers with VideoOut and present with
+`sceVideoOutSubmitFlip` - and see them. It is not a path that requires the AGC
+command processor, `sceAgcDcbSetFlip`, or a Vulkan swapchain.
+
+**What the working sequence is, exactly** (`../PS5_Vulkan/src/demo_renderer.cpp`):
+`sceSystemServiceHideSplashScreen()`; `sceVideoOutOpen(0xff, 0, 0, NULL)`;
+`sceKernelAllocateDirectMemory(0, pool, 0x2000000, 0x200000, 3, &physical)`;
+`sceKernelMapDirectMemory(&mapped, 0x2000000, 0x33, 0, physical, 0x200000)`;
+draw both 16 MiB frames; `flush_range(mapped, 0x2000000)` - `clflush` per 64 bytes
+then `mfence`; `sceVideoOutSetFlipRate(video, 0)`;
+`sceVideoOutSetBufferAttribute2(&attr, 0x8000000022000000, 0, 1920, 1080, 0, 0, 0)`;
+`sceVideoOutRegisterBuffers2(video, 0, 0, buffers, 2, &attr, 0, NULL)`;
+`sceVideoOutSubmitFlip(video, 0, 1, 1)`; `sceVideoOutWaitVblank(video)`. Note that
+it flips **buffer index 0** and never requests a status - the flip status query is
+not part of the working path.
+
+**This port's differences from it are now the whole of the remaining problem.** They
+are small and enumerable, which is a much better position than the one this work
+started from: the port rotates `registered_[back_]` rather than flipping a fixed
+index; it queries `sceVideoOutGetFlipStatus` after the flip and reads the marker;
+and it presents from RetroArch's callback (up to 30 times a second) rather than
+drawing two frames once and holding. Each is testable against a known-good
+reference, and the first thing to do is the smallest possible one: paint the bands
+into a single buffer, register it, flip index 0 once, wait a vblank, and hold.
+
+**One correction to an earlier entry.** The splash call helped - the flip status
+went from `marker=0` to `marker=1` - but it did not make the port's frames appear.
+The demo does call it too, so it is necessary and not sufficient, and the marker
+value is weaker evidence than this entry: an owner's eyes on a rendered pattern.
