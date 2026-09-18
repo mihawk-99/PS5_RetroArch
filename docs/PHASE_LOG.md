@@ -654,4 +654,4 @@ twice, and a probe uploaded under a name never used before read back those same
 old bytes. The console's FTP accepts the transfer and serves something else, so
 the console's owner uploads by hand.
 
-**Commit.** pending — Link the title and register the PS5 video driver.
+**Commit.** `eebba81` — Link the title and register the PS5 video driver.
