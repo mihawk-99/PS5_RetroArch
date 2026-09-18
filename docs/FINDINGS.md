@@ -1585,3 +1585,49 @@ this build does not carry is the obvious candidate for a null call. That is wher
 the next instrument goes - and it must be placed with the editor, not a script:
 reading a marker into the middle of a multi-line call is what produced
 `undefined symbol: rarch_main` in this round's last attempt.
+
+## The config-path crash is a null call in `command_event`, and the file logger cannot see it
+
+**Where it is now, by markers that printed.** With the config-path fix applied, the
+title's own trace ends at exactly this sequence:
+
+    probe M:drivers-init-all        (before drivers_init(DRIVERS_CMD_ALL))
+    probe M:input-init-command
+    probe M:controller-init         (before command_event(CMD_EVENT_CONTROLLER_INIT))
+    -> SIGSEGV, rip = 0
+
+and three markers placed *after* that point never print: the first instruction of
+`command_event_init_controllers`, the `case CMD_EVENT_CONTROLLER_INIT:` label, and
+the statement after `command_event(...)` returns. So the crash is inside
+`command_event()` before its switch reaches the controller case - one frame deeper
+than the call site. The register dump is identical in every config-loading run
+(`rip: 0`, `rdi`/`rsi`/`r13` pointing into one 0x138-byte frame), so it is
+deterministic, not a race.
+
+**A guard that is real but is not the fix.** `patches/series` 0007 adds the missing
+null check before `core_set_controller_port_device`'s call to
+`current_core.retro_set_controller_port_device`. Upstream calls that core callback
+unguarded, and `dynamic_dummy.c` only survives because it defines an empty stub. It
+is now verified in the object (`test %rax,%rax; je` before `call *%rax`) and the
+title still dies with a byte-identical register dump, so it did not fix this crash.
+It is kept because the missing check is genuine.
+
+**The file logger cannot see this crash, and that is structural.**
+`retroarch_main_init` calls `rarch_log_file_init(...)` *after*
+`retroarch_parse_input_and_config(...)` returns, and `command_event` is reached
+later still - but a crash during init happens before the logger opens its file. So
+`log_to_file = true`, `log_to_file_timestamp = false` and `log_dir = "/app0"` are
+now in `config/retroarch.cfg` and are **inert until the config path is fixed**; they
+are there so the log appears the day it is. The logging settings themselves need no
+build flag: `rarch_log_file_init` is compiled unconditionally.
+
+**Two process failures in this round, both worth more than the finding.**
+1. Parking `patches/series` 0006 was done by slicing the script by text, and the
+   slice captured the wrong block: the parked file was truncated to zero bytes and
+   the 0006 entry was deleted from the script while `build/ra-conf` still had it
+   applied - so the next build rebuilt the crash *and* the patch record no longer
+   matched the tree. Both files were recovered with `git checkout`.
+2. Inserting a probe line after each of `command_event`'s getter statements split a
+   multi-line `#if` block and produced `undefined symbol: char_list_new_special` at
+   link time. Markers must be placed at statements, and the result must be compiled
+   before it is trusted; two attempts this round were lost to this.

@@ -128,6 +128,32 @@ EDITS = [
         "   &input_ps5,",
     ),
     (
+        # A core that has not loaded registers no controller-port callback, and
+        # upstream calls it anyway.
+        #
+        # This is a real latent fault, found while chasing the config-path crash
+        # and kept because it is the same shape as the joypad guard below:
+        # `core_set_controller_port_device` guards its own `pad` argument and never
+        # guards the callback it exists to call. `dynamic_dummy.c` only survives it
+        # because it happens to define an empty stub, so a build whose dummy core
+        # does not would jump to address zero - which is exactly what the console
+        # reported for the crash this was found during:
+        # `page fault (user read instruction, page not present)`, `rip: 0`.
+        #
+        # It did NOT turn out to be that crash: with this guard compiled in
+        # (verified in the object as `test %rax,%rax; je` before `call *%rax`) the
+        # title still dies with a byte-identical register dump. The change is kept
+        # because the missing check is real, not because it fixed that.
+        "runloop.c",
+        "   runloop_st->current_core.retro_set_controller_port_device(pad->port, pad->device);\n",
+        "   /* Guarded by this port (patches/series, 0007): a core that has not loaded\n"
+        "    * registers no callbacks, so this member can be NULL. */\n"
+        "   if (!runloop_st->current_core.retro_set_controller_port_device)\n"
+        "      return false;\n"
+        "   runloop_st->current_core.retro_set_controller_port_device(pad->port, pad->device);\n",
+        "registers no callbacks, so this member can be NULL",
+    ),
+    (
         # A null joypad driver is a normal state on this console, and upstream
         # dereferences it. input_driver_collect_system_input calls
         # input_joypad_analog_axis with input_st->primary_joypad, which is NULL

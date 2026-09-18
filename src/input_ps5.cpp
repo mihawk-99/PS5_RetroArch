@@ -206,7 +206,6 @@ void *ps5_input_init(const char *joypad_driver) noexcept
     /* The joypad abstraction is not what this driver uses, so the name RetroArch
      * passes - which names no driver this build has - is deliberately ignored. */
     (void)joypad_driver;
-    ps5_input_trace("input: ps5_input_init entered");
     auto *state = new (std::nothrow) PadState();
     if (state == nullptr)
     {

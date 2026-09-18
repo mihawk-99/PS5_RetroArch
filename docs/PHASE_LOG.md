@@ -851,3 +851,32 @@ the middle of a multi-line call split the call and produced
 substitution: the anchors have to be statements, and the brace and call structure
 has to be checked after every insertion. The input driver stays built, registered
 and unit-tested, and the title stays in its working state while this is chased.
+
+## 2026-09-18: The config crash is in command_event, and the log route is closed for it
+
+**Narrowed.** With the config-path fix applied, markers bracket the crash to
+`command_event()` before its switch reaches `CMD_EVENT_CONTROLLER_INIT`: the marker
+directly before that call prints, and three markers after it - the first instruction
+of `command_event_init_controllers`, the case label, and the statement following the
+call - never do. The register dump is identical across every config-loading run
+(`rip: 0`), so it is deterministic.
+
+**A real guard, kept without pretending it fixed anything.** `patches/series` 0007
+null-guards the core's `retro_set_controller_port_device` callback, which upstream
+calls unguarded and which only `dynamic_dummy.c`'s empty stub makes survivable. It
+is verified present in the object and the crash is unchanged, so the commit message
+and `docs/FINDINGS.md` both say so.
+
+**File logging: configured, inert, and the reason is structural.** The logger is
+initialised after the config is parsed, and this crash happens before that, so the
+log cannot catch it. `log_to_file`, `log_to_file_timestamp` and `log_dir` are now in
+`config/retroarch.cfg` for the day the config is read - they need no build flag,
+since `rarch_log_file_init` is compiled unconditionally.
+
+**State.** The title runs (menu up, no fatal signal, all five gates pass). The
+config-path fix (0006) stays parked in `parked/config-path.patch.py`, the guard
+(0007) is in `patches/series`, and `input_driver` is back to `"null"` because it is
+only reachable through the config file. Two self-inflicted process faults are
+recorded in `docs/FINDINGS.md`: a text-sliced patch park that emptied the parked file
+and desynced the script from the tree (recovered with `git checkout`), and probe
+lines inserted into a multi-line `#if` block that broke the link.
