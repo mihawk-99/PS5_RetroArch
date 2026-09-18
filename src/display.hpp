@@ -61,6 +61,9 @@ class Display final
     /** One pixel, through the tiled layout. Out-of-range writes are ignored. */
     static void write(Surface surface, unsigned x, unsigned y, std::uint32_t colour) noexcept;
 
+    /** The byte offset of one pixel, so a caller can read back what it wrote. */
+    [[nodiscard]] static std::size_t offset_of(unsigned x, unsigned y) noexcept;
+
     /** Fills the whole frame. */
     static void clear(Surface surface, std::uint32_t colour) noexcept;
 

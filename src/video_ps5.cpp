@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <new>
 
 #include "display.hpp"
@@ -60,6 +61,8 @@ struct DriverState
     bool menu_rgb32 = false;
     /* The trace is a development aid; one line per fact is enough. */
     bool trace_texture_frame_done = false;
+    /* The buffer readback is reported once; see ps5_frame. */
+    bool trace_readback_done = false;
 };
 
 DriverState *state_of(void *data) noexcept
@@ -176,6 +179,46 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
                                                           : 0xff3030e0u;
                 Display::write(surface, x, y, colour);
             }
+
+        /* The bands are painted. Are they in the buffer?
+         *
+         * Every static comparison against ../PS5_Vulkan's demo_renderer.cpp - the
+         * allocation, the registration, the format, the colour encoding, the tiled
+         * addressing - has been made and matches, and the screen is still black.
+         * The remaining question cannot be answered by reading: it is whether the
+         * pixels this code writes are the pixels the display reads. So they are
+         * read back here, through the same tiled addressing that wrote them, and
+         * counted against what was intended.
+         *
+         * A count near zero says the bands are in memory and the fault is in the
+         * display half. A count near the frame size says the write never landed and
+         * the fault is here. The two are told apart by one number. */
+        if (!state->trace_readback_done)
+        {
+            state->trace_readback_done = true;
+            const auto *bytes = static_cast<const std::uint8_t *>(surface.base);
+            std::size_t wrong = 0;
+            for (unsigned y = 0; y < surface.height; ++y)
+                for (unsigned x = 0; x < surface.width; ++x)
+                {
+                    unsigned which = x / (band ? band : 1);
+                    which = (which + phase) % 3;
+                    const std::uint32_t colour = which == 0   ? 0xffe03030u
+                                                 : which == 1 ? 0xff30e030u
+                                                              : 0xff3030e0u;
+                    std::uint32_t found = 0;
+                    std::memcpy(&found, bytes + Display::offset_of(x, y), sizeof(found));
+                    if (found != colour)
+                        ++wrong;
+                }
+            char line[224];
+            std::snprintf(line, sizeof(line),
+                          "readback: base=%p %ux%u wrong=%zu of %u (%.1f%% wrong)", surface.base,
+                          surface.width, surface.height, wrong, surface.width * surface.height,
+                          100.0 * static_cast<double>(wrong) /
+                              static_cast<double>(surface.width * surface.height));
+            ps5::debug::mark(line);
+        }
         return state->display.present();
     }
 

@@ -1312,3 +1312,41 @@ where the fault is.
    that appears, the fault is in this port's own drawing; if it does not, the fault
    is in this port's display setup - and either way the working code is right there
    to bisect against.
+
+## The bands are not reaching the screen, and the frame path taken is now in question
+
+**Measured.** `present()` was reduced to the working sequence exactly (paint bands
+into buffer 0, `clflush` + `mfence`, one `sceVideoOutSubmitFlip(handle, 0, 1, 1)`,
+one `sceVideoOutWaitVblank`, then hold), and the screen is still black. That rules
+out the three differences this port had from ../PS5_Vulkan's demo renderer -
+rotation, the flip-status query, and re-flipping - because none of them are in that
+build.
+
+**Everything statically comparable matches**, and this is the list, checked one by
+one against `../PS5_Vulkan/src/demo_renderer.cpp`: the direct-memory allocation
+(`type 3`, alignment `0x200000`, `0x2000000` for two `0x1000000` frames), the map
+protection `0x33`, the two-buffer registration from the mapping's base, the pixel
+format `0x8000000022000000`, the colour encoding (`0xAARRGGBB`; the demo's own cyan
+is literally `0xffffff00`), `sceVideoOutOpen(0xff, 0, 0, NULL)`,
+`sceVideoOutSetFlipRate(handle, 0)`, `sceSystemServiceHideSplashScreen()` before
+the display opens, and the tiled per-pixel addressing - the demo's
+`put_pixel_unchecked` writes through `tiled_byte_offset(x, y)` and this port's
+`Display::write` writes through `tiled_offset(x, y) / 4`, and the two functions
+were compared numerically over 15 sample points and produce identical byte offsets.
+
+**A readback was added and did not run.** It sits inside the `if (source == nullptr)`
+branch of `ps5_frame`, reads the buffer back through the same tiled addressing that
+wrote it, and logs the count of pixels that differ from what was intended. The
+binary is deployed - the console's `eboot.bin` contains the `readback:` string - and
+the line never appears in the trace, while the frame telemetry that follows it in
+the same function does appear.
+
+**The likely reason, to be confirmed.** `ps5_frame`'s trace tag says "no-menu-source"
+when `have_menu_frame` is false, and that is set by `ps5_set_texture_frame`, not by
+the `source == nullptr` test. Those are two different conditions. If the frontend is
+handing this driver a real frame, the code takes the core-frame branch, never
+touches `source == nullptr`, and the readback never runs - which is exactly what the
+trace shows. The first thing the next round should do is log unconditionally at the
+top of `ps5_frame` whether `frame` is null, with its width, height and pitch. That
+one line says which branch the driver is actually taking, and the readback belongs
+in whichever branch it is.

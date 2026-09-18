@@ -258,6 +258,11 @@ Surface Display::back_surface() const noexcept
     return surface;
 }
 
+std::size_t Display::offset_of(unsigned x, unsigned y) noexcept
+{
+    return tiled_offset(x, y);
+}
+
 void Display::write(Surface surface, unsigned x, unsigned y, std::uint32_t colour) noexcept
 {
     if (surface.base == nullptr || x >= surface.width || y >= surface.height)
