@@ -120,4 +120,4 @@ reads and the control payload stayed healthy. `sce_sys/icon0.png` is therefore
 still at the folder root. Both are the first item in `docs/ACTIVE.md`'s Next
 list, and neither is being treated as done.
 
-**Commit.** `{{SHA}}` — Build and deploy the Option 1 baseline.
+**Commit.** `1036f50` — Build and deploy the Option 1 baseline.
