@@ -895,3 +895,65 @@ reaches the folder the loader sees.
 **Boundary.** This console and this title. The error text names the module, but
 the state it describes — "lack of a .prx file" — is not literally true here, so it
 is being treated as a symptom of the image rather than as a missing file.
+
+---
+
+## 2026-09-18: The native pipeline builds with Clang 22, and the console mounts the result
+
+**Measured.** The blocker recorded earlier — "the project needs Clang 18" — was
+this session's own mistake, and the user identified it: `../PS5_Vulkan` builds
+fine with the Clang 22 already installed. The difference is one word in the two
+projects' compiler wrappers:
+
+```text
+PS5_Vulkan/tooling/prospero-clang18         compiler=$(command -v clang || command -v clang-18 || true)
+ps5-native-app-boilerplate-main/...         compiler=$(command -v clang-18 || true)
+```
+
+The first prefers `clang`, the second refuses anything but `clang-18`. The
+`isnan` clash that appeared when the boilerplate was built here came from passing
+the *wrong SDK* alongside it: with its own cached SDK
+(`.deps/native/ps5-payload-sdk`) and `PS5_CLANG=/usr/bin/clang`, its build
+completes — `container: signed, plaintext`, twelve segments, `integrity: valid`.
+The toolchain on this machine is sufficient; no new package is needed.
+
+**Consequence.** `../ps5-native-app-boilerplate-main` can build a real title here,
+which makes it the foundation for the route change rather than a blocked option.
+A test title was built with this project's identity — `PPSA99169`,
+`UP9000-PPSA99169_00-RETROARCH0000001`, "PS5 RetroArch" — and staged in
+`handoff/PPSA99169/`: `eboot.bin` 18,791 bytes starting `4f153d1d` and a
+`sce_module/libc.prx` of 1,284,674 bytes, beside the metadata and assets.
+
+**And the console accepts it.** The kernel log records the mount:
+
+```text
+[kstuff.elf] Title Mounted Successfully: /data/homebrew/PPSA99169 -> /system_ex/app/PPSA99169
+[kstuff.elf] Successfully mounted title PPSA99169 -> /data/homebrew/PPSA99169
+```
+
+**Boundary.** What is proven is the build and the mount. What is not proven is
+whether the title *runs*: the capture taken for this test also contains 943 lines
+from the other session's Vulkan activity, and every title's process is named
+`eboot.bin`, so a crash in that log cannot be attributed to this title. The
+outcome has to be read from a capture taken while no other session is running.
+
+---
+
+## 2026-09-18: Reads from this console's FTP service are not usable as verification
+
+**Measured.** After deploying PPSA99169 — a title id that had never existed — a
+read-back of `/data/homebrew/PPSA99169/eboot.bin` returned 73,648 bytes starting
+`7f454c46`, which is another title's file: the same size and same bytes that
+`/data/homebrew/PPSA99006/eboot.bin` returned, and the same again for a path that
+had just been created. The local file is 18,791 bytes starting `4f153d1d`.
+
+**Consequence.** Every conclusion this session drew from an FTP read-back is
+unsafe, including the ones that looked like confirmations and the ones that looked
+like refusals. The deploy tooling verifies what it *sent*; it cannot verify what
+the console *holds*. Console state must be read from the console's own log, or
+from the owner's file browser, and the two are the only trustworthy witnesses
+available.
+
+**Boundary.** ftpsrv v0.21.1 on this console. This does not say the console is
+faulty; it says that one of its two file views reports another title's bytes for a
+path that did not exist a moment earlier.
