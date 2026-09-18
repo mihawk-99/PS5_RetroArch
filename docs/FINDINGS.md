@@ -1022,3 +1022,40 @@ listener's position before launching, and judges only the lines after that mark.
 
 **Boundary.** This console's launcher behaviour. `--force` exists for the case
 where demonstrating the refusal is the point.
+
+---
+
+## 2026-09-18: VideoOut's constants and tiling are not derivable, and guessing costs a console run
+
+**Measured.** Five things in the display path must be exactly what the console
+expects, and the first version of `src/display.cpp` got all five wrong. The title
+built, deployed and launched cleanly, then reported
+`eboot.bin calls exit() exit_value=1` — the display had refused to open:
+
+```text
+symptom   eboot.bin calls exit() exit_value=1
+```
+
+| What | Wrong | Right |
+| --- | --- | --- |
+| pixel format | `0x80000000 \| 0x0a` | `0x8000000022000000` (64-bit) |
+| direct-memory size | `int64_t` return | `size_t` return |
+| mapping protection | `0x3` | `0x33` |
+| buffer structure | three fields | four pointers: data, metadata, two reserved |
+| frame addressing | row-major | tiled: 128x128 blocks in a fixed order, XOR'd block-local offsets |
+
+The tiled layout is the one that would have produced a wrong-but-plausible result
+rather than an error: a row-major write into a tiled frame does not fail, it
+scrambles. `tiled_offset()` in `src/display.cpp` is the sibling application's,
+kept verbatim with its reason.
+
+**Consequence.** Everything in the display path is now taken from
+`../ps5-native-app-boilerplate-main/src/demo_renderer.cpp`, which had already
+proved each constant on hardware, instead of being reasoned out here. The
+verification that matters is the console's own log: zero fatal signals, the
+process visible in the shell's accounting, and the control payload reporting it
+running.
+
+**Boundary.** The console's VideoOut ABI as this project's SDK declares it.
+Anything that changes one of these five values is a console-side change, not a
+build option.

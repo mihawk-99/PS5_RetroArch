@@ -54,6 +54,10 @@ for item in tooling runtime Makefile; do
 done
 mkdir -p -- "$root/tools"
 cp -an -- "$donor/tools/." "$root/tools/"   # -n: never clobber this project's scripts
+# The converter links two stub objects from the pipeline's vendor tree; they are
+# a few hundred bytes and are copied in without touching vendor/retroarch.
+mkdir -p -- "$root/vendor"
+[[ -d $donor/vendor ]] && cp -an -- "$donor/vendor/." "$root/vendor/"
 mkdir -p -- "$root/sce_sys" "$root/src"
 
 if [[ -f $root/runtime/libc.prx ]]; then

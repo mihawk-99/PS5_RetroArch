@@ -4,9 +4,19 @@
  * Copyright (C) 2026 Mihawk
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The declarations this file needs come from the payload SDK's own headers where
- * they exist, and from a local declaration where the SDK's header is a
- * compatibility stub that does not carry them. Each local one is marked with why.
+ * This is the layer a RetroArch video driver sits on: it opens VideoOut, takes
+ * the direct memory the console's GPU scans out, registers two buffers and
+ * presents one at a time.
+ *
+ * Every constant and the tiled addressing below are taken from the sibling native
+ * application that proved them on hardware
+ * (ps5-native-app-boilerplate-main, src/demo_renderer.cpp). They are not
+ * derivable by guessing, and the first version of this file guessed: the wrong
+ * pixel format, the wrong memory type, the wrong mapping protection, a wrong
+ * buffer structure and linear addressing. The title built, ran, and reported
+ * `eboot.bin calls exit() exit_value=1` because `open` had failed.
+ *
+ * Reference: docs/REFERENCE.md, "The display".
  */
 
 #include "display.hpp"
@@ -16,70 +26,74 @@
 
 extern "C"
 {
-/* The payload SDK's headers for these are ABI declarations with stub bodies, so
- * they are declared here exactly as the sibling native application declares them;
- * the real implementations live in the GPU and kernel modules the linker binds. */
-struct VideoAttribute
-{
-    std::uint32_t set_attribute;
-    std::uint32_t buffer_num;
-    std::uint32_t reserved[6];
-    std::uint32_t pixel_format;
-    std::uint32_t tiling_mode;
-    std::uint32_t reserved2[3];
-    std::uint32_t width;
-    std::uint32_t height;
-    std::uint32_t reserved3[16];
-};
-
-struct VideoBuffer
-{
-    void *data;
-    std::uint64_t reserved[3];
-};
-
+/* The payload SDK's headers for these are ABI declarations whose bodies live in
+ * the kernel and GPU modules the linker binds; the shapes below are the sibling
+ * application's, which the console has accepted. */
+std::size_t sceKernelGetDirectMemorySize();
+int sceKernelAllocateDirectMemory(std::int64_t search_start, std::int64_t search_end,
+                                  std::size_t length, std::size_t alignment, int memory_type,
+                                  std::int64_t *physical_address);
+int sceKernelMapDirectMemory(void **address, std::size_t length, int protection, int flags,
+                             std::int64_t physical_address, std::size_t alignment);
 int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
                     const void *param);
 int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
-int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index, std::int32_t flip_mode,
-                          std::int64_t flip_arg);
+int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
+                          std::uint32_t flip_mode, std::int64_t flip_argument);
 int sceVideoOutWaitVblank(std::int32_t handle);
-void sceVideoOutSetBufferAttribute2(VideoAttribute *attribute, std::uint32_t pixel_format,
-                                    std::uint32_t tiling_mode, std::uint32_t width,
-                                    std::uint32_t height, std::uint32_t reserved0,
-                                    std::uint32_t reserved1, std::uint32_t reserved2);
-int sceVideoOutRegisterBuffers2(std::int32_t handle, std::int32_t set_index,
-                                std::int32_t buffer_index_start, void *buffers,
-                                std::int32_t buffer_num, const VideoAttribute *attribute,
-                                std::uint32_t reserved0, void *reserved1);
-int sceKernelAllocateDirectMemory(std::int64_t search_start, std::int64_t search_end,
-                                  std::size_t len, std::size_t alignment, std::int32_t memory_type,
-                                  std::int64_t *physical_address_out);
-int sceKernelMapDirectMemory(void **address, std::size_t len, std::int32_t protection,
-                             std::int32_t flags, std::int64_t physical_address,
-                             std::size_t alignment);
-std::int64_t sceKernelGetDirectMemorySize(void);
 }
 
 namespace ps5::display
 {
 namespace
 {
-/* The flip mode the sibling application uses: submit with a flip argument and wait
- * for the display to acknowledge it. */
-constexpr std::int32_t flip_mode_vsync = 1;
-constexpr std::int64_t flip_arg_default = 1;
-
-/* Bus and user: user 0xff is "the current user", bus 0 is the main display. */
-constexpr std::int32_t video_user = 0xff;
-constexpr std::int32_t video_bus = 0;
-constexpr std::int32_t video_index = 0;
-
-/* Direct memory, as the sibling application takes it: write-combined, and aligned
- * to the page the console maps with. */
-constexpr std::int32_t memory_type_write_combined = 3;
+constexpr unsigned frame_width = 1920;
+constexpr unsigned frame_height = 1080;
+/* One frame is allocated at 16 MiB and two are taken, which is what the console's
+ * registration accepted; the larger size leaves room for the tiled layout. */
+constexpr std::size_t frame_bytes = 0x1000000;
+constexpr std::size_t memory_bytes = frame_bytes * 2;
 constexpr std::size_t memory_alignment = 0x200000;
-constexpr std::int32_t map_protection_read_write = 0x3;
+constexpr int memory_type_write_combined_garlic = 3;
+constexpr int map_protection = 0x33;
+constexpr std::uint64_t pixel_format_rgba8_srgb = UINT64_C(0x8000000022000000);
+
+/* VideoOut scans out these two structures as the sibling application declares
+ * them; the attribute is opaque and only the call that fills it knows its shape. */
+struct VideoBuffer
+{
+    void *data;
+    void *metadata;
+    void *reserved0;
+    void *reserved1;
+};
+struct VideoAttribute
+{
+    std::uint8_t reserved[80];
+};
+extern "C" void sceVideoOutSetBufferAttribute2(VideoAttribute *attribute,
+                                               std::uint64_t pixel_format,
+                                               std::uint32_t tiling_mode, std::uint32_t width,
+                                               std::uint32_t height, std::uint64_t option,
+                                               std::uint32_t dcc_control,
+                                               std::uint64_t dcc_clear_color);
+extern "C" int sceVideoOutRegisterBuffers2(std::int32_t handle, std::int32_t set_index,
+                                           std::int32_t buffer_index_start, VideoBuffer *buffers,
+                                           std::int32_t buffer_count, VideoAttribute *attribute,
+                                           std::int32_t category, void *option);
+
+/* The frame is tiled, not linear: consecutive x are four pixels apart inside a
+ * 64 KiB block and the blocks are laid out in a fixed order. Writing row-major
+ * produces a scrambled image, which is why every write goes through this offset. */
+[[nodiscard]] constexpr std::size_t tiled_offset(unsigned x, unsigned y) noexcept
+{
+    const std::uint32_t offset = ((y << 4) & 0x70U) ^ ((y << 5) & 0xf00U) ^ ((y << 9) & 0x1000U) ^
+                                 ((y << 8) & 0x4000U) ^ ((x << 2) & 0xcU) ^ ((x << 5) & 0x380U) ^
+                                 ((x << 4) & 0x400U) ^ ((x << 6) & 0x800U) ^ ((x << 9) & 0xa000U);
+    const std::uint32_t blocks_per_row = (frame_width + 127U) >> 7;
+    const std::uint32_t block_index = (y >> 7) * blocks_per_row + (x >> 7);
+    return (static_cast<std::size_t>(block_index) << 16) + offset;
+}
 } // namespace
 
 Display::~Display()
@@ -91,16 +105,18 @@ bool Display::open(unsigned width, unsigned height) noexcept
 {
     if (is_open())
         return true;
-    if (width == 0 || height == 0)
+    /* The registration below is fixed at the console's own frame size, so a caller
+     * asking for another size is refused rather than silently given 1080p. */
+    if (width != frame_width || height != frame_height)
     {
-        error_ = "display size must be non-zero";
+        error_ = "only the console's 1920x1080 frame is supported";
         return false;
     }
 
     width_ = width;
     height_ = height;
 
-    handle_ = sceVideoOutOpen(video_user, video_bus, video_index, nullptr);
+    handle_ = sceVideoOutOpen(0xff, 0, 0, nullptr);
     if (handle_ < 0)
     {
         error_ = "sceVideoOutOpen refused the display";
@@ -108,20 +124,18 @@ bool Display::open(unsigned width, unsigned height) noexcept
         return false;
     }
 
-    const std::size_t frame_bytes = static_cast<std::size_t>(width_) * height_ * sizeof(std::uint32_t);
-    // Two frames plus the alignment the mapping requires.
-    mapped_bytes_ = frame_bytes * 2 + memory_alignment;
-
-    std::int64_t physical = 0;
-    const std::int64_t pool = sceKernelGetDirectMemorySize();
-    if (pool <= 0 || static_cast<std::size_t>(pool) < mapped_bytes_)
+    const std::size_t pool = sceKernelGetDirectMemorySize();
+    if (pool < memory_bytes)
     {
         error_ = "the console has less direct memory than two frames need";
         close();
         return false;
     }
-    if (sceKernelAllocateDirectMemory(0, pool, mapped_bytes_, memory_alignment,
-                                      memory_type_write_combined, &physical) < 0)
+
+    std::int64_t physical = 0;
+    if (sceKernelAllocateDirectMemory(0, static_cast<std::int64_t>(pool), memory_bytes,
+                                      memory_alignment, memory_type_write_combined_garlic,
+                                      &physical) < 0)
     {
         error_ = "sceKernelAllocateDirectMemory failed";
         close();
@@ -129,7 +143,7 @@ bool Display::open(unsigned width, unsigned height) noexcept
     }
 
     void *mapped = nullptr;
-    if (sceKernelMapDirectMemory(&mapped, mapped_bytes_, map_protection_read_write, 0, physical,
+    if (sceKernelMapDirectMemory(&mapped, memory_bytes, map_protection, 0, physical,
                                  memory_alignment) < 0)
     {
         error_ = "sceKernelMapDirectMemory failed";
@@ -139,12 +153,12 @@ bool Display::open(unsigned width, unsigned height) noexcept
     mapped_ = mapped;
 
     auto *base = static_cast<std::uint8_t *>(mapped_);
-    frames_[0] = reinterpret_cast<std::uint32_t *>(base);
-    frames_[1] = reinterpret_cast<std::uint32_t *>(base + frame_bytes);
+    frames_[0] = base;
+    frames_[1] = base + frame_bytes;
 
     std::array<VideoBuffer, 2> buffers{{
-        {frames_[0], {0, 0, 0}},
-        {frames_[1], {0, 0, 0}},
+        {frames_[0], nullptr, nullptr, nullptr},
+        {frames_[1], nullptr, nullptr, nullptr},
     }};
     VideoAttribute attribute{};
     (void)sceVideoOutSetFlipRate(handle_, 0);
@@ -167,28 +181,41 @@ bool Display::open(unsigned width, unsigned height) noexcept
 
 void Display::close() noexcept
 {
-    // Order matters: the display must be told to stop before the memory it scans
-    // out is released, which is why registration and the handle go first.
-    if (handle_ >= 0)
-    {
-        handle_ = -1;
-    }
+    /* The display handle goes first: the buffers must not be released while the
+     * display still scans them out. */
+    handle_ = -1;
     registered_[0] = -1;
     registered_[1] = -1;
     frames_[0] = nullptr;
     frames_[1] = nullptr;
     mapped_ = nullptr;
-    mapped_bytes_ = 0;
     back_ = 0;
 }
 
 Surface Display::back_surface() const noexcept
 {
     Surface surface;
-    surface.pixels = frames_[back_];
+    surface.base = frames_[back_];
     surface.width = width_;
     surface.height = height_;
     return surface;
+}
+
+void Display::write(Surface surface, unsigned x, unsigned y, std::uint32_t colour) noexcept
+{
+    if (surface.base == nullptr || x >= surface.width || y >= surface.height)
+        return;
+    auto *pixels = static_cast<std::uint32_t *>(surface.base);
+    pixels[tiled_offset(x, y) / sizeof(std::uint32_t)] = colour;
+}
+
+void Display::clear(Surface surface, std::uint32_t colour) noexcept
+{
+    if (surface.base == nullptr)
+        return;
+    for (unsigned y = 0; y < surface.height; ++y)
+        for (unsigned x = 0; x < surface.width; ++x)
+            write(surface, x, y, colour);
 }
 
 bool Display::present() noexcept
@@ -198,14 +225,12 @@ bool Display::present() noexcept
         error_ = "present without an open display";
         return false;
     }
-
-    const int index = registered_[back_];
-    if (sceVideoOutSubmitFlip(handle_, index, flip_mode_vsync, flip_arg_default) < 0)
+    if (sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1) < 0)
     {
         error_ = "sceVideoOutSubmitFlip refused the frame";
         return false;
     }
-    // The buffer is only safe to draw into again once the display has taken it.
+    /* The buffer may only be drawn into again once the display has taken it. */
     (void)sceVideoOutWaitVblank(handle_);
     back_ ^= 1;
     error_ = "";

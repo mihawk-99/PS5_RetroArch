@@ -64,7 +64,8 @@ fi
 
 stamp=$(date +%H%M%S)
 out="klog/${title}-${stamp}.log"
-echo "==> [run] listening on $host:$klog -> ${out}"
+# The listener starts first, so the capture includes what the console says while
+# the title starts and the mark below delimits this run from anything before it.
 ( timeout "$((watch + 20))" bash -c "exec 3<>/dev/tcp/$host/$klog; cat <&3" > "$out" 2>&1 & )
 sleep 3
 mark=$(wc -l < "$out")
@@ -90,12 +91,14 @@ tail -n +"$mark" "$out" \
     | tail -25 || echo "    (nothing matching)"
 
 echo
+count=$(sed -n 's/.*count=\([0-9]*\).*/\1/p' <<<"$after")
+count=${count:-0}
 if grep -q '0x80940010' <<<"$result"; then
     echo "==> [run] VERDICT: refused - another title was running (0x80940010)"
-elif grep -q 'App Crash' "$out"; then
+elif grep -q 'fatal signal' "$out" && grep -q "$title" "$out"; then
     echo "==> [run] VERDICT: started and crashed; the crash block above names why"
-elif [[ -n $after ]]; then
+elif (( count > 0 )); then
     echo "==> [run] VERDICT: still running - it started and stayed up"
 else
-    echo "==> [run] VERDICT: started, then closed; see the lines above"
+    echo "==> [run] VERDICT: not running now; see the lines above"
 fi

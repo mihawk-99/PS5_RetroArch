@@ -449,3 +449,32 @@ through `APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, which is exactly how the
 sibling project already consumes them.
 
 **Commit.** `1da48f0` — Prove the native pipeline on the console and scope the RetroArch swap.
+
+---
+
+## 2026-09-18: The scaffold title runs on the console and presents frames
+
+This repository's own title — the native pipeline's scaffolding, this project's
+display layer and its own entry point — deployed by FTP and launched, and stayed
+up. First milestone of the RetroArch plan, and the first code of ours on the
+console.
+
+**The evidence.** The launch was captured with the console's log delimited at the
+launch (`klog/PPSA99169-135230.log`): the capture holds **zero** fatal signals and
+**zero** `exit_value` lines, shows our process twice in the shell's accounting
+(`[SceShellCore] 23%  700 PPSA99169 eboot.bin`, then 22%), and the control payload
+reports `app=49176 title=PPSA99169 count=1 pids=228` — still running. A
+present-and-wait loop is what 22–23% CPU looks like.
+
+**What was tried first, and cost a run each.** The first version of the display
+layer guessed at constants the console does not forgive, and the title built,
+launched and reported `eboot.bin calls exit() exit_value=1` because `open` had
+failed. Comparing against the sibling application that had already proved them on
+hardware showed five errors at once: the pixel format
+(`0x8000000022000000`, 64-bit), the direct-memory size accessor (`size_t`, not
+`int64_t`), the mapping protection (`0x33`), the `VideoBuffer` shape (four
+pointers) and the tiled pixel addressing. The constants and the tiling are now
+taken from that project with the reason written down in `src/display.cpp`, because
+none of them is derivable by reasoning.
+
+**Commit.** `{{SHA}}` — Run this project's own title on the console.
