@@ -156,4 +156,4 @@ ignores the path argument of a listing command and answers deletes with 226.
 Both behaviours are handled in `tools/deploy.py` and written up in
 `docs/FINDINGS.md`.
 
-**Commit.** `{{SHA}}` — Prove the Option 1 baseline on the console.
+**Commit.** `d869361` — Prove the Option 1 baseline on the console.
