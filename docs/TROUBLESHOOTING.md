@@ -65,6 +65,38 @@ digest before extracting, so a re-fetch is cheap and cannot silently pick up a
 different upstream. Never edit a file under `vendor/` to get unblocked: put the
 change in `patches/` and re-run the fetcher, or the next fetch discards it.
 
+## The title closes immediately and the log says `PRX_SCE_MODULE_LOAD_ERROR`
+
+**Cause.** The console's loader could not load a module the application needs, and
+it names the reason itself:
+
+```text
+# exception: 0xa0020102 (PRX_SCE_MODULE_LOAD_ERROR)
+# === Lack of a .prx file in /app0/sce_module is detected!!! ===
+# Copy the file (e.g. libc.prx) from target/sce_module.
+```
+
+`/app0` is the title's own directory as the application sees it, so this means the
+file at `sce_module/libc.prx` inside the title folder is missing, misnamed, or
+not a module the loader accepts. The size settles which: the signed module is
+`1,284,674` bytes, and a copy that is `1,335,962` bytes is the module's raw ELF
+rather than its signed container, which the loader refuses — and then reports as
+absent.
+
+**Fix.** Put the signed module in place, with that exact lower-case name:
+
+```text
+sce_module/libc.prx   1,284,674 bytes   sha256 e6ff45d16adf687855cc3b33b0c8a4132b6504360b221e0a34c7e99fb3ba0036
+```
+
+`dist/<TITLE_ID>/sce_module/libc.prx` in this repository is that file, and it is
+byte-identical to the sibling project's `../PS5_Vulkan/runtime/libc.prx`.
+
+**Tell it apart from.** A null-pointer crash inside a *raw* `eboot.bin` looks
+similar from the sofa — the title closes at once — but its log shows `signal: 11
+(SIGSEGV)` with `fault address: 0000000000000001` and no `PRX_SCE_MODULE_LOAD_ERROR`
+line. That failure is the image, not the module; see `docs/FINDINGS.md`.
+
 ## Known benign
 
 Messages that are expected and safe, with the exact text to match. Anything not
