@@ -9,41 +9,51 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**One step from working: two files on the console are the wrong ones.** The title
-crashes because `/data/homebrew/PPSA99005/eboot.bin` is a raw link ELF
-(51,870,448 bytes, starts `7f454c46`) rather than the converted application image,
-and `sce_module/libc.prx` is likewise the raw 1,335,962-byte module rather than
-the signed 1,284,674-byte one. The correct pair sits in `dist/PPSA99005/` here,
-and the working sibling title shows what a converted image looks like:
-`PS5_Vulkan/dist/PPSA99988/eboot.bin` starts `4f153d1d`.
+**The decision has changed: stop converting the payload, build a native title.**
+The vendored-recipe route has been abandoned by the project owner. The reason is
+measured, not a preference: a title's `eboot.bin` must be a *converted* image and
+the conversion strips the dynamic symbols the homebrew launcher needs, so one set
+of sources cannot serve both routes, and every step of converting the finished
+payload produced a new failure on the console
+(`docs/FINDINGS.md`, the loader-route entries).
 
-**The FTP route cannot place them, and the reason is recorded rather than
-guessed.** The folder accepts everything else — markers, blobs of 2 MB, 8 MB,
-60 MB, a blob of exactly the converted image's size, and the 512x512 icon, all
-round-tripping byte-for-byte — but the converted image is returned as the other
-file's bytes under its own name, an unused name, in place, and via a rename. A
-fresh name receives `eboot.bin`'s bytes, which no ordering explanation covers.
-The service also began refusing reads with `550 Broken pipe` under this load.
-`docs/FINDINGS.md` carries the measurements and the two corrections to earlier
-conclusions — including that the second session publishes `PPSA99988`, not this
-title, which rules out the hypothesis first recorded here.
+**The new foundation is the pipeline that already produces working titles.**
+`../ps5-native-app-boilerplate-main` (and the project built on it,
+`../ProsperoLight`) compiles application sources with a fixed toolchain, links
+them through its own CRT, runtime and `ps5-pie.ld`, and signs the result with its
+own tool — the exact path that produces the `PPSA99988` image which starts on this
+console. Building RetroArch *inside* that pipeline is a different job from
+converting a finished payload into it: the sources are compiled for it rather than
+adapted afterwards.
 
-**Everything else is ready.** `tools/deploy-title.py` publishes and verifies,
-`tools/console-launch.sh` launches and captures, `tools/evidence.py` replays the
-two committed records, and the folder in `dist/PPSA99005/` is complete and
-digest-checked.
+**What the new pipeline requires, measured from its build script.** Sources are
+collected from `src/` only, matching `src/**/*.{c,cc,cpp}`, and compiled with
+fixed flags — `-std=c11` for C, `-std=c++20` for C++, `-O2 -Wall -Wextra
+-ffunction-sections -fdata-sections`. Include paths and static archives are passed
+through `APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, and the result is linked
+with the project's own `app_crt.o`, `app_cpp_runtime.o`, stub objects and version
+script. A tree of RetroArch's shape has to be reached by include path rather than
+dropped into `src/` one file at a time.
+
+**Its one hard prerequisite is not installed here.** The build needs **Clang 18**:
+the SDK's `math.h` defines `isnan` unconditionally, and Clang 22's libc++ headers
+call `std::isnan`, so the two cannot be mixed (`error: expected unqualified-id`).
+The package is available — `extra/clang18 18.1.8-2` — and installing it needs
+administrator rights, which this session does not have and does not ask for.
 
 ## Next
 
-1. Place `dist/PPSA99005/eboot.bin` and `dist/PPSA99005/sce_module/libc.prx` on
-   the console by a route other than this FTP service — the console owner's own
-   tooling, USB, or kstuff. Verify with `tools/deploy-title.py --check`: the line
-   to look for is `eboot.bin magic: 4f153d1d`.
-2. Launch it with the kernel log captured and record the outcome beside
-   `evidence/psa-99005-startup-crash/`; the same capture after the change says
-   whether the fault moved.
-3. Then Option 2, the Vulkan driver, for which `../PS5_Vulkan` already implements
-   every display entry point RetroArch's Vulkan path calls.
+1. Install Clang 18 (`sudo pacman -S clang18`), then build
+   `../ps5-native-app-boilerplate-main` with
+   `PS5_CLANG=/usr/bin/clang18 PS5_PAYLOAD_SDK=$PS5_PAYLOAD_SDK make app` — the
+   known-good image that proves the pipeline end to end on this machine.
+2. Place that image on the console under its **own** title id (PPSA99999) and
+   launch it. That answers whether a native-pipeline image boots here, without
+   touching PPSA99005 or any other title.
+3. If it boots, bring RetroArch's sources into the pipeline behind a symlinked
+   `src/` tree: a first milestone is the frontend initialising with a null video
+   driver, the second a frame through the Vulkan driver in `../PS5_Vulkan`.
+4. Retire the conversion path once (3) holds, and say so in `docs/REFERENCE.md`.
 
 ## Working notes
 

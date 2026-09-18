@@ -344,3 +344,40 @@ service. Everything around it is ready and verified; the check that names succes
 is `tools/deploy-title.py --check` reporting `eboot.bin magic: 4f153d1d`.
 
 **Commit.** `4ad48bf` — Correct the deployment diagnosis and record what the console actually stores.
+
+---
+
+## 2026-09-18: The route changes — a native title instead of a converted payload
+
+The project owner has ended the conversion approach: build RetroArch on the
+pipeline that already produces working titles rather than converting a finished
+payload into the title format. This entry records why that is the right call and
+what the new shape is, because both are measured rather than assumed.
+
+**Why the conversion route ends.** A title's `eboot.bin` must be a converted
+image, and conversion strips the dynamic symbols the homebrew launcher needs — the
+converter refuses to publish exports and `--exclude-libs=ALL` keeps the rest
+internal. So the same build cannot serve both routes, and each step of converting
+the finished payload produced a further failure on the console: a null-pointer
+crash inside a raw image, then `PRX_SCE_MODULE_LOAD_ERROR` from an image the
+loader would not take. The lesson is the one the user reached first: sources
+should be *built for* the title pipeline, not adapted into it afterwards.
+
+**The new foundation.** `../ps5-native-app-boilerplate-main`, and the project
+built on it, `../ProsperoLight` — same author, both native PS5 applications whose
+titles start on this console. Their `tools/build.sh` collects `src/**/*.{c,cc,cpp}`
+only, compiles it with fixed flags (`-std=c11`, `-std=c++20`, `-O2 -Wall -Wextra
+-ffunction-sections -fdata-sections`), links it with the project's own
+`app_crt.o`, `app_cpp_runtime.o`, stub objects and version script, and signs the
+result into `eboot.bin`. Include paths and static archives arrive through
+`APP_INCLUDE_PATHS` and `APP_STATIC_ARCHIVES`, which is how a tree of RetroArch's
+shape can be reached without moving it file by file.
+
+**The blocker found by trying it.** Building that project here fails in its C++
+headers: the SDK's `math.h` defines `isnan` unconditionally while Clang 22's
+libc++ headers call `std::isnan` — `error: expected unqualified-id`. Both SDK
+copies on this machine share that header, so the pairing is inherent, which is
+why the project pins Clang 18 (`extra/clang18 18.1.8-2` is available). Installing
+it needs administrator rights, so the build waits on that.
+
+**Commit.** `{{SHA}}` — Change route: build a native title on the pipeline that works.
