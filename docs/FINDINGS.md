@@ -855,3 +855,43 @@ folder.
 **Boundary.** This title and layout. A title that does not use the standard
 runtime module would not need `sce_module/`, which is why the requirement is
 stated as a property of the layout rather than of the console.
+
+---
+
+## 2026-09-18: The title gets as far as Exec and then fails to load its runtime module
+
+**Measured.** With the title folder as the console currently holds it, the launch
+reaches the application and fails at module load:
+
+```text
+<194> EXEC /app0/eboot.bin [user], vm#1, dmem#1 abi=native category=native_game
+# exception: 0xa0020102 (PRX_SCE_MODULE_LOAD_ERROR)
+# === Lack of a .prx file in /app0/sce_module is detected!!!
+[Syscore App] App Crash : PID=0xc2, reason=0xa0020102
+```
+
+The control payload reported the title running (`app=16408 title=PPSA99005
+count=1 pids=194`) while the log recorded the crash — so the launch itself works
+and the failure is inside the application's startup.
+
+Comparing the two title folders side by side, shallowly:
+
+```text
+PPSA99988 (runs)   eboot.bin 17,264,224   sce_module/libc.prx 1,335,962
+PPSA99005 (fails)  eboot.bin 51,870,448   sce_module/libc.prx 1,335,962
+```
+
+The module is the **same size in both**, so this project's deployed module is not
+the anomaly the earlier entry assumed. The difference is the image: ours is
+51,870,448 bytes starting `7f454c46` — a raw link output — where the working title
+carries a converted image.
+
+**Consequence.** Two things must be true in the folder the loader reads, and only
+one is: the module is right, the image is not. `dist/PPSA99005/` holds the
+converted image (49,968,821 bytes, `4f153d1d`) and verifies against its own
+manifest, so the remaining action is a copy of that one file, by a route that
+reaches the folder the loader sees.
+
+**Boundary.** This console and this title. The error text names the module, but
+the state it describes — "lack of a .prx file" — is not literally true here, so it
+is being treated as a symptom of the image rather than as a missing file.
