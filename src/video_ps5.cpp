@@ -74,6 +74,15 @@ struct DriverState
     bool seen_core_frame = false;
     bool seen_menu_frame = false;
     bool trace_sources_done = false;
+    /* The menu's framebuffer as it was last seen, and how many times it has been
+     * handed over with different pixels in it. Two different questions live here
+     * and only the second one is "is the picture frozen": the driver presents a
+     * frame every vblank whether or not anything changed, and RGUI redraws its
+     * framebuffer only when something has. */
+    std::uint32_t menu_sample[16] = {0};
+    bool menu_sample_valid = false;
+    std::uint64_t menu_commits = 0;
+    std::uint64_t menu_changes = 0;
 };
 
 DriverState *state_of(void *data) noexcept
@@ -335,6 +344,21 @@ bool ps5_frame(void *data, const void *frame, unsigned width, unsigned height,
                       state->seen_menu_frame ? "yes" : "no", state->seen_core_frame ? "yes" : "no");
         ps5::debug::mark(line);
     }
+
+    /* Every six hundred frames, what the menu has drawn and how often its picture
+     * actually changed. One line per ten seconds says whether this is a live
+     * frontend or a still image: a menu_changes count that stops at 1 while
+     * menu_commits climbs is a frozen picture, and one that climbs is not. */
+    if (frame_count != 0 && frame_count % 600 == 0)
+    {
+        char line[176];
+        std::snprintf(
+            line, sizeof(line), "ps5_frame %llu: menu commits=%llu changes=%llu presented=%s",
+            static_cast<unsigned long long>(frame_count),
+            static_cast<unsigned long long>(state->menu_commits),
+            static_cast<unsigned long long>(state->menu_changes), presented ? "yes" : "no");
+        ps5::debug::mark(line);
+    }
     return presented;
 }
 
@@ -374,6 +398,33 @@ void ps5_set_viewport(void *data, unsigned width, unsigned height, bool force_fu
 
 /* --- video_poke_interface_t ----------------------------------------------- */
 
+/* A cheap fingerprint of the menu's framebuffer: sixteen pixels read across it.
+ *
+ * Reading all 2,073,600 of them every frame would cost as much as the blit it is
+ * meant to be watching, and would be measuring the driver rather than the menu.
+ * Sixteen samples spread over the frame are enough to tell "the same picture" from
+ * "a re-rendered one", which is the only distinction that matters here. */
+bool sample_menu_frame(const void *frame, unsigned width, unsigned height, bool rgb32,
+                       std::uint32_t out[16]) noexcept
+{
+    if (frame == nullptr || width == 0 || height == 0)
+        return false;
+    const unsigned bytes = rgb32 ? 4u : 2u;
+    const auto *base = static_cast<const std::uint8_t *>(frame);
+    const unsigned stride = width * bytes;
+    for (unsigned index = 0; index < 16; ++index)
+    {
+        const unsigned x = (index * 7u + 3u) % width;
+        const unsigned y = (index * 13u + 5u) % height;
+        const std::uint8_t *at =
+            base + static_cast<std::size_t>(y) * stride + static_cast<std::size_t>(x) * bytes;
+        std::uint32_t value = 0;
+        std::memcpy(&value, at, bytes);
+        out[index] = value;
+    }
+    return true;
+}
+
 void ps5_set_texture_frame(void *data, const void *frame, bool rgb32, unsigned width,
                            unsigned height, float alpha) noexcept
 {
@@ -405,6 +456,33 @@ void ps5_set_texture_frame(void *data, const void *frame, bool rgb32, unsigned w
                       rgb32 ? 1 : 0, width, height, frame ? "present" : "NULL",
                       state->have_menu_frame ? 1 : 0, was_available ? 1 : 0);
         ps5::debug::mark(line);
+    }
+
+    /* Is this the same picture the menu handed over last time? The first commit
+     * and every change are written down, with the commit number, because that
+     * number is what tells a frozen picture from a live one from the trace alone:
+     * the driver presents every vblank either way, so only the menu's own output
+     * answers the question. */
+    std::uint32_t sample[16];
+    if (sample_menu_frame(frame, width, height, rgb32, sample))
+    {
+        const bool changed = !state->menu_sample_valid ||
+                             std::memcmp(sample, state->menu_sample, sizeof(sample)) != 0;
+        ++state->menu_commits;
+        if (changed)
+        {
+            ++state->menu_changes;
+            std::memcpy(state->menu_sample, sample, sizeof(sample));
+            state->menu_sample_valid = true;
+            char line[176];
+            std::snprintf(line, sizeof(line),
+                          "menu: framebuffer commit %llu is a new picture (%llu of %llu changed "
+                          "so far)",
+                          static_cast<unsigned long long>(state->menu_commits),
+                          static_cast<unsigned long long>(state->menu_changes),
+                          static_cast<unsigned long long>(state->menu_commits));
+            ps5::debug::mark(line);
+        }
     }
 }
 

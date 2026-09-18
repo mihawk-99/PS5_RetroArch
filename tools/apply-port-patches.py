@@ -97,6 +97,37 @@ EDITS = [
         "int rarch_main_entry(int argc, char *argv[])",
     ),
     (
+        # This project's input driver, declared beside the others so that
+        # input/input_driver.c can name it in input_drivers[]. The implementation
+        # is src/input_ps5.cpp, not a file in this tree, for the same reason
+        # video_ps5 is: the console's pad calls and the driver's shape are this
+        # project's, and upstream stays upstream.
+        #
+        # It is an *input* driver and not a joypad driver because every joypad
+        # driver upstream ships needs a library this SDK does not carry, so
+        # primary_joypad is NULL here - see the guard below. input_state_wrap
+        # consults the joypad only when there is one and calls the input driver's
+        # own input_state unconditionally, so a pad read directly still reaches
+        # the menu.
+        "input/input_driver.h",
+        "extern input_driver_t input_ps4;",
+        "extern input_driver_t input_ps4;\n"
+        "/* Supplied by this project (src/input_ps5.cpp): reads the console's pad\n"
+        " * through scePadRead and reports it as a RetroPad. Declared with C linkage\n"
+        " * because RetroArch's own sources are C. */\n"
+        "extern input_driver_t input_ps5;",
+        "extern input_driver_t input_ps5;",
+    ),
+    (
+        # And listed in the table itself, before input_null so that a
+        # configuration naming \"ps5\" finds it and the null driver stays the last
+        # entry, which is what terminates the array.
+        "input/input_driver.c",
+        "   &input_null,\n   NULL,\n};",
+        "   &input_ps5,\n   &input_null,\n   NULL,\n};",
+        "   &input_ps5,",
+    ),
+    (
         # A null joypad driver is a normal state on this console, and upstream
         # dereferences it. input_driver_collect_system_input calls
         # input_joypad_analog_axis with input_st->primary_joypad, which is NULL

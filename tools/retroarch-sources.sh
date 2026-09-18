@@ -97,6 +97,15 @@ configure_flags=(
     --disable-libretrodb --disable-video_filter --disable-dsp_filter
     # The BSV movie recorder compiles against zlib, which this SDK does not ship.
     --disable-bsv_movie
+    # RetroArch's built-in test input driver is on by default, and while it is on
+    # `video_driver_init_input` never initialises any real input driver: its first
+    # instruction returns early whenever the configured driver is not "test",
+    # because it assumes a test driver is already wrapping input. This port's own
+    # driver was therefore constructed, registered, never initialised, and never
+    # asked for a button - the pad did nothing and nothing said why. It is a
+    # development driver for RetroArch's own test suite and has no place in a
+    # shipping title in any case.
+    --disable-test_drivers
 )
 
 if [[ ${1:-} == --config ]]; then

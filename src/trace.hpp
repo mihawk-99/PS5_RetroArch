@@ -40,4 +40,12 @@ void mark_value(const char *step, long long value) noexcept;
 void mark_init(const char *step, bool have_video, int width, int height) noexcept;
 } // namespace ps5::debug
 
+/* The same trace, with C linkage, for src/input_ps5.cpp.
+ *
+ * That driver is compiled as C++ but holds the frontend's C interface, and its
+ * `extern "C"` block is where the console's pad calls are declared. Every call in
+ * that block has to be a C symbol, so its trace line goes through this door rather
+ * than naming a C++ namespace from inside it. */
+extern "C" void ps5_input_trace(const char *line) noexcept;
+
 #endif

@@ -68,7 +68,6 @@ constexpr std::size_t frame_bytes = 0x1000000;
 /* sceVideoOutGetFlipStatus fills 16 64-bit words; the fourth carries the
  * marker of the latest flip the display has shown. Confirmed by measurement
  * against ../PS5_Vulkan/driver/ps5vk_queue.c, which reads the same word. */
-constexpr unsigned flip_status_words = 16;
 constexpr unsigned flip_status_marker_word = 3;
 
 constexpr std::size_t memory_bytes = frame_bytes * 2;

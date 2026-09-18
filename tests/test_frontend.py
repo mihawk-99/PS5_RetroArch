@@ -167,6 +167,76 @@ int main()
     return table
 
 
+def symbol_in_object(obj: Path, name: str) -> tuple[int, int, str]:
+    """A local object symbol's address, size and section name, from readelf.
+
+    The section matters: a local symbol's address is relative to its own section,
+    and objects are not linked, so address 0 is the start of the object *and* of
+    every section in it. Looking a symbol up by address alone finds the wrong one.
+
+    readelf prints the address in hexadecimal and the size in decimal, which is
+    worth stating because reading a size as hex turned a 112-byte table into 274
+    and failed a length check that had nothing wrong with it.
+    """
+    done = subprocess.run(["readelf", "-sW", str(obj)], capture_output=True, text=True, check=True)
+    for line in done.stdout.splitlines():
+        fields = line.split()
+        # Num Value Size Type Bind Vis Ndx Name. A local object also has a section
+        # named after it (`.rodata.<symbol>`) whose own symbol carries the same
+        # name and a zero size, so section symbols are skipped by kind.
+        if (len(fields) >= 7 and fields[-1] == name and fields[3] == "OBJECT"
+                and fields[6] != "SECTION"):
+            return int(fields[1], 16), int(fields[2], 10), fields[6]
+    raise AssertionError(f"{obj} no longer defines {name} (an OBJECT symbol)")
+
+
+def section_headers(obj: Path) -> list[tuple[str, int, int]]:
+    """(name, address, file offset) for every section, from readelf -SW."""
+    done = subprocess.run(["readelf", "-SW", str(obj)], capture_output=True, text=True, check=True)
+    sections = []
+    for line in done.stdout.splitlines():
+        if not line.lstrip().startswith("["):
+            continue
+        fields = line.replace("[", " ").replace("]", " ").split()
+        # Nr Name Type Address Off Size ...; the header row also starts with a
+        # bracket and puts the word "Address" in that column.
+        if len(fields) < 6 or not all(character in "0123456789abcdef" for character in fields[2]):
+            continue
+        sections.append((fields[1], int(fields[3], 16), int(fields[4], 16)))
+    return sections
+
+
+def symbol_in_section_bytes(obj: Path, name: str) -> bytes:
+    """The bytes of one local object symbol, through its own section's header."""
+    address, size, section_index = symbol_in_object(obj, name)
+    sections = section_headers(obj)
+    # The symbol's Ndx is the section's number; readelf lists sections by name, so
+    # the number is matched by counting the same order the headers came in.
+    numbered = [entry for entry in _numbered_sections(obj)]
+    for number, name_of_section, section_address, file_offset in numbered:
+        if number != int(section_index):
+            continue
+        start = file_offset + (address - section_address)
+        return obj.read_bytes()[start:start + size]
+    raise AssertionError(f"{obj} symbols name section {section_index}, which its headers do not "
+                         f"({[entry[1] for entry in numbered]})")
+
+
+def _numbered_sections(obj: Path) -> list[tuple[int, str, int, int]]:
+    """(number, name, address, file offset) for every section."""
+    done = subprocess.run(["readelf", "-SW", str(obj)], capture_output=True, text=True, check=True)
+    sections = []
+    for line in done.stdout.splitlines():
+        if not line.lstrip().startswith("["):
+            continue
+        fields = line.replace("[", " ").replace("]", " ").split()
+        if len(fields) < 6 or not fields[0].rstrip(":").isdigit():
+            continue
+        sections.append((int(fields[0].rstrip(":")), fields[1], int(fields[3], 16),
+                         int(fields[4], 16)))
+    return sections
+
+
 def frontend_defines() -> list[str]:
     """The -D flags the frontend archive is compiled with, from its own build.
 
@@ -211,6 +281,92 @@ class DriverTable(unittest.TestCase):
         self.assertIsNotNone(section)
         count = len(re.findall(r"R_X86_64_64", section.group(1)))
         self.assertEqual(count, 2, "the table is NULL-terminated; its size is part of it")
+
+
+class InputDriver(unittest.TestCase):
+    """The console's pad is registered as RetroArch's input driver, and its
+    buttons map to the right RetroPad buttons.
+
+    Two faults live here and neither shows up as a crash. A driver missing from
+    input_drivers[] is a frontend with no input at all: the menu draws, the pad
+    does nothing, and nothing says why. A driver whose button words are read in
+    the wrong order is worse, because it works - the wrong button moves the menu,
+    and the only symptom is a player pressing down and the selection going up.
+    """
+
+    frontend_obj = ROOT / "build" / "ra" / "obj" / "input_input_driver.c.o"
+    title_obj = ROOT / "build" / "obj" / "src_input_ps5.cpp.o"
+
+    # (RetroArch button, the console's pad word). RetroArch numbers its buttons by
+    # where they sat on a Super Nintendo pad, so its A is the right-hand button and
+    # its B is the bottom one: on a PlayStation pad that is CIRCLE and CROSS, which
+    # is what makes CIRCLE confirm a menu entry. The indices are libretro's own:
+    # B 0, Y 1, SELECT 2, START 3, UP 4, DOWN 5, LEFT 6, RIGHT 7, A 8, X 9, L 10,
+    # R 11, L2 12, R2 13, L3 14, R3 15.
+    expected = {
+        0: 0x4000,   # B      -> CROSS
+        8: 0x2000,   # A      -> CIRCLE
+        1: 0x8000,   # Y      -> SQUARE
+        9: 0x1000,   # X      -> TRIANGLE
+        4: 0x0010,   # UP
+        5: 0x0040,   # DOWN
+        6: 0x0080,   # LEFT
+        7: 0x0020,   # RIGHT
+        10: 0x0400,  # L      -> L1
+        11: 0x0800,  # R      -> R1
+        14: 0x0002,  # L3     -> left stick click
+        15: 0x0004,  # R3     -> right stick click
+        3: 0x0008,   # START  -> OPTIONS
+        2: 0x100000, # SELECT -> TOUCH PAD
+    }
+
+    def setUp(self) -> None:
+        for path in (self.frontend_obj, self.title_obj):
+            if not path.is_file():
+                self.skipTest(f"{path} is not built; run tools/build-title.sh")
+
+    def test_input_drivers_lists_ps5_last_before_null(self) -> None:
+        done = subprocess.run(["readelf", "-rW", str(self.frontend_obj)],
+                              capture_output=True, text=True, check=True)
+        section = re.search(
+            r"Relocation section '\.rela\.data\.input_drivers' at.*?\n(.*?)\n\n",
+            done.stdout, re.S)
+        self.assertIsNotNone(section, "the object has no .rela.data.input_drivers section")
+        targets = re.findall(r"R_X86_64_64\s+\S+\s+(\S+)", section.group(1))
+        # An entry that lives in its own section is relocated against that
+        # section's symbol, so ".data.input_null" and "input_null" are the same
+        # driver: the last component is the name that matters.
+        names = [target.rsplit(".", 1)[-1] for target in targets]
+        self.assertEqual(
+            names[-2:], ["input_ps5", "input_null"],
+            "input_drivers[] must name input_ps5 before input_null: the null driver "
+            "reports no input and terminates the array, so a pad driver listed after "
+            "it is a pad driver the frontend never reaches")
+
+    def test_the_button_map_is_the_console_s_own_words(self) -> None:
+        """The pairing table, read out of the object the title links.
+
+        Read rather than compiled and run: the driver's other functions call the
+        console's pad service, which no host can resolve, so nothing here links
+        the object. The table is a run of uint32 pairs in its own section, and its
+        symbol carries the size - so a table that lost a pair fails this test's
+        length check instead of silently mapping nothing.
+        """
+        raw = symbol_in_section_bytes(self.title_obj, "_ZZ20ps5_input_button_mapE3map")
+        self.assertEqual(len(raw) % 8, 0,
+                         f"the button map is {len(raw)} bytes, which is not a run of uint32 pairs")
+        values = struct.unpack(f"<{len(raw) // 4}I", raw)
+        pairs = {values[i]: values[i + 1] for i in range(0, len(values), 2)}
+        self.assertEqual(len(pairs), len(values) // 2, "the map repeats a RetroArch button")
+        self.assertEqual(len(pairs), len(self.expected),
+                         "the button map no longer covers every button on this pad")
+        for button, word in self.expected.items():
+            with self.subTest(button=button):
+                self.assertEqual(
+                    pairs.get(button), word,
+                    f"RetroArch button {button} must be the pad word {word:#x}; it is "
+                    f"{pairs.get(button)}. Reading one numbering as the other is a pad "
+                    f"that works and moves the menu the wrong way")
 
 
 class DriverTableAbi(unittest.TestCase):

@@ -775,3 +775,49 @@ evidence)**, including the 11 host tests and the three replayed evidence records
 The probes are gone from the configured tree: `build/ra-conf` was deleted,
 regenerated from `vendor/retroarch`, and diffed - only the four files
 `patches/series` names differ from upstream.
+
+## 2026-09-18: The pad driver is written and registered, and two upstream faults stand in front of it
+
+**What was built.** `src/input_ps5.cpp` is a complete input driver for this console:
+the pad is read with `scePadInit`/`scePadOpen`/`scePadRead` and the 120-byte sample
+layout that `../ProsperoLight` verified on hardware, the pad's button words are
+mapped to RetroArch's own numbering (CIRCLE is its A, so CIRCLE confirms), sticks
+and triggers are reported as axes, and the table is registered in
+`input_drivers[]` before `input_null`. `tests/test_frontend.py` pins the
+registration with a relocation test and the button pairing by reading the map out of
+the object the title links, so neither can drift quietly.
+
+**Two faults were found in front of it, both upstream, both fixed.**
+
+The first is that RetroArch's built-in test input driver is on by default
+(`HAVE_TEST_DRIVERS=yes` in `qb/config.params.sh`), and with it on
+`video_driver_init_input` returns immediately whenever the configured driver is not
+`"test"` - so no input driver is ever initialised and every button reads 0. That is
+now disabled at configure time.
+
+The second is that the title's `-c /app0/retroarch.cfg` never reached RetroArch:
+content loading rebuilds argv from the frontend's environment and keeps only
+`["retroarch", "--menu"]`. The trace shows it plainly -
+`probe config_parse_file: path="(null)"` and `probe config_load: after parse
+input="null" video="ext"` - which means this title has been running on compiled
+defaults since the day it first built, with its config file unread and `--verbose`
+dropped. A one-line guarded fix restores the title's own config path.
+
+**And that fix is parked, because it exposes a crash I could not finish.** With the
+config actually read, the title dies on launch with `SIGSEGV`, `rip=0` - a call
+through a null function pointer - before `ps5_input_init` is entered and also with
+`input_driver="null"` configured. Markers through `drivers_init` and
+`video_driver_init_internal` show the entire video path completing, so the crash is
+after driver initialisation, in the runloop or the content task. The change is in
+`parked/config-path.patch.py` with its reasoning; `config/retroarch.cfg` keeps
+`input_driver = "null"` so the title continues to run and show its menu.
+
+**Honest position.** The pad does not work yet, the picture is still one menu frame
+that only redraws when something changes (which is what input is for), and the
+"frozen frame" question cannot be settled until input lands. What is solid: the
+driver exists, is registered, is unit-tested, and the two faults that were silently
+blocking every input path are named with their measurements.
+
+**Verification.** `bash tools/verify.sh` → PASS (format unit build integration
+evidence), 13 host tests. `bash tools/run-title.sh --watch 12` → title runs, menu
+visible, no fatal signal, `/app0/trace.txt` shows the same hand-over as before.

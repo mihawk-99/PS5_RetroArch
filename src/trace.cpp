@@ -49,3 +49,9 @@ void mark_init(const char *step, bool have_video, int width, int height) noexcep
     write(line);
 }
 } // namespace ps5::debug
+
+/* The C door src/input_ps5.cpp writes through; see the note in trace.hpp. */
+extern "C" void ps5_input_trace(const char *line) noexcept
+{
+    ps5::debug::mark(line);
+}

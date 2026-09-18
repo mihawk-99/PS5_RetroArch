@@ -9,59 +9,97 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The RGUI menu is on the console's screen.** `bash tools/run-title.sh --watch 20`
-builds, publishes, verifies, launches, watches and closes the title in one
-unattended command; the console reports no fatal signal, and the console's owner
-watched the menu on the television during the run. The title's own trace is
-committed as `evidence/ppsa-99169-rgui-menu-on-screen/`, and `bash tools/verify.sh`
-passes all five gates. Pad input was out of scope and is still not wired.
+**The menu is on screen and the title runs; the pad does not work yet.** An
+unattended `bash tools/run-title.sh --watch 12` runs the title, shows the RGUI menu
+and is closed by the script with no fatal signal. `bash tools/verify.sh` passes all
+five gates and the host suite is 13 tests.
 
-**The end of the frame path.** The driver opens VideoOut at 1920x1080, tells the
-frontend the size with `video_driver_set_size`, and presents by flushing the back
-buffer, submitting a flip to that buffer's registered index, waiting a vblank, and
-alternating buffers. RGUI renders the menu into its own 320x240 RGB565 framebuffer
-and hands it over through `poke->set_texture_frame`; the driver scales it into the
-console's frame through the tiled addressing. The bands that were this project's
-only instrument are still painted underneath, so a black screen can still be told
-apart from a menu that is not drawing: they vanish as soon as a menu frame exists.
+**A complete input driver for this console exists and is registered.** It is
+`src/input_ps5.cpp`: the DualSense is read with
+`scePadInit`/`scePadOpen`/`scePadRead` and the 120-byte sample layout
+`../ProsperoLight` verified on hardware, its button words are mapped onto
+RetroArch's numbering (CIRCLE is RetroArch's A, so CIRCLE confirms a menu entry),
+and sticks and triggers are reported as axes. `tests/test_frontend.py` pins both the
+registration and the pairing. What is missing is that the frontend never gets as
+far as calling it.
 
-**Two faults were behind the black screen, and they were independent.**
+**Two faults stood in front of it, and both are fixed.**
 
-1. **The title and the frontend disagreed about the size of RetroArch's driver
-   interface struct.** `src/` was compiled with no `-DHAVE_*` flags; the archive is
-   compiled with fifty. `video_ps5` was 136 bytes where the frontend read 144, so
-   `poke_interface` and `wrap_type_to_enum` were both read one member late and both
-   came back NULL. The frontend calls `poke_interface` only when it is not NULL, so
-   RGUI's hand-over was dropped in silence on every frame while the driver
-   presented happily. `tools/build-title.sh` now passes `tools/retroarch-flags.sh`'s
-   own list to the title's sources, and `tests/test_frontend.py` fails on any
-   recurrence by comparing the two sizes.
-2. **`sceAgcInit(8)` was called before the display opened**, left over from the
-   round that submitted flips through an AGC command buffer.
-   `../PS5_Vulkan/src/demo_renderer.cpp`, whose output has been seen on this
-   console, contains no `sceAgc` call. Removing it produced the first pixels this
-   port ever put on the screen.
+1. **RetroArch's built-in test input driver was on** (`HAVE_TEST_DRIVERS=yes` by
+   default), and while it is on `video_driver_init_input` returns before
+   initialising any real input driver. `--disable-test_drivers` is now in
+   `tools/retroarch-sources.sh`.
+2. **The title's `-c` never reached RetroArch.** Content loading rebuilds argv from
+   the frontend's environment and kept only `["retroarch", "--menu"]`, so the config
+   file was never read and the title ran on compiled defaults -
+   `probe config_parse_file: path="(null)"`. A guarded fix restores the path.
 
-**A correction to the lead this round started from.** Holding the frame inside
-`present()` instead of returning into RetroArch's runloop was expected to be the
-fix. It is not: the bands appeared immediately - before the hold began - and were
-still up twelve seconds after `present()` had returned into the runloop, with the
-display's flip status at `marker=1` throughout. The runloop does not take a
-presented frame back. See `docs/FINDINGS.md` for the timing and for what the run
-does and does not separate.
+**That fix is parked, because it exposes a crash that is not yet understood.** With
+the config actually read, the title dies on launch: `SIGSEGV`, `rip=0`, a call
+through a null function pointer - with `input_driver="ps5"` and equally with
+`"null"`. Markers show the whole video path completing, so the fault is after driver
+initialisation. The change and its reasoning are in `parked/config-path.patch.py`;
+`config/retroarch.cfg` keeps `input_driver = "null"` so the title keeps running.
 
 ## Next
 
-1. **Input.** The driver owns no input and hands it back to the frontend, which has
-   no joypad driver on this console (`primary_joypad` is NULL; `patches/series` 0004
-   stops the menu crashing on it). A pad path is the next milestone, and it is what
-   makes the menu navigable rather than merely visible.
-2. **The menu is 320x240 in a 1920x1080 frame.** That is what RGUI's framebuffer is
-   and the driver scales it up whole. `menu_rgui_internal_upscale_level` and the
-   RGUI aspect-ratio settings are the frontend's own knobs for this, and the
-   driver's blit is nearest-neighbour on purpose.
-3. **`sce_module/libc.prx` still cannot be replaced over FTP** (see Open findings):
-   the console runs its own copy. Harmless today, a real gap for a release.
+1. **Fix the config-path crash, then turn the pad on.** The driver is written,
+   registered and tested; the only thing between it and a working controller is that
+   crash. Instrument `runloop_iterate` and the content task, not the driver: the
+   driver is never entered.
+2. **Then answer the frozen-frame question.** The menu redraws only when something
+   changes, which is why it looks still today; `ps5_frame ... menu commits=N
+   changes=M` in the trace is the instrument that will say whether input makes it
+   redraw, and the commit/change counters are already in the driver.
+3. **Then the menu's size.** RGUI renders 320x240 into a 1920x1080 frame and the
+   driver scales it up whole.
+
+## Working notes
+
+- **`bash tools/run-title.sh` is the only way to run the title.** It owns the whole
+  sequence and prints the title's own trace. Do not hand-deploy.
+- **Trace files are append-only and grow without bound.** One session took
+  `/app0/trace.txt` past 70,000 lines. Read the tail, or slice from the last
+  `main() entered`.
+- **A probe is not gone until `build/ra/obj` is deleted too.** Reconfiguring alone
+  reuses stale objects and ships old probes into `eboot.bin`.
+- **Do not patch the configured tree with multi-line scripted replacements.** Two
+  rounds were lost to a replaced brace that produced
+  `undefined symbol: input_config_reset` at link time. Single-line insertions,
+  verified by brace count, are safe; blocks are not.
+- **The console's signal block prints `rip`.** `rip=0` is a call through a null
+  function pointer, not a bad data read, and reading it first saves a round.
+- **`src/` must be compiled with the frontend's `-D` flags**, which
+  `tools/build-title.sh` does by asking `tools/retroarch-flags.sh`; a bare
+  `make app` produces a driver table the frontend reads at the wrong offsets.
+- **Compile from `build/ra-conf`, never from `vendor/retroarch`**; upstream is never
+  edited and `patches/series` is the only record of this port's changes.
+- **`-DHAVE_MAIN` must never be defined**: it compiles the frontend's main loop out.
+- The console's address and credentials come from the ignored `.env`; console
+  captures stay in the ignored `klog/` tree.
+
+## Last verified
+
+| Check | Result |
+| --- | --- |
+| `bash tools/run-title.sh --watch 12` | PASS: title runs, RGUI menu visible, no fatal signal, closed by the script |
+| `bash tools/verify.sh` (all gates) | PASS (format unit build integration evidence) |
+| `python3 -m unittest discover -s tests` | PASS: 13 tests, including the input driver's registration and button map |
+| `nm -S build/obj/src_input_ps5.cpp.o` | PASS: `input_ps5` is 0x58 bytes, the frontend's `sizeof(input_driver_t)` |
+| `nm -u build/ra/obj/input_input_driver.c.o` | PASS: the frontend references `input_ps5` |
+| Input driver selected on the console | **FAILS**: `SIGSEGV`, `rip=0`, before `ps5_input_init`; parked |
+
+## Open findings
+
+- The config-path crash above is the blocker for input, and therefore for the
+  frozen-frame question. It happens with any input driver selected, so it is the
+  config being read - not the driver - that exposes it.
+- The console's FTP will not replace `sce_module/libc.prx`; the title runs against
+  the console's copy. A release has to solve this.
+- RGUI's assets: the fonts are bundled under `assets/rgui/font/`; whether the rest
+  of RetroArch's asset tree should ship is undecided.
+- A pad-driven build cannot be verified unattended yet: the trace reports the first
+  press, but nothing in the pipeline exercises a button.
 
 ## Working notes
 

@@ -1473,3 +1473,67 @@ upstream tree does not disappear when you stop adding it: after deleting
 into `eboot.bin`. Deleting the object directory is what makes a probe really gone.
 And a trace file that is appended to for every run stops being readable: this
 session's `/app0/trace.txt` reached 72,904 lines because every run appends to it.
+
+## The pad input driver is written and registered, and two faults upstream of it block it
+
+**Measured.** A complete `input_driver_t` for this console lives in
+`src/input_ps5.cpp`: it reads the DualSense through `scePadInit`/`scePadOpen`/
+`scePadRead` with the 120-byte sample layout `../ProsperoLight` verified on
+hardware, maps the pad's button words onto RetroArch's own numbering, and reports
+sticks and triggers as axes. It is registered in `input_drivers[]`, its button map
+is pinned by a host test, and `config/retroarch.cfg` names it. What is **not** true
+is that the pad works: the title never reaches `ps5_input_init`, and the two
+reasons are both upstream of the driver.
+
+**Fault one, found by disassembly and fixed: RetroArch's built-in test input driver
+was on.** `HAVE_TEST_DRIVERS` defaults to `yes` in `qb/config.params.sh`, and while
+it is on `video_driver_init_input` opens with
+
+    if (*input)
+       if (strcmp(settings->arrays.input_driver, "test") != 0)
+          return true;
+
+so the whole input-driver initialisation is skipped whenever the configured driver
+is not `"test"`. With it on, `input_drivers[]` holds the test driver, the null
+driver and this project's driver, and the frontend's first entry is the test one:
+`probe init_input entered: *input=ba4dc0 configured="null" joypad="null"` and then
+`return true`. No input driver is ever initialised, so `current_data` stays NULL and
+every button read is a call that answers 0. `--disable-test_drivers` is now in
+`tools/retroarch-sources.sh`; it is a development driver for RetroArch's own test
+suite and has no place in a shipping title.
+
+**Fault two, found by trace and fixed: the title's `-c` was thrown away.** The entry
+point passes `-f -c /app0/retroarch.cfg --verbose --menu`, and content loading
+rebuilds a fresh argv from the frontend's environment
+(`content_load_init_wrap`), which offers no `-c`: the pair RetroArch actually parsed
+was `["retroarch", "--menu"]`. `probe config_parse_file: path="(null)"` is that
+measurement, and `probe config_load: after parse input="null" video="ext"` shows the
+consequence - **the title has been running on compiled defaults all along**, config
+file ignored, `--verbose` dropped. The display worked only because the video
+driver's *default* happened to be ps5 already. The fix is one guarded insertion in
+`tasks/task_content.c` (`patches/series`, 0006) that restores the title's own config
+path when the frontend environment does not name one.
+
+**And that fix is parked, because it exposes a crash that is not yet understood.**
+With the config actually read, the title dies on launch:
+
+    # signal: 11 (SIGSEGV)
+    # reason: page fault (user read instruction, page not present)
+    # fault address: 0000000000000000
+    # rip: 0000000000000000
+
+`rip: 0` is a call through a null function pointer. It is not the input driver:
+with `input_driver = "ps5"` the trace stops after `ps5_get_poke_interface entered`
+and `ps5_input_init` is never entered, and with `input_driver = "null"` the same
+crash happens once the config is read. Markers through `drivers_init` and
+`video_driver_init_internal` show the whole video path completing - overlay
+unload/init, context reset, display server, mouse cursor, audio init, core info all
+print - so the crash is after that, in `rarch_main`'s runloop or the content task.
+The parked change is `parked/config-path.patch.py`; the config keeps
+`input_driver = "null"` so the title runs.
+
+**What this means for the next round.** The order is: fix the config-path crash,
+then the driver that is already written and tested should initialise and the pad
+should work. The crash is a null call in the runloop after driver initialisation,
+and the fastest instrument is a marker on `runloop_iterate` and the content task,
+not more of the driver.
