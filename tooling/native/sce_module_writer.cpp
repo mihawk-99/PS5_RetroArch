@@ -908,8 +908,7 @@ Bytes write_executable(const Image &image, std::span<const Stub> stubs, const Op
         if (header.type == kProgramLoad && header.alignment > 1)
             require(header.offset % header.alignment == header.address % header.alignment,
                     "PT_LOAD at address " + std::to_string(header.address) +
-                        " is not page aligned with file offset " +
-                        std::to_string(header.offset));
+                        " is not page aligned with file offset " + std::to_string(header.offset));
     }
     for (std::size_t i = 0; i < headers.size(); ++i)
         write_program_header(output, i, headers[i]);

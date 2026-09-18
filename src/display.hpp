@@ -42,9 +42,18 @@ class Display final
     bool open(unsigned width, unsigned height) noexcept;
     void close() noexcept;
 
-    [[nodiscard]] bool is_open() const noexcept { return handle_ >= 0; }
-    [[nodiscard]] unsigned width() const noexcept { return width_; }
-    [[nodiscard]] unsigned height() const noexcept { return height_; }
+    [[nodiscard]] bool is_open() const noexcept
+    {
+        return handle_ >= 0;
+    }
+    [[nodiscard]] unsigned width() const noexcept
+    {
+        return width_;
+    }
+    [[nodiscard]] unsigned height() const noexcept
+    {
+        return height_;
+    }
 
     /** The buffer the caller may write into now. */
     [[nodiscard]] Surface back_surface() const noexcept;
@@ -59,7 +68,10 @@ class Display final
     bool present() noexcept;
 
     /** The last failure, for one log line; never null. */
-    [[nodiscard]] const char *last_error() const noexcept { return error_; }
+    [[nodiscard]] const char *last_error() const noexcept
+    {
+        return error_;
+    }
 
   private:
     int handle_ = -1;

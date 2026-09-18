@@ -10,9 +10,9 @@ those are `docs/ACTIVE.md` and `docs/PHASE_LOG.md`.
 | Step | What | Acceptance |
 | --- | --- | --- |
 | M0.1 | Fill the documentation contract: this file's ladder, the gates in `docs/PLAN.md`, the environment table below, and the procedures in `docs/TESTING.md`, `docs/DEPLOYMENT.md` and `docs/TROUBLESHOOTING.md` | `grep -rno '{{[A-Z0-9_]*}}' AGENTS.md docs tools` returns nothing, and every command named in a gate exists as a file in `tools/` |
-| M0.2 | Pin the toolchain and the upstream source: `tools/doctor.sh` proves the SDK and every host tool, `tools/fetch-upstream.sh` fetches the pinned tarball, verifies its digest and applies `patches/series` into `vendor/retroarch` | `tools/doctor.sh` exits 0 and names each resolved path; `tools/fetch-upstream.sh` prints `main.c`-bearing tree at the pinned version and a second run is a no-op |
-| M0.3 | Cross-compile `libretro-common` alone to prove the toolchain end to end | `tools/verify.sh build` produces `build/ps5/libretro_common.a`, and `tools/check-ps5-object.sh` finds `libkernel_web.sprx` and no `libkernel_sys.sprx` in its import table |
-| M0.4 | Stage the title skeleton: `sce_sys/param.json`, `sce_sys/icon0.png`, `retroarch.cfg` seed and the directory layout the loader reads | `tools/stage.sh` writes `dist/<TITLE_ID>/` with all four; the manifest is committed and `tools/verify.sh integration` passes on it |
+| M0.2 | Pin the toolchain and the upstream source: `tools/doctor.sh` proves the SDK and every host tool, `tools/fetch-retroarch.sh` fetches the pinned revision and checks the tree it got against that commit | `tools/doctor.sh` exits 0 and names each resolved path; `tools/fetch-retroarch.sh --check` prints the pin and what is present, and a second run is a no-op |
+| M0.3 | Compile the frontend's own sources, to prove the toolchain end to end: `tools/retroarch-sources.sh` asks RetroArch's build which objects a link needs, `tools/build-retroarch.sh` compiles them | `tools/build-retroarch.sh` reports how many sources it compiled and archives them into `build/ra/libretroarch.a`; every source it could not compile is named in its report |
+| M0.4 | Stage the title: `sce_sys/param.json`, the presentation assets, the runtime and the signed image in the layout the loader reads | `bash tools/build-title.sh` writes `dist/<TITLE_ID>/` with `eboot.bin`, `sce_sys/` and `sce_module/libc.prx`, and records `manifest.sha256`; `bash tools/check-manifest.sh` verifies it and `tools/verify.sh integration` passes on it |
 | M0.5 | The gate runner: `tools/verify.sh` runs format, unit, build, integration, evidence in order and fails fast | `tools/verify.sh` exits 0 on a clean tree and exits 1 at the first red gate; `tools/verify.sh --list` prints the five commands |
 
 ## M1: the console shell
@@ -95,11 +95,11 @@ re-derives these, at full price.*
 | PS5 SDK | `$PS5_PAYLOAD_SDK`, default `/home/mihawk/ps5-payload-sdk`, unpacked 2026-09-17; environment from `$PS5_PAYLOAD_SDK/toolchain/prospero.sh` |
 | PS5 compiler | `prospero-clang` 22.1.8, target `x86_64-sie-ps5`; sysroot `$PS5_PAYLOAD_SDK/target` |
 | Upstream source | RetroArch 1.22.2 tarball, fetched into the ignored `vendor/`, patched per `patches/series` |
-| Build | `make` → `tools/verify.sh build` → `build/ps5/retroarch.elf`, then `tools/stage.sh` → `dist/<TITLE_ID>/` |
+| Build | `bash tools/build-title.sh` → `dist/<TITLE_ID>/eboot.bin`, signed and manifested; `bash tools/verify.sh build` runs the same command |
 | Test | `tools/verify.sh unit` (host-native, GoogleTest) and `tools/verify.sh integration` (shell and Python against the staged tree) |
 | Format and lint | `tools/verify.sh format` (`clang-format --dry-run --Werror`, `bash -n`, `python3 -m py_compile`, attribution and JSON checks) |
 | Run locally | host-native frontend against the headless driver: `build/host/retroarch --features` and the unit suite; no console is touched |
-| Target | PS5 payload ELF (`retroarch.elf`, x86-64, `libkernel_web` imports) plus `retroarch.cfg`, `sce_sys/param.json` and `sce_sys/icon0.png` as a homebrew title folder |
+| Target | A PS5 title folder: a signed fake-self `eboot.bin` (x86-64) with `sce_module/libc.prx` and `sce_sys/`, which is what the console's loader runs |
 | Graphics on the target | the relocatable OpenGL 3.3 Core package from `../ps5-opengl-sdk-0.2.0` today, and the Vulkan driver from `../PS5_Vulkan` once it reaches rung 1.0 — see "The graphics backend" below; neither is rebuilt here |
 | Vulkan headers for our build | `../ps5-opengl-sdk-0.2.0/third_party/Vulkan-Headers/include`, the vendored copy the local driver builds against; the payload SDK's sysroot ships none |
 | Console tools | the resident control payload and `ps5_console.py` from `../PS5_Vulkan` (`launch`, `kill`, `klog` on port 3232); address and credentials come from the ignored `.env` |
@@ -156,7 +156,7 @@ on this console: ProsperoLight, built the same way, starts when placed.
 
 | Piece | Where it comes from |
 | --- | --- |
-| the tooling that converts and signs `eboot.bin` | `tooling/`, copied by `tools/scaffold-native.sh` |
+| the tooling that links and signs `eboot.bin` | `tooling/`, taken from the native pipeline and committed as part of this project |
 | the loader-visible runtime module | `runtime/libc.prx`, checked against its own digest manifest |
 | the title's identity and launcher assets | `sce_sys/`, written by the scaffold from `title/` |
 | the application | RetroArch's sources, compiled by `tools/build-retroarch.sh`, linked with `src/` |
@@ -182,7 +182,7 @@ kinds of thing:
 | Path | Committed | Rule |
 | --- | --- | --- |
 | `reference/` | yes, with a `PROVENANCE.txt` naming the source, the revision and every file's digest | read-only. It is what a claim was measured against; a change to it is its own step, and the digests are re-recorded in that step |
-| `vendor/` | no, ignored | build-time only. `tools/fetch-upstream.sh` recreates it from the pin on every clean build, so nothing in it can be relied on to persist |
+| `vendor/` | no, ignored | build-time only. `tools/fetch-retroarch.sh` recreates it from the pin on every clean build, so nothing in it can be relied on to persist |
 
 Neither is edited to get a step unblocked. A change we want in either one is a
 patch in `patches/` or a documented decision, never a quiet edit.

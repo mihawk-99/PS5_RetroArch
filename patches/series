@@ -1,0 +1,17 @@
+# This port's changes to RetroArch's own sources.
+#
+# Unlike a unified diff, these are applied by tools/apply-port-patches.py, which
+# matches each change on a stable anchor line instead of a line number. The reason
+# is in that file: a diff carries one revision's line numbers and applies in the
+# wrong place, or not at all, when upstream moves.
+#
+# vendor/retroarch is never edited. The patches go to the configured copy under
+# build/ra-conf/, so "upstream plus a named, re-runnable change" stays true.
+#
+# 0001  register the PS5 video driver   gfx/video_driver.{h,c}
+0001-register-the-ps5-video-driver
+#
+# 0002  declare HAVE_XKBCOMMON, the one optional library upstream checks for
+#       without declaring, so that --disable-xkbcommon is accepted
+#       qb/config.params.sh
+0002-declare-have-xkbcommon

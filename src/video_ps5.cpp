@@ -198,7 +198,8 @@ void ps5_viewport_info(void *data, video_viewport_t *vp) noexcept
     vp->full_height = vp->height;
 }
 
-void ps5_get_video_output_size(void *data, unsigned *width, unsigned *height, char *s, std::size_t len) noexcept
+void ps5_get_video_output_size(void *data, unsigned *width, unsigned *height, char *s,
+                               std::size_t len) noexcept
 {
     (void)s;
     (void)len;
@@ -220,31 +221,31 @@ void ps5_set_video_mode(void *data, unsigned width, unsigned height, bool fullsc
 }
 
 static const video_poke_interface_t ps5_poke = {
-    nullptr,               /* get_flags */
-    nullptr,               /* load_texture */
-    nullptr,               /* unload_texture */
-    ps5_set_video_mode,    /* set_video_mode */
-    nullptr,               /* get_refresh_rate */
-    nullptr,               /* set_filtering */
+    nullptr,                   /* get_flags */
+    nullptr,                   /* load_texture */
+    nullptr,                   /* unload_texture */
+    ps5_set_video_mode,        /* set_video_mode */
+    nullptr,                   /* get_refresh_rate */
+    nullptr,                   /* set_filtering */
     ps5_get_video_output_size, /* get_video_output_size */
-    nullptr,               /* get_video_output_prev */
-    nullptr,               /* get_video_output_next */
-    nullptr,               /* get_current_framebuffer */
-    nullptr,               /* get_proc_address */
-    nullptr,               /* set_aspect_ratio */
-    nullptr,               /* apply_state_changes */
-    ps5_set_texture_frame, /* set_texture_frame */
-    ps5_set_texture_enable,/* set_texture_enable */
-    nullptr,               /* set_osd_msg */
-    nullptr,               /* show_mouse */
-    nullptr,               /* grab_mouse_toggle */
-    nullptr,               /* get_current_shader */
-    nullptr,               /* get_current_software_framebuffer */
-    nullptr,               /* get_hw_render_interface */
-    nullptr,               /* set_hdr_max_nits */
-    nullptr,               /* set_hdr_paper_white_nits */
-    nullptr,               /* set_hdr_contrast */
-    nullptr,               /* set_hdr_expand_gamut */
+    nullptr,                   /* get_video_output_prev */
+    nullptr,                   /* get_video_output_next */
+    nullptr,                   /* get_current_framebuffer */
+    nullptr,                   /* get_proc_address */
+    nullptr,                   /* set_aspect_ratio */
+    nullptr,                   /* apply_state_changes */
+    ps5_set_texture_frame,     /* set_texture_frame */
+    ps5_set_texture_enable,    /* set_texture_enable */
+    nullptr,                   /* set_osd_msg */
+    nullptr,                   /* show_mouse */
+    nullptr,                   /* grab_mouse_toggle */
+    nullptr,                   /* get_current_shader */
+    nullptr,                   /* get_current_software_framebuffer */
+    nullptr,                   /* get_hw_render_interface */
+    nullptr,                   /* set_hdr_max_nits */
+    nullptr,                   /* set_hdr_paper_white_nits */
+    nullptr,                   /* set_hdr_contrast */
+    nullptr,                   /* set_hdr_expand_gamut */
 };
 
 void ps5_get_poke_interface(void *data, const video_poke_interface_t **iface) noexcept
@@ -257,7 +258,8 @@ void ps5_get_poke_interface(void *data, const video_poke_interface_t **iface) no
 /* The driver table. Positions are the interface; see the field list in
  * docs/REFERENCE.md. Conditional members are honoured so the same literal works
  * with or without HAVE_OVERLAY and HAVE_GFX_WIDGETS. */
-video_driver_t video_ps5 = {
+/* C linkage: gfx/video_driver.c is C and names this symbol in its driver table. */
+extern "C" video_driver_t video_ps5 = {
     ps5_init,
     ps5_frame,
     nullptr, /* set_nonblock_state */

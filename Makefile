@@ -53,35 +53,22 @@ doctor:
 	@printf '%s\n' '==> [doctor] Checking the Linux/WSL host without changing it'
 	@bash tools/doctor.sh
 
-test: test-unit test-integration
+test: test-unit
 
 test-deps:
-	@printf '%s\n' '==> [test-deps] Fetching the pinned host-only GoogleTest source'
-	@bash tools/setup-test-dependencies.sh >/dev/null
+	@printf '%s\n' '==> [test-deps] Nothing to fetch: the tests are host-native python'
+	@python3 -c 'import sys; print("==> [test-deps] python", sys.version.split()[0])'
 
-test-unit: $(HOST_UNIT_TEST)
-	@printf '%s\n' '==> [test-unit] Running host-native GoogleTest application tests'
-	@$(HOST_UNIT_TEST) $(GTEST_ARGS)
-
-$(HOST_UNIT_TEST): tests/test_demo_renderer.cpp src/demo_renderer.cpp src/demo_renderer.hpp tools/setup-test-dependencies.sh | test-deps
-	@printf '%s\n' '==> [test-unit] Compiling the host-native GoogleTest binary'
-	@mkdir -p -- $(@D)
-	@gtest=$$(bash tools/setup-test-dependencies.sh); \
-		$(HOST_CXX) -std=c++20 -O2 -pthread \
-			-isystem "$$gtest/googletest/include" -I"$$gtest/googletest" \
-			-c "$$gtest/googletest/src/gtest-all.cc" -o $(@D)/gtest-all.o; \
-		$(HOST_CXX) -std=c++20 -O2 -pthread \
-			-isystem "$$gtest/googletest/include" -I"$$gtest/googletest" \
-			-c "$$gtest/googletest/src/gtest_main.cc" -o $(@D)/gtest-main.o; \
-		$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -pthread -Isrc \
-			-isystem "$$gtest/googletest/include" \
-			tests/test_demo_renderer.cpp src/demo_renderer.cpp \
-			$(@D)/gtest-all.o $(@D)/gtest-main.o \
-			$(HOST_TEST_LDFLAGS) -o $@
-
-test-integration:
-	@printf '%s\n' '==> [test-integration] Running host tooling integration tests'
+# The template's GoogleTest target is gone with the template's demo renderer. What
+# replaced it is tests/test_frontend.py, which is python and needs no build step:
+# it compiles the frame-layout function out of src/display.cpp with the host
+# compiler and reads the built object and the built artifact directly, so it can
+# question what was made without a cross toolchain and without a console.
+test-unit:
+	@printf '%s\n' '==> [test-unit] Running the host-native frontend tests'
 	@python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+test-integration: test-unit
 
 deps: test-deps
 	@printf '%s\n' '==> [deps] Fetching declared native dependencies'
@@ -125,12 +112,17 @@ packages: $(RUNTIME)
 	@bash tools/build.sh All
 
 deploy:
-	@printf '%s\n' '==> [deploy] Building and publishing the selected app output over FTP'
-	@bash tools/deploy.sh
+	@printf '%s\n' '==> [deploy] Building the title and publishing it over FTP'
+	@bash tools/build-title.sh
+	@python3 tools/deploy-title.py
+
+deploy-check:
+	@printf '%s\n' '==> [deploy] Reading back what the console holds for this title'
+	@python3 tools/deploy-title.py --check
 
 undeploy:
 	@printf '%s\n' '==> [undeploy] Removing staged development files for this title over FTP'
-	@bash tools/deploy.sh undeploy
+	@python3 tools/deploy-title.py --clean
 
 format:
 	@printf '%s\n' '==> [format] Formatting C and C++ sources'

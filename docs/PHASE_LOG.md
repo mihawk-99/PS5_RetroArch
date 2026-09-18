@@ -558,3 +558,100 @@ register `&video_ps5` in `video_drivers[]`, and reconcile the entry point, since
 Then link with the pipeline's CRT and runtime, stage, deploy and launch.
 
 **Commit.** `b214c22` — Delete the websrv material and compile the frontend from RetroArch's own build.
+
+## 2026-09-18: The title links, signs, and carries the PS5 driver in its table
+
+**What was asked.** Register `&video_ps5` in RetroArch's `video_drivers[]`,
+reconcile the entry point, and link the frontend with `src/` through the native
+pipeline's CRT — the two items the goal table still had open.
+
+**Both were done, and the link is the proof.** `bash tools/build-title.sh`
+compiles 225 of 225 sources, archives them into `build/ra/libretroarch.a`, links
+that with `src/` through `app_crt.o` and the SDK's `_start`, signs the result and
+assembles `dist/PPSA99169/`. `eboot.bin` is 8,026,239 bytes, `container: signed,
+plaintext`, 12 segments, `integrity: valid`.
+
+**The registration is verified by relocation, not by reading the source.**
+`readelf -r build/ra/obj/gfx_video_driver.c.o` shows `.rela.data.video_drivers`
+holding exactly two entries, `video_ps5` then `video_null`, and
+`nm build/llvm-pie.elf` shows `video_ps5`, `video_null`, `rarch_main` and a single
+`main`. The entry point needed no adapter: RetroArch guards its own `main` with
+`#ifndef HAVE_MAIN`, which its desktop build defines, so `-DHAVE_MAIN` removes it
+and `src/main.cpp` supplies the only one.
+
+**Five faults were found on the way, and each was a real one.**
+
+1. *The build compiled the wrong tree.* `tools/build-retroarch.sh` read sources
+   from `vendor/retroarch` while the port's patches were applied to `build/ra-conf`.
+   It linked, signed and started with `video_drivers[]` holding no ps5 entry: the
+   file that lists the drivers came from the tree that had never heard of the
+   patch. Source and patch now come from the same place by construction.
+2. *The feature flags were stated twice.* The script passed 36 `-DHAVE_*` flags of
+   its own, six of which configure had turned off — the BSV movie recorder, the
+   soft filters, the video filters, the translator, gfx widgets. Those compiled
+   code whose sources are not in the object list, so the link failed on symbols
+   belonging to files nobody built. `tools/retroarch-flags.sh` now asks `make -n`
+   for the flags it would use; the hand-written list is gone.
+3. *`config.h` alone is not enough.* A source can test a feature before any header
+   that includes `config.h` reaches it: `libchdr_chd.c` guards its zlib code with
+   `#ifdef HAVE_ZLIB` near the top, so a build with config.h only compiled the CHD
+   reader without zlib. This is why `make` passes each enabled feature on the
+   command line as well, and why this project does too.
+4. *Four Linux-only subsystems were in the object list.* udev, v4l2, tinyalsa and
+   libusb cannot compile against this SDK, and xkbcommon is enabled by this host's
+   pkg-config rather than by a compiler flag. All five are now switched off at
+   their own configure switches — `HAVE_XKBCOMMON` is declared `auto` in
+   `qb/config.params.sh` by the port's second patch, because upstream checks for it
+   without declaring it and configure therefore refuses the switch. Three further
+   sources (`linuxraw_input.c`, `linuxraw_joypad.c`, `linux_common.c`) are in the
+   object list because `Makefile.common` tests `findstring Linux,$(OS)` and
+   configure is given `OS=BSD`; they are dropped by `tools/retroarch-sources.sh`,
+   which is safe because the toolchain defines `__FreeBSD__` and not `__linux__`,
+   so nothing references them.
+5. *Two link-time stubs the pipeline refuses.* `assert` expands to `__assert`,
+   which only `libc.a` defines and this pipeline deliberately does not link, so
+   the build is now `-DNDEBUG` — what a release build of RetroArch uses anyway.
+   zstd enables its tracing hooks on any x86-64 ELF and emits a weak undefined
+   symbol; the pipeline's stub table refuses to write one for a symbol no public
+   stub exports, so `-DZSTD_TRACE=0` stops it being emitted.
+
+**The abandoned route is fully gone.** The tools that belonged to it —
+`deploy.py`, `console-launch.sh`, `check-payload.sh`, `scaffold-native.sh`,
+`build-native-app.sh`, `install-title.sh` and `deploy.sh` — are deleted, and the
+tools that remain are the ones `build-title.sh` and `verify.sh` call. Every tool
+named by another tool now exists: `tools/fetch-retroarch.sh` was named by three
+tools and three documents and had never been committed, and it now pins
+RetroArch at v1.22.2 (`69a4f0e`) and checks the fetched tree against that commit.
+`vendor/retroarch` carries no git directory, so upstream cannot be committed into.
+
+**The gates are green for the first time.** `tools/verify.sh` passes format, unit,
+build, integration and evidence. Three gate scripts it named had never been
+written: `tools/lint-shell.sh` and `tools/lint-format.sh` now exist, and
+`tools/check-manifest.sh` verifies the built folder against its manifest. The
+template's `make test-unit` built a test for `src/demo_renderer.cpp`, a file that
+does not exist here; `tests/test_frontend.py` replaces it with eight checks over
+what actually risks being wrong — the driver table's relocations, the frame
+layout's arithmetic compiled from `src/display.cpp`, and the artifact's container.
+
+**A generated file stopped dirtying the tree.** `tools/build-retroarch.sh` had
+been copying the configured `config.h` to the repository root; no source read it,
+and it made every build show a modified tracked file. Untracked and ignored, and
+the build is byte-identical without it.
+
+**The evidence.** `bash tools/build-title.sh` → `eboot.bin` 8,026,239 bytes,
+`integrity: valid`. Two consecutive builds produce the same digest,
+`71c88975040535a02b462618dd394a7a378034272c9bffa43ce0ca4b717ab9b7`. `bash
+tools/check-manifest.sh` → 7 files match, none extra, `eboot.bin` magic
+`4f153d1d`, and it fails as it should when one byte of the image is changed.
+`tools/verify.sh` → `PASS (format unit build integration evidence)`. Staged tree
+for the console: `handoff/PPSA99169/`, 8 files.
+
+**What is not done.** The title has not run. It is built, signed and manifested,
+and the folder has to reach `/data/homebrew/PPSA99169` on the console. Writes from
+this machine do not take: `tools/deploy-title.py` stored a 1,284,674-byte
+`libc.prx` and read back the previous 1,335,962-byte file under the new name,
+twice, and a probe uploaded under a name never used before read back those same
+old bytes. The console's FTP accepts the transfer and serves something else, so
+the console's owner uploads by hand.
+
+**Commit.** pending — Link the title and register the PS5 video driver.

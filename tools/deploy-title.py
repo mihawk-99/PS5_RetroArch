@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from posixpath import join
@@ -57,11 +58,29 @@ def load_settings() -> dict:
 
 
 def title_id() -> str:
+    """The title id of the built application, read from its own param.json.
+
+    There is exactly one source for this and it is the signed title's metadata:
+    sce_sys/param.json is what the console's loader reads to decide which title a
+    folder is, so a deployment that agreed with anything else - a variable, a
+    copy under title/, a constant - could publish a folder the console calls
+    something the build never named. dist/ is where tools/build.sh writes it.
+    """
     import json, re
-    param = ROOT / "title" / "sce_sys" / "param.json"
+    matches = sorted(ROOT.glob("dist/PPSA*/sce_sys/param.json"))
+    if not matches:
+        raise SystemExit("nothing built: no dist/PPSA*/sce_sys/param.json; "
+                         "run tools/build-title.sh first")
+    if len(matches) > 1:
+        names = ", ".join(str(p.parent.parent.name) for p in matches)
+        raise SystemExit(f"more than one title is built ({names}); "
+                         "remove the ones not being deployed")
+    param = matches[0]
     value = json.loads(param.read_text(encoding="utf-8"))["titleId"]
     if not re.fullmatch(r"PPSA\d{5}", value):
         raise SystemExit(f"param.json holds an invalid title id: {value!r}")
+    if param.parent.parent.name != value:
+        raise SystemExit(f"{param} says {value} but sits in {param.parent.parent.name}/")
     return value
 
 
@@ -73,6 +92,25 @@ def sizes(ftp, path: str) -> dict[str, int]:
                 for name, facts in ftp.mlsd() if name not in {".", ".."}}
     finally:
         ftp.cwd(previous)
+
+
+def remote_digest(ftp, path: str) -> tuple[int, str]:
+    """Read a file back and return its size and sha256.
+
+    Why a read-back and not the size the listing reports. This console's FTP
+    service has been measured answering with bytes that belong to another file,
+    and its directory entries go stale: after an upload of a 1,284,674-byte
+    libc.prx it still listed the previous 1,335,962-byte file, so a size check
+    either passes on the old content or fails on the new one without saying which
+    happened. A digest of what the server actually serves is the only answer that
+    distinguishes "the upload did not land" from "the listing is old", and the
+    cost is one read of each file - about 19 MB for this title.
+    """
+    import hashlib, io
+    buffer = io.BytesIO()
+    ftp.retrbinary(f"RETR {path}", buffer.write, blocksize=256 * 1024)
+    payload = buffer.getvalue()
+    return len(payload), hashlib.sha256(payload).hexdigest()
 
 
 def do_check(settings: dict, tid: str) -> int:
@@ -100,7 +138,7 @@ def do_check(settings: dict, tid: str) -> int:
 def do_deploy(settings: dict, tid: str) -> int:
     artifact = ROOT / "dist" / tid
     if not artifact.is_dir():
-        raise SystemExit(f"nothing staged at {artifact}; run tools/stage-ppsa.sh first")
+        raise SystemExit(f"nothing staged at {artifact}; run tools/build-title.sh first")
 
     files = [p for p in sorted(artifact.rglob("*")) if p.is_file()]
     if not files:
@@ -116,15 +154,27 @@ def do_deploy(settings: dict, tid: str) -> int:
         for local in ordered:
             relative = local.relative_to(artifact).as_posix()
             remote = join(remote_root, relative)
+            expected = hashlib.sha256(local.read_bytes()).hexdigest()
             upload_atomic(ftp, local, remote)
-            if sizes(ftp, remote.rsplit("/", 1)[0]).get(local.name) != local.stat().st_size:
-                raise SystemExit(f"{relative}: the console did not store the whole file")
+            size, digest = remote_digest(ftp, remote)
+            # A read-back can itself be the flaky part, so the same wrong answer
+            # twice is not proof: one retry, then report what the console served.
+            if digest != expected:
+                print(f"    {relative}: read-back differs; uploading again")
+                upload_atomic(ftp, local, remote)
+                size, digest = remote_digest(ftp, remote)
+            if digest != expected:
+                raise SystemExit(
+                    f"{relative}: the console serves {size} bytes with sha256 "
+                    f"{digest[:16]}, the file here is {local.stat().st_size} bytes "
+                    f"with {expected[:16]}")
+            print(f"    {relative:28} {size:>10,} bytes  {digest[:16]}  ok")
         present_root = list_names(ftp, remote_root)
         present_sys = list_names(ftp, join(remote_root, "sce_sys"))
     for required, where in (("eboot.bin", present_root), ("param.json", present_sys)):
         if required not in where:
             raise SystemExit(f"upload finished but {required} is not listed")
-    print("==> [deploy] every file is on the console at the size it has here")
+    print("==> [deploy] every file on the console is byte for byte the file here")
     return 0
 
 

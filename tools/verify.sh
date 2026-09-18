@@ -51,13 +51,20 @@ gate_unit() {
 
 gate_build() {
     require Makefile || return 1
-    make app
+    # Not bare `make app`: that target compiles src/ and links it, but the four
+    # things the link needs - the vendored SDK, PS5_CLANG, the pystub PYTHONPATH,
+    # and RetroArch's include paths plus the frontend archive - are set by
+    # tools/build-title.sh and by nothing else. A gate that ran `make app` would
+    # report a build failure that is really a missing environment.
+    require tools/build-title.sh || return 1
+    bash tools/build-title.sh
 }
 
 gate_integration() {
     require Makefile || return 1
     require tools/check-manifest.sh || return 1
     make test-integration
+    bash tools/check-manifest.sh
 }
 
 gate_evidence() {
@@ -70,8 +77,8 @@ case "${1:-}" in
         printf '%-12s %s\n' \
             format      'bash tools/lint-shell.sh && bash tools/lint-format.sh' \
             unit        'make test-unit' \
-            build       'make app' \
-            integration 'make test-integration' \
+            build       'bash tools/build-title.sh' \
+            integration 'make test-integration && bash tools/check-manifest.sh' \
             evidence    'python3 tools/evidence.py compare evidence/'
         exit 0
         ;;

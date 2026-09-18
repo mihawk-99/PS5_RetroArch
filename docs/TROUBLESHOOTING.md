@@ -16,7 +16,7 @@ the loader refuses the module without printing anything the user can see. A link
 against the wrong kernel stub produces this, and so does a core built by a
 makefile that picked the `sys` variant on its own.
 
-**Fix.** `readelf -dW dist/<TITLE_ID>/retroarch.elf | grep NEEDED` must list
+**Fix.** `readelf -dW dist/<TITLE_ID>/eboot.bin | grep NEEDED` must list
 `libkernel_web.sprx` and must not list `libkernel_sys.sprx`. `prospero-clang`
 links the `web` variant by default, so a `sys` entry means a flag, a makefile
 variable or a prebuilt archive pulled it in: find the archive with
@@ -56,11 +56,11 @@ gone; that is not a failure.
 ## A `make` target in `vendor/` cannot find a header the patch was supposed to add
 
 **Cause.** `vendor/retroarch` is a patched tree, and a partial re-fetch, an
-interrupted patch or a checkout that skipped `tools/fetch-upstream.sh` leaves it
+interrupted patch or a checkout that skipped `tools/fetch-retroarch.sh` leaves it
 half-applied. Nothing in `vendor/` is committed, so the tree on disk is the only
 copy.
 
-**Fix.** `rm -rf vendor && tools/fetch-upstream.sh`. It verifies the pinned
+**Fix.** `rm -rf vendor && tools/fetch-retroarch.sh`. It verifies the pinned
 digest before extracting, so a re-fetch is cheap and cannot silently pick up a
 different upstream. Never edit a file under `vendor/` to get unblocked: put the
 change in `patches/` and re-run the fetcher, or the next fetch discards it.

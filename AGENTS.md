@@ -114,7 +114,7 @@ Keep one completion objective for work that spans many turns, and let it drive
 the rounds.
 
 - State it as something finishable and checkable, not a direction: for example
-  "a release ZIP whose `retroarch.elf` loads on the 6.02 console, draws the RGUI
+  "a release ZIP whose `eboot.bin` loads as a title on the 6.02 console, draws the RGUI
   menu and returns the driver identity recorded in `docs/FINDINGS.md`".
 - Each round: inspect the workspace, make concrete progress, verify it, report
   what remains. Never restart finished work.

@@ -9,9 +9,12 @@
 vendor/
 RetroArch-*/
 
-# Cross-build output, the prepared upstream tree, and the staged title folder.
+# Cross-build output, the prepared upstream tree, the staged title folder, and the
+# copy of it handed to the console's owner. All four are the same artifact at
+# different points in one pipeline; the source they come from is what is committed.
 build/
 dist/
+handoff/
 work/
 
 # Fetched dependencies (host test framework, graphics SDK packages).
@@ -34,3 +37,8 @@ klog/
 *.a
 __pycache__/
 *.pyc
+
+# The header configure generates, at any tree root. It is written into the
+# configured copy under build/, which is not committed; an older build script also
+# copied it here, and a generated file must never be able to dirty the tree.
+config.h

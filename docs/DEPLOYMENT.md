@@ -22,28 +22,34 @@ are the console owner's, not this project's.
 ## The artifact
 
 Build once, stage once, promote the same tree. The artifact is
-`dist/<TITLE_ID>/`: the payload ELF `retroarch.elf`, the configuration seed
-`retroarch.cfg`, the metadata under `sce_sys/` (`param.json`, `icon0.png`), and
-the runtime files the title needs beside it — exactly what the console's loader
-reads, and nothing that only exists on this host.
+`dist/<TITLE_ID>/`: the signed application image `eboot.bin`, the runtime the
+title carries in `sce_module/libc.prx`, and the metadata under `sce_sys/`
+(`param.json`, `icon0.png`, `pic0.dds`, `pic1.dds`, `snd0.at9`) — exactly what the
+console's loader reads, and nothing that only exists on this host. There is no
+separate payload file: this is a title, and the console runs its `eboot.bin`.
 
-The build is reproducible from a clean checkout at the committed revision: the
-upstream tarball's digest is pinned, `patches/series` is committed, and a staged
-tree's file list and digests are recorded in `dist/<TITLE_ID>/manifest.sha256`,
-which `tools/check-manifest.sh` verifies. Anything that cannot be reproduced is
-not part of the artifact (`vendor/`, `build/`, `.deps/`, `klog/`).
+The build is reproducible from a clean checkout at the committed revision:
+`tools/fetch-retroarch.sh` names the upstream revision and checks the fetched tree
+against that commit, `patches/series` is committed, and the artifact's file list,
+sizes and sha256 digests are recorded in `dist/<TITLE_ID>/manifest.sha256`, which
+`tools/check-manifest.sh` verifies. Anything that cannot be reproduced is not part
+of the artifact (`vendor/`, `build/`, `.deps/`, `klog/`).
 
 ## Shipping a change
 
 1. All gates green at the revision being shipped (`tools/verify.sh`).
-2. `make stage` produces `dist/<TITLE_ID>/` and its manifest digest.
-3. `tools/deploy.sh` uploads the tree over the console's FTP service, each file
-   under a temporary name and promoted only after its transfer completes; the
-   metadata and the ELF are published last.
-4. `tools/console.sh launch` starts the title through the resident control
-   payload, and `tools/console.sh klog` captures the run.
-5. `tools/console.sh kill` closes it, and the distilled capture becomes the
-   step's evidence under `evidence/<step>/`.
+2. `bash tools/build-title.sh` produces `dist/<TITLE_ID>/` and records its
+   manifest; `bash tools/check-manifest.sh` proves the folder is that manifest —
+   every file present and unchanged, nothing extra, `eboot.bin` a fake self, and
+   `param.json` naming the folder it sits in.
+3. `python3 tools/deploy-title.py` uploads the tree over the console's FTP
+   service, each file under a temporary name and promoted only after its transfer
+   completes, the image and the metadata last; it then reads every file back and
+   compares digests.
+4. `tools/console-run.sh <TITLE_ID>` starts the title through the resident control
+   payload and captures the console's log from a marked position.
+5. The run's distilled capture becomes the step's evidence under
+   `evidence/<step>/`.
 
 Selecting a console is configuration, never a committed value:
 
@@ -56,15 +62,18 @@ Selecting a console is configuration, never a committed value:
 | `PS5_FTP_USER`, `PS5_FTP_PASSWORD` | unset | credentials, if the console's FTP service wants them |
 | `DEPLOY_DRY_RUN` | `0` | `1` builds and prints the target without networking |
 
-`tools/deploy.sh` refuses to run without a host, refuses a host that is not an
-address or hostname, and with `DEPLOY_DRY_RUN=1` never opens a socket. Rollback
-and removal are the same command family: `tools/deploy.sh undeploy` removes only
-this title's directory.
+`tools/deploy-title.py` refuses to run without a host and refuses a host that is
+not an address or hostname. It publishes `dist/<TITLE_ID>/` and then reads every
+file back and compares its sha256 with the file here, because this console's FTP
+service has served a file's old bytes under its new name and listed a stale size
+for a file it had already replaced: a size check passed on content that was not
+there. Rollback and removal are the same command family: `python3
+tools/deploy-title.py --clean` removes only this title's directory.
 
 ## Rollback
 
-`tools/deploy.sh undeploy` removes `/data/homebrew/<TITLE_ID>/` and leaves the
-previous release ZIP as the fallback: extracting the previous release over the
+`tools/deploy-title.py --clean` removes `/data/homebrew/<TITLE_ID>/` and leaves
+the previous release ZIP as the fallback: extracting the previous release over the
 same path restores it in one step. A change that cannot be rolled back this way —
 anything that writes outside the title folder — is not shipped without a written
 reason in `docs/PHASE_LOG.md`.
@@ -86,11 +95,13 @@ do that either.
 
 ## Observing a target run
 
-- `tools/console.sh klog` captures the console's kernel log for the run, and the
-  run's own output is captured beside it. The raw capture stays in the ignored
-  `klog/`; the distilled record is what gets committed.
+- `tools/console-run.sh <TITLE_ID>` captures the console's kernel log for the run:
+  it checks what the console is already running, starts the listener, records its
+  position in the stream, launches, and judges only the lines after that mark. The
+  raw capture stays in the ignored `klog/`; the distilled record is what gets
+  committed.
 - The resident control payload comes from the console tooling already in use in
-  `../PS5_Vulkan`: it answers one command per connection (`ping`, `status`,
+  `../PS5_Vulkan`: it answers one command per connection (`ping`, `procs`,
   `launch <TITLE_ID>`, `kill <TITLE_ID>`, `restart <TITLE_ID>`) so a run is
   scripted rather than clicked. Keeping it out of this repository is deliberate:
   one console agent, one owner.
@@ -106,7 +117,8 @@ The console runs one title at a time, and two sessions cannot both use it: a
 launch from a second session replaces whatever the first was running. This
 machine's console is shared with the PS5_Vulkan work, so **ask before every
 launch and every upload** — the rule the console's owner set, and the reason
-`tools/console-launch.sh` prints what it is about to do before it does it.
+`tools/console-run.sh` prints what it is about to do before it does it, and
+refuses to launch into a busy console with `0x80940010`.
 
 Two habits follow from that:
 

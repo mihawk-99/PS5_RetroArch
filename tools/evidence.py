@@ -64,7 +64,7 @@ def distil(args: argparse.Namespace) -> int:
         "recorded": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "console_run": args.console_run,
         "revision": args.revision,
-        "command": args.command or "tools/console-launch.sh --capture",
+        "command": args.command or "tools/console-run.sh <TITLE_ID>",
         "raw_capture": relative(raw),
         "raw_lines": len(text.splitlines()),
         "raw_bytes": len(text.encode("utf-8")),

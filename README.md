@@ -52,7 +52,7 @@ The application ships as a homebrew title folder, not a retail package:
 
 ```text
 dist/<TITLE_ID>/
-├── retroarch.elf          the frontend payload
+├── eboot.bin              the signed application image the console runs
 ├── retroarch.cfg          the configuration seed
 └── sce_sys/               param.json, icon0.png
 ```

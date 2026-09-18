@@ -45,6 +45,29 @@ configure_flags=(
     --disable-kms --disable-caca --disable-sixel --disable-bluetooth
     --disable-nvda --disable-sapi --disable-winrawinput --disable-gdi
     --disable-angle --disable-blissbox --disable-xdelta
+    # Input and audio back-ends that the console does not have and this SDK has
+    # no headers for. Each one is a source that cannot compile here, so each one
+    # is switched off at its own configure switch rather than left in the object
+    # list to fail: udev needs libudev.h, epoll and evdev (udev also brings in
+    # linux_common.c and linuxraw_input.c through the same gate); v4l2 needs
+    # linux/videodev2.h for the camera and the video processor; tinyalsa needs
+    # linux/ioctl.h. libusb is off because the SDK carries no libusb and nothing
+    # here talks to a USB device directly. The console's own pad is reached
+    # through the system's input service, which is a driver this project supplies
+    # in src/, not one of these.
+    --disable-udev --disable-v4l2 --disable-tinyalsa --disable-libusb
+    # xkbcommon comes from a host library, not a compiler flag: configure finds
+    # this machine's copy through check_val and writes the decision into
+    # config.mk, which is what puts keyboard_event_xkb.o in the object list even
+    # though the build targets BSD. That object needs xkbcommon/xkbcommon.h, and
+    # the console has no X keyboard, so the switch goes off like the rest.
+    --disable-xkbcommon
+    # CRT mode switching drives a PC monitor's video timings through switchres,
+    # a library that is not in RetroArch's tree and that this project does not
+    # carry. configure enables it because this machine has a C++11 compiler, and
+    # the object it adds then calls sr_* functions nothing defines. A console
+    # plugged into a television has no such timings to switch.
+    --disable-crtswitchres
     # Built-in copies this build does not use.
     # RetroArch vendors zlib in deps/libz, so baking it in costs nothing and
     # removes the dependency on a system zlib this SDK does not ship.
@@ -71,6 +94,18 @@ if [[ ! -f $work/config.mk || ! -f $work/config.h ]]; then
     mkdir -p "$(dirname "$work")"
     cp -a "$upstream" "$work"
     rm -rf "$work/.git"
+    # The port's changes go in before configure runs, not after: one of them is
+    # read by configure itself (qb/config.params.sh declares HAVE_XKBCOMMON so
+    # that --disable-xkbcommon below is an option configure accepts). Applying
+    # them here and again at compile time is deliberate - this script can be run
+    # on its own, and tools/apply-port-patches.py reports `present` when an edit
+    # is already in place.
+    if [[ -f $root/patches/series ]]; then
+        python3 "$root/tools/apply-port-patches.py" "$work" || {
+            echo "error: a port change could not be applied to $work" >&2
+            exit 2
+        }
+    fi
     (
         cd "$work"
         export PS5_PAYLOAD_SDK="$sdk"
@@ -93,4 +128,23 @@ if [[ ! -s $objects ]]; then
 fi
 
 # obj-unix/release/<source>.o -> <source>.c, with the leading ./ normalised.
-sed -e 's|^obj-unix/release/||' -e 's|^\./||' -e 's|\.o$|.c|' "$objects"
+#
+# Three of those objects are dropped here, and this is the one place this project
+# filters RetroArch's list rather than asking configure for a different one. The
+# reason is a substring test upstream cannot win: Makefile.common does
+#
+#    ifneq ($(findstring Linux,$(OS)),)
+#
+# and configure is given OS=BSD, which contains "Linux". So the Linux raw input
+# driver, its evdev joypad and the shared linux_common.c are always in the object
+# list, and all three need headers this SDK does not carry (linux/input.h,
+# sys/inotify.h). They are also never reachable in the binary: retroarch.c
+# registers both drivers inside `#if defined(__linux__)`, and this toolchain
+# defines __FreeBSD__, __PROSPERO__ and __unix__, not __linux__. Dropping them
+# changes what is compiled without changing what is linked.
+skipped_linux_only='input/drivers/linuxraw_input.c
+input/drivers_joypad/linuxraw_joypad.c
+input/common/linux_common.c'
+
+sed -e 's|^obj-unix/release/||' -e 's|^\./||' -e 's|\.o$|.c|' "$objects" |
+    grep -v -x -F "$skipped_linux_only"

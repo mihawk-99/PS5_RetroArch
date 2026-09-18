@@ -4,59 +4,46 @@
  * Copyright (C) 2026 Mihawk
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * This file owns the process: open the display, draw, present, repeat. RetroArch's
- * frontend is driven from here once its video driver is in place
- * (docs/REFERENCE.md, "The port").
+ * RetroArch's own `main` is one line: `return rarch_main(argc, argv, NULL)`. So
+ * the entry point is not reconciled with RetroArch's, it simply calls the same
+ * function with the arguments this title wants, and the pipeline's `_start` stays
+ * the process entry. That is the whole of the "entry point" problem the plan
+ * listed.
  *
- * Until then it draws a moving bar, which is the cheapest thing that proves the
- * title pipeline end to end: the build, the title format, the launcher, VideoOut
- * and the tiled direct-memory path. If a step here fails, the title reports it in
- * the kernel log instead of exiting silently, because a launch context that
- * returns from main is closed by the shell as a crash.
+ * The display is opened by the video driver, not here: `video_ps5` owns it, and
+ * this file's job is to hand RetroArch its arguments and let its runloop drive.
+ *
+ * Arguments, and why each is here:
+ *   -f              fullscreen, which on a console is the only mode
+ *   -c <path>       the config to read and write, inside the title's own folder
+ *   --verbose       so the run is readable in the console's log
  */
 
-#include "display.hpp"
+#include <cstddef>
 
-#include <cstdint>
-
-extern "C" int sceKernelUsleep(std::uint32_t microseconds);
+/* RetroArch's entry, in C. */
+extern "C" int rarch_main(int argc, char *argv[], void *data);
 
 namespace
 {
-/* Never returns: the shell owns this process's lifetime, and returning from main
- * is reported as `eboot.bin calls exit()`. */
-[[noreturn]] void halt(const char *reason) noexcept
-{
-    for (;;)
-        (void)sceKernelUsleep(1000000);
-    (void)reason;
-}
-
-void draw_progress(ps5::display::Surface surface, unsigned step) noexcept
-{
-    const std::uint32_t background = 0xff0a0d19u;
-    const std::uint32_t bar = 0xff00ffffu;
-    ps5::display::Display::clear(surface, background);
-
-    const unsigned bar_height = surface.height / 24;
-    const unsigned top = surface.height / 2 - bar_height / 2;
-    const unsigned filled = (surface.width / 60) * (step % 60);
-    for (unsigned y = top; y < top + bar_height; ++y)
-        for (unsigned x = 0; x < filled; ++x)
-            ps5::display::Display::write(surface, x, y, bar);
-}
+/* The title's own folder, as the console mounts it: the application image is at
+ * /app0 and this is where a title may keep its configuration. */
+constexpr const char *config_path = "/app0/retroarch.cfg";
 } // namespace
 
 int main()
 {
-    ps5::display::Display display;
-    if (!display.open(1920, 1080))
-        halt(display.last_error());
+    /* argv must be writable and NULL-terminated: RetroArch's option parsing
+     * walks it the way the C runtime would have. */
+    char arg0[] = "retroarch";
+    char arg_fullscreen[] = "-f";
+    char arg_config[] = "-c";
+    char arg_config_path[] = "/app0/retroarch.cfg";
+    char arg_verbose[] = "--verbose";
+    char *argv[] = {
+        arg0, arg_fullscreen, arg_config, arg_config_path, arg_verbose, nullptr,
+    };
+    (void)config_path;
 
-    for (unsigned step = 0;; ++step)
-    {
-        draw_progress(display.back_surface(), step);
-        if (!display.present())
-            halt(display.last_error());
-    }
+    return rarch_main(static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1, argv, nullptr);
 }

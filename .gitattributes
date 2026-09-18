@@ -1,0 +1,22 @@
+# ps5-native-app-boilerplate - Git content and line-ending policy.
+# Copyright (C) 2026 BlackBearReloaded
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+* text=auto
+*.sh text eol=lf
+*.c text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.ld text eol=lf
+Makefile text eol=lf
+.clang-format text eol=lf
+.clang-tidy text eol=lf
+tooling/prospero-clang18 text eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.dds binary
+*.at9 binary
+*.prx binary
+*.bin binary

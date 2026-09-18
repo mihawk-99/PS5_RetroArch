@@ -1,0 +1,16 @@
+# ps5-native-app-boilerplate - Clang formatting policy.
+# Copyright (C) 2026 BlackBearReloaded
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+PointerAlignment: Right
+SpaceBeforeParens: ControlStatements
+DerivePointerAlignment: false
+SortIncludes: false

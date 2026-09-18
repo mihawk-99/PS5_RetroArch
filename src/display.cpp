@@ -26,21 +26,21 @@
 
 extern "C"
 {
-/* The payload SDK's headers for these are ABI declarations whose bodies live in
- * the kernel and GPU modules the linker binds; the shapes below are the sibling
- * application's, which the console has accepted. */
-std::size_t sceKernelGetDirectMemorySize();
-int sceKernelAllocateDirectMemory(std::int64_t search_start, std::int64_t search_end,
-                                  std::size_t length, std::size_t alignment, int memory_type,
-                                  std::int64_t *physical_address);
-int sceKernelMapDirectMemory(void **address, std::size_t length, int protection, int flags,
-                             std::int64_t physical_address, std::size_t alignment);
-int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
-                    const void *param);
-int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
-int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
-                          std::uint32_t flip_mode, std::int64_t flip_argument);
-int sceVideoOutWaitVblank(std::int32_t handle);
+    /* The payload SDK's headers for these are ABI declarations whose bodies live in
+     * the kernel and GPU modules the linker binds; the shapes below are the sibling
+     * application's, which the console has accepted. */
+    std::size_t sceKernelGetDirectMemorySize();
+    int sceKernelAllocateDirectMemory(std::int64_t search_start, std::int64_t search_end,
+                                      std::size_t length, std::size_t alignment, int memory_type,
+                                      std::int64_t *physical_address);
+    int sceKernelMapDirectMemory(void **address, std::size_t length, int protection, int flags,
+                                 std::int64_t physical_address, std::size_t alignment);
+    int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
+                        const void *param);
+    int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
+    int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
+                              std::uint32_t flip_mode, std::int64_t flip_argument);
+    int sceVideoOutWaitVblank(std::int32_t handle);
 }
 
 namespace ps5::display
@@ -162,7 +162,8 @@ bool Display::open(unsigned width, unsigned height) noexcept
     }};
     VideoAttribute attribute{};
     (void)sceVideoOutSetFlipRate(handle_, 0);
-    sceVideoOutSetBufferAttribute2(&attribute, pixel_format_rgba8_srgb, 0, width_, height_, 0, 0, 0);
+    sceVideoOutSetBufferAttribute2(&attribute, pixel_format_rgba8_srgb, 0, width_, height_, 0, 0,
+                                   0);
     if (sceVideoOutRegisterBuffers2(handle_, 0, 0, buffers.data(),
                                     static_cast<std::int32_t>(buffers.size()), &attribute, 0,
                                     nullptr) < 0)

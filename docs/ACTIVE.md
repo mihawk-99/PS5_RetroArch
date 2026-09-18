@@ -9,76 +9,93 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The frontend compiles from RetroArch's own build.** `tools/retroarch-sources.sh`
-runs RetroArch's `./configure` and `make info` and prints the objects a link needs;
-`tools/build-retroarch.sh` compiled **225 of 244** with the pipeline's compiler. The
-remainder is Linux-only (udev, xkb, linuxraw input) plus zstd, and is out of scope
-for this console. Evidence: the object files under `build/ra/obj/`.
+**The title builds.** `bash tools/build-title.sh` compiles RetroArch's own sources
+(225 objects), archives them, links them with `src/` through the native pipeline's
+CRT, signs the result and assembles `dist/PPSA99169/`: **`eboot.bin` 8,026,239
+bytes**, `container: signed, plaintext`, 12 segments, `integrity: valid`, plus
+`sce_module/libc.prx` and the `sce_sys/` metadata. The folder's digests are in
+`dist/PPSA99169/manifest.sha256` and `bash tools/check-manifest.sh` passes on it.
 
-**The scaffold title runs on the console.** This repository's own title —
-the pipeline's scaffolding, `src/display.cpp` and `src/main.cpp` — was deployed by
-FTP and launched, and stayed up: the capture holds zero fatal signals and the
-control payload reported it running. That is the display path RGUI will present
-through.
+**The video driver is registered, and that is verified, not assumed.** The port's
+changes to RetroArch live in `patches/series` and are applied by
+`tools/apply-port-patches.py` to the configured copy under `build/ra-conf` —
+never to `vendor/retroarch`. The evidence is a relocation, not a run:
+`readelf -r build/ra/obj/gfx_video_driver.c.o` shows `.rela.data.video_drivers`
+holding exactly two entries, `video_ps5` then `video_null`, and
+`nm build/llvm-pie.elf` shows `video_ps5`, `video_null`, `rarch_main` and one
+`main`.
 
-**The video driver is written.** `src/video_ps5.cpp` implements the
-`video_driver_t` and the `video_poke_interface_t` RGUI needs, and compiles against
-RetroArch's headers.
+**The entry point is reconciled.** RetroArch's `main` is compiled out with
+`-DHAVE_MAIN`, the flag RetroArch's own desktop build passes; `src/main.cpp`
+supplies `main` and calls `rarch_main` with `-f -c /app0/retroarch.cfg --verbose`,
+and the SDK's `_start` remains the process entry. Two `main` symbols would be a
+link error, and there is no link error.
 
-**RGUI is the target, and that is a measured choice.** RGUI references the menu
-display context zero times; XMB references it 72 times and every backend in
-`gfx_display_ctx_drivers[]` is a GPU API with no software entry. So RGUI runs over
-VideoOut alone, and XMB waits for `../PS5_Vulkan`'s driver.
+**Everything the abandoned route left behind is gone.** The conversion tools, the
+baseline tree, the ports cache, `tools/deploy.py`, `tools/console-launch.sh`,
+`tools/check-payload.sh`, `tools/scaffold-native.sh`, `tools/build-native-app.sh`,
+`tools/install-title.sh` and `tools/deploy.sh` are deleted; the tools that remain
+are the ones `tools/build-title.sh` and `tools/verify.sh` actually call, and every
+tool named by another tool exists.
 
-**Everything websrv-derived is deleted.** The Option 1 baseline tree, its
-artifacts, the ports cache and the conversion tools are gone, and the docs no
-longer describe that route.
+**`RGUI on screen` is the goal, and it is not met.** The title is built and
+manifested; it has not run.
 
 ## Next
 
-1. Register `&video_ps5` in RetroArch's `video_drivers[]` as a patch under
-   `patches/`, and reconcile the entry point — `retroarch.c` defines its own `main`
-   and the pipeline supplies `_start`.
-2. Link the 225 objects with `src/` through the pipeline's CRT and runtime, so the
-   title builds the way ProsperoLight's does.
-3. Deploy by FTP, launch with `tools/console-run.sh`, read the console's log, fix,
-   repeat — until RGUI is on screen.
-4. Then XMB, which needs a Vulkan-backed display context over `../PS5_Vulkan`.
+1. The title folder has to reach `/data/homebrew/PPSA99169` on the console. The
+   owner uploads it: **writes from this machine do not take.** Measured on
+   2026-09-18: `tools/deploy-title.py` stored a 1,284,674-byte `libc.prx` and read
+   back the *previous* 1,335,962-byte file under the new name, twice, and a probe
+   uploaded under a name never used before read back those same old bytes. The
+   console's FTP accepts the transfer and serves something else.
+2. Then `tools/console-run.sh PPSA99169` and read the console's log from the mark.
+3. Then fix what the log says, and repeat until RGUI is on screen.
 
 ## Working notes
 
-- `tools/fetch-ports.sh` provisions the ports image once (346 MB, digest-checked,
-  cached in `.deps/pacbrew/`) and `tools/build-baseline.sh` runs `--check`
-  without building anything. Both are cheap to re-run.
-- The recipe's own build script is never edited: our changes are injected into a
-  copy at `work/baseline/build.sh`, so `reference/ps5-retroarch/` stays the
-  baseline it was measured against.
-- This console's FTP service ignores the path in a listing command and answers
-  deletes with 226. `tools/deploy.py` handles both; do not "simplify" that away.
-- `source $PS5_PAYLOAD_SDK/toolchain/prospero.sh` before any manual PS5 compile;
-  the clang is 22.1.8 targeting `x86_64-sie-ps5`.
+- **Nothing from the old websrv repository is used.** The build reads only
+  `vendor/retroarch` (pinned by `tools/fetch-retroarch.sh` to v1.22.2 at
+  `69a4f0e`), this project's `src/`, `patches/`, `tooling/`, `runtime/`, `sce_sys/`
+  and `assets/`. `vendor/retroarch` no longer carries a git directory, so it cannot
+  be committed into: upstream stays upstream.
+- **The exact working command is `bash tools/build-title.sh`**, not bare
+  `make app`. The Makefile's four unknowns — vendored SDK, `PS5_CLANG`, the
+  `pystub` `PYTHONPATH`, and RetroArch's include paths plus the frontend archive —
+  are set by that script and by nothing else.
+- **Compile from `build/ra-conf`, never from `vendor/retroarch`.** A build that
+  read sources from `vendor/` and headers from `build/ra-conf` linked, signed and
+  started with `video_drivers[]` holding no ps5 entry: the file that lists the
+  drivers came from the tree that had never heard of the patch.
+- **The feature set is chosen once**, in `tools/retroarch-sources.sh`'s configure
+  flags. `tools/retroarch-flags.sh` asks `make` which `-D` flags it would use
+  rather than restating them; a hand-written list is wrong in both directions.
 - The console's address and credentials come from the ignored `.env`.
 
 ## Last verified
 
 | Check | Result |
 | --- | --- |
-| `tools/build-baseline.sh` from cache | PASS in 34 s; 4 files staged; payload imports `libkernel_web.sprx`, not `libkernel_sys.sprx` |
-| `tools/build-baseline.sh` after a source edit | PASS in 35 s |
-| `tools/fetch-ports.sh` | PASS: v0.40.2 verified by SHA-256, SDL2 2.30.12 resolved |
-| Console listing of `/data/homebrew/PS5_RetroArch/` | payload, config, manifest and launcher present; icon still at the folder root |
-| Console FTP writes | FAILED: `550 Read-only filesystem` on the last attempt; reads fine |
-| Console run of the baseline, `evidence/m1-baseline-loads/` | PASS: payload started under the homebrew launcher (pid 151), menu on screen, config written to the title folder |
-| `tools/stage-ppsa.sh` | PASS: `dist/PPSA99005/` holds 6 files with a digest manifest |
-| Image conversion | PASS: `eboot.bin` 49,968,821 bytes, `signed, plaintext`, 12 segments, `integrity: valid` |
-| Launcher icon | PASS: `title/assets/retroarch.png` (640x640) resampled to 512x512, sha256 `65dcb224d62da0427f17589f16922918` |
-| `tools/verify.sh` (all gates) | not yet green: the gate scripts it names still have to be written |
+| `bash tools/build-title.sh` | PASS: 225 of 225 sources, 225 objects archived, `eboot.bin` 8,026,239 bytes, signed, 12 segments, `integrity: valid` |
+| Same build twice | PASS: identical `eboot.bin` digest `71c88975040535a02b462618dd394a7a378034272c9bffa43ce0ca4b717ab9b7` |
+| `bash tools/check-manifest.sh` | PASS: 7 files match their digests, none extra, `eboot.bin` magic `4f153d1d`; FAILS as it should when one byte is changed |
+| `readelf -r build/ra/obj/gfx_video_driver.c.o` | PASS: `.rela.data.video_drivers` holds `video_ps5` then `video_null` |
+| `bash tools/fetch-retroarch.sh --verify` | PASS: `vendor/retroarch` is at the pinned revision, with no history |
+| `bash tools/lint-shell.sh` | PASS: 28 scripts and 5 python tools parse, no CRLF, no committed address or credential |
+| `bash tools/lint-format.sh` | PASS after applying the policy to `src/` |
+| `python3 tools/deploy-title.py` | **FAILED**: the console stores the transfer and serves the previous bytes; two attempts, both read back the old file |
+| `tools/verify.sh` (all gates) | not yet green: `unit`, `build` and `integration` still name commands that have to be wired |
 
 ## Open findings
 
-- The console's write path needs re-checking before the deploy can finish. If it
-  stays read-only, the loader cannot see a new folder either.
-- The recipe pins upstream 1.21.0 while our own tree is 1.22.2. The baseline is
-  deliberately the recipe's version so it matches what the user already runs.
-- Nothing in this repository has run on a console yet, so every target-layer
-  claim in the docs is a specification, not a result.
+- The console's FTP write path is the blocker for the goal, and it is not this
+  project's code: the server answers `226` to `STOR` and then serves the file it
+  already had. The owner uploading by hand is the route that works.
+- `tools/verify.sh`'s `build` gate runs bare `make app`, which cannot work without
+  the environment `tools/build-title.sh` sets. It must call that script instead.
+  Its `unit` and `integration` gates name `make test-unit` and
+  `make test-integration`, and the Makefile has no integration target yet.
+- The RGUI menu reads its assets from `ASSETS_DIR`, compiled as `/app0/assets`,
+  and the artifact does not carry an `assets/` folder: the menu will fall back to
+  its built-in font and look sparse. Enough to prove the driver, not enough to
+  ship. Whether RetroArch's asset directory should be bundled is undecided.
