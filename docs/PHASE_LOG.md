@@ -410,4 +410,4 @@ owner's step, because writes from this machine do not reach the console's title
 folders, and a title also has to be registered with the shell before its launch is
 anything but `is not registered`.
 
-**Commit.** `{{SHA}}` — Build ProsperoLight on this machine and stage its title.
+**Commit.** `d1165a2` — Build ProsperoLight on this machine and stage its title.
