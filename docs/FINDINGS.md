@@ -638,3 +638,38 @@ byte-identical.
 
 **Boundary.** This console and these two titles. The claim is about what the
 loader is handed, not about the signing chain a retail title would carry.
+
+---
+
+## 2026-09-18: The two start routes take incompatible artefacts, so the launcher cannot test this image
+
+**Measured.** The console starts code two ways, and the artefacts they need are
+mutually exclusive:
+
+| Route | What it starts | What the file must be |
+| --- | --- | --- |
+| homebrew launcher | an ELF, with its symbols resolved for it | a plain ELF that imports the kernel stubs and carries `_start` and `main` in the dynamic table |
+| application loader | a title's `eboot.bin` | a converted development container, magic `4f153d1d` |
+
+Our converted image has **zero** dynamic symbols. That is not an accident of the
+build: the converter's own rule is that it does not publish application exports,
+and `--exclude-libs=ALL` keeps the rest internal. So the converted image cannot be
+started by the launcher, which reads exactly the table that conversion removes.
+
+This closes the idea of testing the converted image through the working launcher
+path, which was the intent behind `tools/check-payload.sh` — and the guard now
+answers the question in one command instead: our baseline payload reports
+`verdict LAUNCHER route` with `_start`, `main` and `libkernel_web.sprx` present,
+while the converted image reports that only the loader route takes it. Its first
+version got the import check wrong by looking for undefined symbols where this
+target names stub libraries in `DT_NEEDED`; that was caught by running it against
+the payload that had already started successfully on the console.
+
+**Consequence.** There is no substitute test for the title path: the converted
+image has exactly one way to run, and it is the one blocked by two files that
+cannot be replaced over FTP. The uncertainty that remains is therefore narrow and
+named — whether the converted image and the signed module together start — and it
+is resolved by placing those two files, not by another route.
+
+**Boundary.** This console's launcher and loader. A future conversion that keeps a
+dynamic table would make the launcher route viable for the same bytes.
