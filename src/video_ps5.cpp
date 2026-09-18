@@ -97,16 +97,11 @@ void *ps5_init(const video_info_t *video, input_driver_t **input, void **input_d
     ps5::debug::mark_value("ps5_init: display opened, back_surface width",
                            static_cast<long long>(state->display.back_surface().width));
 
-    /* Tell the frontend the size of the display it is drawing into.
-     *
-     * Every video driver that has a display does this, and this one did not, so
-     * video_st->width and video_st->height stayed zero. The menu reads them: the
-     * runloop calls the menu's render with video_st->width/height, so rgui_render
-     * was entered every frame with 0,0 and returned at its own guard. That is why a
-     * menu which was alive, had fonts and had a 320x240 framebuffer still
-     * contributed no pixels. */
-    video_driver_set_size(state->display.back_surface().width,
-                          state->display.back_surface().height);
+    /* The display's size is reported from ps5_set_viewport, not here: calling
+     * video_driver_set_size during init was measured to leave the title dead a
+     * quarter of a second after EXEC, with no signal line in the console's log at
+     * all. set_viewport is where the frontend asks, so it is where the answer
+     * belongs. */
 
     /* The driver owns no input: leaving these untouched hands input back to the
      * frontend's own driver, which is what this step is meant to test. */

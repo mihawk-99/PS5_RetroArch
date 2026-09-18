@@ -1138,3 +1138,50 @@ its own guard. Those come from `video_st->width`/`video_st->height`, which nothi
 sets because no core is loaded and the dummy core's AV info is empty. So there are
 two separate faults, and the cache flush is the one that decides whether any pixel
 this title writes becomes visible.
+
+## Vulkan is prepared and switched off, and switching it back on is written down
+
+**What was done.** RetroArch's Vulkan video driver is the retirement plan for the
+hand-written path in `src/display.cpp`: it drives the menu itself
+(`menu_driver_frame`), it uploads RGUI's framebuffer as a texture
+(`vulkan_set_texture_frame`), and it loads the GPU side by filename -
+`dylib_load("libvulkan.so.1")`, then `"libvulkan.so"` - so ../PS5_Vulkan's
+libps5vk drops in beside the title. RGUI needs no GPU context of its own: its
+render path references `gfx_display` eight times and every one is a type, not a
+call.
+
+**It builds.** With `--enable-vulkan` the frontend configures, compiles 268 of 278
+sources and links, and the title grows from 8,030,159 to 8,227,775 bytes. Three
+things had to be added, and all three are kept:
+
+- `--enable-builtinglslang`: configure refuses to build the Vulkan driver without
+  a GLSL-to-SPIR-V compiler, and RetroArch vendors glslang in `deps/glslang`.
+- `src/video_filters_stub.cpp`: a Vulkan build names the filter chain's twenty
+  entry points and one preset parser, and their implementation is not in
+  upstream's tarball. They are stubs because this port has video filters off and
+  the menu needs no shader; every create returns NULL, which is the driver's own
+  "no chain" case.
+- The glslang, SPIRV-Cross and `gfx/include` include paths, in
+  `tools/build-retroarch.sh`.
+
+**A tooling bug fell out of it, and it was a real one.**
+`tools/retroarch-sources.sh` rewrote every object in `make info`'s list to `.c`,
+but RetroArch's list is not all C: `gfx/drivers_shader/slang_process.cpp` is C++,
+and the rewrite turned it into a path that does not exist. The frontend then
+linked with `slang_preprocess_parse_parameters` undefined - a missing C++ source
+reported as a missing symbol, which is a much longer walk back to the cause than a
+path that says `.cpp`. The list now keeps each source's own extension (47 C++
+sources in the full configuration) and the compile loop picks `-std=c++20` and
+`-fno-exceptions -fno-rtti` for them.
+
+**Why it is off.** With Vulkan enabled the title exits **1** within a second of
+EXEC, with no signal and no message from RetroArch - and it does that whatever
+`video_driver` the config names, including `"ps5"`, so a Vulkan build cannot fall
+back to another driver. There is no ICD yet (`libvulkan.so.1` is not beside the
+title), and that is the most probable cause, but it is not proven: the failure is
+silent, and the next step is to make RetroArch say why - its own logs go to a file
+in the title folder once `log_verbosity` is on.
+
+**What switching it on costs, when the ICD exists.** One line in
+`tools/retroarch-sources.sh` (`--enable-vulkan`) and one in the title's
+`retroarch.cfg` (`video_driver = "vulkan"`). Everything else is already there.

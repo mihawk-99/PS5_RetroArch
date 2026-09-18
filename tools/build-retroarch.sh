@@ -132,6 +132,14 @@ includes=(
     -I"$tree/libretro-common/include/compat/zlib"
     -I"$tree/deps/libz"
     -I"$tree/libretro-db" -I"$tree/deps/rcheevos/include"
+    # Vulkan needs a GLSL-to-SPIR-V compiler; RetroArch vendors glslang under
+    # deps/glslang/glslang, and its headers are included as
+    # <glslang/Public/ShaderLang.h>, so the include root is that inner directory.
+    -I"$tree/deps/glslang/glslang"
+    # RetroArch vendors the Vulkan headers it compiles against in gfx/include.
+    -I"$tree/gfx/include"
+    # Vulkan's shader path includes SPIRV-Cross as <spirv_cross.hpp>.
+    -I"$tree/deps/SPIRV-Cross"
     -I"$root/src"
 )
 
@@ -216,9 +224,18 @@ for source in "${sources[@]}"; do
     if [[ -f $target && $target -nt $src ]]; then
         compiled=$((compiled + 1)); continue
     fi
+    # The language follows the source, not a preference: RetroArch's object list
+    # holds C and C++, and glslang and slang are C++. -fno-exceptions -fno-rtti
+    # matches what the title's own build uses for C++, and the pipeline's C++ is
+    # built without unwinding support, so a C++ source that threw could not be
+    # caught here anyway.
+    standard=-std=c11
+    [[ $source == *.c ]] || standard=-std=c++20
+    extra=()
+    [[ $source == *.c ]] || extra=(-fno-exceptions -fno-rtti)
     if PS5_CLANG=/usr/bin/clang PS5_PAYLOAD_SDK="$sdk" \
-        sh "$root/tooling/prospero-clang18" -std=c11 -O2 -w \
-           -ffunction-sections -fdata-sections \
+        sh "$root/tooling/prospero-clang18" "$standard" -O2 -w \
+           "${extra[@]}" -ffunction-sections -fdata-sections \
            "${defines[@]}" "${includes[@]}" -c "$src" -o "$target" 2>"$out/last-error.txt"; then
         compiled=$((compiled + 1))
     else

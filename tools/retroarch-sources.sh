@@ -35,6 +35,20 @@ configure_flags=(
     --enable-menu --enable-rgui
     --disable-materialui --disable-xmb --disable-ozone --disable-gfx_widgets
     # No graphics API: the frame is presented by src/display.cpp.
+    #
+    # Vulkan is prepared but switched off, and the reason is measured. With
+    # --enable-vulkan the frontend builds and links (the driver, its loader and
+    # gfx_display_ctx_vulkan all present, plus the stubs in
+    # src/video_filters_stub.cpp that a Vulkan build needs), but the title then
+    # exits 1 within a second of EXEC with no signal and no message, whatever
+    # video_driver the config names - so a Vulkan build cannot even fall back to
+    # another driver. Turning it back on is the right move once ../PS5_Vulkan's
+    # libvulkan.so.1 is beside the title: switch this line to --enable-vulkan,
+    # keep the config's video_driver as "vulkan", and the other changes Vulkan
+    # needed are already in place (tools/build-retroarch.sh: the glslang and
+    # SPIRV-Cross include paths, and the C++ sources RetroArch's object list
+    # contains; tools/retroarch-sources.sh: the object list no longer renames
+    # .cpp to .c).
     --disable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
     --disable-sdl2 --disable-sdl --disable-cg
     # Libraries this SDK does not carry.
@@ -73,7 +87,12 @@ configure_flags=(
     # removes the dependency on a system zlib this SDK does not ship.
     --enable-builtinzlib
     --disable-builtinflac --disable-builtinbearssl
-    --disable-builtinmbedtls --disable-builtinglslang
+    --disable-builtinmbedtls
+    # Vulkan needs a GLSL-to-SPIR-V compiler and configure refuses to build the
+    # Vulkan driver without one. RetroArch vendors glslang in deps/glslang, so the
+    # built-in copy costs a compile rather than a dependency this SDK does not
+    # carry.
+    --enable-builtinglslang
     --disable-update_cores --disable-update_core_info
     --disable-libretrodb --disable-video_filter --disable-dsp_filter
     # The BSV movie recorder compiles against zlib, which this SDK does not ship.
@@ -124,10 +143,18 @@ if [[ ! -s $objects ]]; then
         export OS=BSD DISTRO=
         make info >"$work/info.log" 2>&1
     ) || { echo "error: 'make info' failed; see $work/info.log" >&2; exit 2; }
-    grep -oE '[A-Za-z0-9_./-]+\.o' "$work/info.log" | sort -u > "$objects"
+    grep -oE '[A-Za-z0-9_./-]+\.[oc]+' "$work/info.log" | sort -u > "$objects"
 fi
 
-# obj-unix/release/<source>.o -> <source>.c, with the leading ./ normalised.
+# obj-unix/release/<source>.o -> <source>.<ext>, with the leading ./ normalised.
+#
+# The extension is kept rather than assumed. `make info` prints the object's own
+# name, and RetroArch's object list is not all C: glslang's and slang's sources are
+# C++ and upstream's build compiles them with $(CXX). Rewriting every entry to .c
+# turned gfx/drivers_shader/slang_process.cpp into a path that does not exist, so
+# the frontend linked with slang_preprocess_parse_parameters undefined - a missing
+# C++ source reported as a missing symbol, which is a much longer walk back to the
+# cause than a path that says .cpp.
 #
 # Three of those objects are dropped here, and this is the one place this project
 # filters RetroArch's list rather than asking configure for a different one. The
@@ -146,5 +173,11 @@ skipped_linux_only='input/drivers/linuxraw_input.c
 input/drivers_joypad/linuxraw_joypad.c
 input/common/linux_common.c'
 
-sed -e 's|^obj-unix/release/||' -e 's|^\./||' -e 's|\.o$|.c|' "$objects" |
+sed -e 's|^obj-unix/release/||' -e 's|^\./||' -e 's|\.o$||' "$objects" |
+    while IFS= read -r stem; do
+        for ext in c cpp cc; do
+            [[ -f $upstream/$stem.$ext ]] && { printf '%s.%s\n' "$stem" "$ext"; continue 2; }
+        done
+        printf '%s.c\n' "$stem"
+    done |
     grep -v -x -F "$skipped_linux_only"

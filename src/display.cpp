@@ -38,12 +38,19 @@ extern "C"
                                       std::int64_t *physical_address);
     int sceKernelMapDirectMemory(void **address, std::size_t length, int protection, int flags,
                                  std::int64_t physical_address, std::size_t alignment);
+    /* The AGC entry point that brings up the GPU command-processor context, with
+     * the ABI ../PS5_Vulkan's native runtime uses: sceAgcInit(uint32_t version).
+     * Submitting a command buffer without it is what faulted this port with a
+     * write to 0x202210000. */
+    std::int32_t sceAgcInit(std::uint32_t version);
     int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
                         const void *param);
     int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
     int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
                               std::uint32_t flip_mode, std::int64_t flip_argument);
     int sceVideoOutWaitVblank(std::int32_t handle);
+    int sceVideoOutGetFlipStatus(std::int32_t handle, void *status);
+    int sceVideoOutIsFlipPending(std::int32_t handle);
 }
 
 namespace ps5::display
@@ -55,6 +62,15 @@ constexpr unsigned frame_height = 1080;
 /* One frame is allocated at 16 MiB and two are taken, which is what the console's
  * registration accepted; the larger size leaves room for the tiled layout. */
 constexpr std::size_t frame_bytes = 0x1000000;
+/* sceVideoOutGetFlipStatus fills 16 64-bit words; the fourth carries the
+ * marker of the latest flip the display has shown. Confirmed by measurement
+ * against ../PS5_Vulkan/driver/ps5vk_queue.c, which reads the same word. */
+/* The version the sibling project's native runtime passes to sceAgcInit. */
+constexpr std::uint32_t agc_version = 8;
+
+constexpr unsigned flip_status_words = 16;
+constexpr unsigned flip_status_marker_word = 3;
+
 constexpr std::size_t memory_bytes = frame_bytes * 2;
 constexpr std::size_t memory_alignment = 0x200000;
 constexpr int memory_type_write_combined_garlic = 3;
@@ -137,6 +153,14 @@ bool Display::open(unsigned width, unsigned height) noexcept
 
     width_ = width;
     height_ = height;
+
+    /* The GPU command-processor context, before anything is submitted to it.
+     * ../PS5_Vulkan initialises AGC before its first submission
+     * (driver/ps5vk_device.c), and a submission without it is what faulted this
+     * port with a write to 0x202210000. A failure here is not fatal for the
+     * present path below, so it is recorded rather than returned: the flip itself
+     * is what reports whether the display took the frame. */
+    agc_ready_ = sceAgcInit(agc_version) == 0;
 
     handle_ = sceVideoOutOpen(0xff, 0, 0, nullptr);
     if (handle_ < 0)
@@ -248,27 +272,40 @@ bool Display::present() noexcept
         error_ = "present without an open display";
         return false;
     }
-    /* flip_mode 0 (immediate) and flip_arg 0: the frame is handed over and the
-     * call returns. An earlier version used (1, 1), which asks the display to
-     * wait, and then waited for a vblank itself - and nothing this title ever
-     * submitted appeared on screen, with the title hanging rather than
-     * returning. Whether the wait was the block or the mode was wrong could not
-     * be told apart from a black screen, so the call is traced and the wait is
-     * gone: a frame that arrives and tears is a frame, and tearing is a
-     * presentable problem. */
+
+    /* The CPU's dirty cache lines are invisible to the display, so the frame is
+     * flushed before the display is asked for it. */
     flush_frame_cache(frames_[back_], frame_bytes);
-    const int result = sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1);
-    if (result < 0)
+
+    /* Confirmed, not assumed. For several rounds this port could not tell a
+     * presented frame from one the display never took, because the only check was
+     * the call's return code. The status query is what an earlier version was
+     * missing, and it is the difference between "the driver thinks it drew" and
+     * "the display says it showed". */
+    if (sceVideoOutSubmitFlip(handle_, registered_[back_], 1, 1) < 0)
     {
-        char line[128];
-        std::snprintf(line, sizeof(line), "SubmitFlip failed: %d (0x%08x) buffer %d", result,
-                      static_cast<unsigned>(result), registered_[back_]);
-        ps5::debug::mark(line);
         error_ = "sceVideoOutSubmitFlip refused the frame";
         return false;
     }
-    back_ ^= 1;
+    (void)sceVideoOutWaitVblank(handle_);
+
+    const int status = sceVideoOutGetFlipStatus(handle_, flip_status_);
+    /* Report what the display says it has shown, once, so the trace answers the
+     * question the return code cannot: a flip the display never took reads as
+     * success from SubmitFlip and as a marker of zero here. */
+    static bool reported = false;
+    if (!reported)
+    {
+        reported = true;
+        char line[160];
+        std::snprintf(line, sizeof(line), "flip status: call=%d marker=%llu shown=%llu", status,
+                      static_cast<unsigned long long>(flip_status_[flip_status_marker_word]),
+                      static_cast<unsigned long long>(flip_status_[0]));
+        ps5::debug::mark(line);
+    }
     error_ = "";
+
+    back_ ^= 1;
     return true;
 }
 } // namespace ps5::display

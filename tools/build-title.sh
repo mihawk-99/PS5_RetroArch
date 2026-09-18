@@ -65,6 +65,14 @@ title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titl
 dist="$root/dist/$title_id"
 [[ -f $dist/eboot.bin ]] || { echo "error: no eboot.bin under $dist" >&2; exit 2; }
 
+# The configuration seed goes into the title folder, after tools/build.sh has
+# assembled it - the app folder is recreated on every build, so a copy made
+# earlier is removed with the rest. This file is the only place the video driver is
+# chosen: the safe one is named until ../PS5_Vulkan's libvulkan.so.1 is beside the
+# title, because naming a driver whose library is missing makes RetroArch fail to
+# initialise and the title exit 1 saying nothing. See config/retroarch.cfg.
+cp -a -- "$root/config/retroarch.cfg" "$dist/retroarch.cfg"
+
 # The manifest is recorded here, as part of building, because a folder published
 # without one cannot be told apart from the folder published last week: this
 # project has already produced a title folder whose eboot.bin was a raw link-stage

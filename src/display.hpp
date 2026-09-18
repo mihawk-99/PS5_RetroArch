@@ -77,6 +77,8 @@ class Display final
     int handle_ = -1;
     void *mapped_ = nullptr;
     void *frames_[2] = {nullptr, nullptr};
+    std::uint64_t flip_status_[16] = {0};
+    bool agc_ready_ = false;
     int registered_[2] = {-1, -1};
     int back_ = 0;
     unsigned width_ = 0;
