@@ -711,3 +711,5 @@ account for it: the worktree file and `title/assets/retroarch.png` are both
 512x512 but differently encoded, and nothing in this round touches it. It is
 committed as it stands rather than reverted, and flagged here so it is not a
 silent change.
+
+**Commit.** `4e91e35` — Automate the console loop, fix the null joypad crash, bundle the RGUI fonts.
