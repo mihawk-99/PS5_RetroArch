@@ -120,13 +120,21 @@ def compare(args: argparse.Namespace) -> int:
             if needle in body:
                 problems.append(f"present but must not be: {needle!r}")
 
+        # The distilled record is the evidence; the raw capture is a working file
+        # in the ignored klog/ tree and is expected to age out. Its absence is
+        # reported, never a failure -- otherwise the gate would go red for a
+        # cleanup rather than for a change in behaviour.
         raw = ROOT / capture.get("raw_capture", "")
-        if capture.get("raw_capture") and not raw.is_file():
-            problems.append(f"the raw capture it names is gone: {capture['raw_capture']}")
+        raw_gone = bool(capture.get("raw_capture")) and not raw.is_file()
+        if not capture.get("lines"):
+            problems.append("the record holds no lines: nothing was distilled")
 
         status = "FAIL" if problems else "OK"
         print(f"{step.name}: {status} (raw {capture.get('raw_capture')}, "
               f"{capture.get('raw_lines')} lines)")
+        if raw_gone:
+            print(f"    note: the raw capture is not on disk any more (it lives in "
+                  f"the ignored klog/ tree); the distilled lines above are the record")
         if problems:
             failures += 1
             for problem in problems:

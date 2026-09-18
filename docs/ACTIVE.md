@@ -9,45 +9,43 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The PPSA title folder is complete: `dist/PPSA99005/`.** It holds the signed
-application image `eboot.bin` (49,968,821 bytes), the loader module
-`sce_module/libc.prx`, the title's identity and 512x512 icon under `sce_sys/` (generated from
-`title/assets/retroarch.png`),
-the configuration seed, the payload beside them and a digest manifest.
-`tools/stage-ppsa.sh` assembles it and exits 0 only when every piece is there.
-Evidence: the folder's `manifest.sha256` and the converter's own inspection of
-the image — `container: signed, plaintext; segments: 12; authority:
-0x3100000000000002; program type 0x1; integrity: valid`. What it still owes: a
-console run. The folder is built and validated here, not yet installed.
+**The installed title was launched and it crashes; the cause is measured.** The
+console's `/data/homebrew/PPSA99005/eboot.bin` was a link-stage ELF (51,870,448
+bytes) rather than a converted application image, and the loader faulted inside
+it before `main()` ran: `SIGSEGV`, page fault at address `1`, thread `eboot.bin`,
+with `/app0/sce_module/libc.prx` on the stack, then
+`[Syscore App] App Crash`. The capture is committed as
+`evidence/ppsa-99005-startup-crash/`, and the diagnosis is in `docs/FINDINGS.md`.
+The converted image this repository produces is 49,968,821 bytes and validates
+(`signed, plaintext`, 12 segments, `integrity: valid`).
 
-**Getting there took three image-format requirements, all now satisfied and
-recorded.** The link is not the compiler driver's link any more: it goes through
-`linker/ps5-pie.ld` (the layout that leaves room for the console's process
-parameters), the SDK's startup objects (without them there is no `_start` and the
-entry point stays 0), `platform/ps5_image_symbols.S` (the image's own boundary
-symbols, which no stub can export) and `--exclude-libs=ALL` (without it the
-linker exports symbols pulled from static libraries and the converter refuses the
-image). `tools/prospero-clang-link` is the shim that applies all of it, and
-`docs/FINDINGS.md` carries each requirement with the exact error that revealed it.
+**That folder then disappeared from the console.** The replace reported success
+at every step and the directory was gone immediately afterwards; the neighbouring
+homebrew folders were untouched and the control payload stayed healthy. Recorded
+as its own finding, because it changes how an install must work here: write a
+whole folder and verify it, never patch a file inside one.
 
-**The Option 1 baseline remains verified.** `evidence/m1-baseline-loads/` holds
-the console run: payload started under the homebrew launcher, menu on screen,
-configuration written into the title folder.
+**Everything needed to rebuild the title folder is local.** `dist/PPSA99005/`
+holds the converted `eboot.bin`, the payload, the configuration, the loader
+module, the identity and the icon, with a digest per file; the same payload also
+survives on the console under `/data/homebrew/PS5_RetroArch/`. Nothing was lost
+that cannot be regenerated or re-copied.
 
-**The console is shared with the PS5_Vulkan session; every launch, upload and
-install is asked for first** (`docs/DEPLOYMENT.md`). Nothing has been sent.
+**The Option 1 baseline is still verified.** `evidence/m1-baseline-loads/` holds
+that run, and `tools/evidence.py compare` now replays both records cleanly — with
+one correction: a raw capture that has aged out of the ignored `klog/` tree is a
+note, not a failure, since the distilled record is the evidence.
 
 ## Next
 
-1. Ask for a console window, then install `dist/PPSA99005/` on the console and
-   capture the run as `evidence/m-ppsa/`: the home screen listing the title, the
-   title starting from it, and the menu on screen.
-2. If the installed title does not start, the first thing to check is the
-   loader's own message: it names the reason rather than failing silently
-   (`docs/TROUBLESHOOTING.md`).
-3. Option 2: the Vulkan driver. `../PS5_Vulkan` implements every WSI entry point
-   RetroArch's display-based Vulkan path calls, so the remaining questions are
-   the driver's consumer package and what RetroArch's renderer needs beyond it.
+1. Rebuild `/data/homebrew/PPSA99005/` on the console from `dist/PPSA99005/`,
+   whole folder first and verified after, then launch it with the kernel log
+   being captured and record the result as the repaired run.
+2. If it still faults, the next measurement is where: the earlier capture names
+   the module on the stack, so the same capture with the new image says whether
+   the crash moved.
+3. Option 2 remains the Vulkan driver, and `../PS5_Vulkan` already implements
+   every display entry point RetroArch's Vulkan path calls.
 
 ## Working notes
 

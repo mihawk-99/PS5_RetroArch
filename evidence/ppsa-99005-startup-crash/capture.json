@@ -1,0 +1,21 @@
+{
+  "step": "ppsa-99005-startup-crash",
+  "recorded": "2026-09-18T12:30:00Z",
+  "console_run": "launch PPSA99005 via the resident control payload; klog captured on port 3232",
+  "revision": "2ea07b1",
+  "command": "tools/console-klog.sh then 'launch PPSA99005'",
+  "raw_capture": "klog/ppsa99005-122733.log",
+  "raw_lines": 214,
+  "lines": [
+    "[SceLncService] EndAppMount(0x00000018)",
+    "[kstuff.elf] Title Mounted Successfully: /data/homebrew/PPSA99005 -> /system_ex/app/PPSA99005",
+    "# A user thread receives a fatal signal",
+    "# signal: 11 (SIGSEGV)",
+    "# thread name: eboot.bin",
+    "# reason: page fault (user read instruction, page not present)",
+    "# fault address: 0000000000000001",
+    "/app0/sce_module/libc.prx",
+    "[Syscore App] App Crash : reason=0xb",
+    "[SceLncService] AppCrash: appId={0x00002018}"
+  ]
+}

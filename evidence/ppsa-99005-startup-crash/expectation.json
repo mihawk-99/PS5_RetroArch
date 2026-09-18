@@ -1,0 +1,12 @@
+{
+  "step": "ppsa-99005-startup-crash",
+  "note": "The title installed on the console at the time did not start: the loader faulted inside eboot.bin before main() ran. This record exists so the failure is a measurement rather than a memory, and so the repaired run can be compared against it.",
+  "must_contain": [
+    "# signal: 11 (SIGSEGV)",
+    "# fault address: 0000000000000001",
+    "/app0/sce_module/libc.prx",
+    "App Crash"
+  ],
+  "must_not_contain": [],
+  "human_check": "The console's home screen showed no running title, and the control payload reported 0 running processes after the launch."
+}

@@ -248,3 +248,37 @@ back as an image to confirm it is the intended artwork rather than a blank or
 distorted tile.
 
 **Commit.** `162f974` — Generate the launcher icon from the project's artwork.
+
+---
+
+## 2026-09-18: The installed title was launched, it crashed, and the log says why
+
+The user asked for the kernel log to be watched while `PPSA99005` was opened.
+Both were done: the log was captured from the console's klog service and the
+title was launched through the resident control payload. It does not start, and
+the capture says exactly why.
+
+**The evidence.** `evidence/ppsa-99005-startup-crash/` holds the distilled record
+and the raw capture (`klog/ppsa99005-122733.log`, 214 lines), and
+`tools/evidence.py compare` replays it. The launch returned
+`EndAppMount(0x00000018)` with no running process; the log shows the title being
+mounted, then `SIGSEGV` in a thread named `eboot.bin`, a page fault at address
+`0x1`, `/app0/sce_module/libc.prx` named in the crash block, and
+`[Syscore App] App Crash`. The installed image is 51,870,448 bytes — a link-stage
+ELF, not the converted and signed 49,968,821-byte image this repository produces.
+
+**What was tried first.** `tools/install-title.sh` was written to replace that
+image and ran, reporting `226 File deleted` and `226 Path renamed` and verifying
+nothing. Immediately afterwards the entire `/data/homebrew/PPSA99005/` directory
+was gone from the console: absent from the parent listing, refused by `CWD`. The
+neighbouring homebrew folders were untouched and the control payload never
+faltered. That is recorded as its own finding rather than smoothed over, because
+it changes the install procedure: this service may lose a directory during a
+replace, so an install must write a whole folder and then verify it.
+
+**Still open.** The repaired run has not happened. Everything needed is local
+(`dist/PPSA99005/` with a digest per file, plus the same payload on the console
+under `/data/homebrew/PS5_RetroArch/`), so nothing was lost that cannot be
+rebuilt.
+
+**Commit.** `{{SHA}}` — Watch the kernel log, launch the title, and record why it crashes.

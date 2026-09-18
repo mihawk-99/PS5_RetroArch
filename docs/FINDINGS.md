@@ -393,3 +393,69 @@ until the extraction guard learned to repair it.
 **Boundary.** The artwork is the project's own file. A different source image
 needs only to be square; the scripts stretch to 512x512 rather than padding, so a
 non-square source would be distorted and should be rejected by whoever replaces it.
+
+---
+
+## 2026-09-18: The installed title crashed because its eboot.bin was not a converted image
+
+**Measured.** With the title installed on the console, `launch PPSA99005` through
+the resident control payload produced `EndAppMount(0x00000018)` and no running
+process, and the kernel log captured on port 3232 recorded a fatal signal inside
+the application:
+
+```text
+[SceLncService] EndAppMount(0x00000018)
+[kstuff.elf] Title Mounted Successfully: /data/homebrew/PPSA99005 -> /system_ex/app/PPSA99005
+# A user thread receives a fatal signal
+# signal: 11 (SIGSEGV)
+# thread name: eboot.bin
+# reason: page fault (user read instruction, page not present)
+# fault address: 0000000000000001
+/app0/sce_module/libc.prx
+[Syscore App] App Crash : reason=0xb
+```
+
+The installed `eboot.bin` was 51,870,448 bytes — the size of a **link-stage ELF**,
+and larger than the converted and signed image this repository now produces
+(49,968,821 bytes). The loader therefore started a file that is not in the
+application-image format `eboot.bin` has to be, and faulted before `main()` ran.
+The thread name and the process name both read `eboot.bin` because that is what
+the loader had just started.
+
+**Consequence.** `tools/install-title.sh` exists to prevent exactly this: it
+installs only `dist/<TITLE_ID>/eboot.bin`, verifies the stored bytes against the
+local image by size and SHA-256, and keeps the previous image as
+`eboot.bin.previous` so the change is reversible. The crash is recorded as
+evidence in `evidence/ppsa-99005-startup-crash/` so the repaired run has
+something to be compared against.
+
+**Boundary.** This is a property of the console's loader, not of RetroArch: any
+payload placed at `eboot.bin` without being converted will fault the same way.
+The three converter requirements in the previous finding are what stands between
+a link output and a runnable title.
+
+---
+
+## 2026-09-18: This console's FTP service can lose a directory during a replace
+
+**Measured.** Replacing `eboot.bin` in `/data/homebrew/PPSA99005/` was performed
+as an upload to a temporary name followed by delete-and-rename, and reported
+success at every step (`226 File deleted`, `226 Path renamed`). Immediately
+afterwards the whole directory was gone: `LIST /data/homebrew/PPSA99005/` is
+empty, the folder no longer appears in `LIST /data/homebrew/`, and a later `CWD`
+into it fails with `550 No such file or directory`. The neighbouring homebrew
+folders (`PS5_RetroArch`, `RetroArch`, `PPSA99988`) were unaffected, and the
+control payload stayed healthy throughout.
+
+**Consequence.** The folder has to be treated as reconstructable rather than
+durable. Everything it held is reproducible: `dist/PPSA99005/` holds the
+converted image, the configuration, the payload, the module, the identity and the
+icon with a digest per file, and the same payload also still exists on the
+console under `/data/homebrew/PS5_RetroArch/`. Any install path must therefore
+recreate the folder rather than patch a file inside it, and must verify what it
+wrote.
+
+**Boundary.** ftpsrv v0.21.1 on this console, which also answers deletes with 226
+and ignores the path argument of a listing command. Rewriting a file in place is
+not a safe operation on this service; writing a whole directory and checking it
+is.
