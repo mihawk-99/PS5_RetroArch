@@ -40,5 +40,5 @@ Vulkan project has driver sources and headers but no consumer package yet.
 decides between them, instead of the assumption. Recorded here so the next step
 does not rediscover it.
 
-**Commit.** `{{COMMIT_SHA}}` — Instantiate the agent documentation contract for
-PS5 RetroArch.
+**Commit.** `3dfc3dd` — Instantiate the agent documentation contract for PS5
+RetroArch.
