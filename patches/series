@@ -15,3 +15,16 @@
 #       without declaring, so that --disable-xkbcommon is accepted
 #       qb/config.params.sh
 0002-declare-have-xkbcommon
+#
+# 0003  rename upstream's `main` so the SDK's _start has one definition to reach
+#       and rarch_main keeps the frontend's main loop (see the note in
+#       tools/apply-port-patches.py: defining HAVE_MAIN instead compiles the loop
+#       out, which is a title that initialises everything and exits)
+#       retroarch.c
+0003-rename-upstream-main
+#
+# 0004  guard input_joypad_analog_axis against a null joypad driver, which is this
+#       console's normal state: without it the menu's analog read faults on the
+#       second pass through the runloop (see tools/apply-port-patches.py)
+#       input/input_driver.c
+0004-guard-the-joypad-analog-read

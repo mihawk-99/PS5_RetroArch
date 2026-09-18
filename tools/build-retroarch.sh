@@ -66,12 +66,15 @@ mapfile -t defines < <("$root/tools/retroarch-flags.sh" | tr ' ' '\n' | grep -E 
 # Plus the three things `make` cannot know, because they are about this title
 # rather than about RetroArch:
 defines+=(
-    # RetroArch defines the C `main` in retroarch.c only when HAVE_MAIN is set;
-    # its own build passes it on every desktop platform. This port's `main` lives
-    # in src/main.cpp and calls rarch_main with this title's arguments, so
-    # retroarch.c must not supply a second one: two `main` symbols is a link
-    # error, and the SDK's `_start` reaches only what it links.
-    -DHAVE_MAIN
+    # HAVE_MAIN is deliberately NOT defined, and defining it is the mistake this
+    # build already made once. The name reads like "this platform has a main", but
+    # the comment above rarch_main says what it does: without HAVE_MAIN, rarch_main
+    # initialises and then runs the frontend's main loop; with it, rarch_main only
+    # initialises and returns. The title built with it initialised every driver -
+    # this project's video driver included, its display open at 1920x1080, per the
+    # trace in the title folder - and then exited zero without drawing a frame.
+    # The duplicate `main` symbol it was meant to avoid is removed by renaming
+    # upstream's, in patches/series 0003.
     # This SDK's time.h only defines the POSIX clock ids when
     # __POSIX_VISIBLE >= 200112, which the -std=c11 the pipeline uses suppresses.
     # The ids are pre-defined here with the header's own values (CLOCK_REALTIME 0,
@@ -144,13 +147,29 @@ fi
 # in build/ra-conf by tools/apply-port-patches.py, which matches each change on a
 # stable anchor line rather than a diff's line numbers. vendor/retroarch is never
 # edited, so "upstream plus a named, re-runnable change" stays true.
+#
+# The patcher's decision is remembered, and that is not bookkeeping. A patch that is
+# already applied reports `present` and writes nothing, so the patched file's
+# timestamp does not move - and the compile loop below, which skips a source older
+# than its object, then keeps an object that was compiled BEFORE the patch existed.
+# That is not hypothetical: after the rename of upstream's `main` was added, the
+# build kept a retroarch.c.o with no runloop_iterate in it, because the object was
+# newer than the already-patched source. The build looked correct and the frontend
+# had no main loop in it. So the patch list is stamped, and when it changes the
+# objects belonging to patched files are deleted rather than trusted.
+patch_stamp="$obj/.patches"
+patched_files=()
 if [[ -f $root/patches/series ]]; then
     echo "==> [ra] applying the port's changes to build/ra-conf"
-    python3 "$root/tools/apply-port-patches.py" "$root/build/ra-conf" || {
+    patch_report=$(python3 "$root/tools/apply-port-patches.py" "$root/build/ra-conf") || {
+        echo "$patch_report"
         echo "error: a port change could not be applied; the frontend would build" >&2
         echo "       against unpatched sources and silently ignore the driver." >&2
         exit 2
     }
+    printf '%s\n' "$patch_report"
+    mapfile -t patched_files < <(printf '%s\n' "$patch_report" |
+        sed -n 's/^  \([^:]*\): .*/\1/p')
 fi
 
 mkdir -p "$obj"
@@ -169,6 +188,21 @@ if [[ ! -f $stamp || $(<"$stamp") != "$fingerprint" ]]; then
         rm -f "$obj"/*.o
     fi
     printf '%s\n' "$fingerprint" > "$stamp"
+fi
+
+# The set of patched files, as of now. When it differs from last run's, the objects
+# for exactly those files go, so the patch is compiled rather than assumed.
+patch_list=$(printf '%s\n' "${patched_files[@]:-}" | sort)
+if [[ ! -f $patch_stamp || $(<"$patch_stamp") != "$patch_list" ]]; then
+    if [[ -f $patch_stamp ]]; then
+        removed=0
+        for name in "${patched_files[@]}"; do
+            target="$obj/${name//\//_}.o"
+            [[ -f $target ]] && { rm -f "$target"; removed=$((removed + 1)); }
+        done
+        (( removed )) && echo "==> [ra] the port's changes moved; rebuilding $removed object(s)"
+    fi
+    printf '%s\n' "$patch_list" > "$patch_stamp"
 fi
 
 compiled=0

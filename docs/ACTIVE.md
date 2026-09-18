@@ -9,37 +9,21 @@ _Updated: 2026-09-18_
 
 ## Now
 
-**The title builds.** `bash tools/build-title.sh` compiles RetroArch's own sources
-(225 objects), archives them, links them with `src/` through the native pipeline's
-CRT, signs the result and assembles `dist/PPSA99169/`: **`eboot.bin` 8,026,239
-bytes**, `container: signed, plaintext`, 12 segments, `integrity: valid`, plus
-`sce_module/libc.prx` and the `sce_sys/` metadata. The folder's digests are in
-`dist/PPSA99169/manifest.sha256` and `bash tools/check-manifest.sh` passes on it.
+**The console loop runs itself.** `bash tools/run-title.sh` builds, publishes,
+verifies what the console stored, listens, launches, watches, closes the title
+itself and prints the title's own trace. No upload needs a person any more.
 
-**The video driver is registered, and that is verified, not assumed.** The port's
-changes to RetroArch live in `patches/series` and are applied by
-`tools/apply-port-patches.py` to the configured copy under `build/ra-conf` —
-never to `vendor/retroarch`. The evidence is a relocation, not a run:
-`readelf -r build/ra/obj/gfx_video_driver.c.o` shows `.rela.data.video_drivers`
-holding exactly two entries, `video_ps5` then `video_null`, and
-`nm build/llvm-pie.elf` shows `video_ps5`, `video_null`, `rarch_main` and one
-`main`.
+**The title runs and stays up.** 1500+ frames in 25 s, closed by the script, after
+`patches/series` 0004 fixed a null joypad driver that killed the second pass
+through the runloop (see `docs/FINDINGS.md`).
 
-**The entry point is reconciled.** RetroArch's `main` is compiled out with
-`-DHAVE_MAIN`, the flag RetroArch's own desktop build passes; `src/main.cpp`
-supplies `main` and calls `rarch_main` with `-f -c /app0/retroarch.cfg --verbose`,
-and the SDK's `_start` remains the process entry. Two `main` symbols would be a
-link error, and there is no link error.
-
-**Everything the abandoned route left behind is gone.** The conversion tools, the
-baseline tree, the ports cache, `tools/deploy.py`, `tools/console-launch.sh`,
-`tools/check-payload.sh`, `tools/scaffold-native.sh`, `tools/build-native-app.sh`,
-`tools/install-title.sh` and `tools/deploy.sh` are deleted; the tools that remain
-are the ones `tools/build-title.sh` and `tools/verify.sh` actually call, and every
-tool named by another tool exists.
-
-**`RGUI on screen` is the goal, and it is not met.** The title is built and
-manifested; it has not run.
+**The menu does not draw yet, and the reason is measured.** RGUI initialises and
+holds a 320x240 framebuffer, but `GFX_DISP_FLAG_FB_DIRTY` is never set, so
+`rgui_set_texture` returns every frame and the driver reports `no-menu-source`.
+That flag is set at the end of `rgui_render`, which is only reached through
+`menu->driver_ctx->render` under `if (BIT64_GET(menu->state, MENU_STATE_BLIT))`.
+The menu's renderer never runs; finding which condition above that call is false
+is the next step, and `docs/FINDINGS.md` records the path there.
 
 ## Next
 

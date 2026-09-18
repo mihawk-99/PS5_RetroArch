@@ -655,3 +655,59 @@ old bytes. The console's FTP accepts the transfer and serves something else, so
 the console's owner uploads by hand.
 
 **Commit.** `eebba81` — Link the title and register the PS5 video driver.
+
+## 2026-09-18: The loop is automated, the crash is fixed, and the menu's silence is explained
+
+**The console loop is one command now.** `tools/run-title.sh` builds, publishes
+over FTP, verifies what the console stored, starts the kernel-log listener before
+launching, launches, watches, closes the title itself, and prints the title's own
+trace. It exists because the hand-driven loop had produced two bad readings: runs
+overlapped, so a trace from one launch was read as another's result, and a probe
+build was left in place and mistaken for a finding. No round after this one
+needs a person to upload anything.
+
+**Verification had to change to match this console.** It converts a signed fake
+self into a raw ELF as it stores it, so the file it serves is a different
+container from the file sent - the stored image is 8,117,072 bytes against a
+signed 8,029,263 and only 12.8% of the bytes agree. A digest comparison therefore
+answers the wrong question and was rejecting successful uploads. eboot.bin is now
+verified by the strings that only this build carries, which is the same evidence
+the debugging used. `sce_module/libc.prx` is the one path this console will not
+replace - four uploads, a fresh filename and a full listing all returned the
+console's own 1,335,962-byte file - so it is reported and kept, not fatal: the
+title runs against the console's copy, and failing on it blocked eboot.bin from
+being published at all.
+
+**The crash is fixed, and it was a null joypad driver.** Every joypad driver
+upstream ships needs a library or header this SDK does not carry, so
+`primary_joypad` is NULL, and `input_joypad_analog_axis` reads `drv->axis` without
+checking `drv`. It only runs when the menu is alive, which is why the first pass
+through the runloop survived and the second died: SIGSEGV, fault address 0x18,
+which is `joypad_info.joy_idx` plus the `auto_binds` member. `patches/series` 0004
+returns 0 when there is no driver - the answer the function already gives when
+there is no axis to read. The title now runs indefinitely: 1500+ frames in 25
+seconds, closed by the script.
+
+**The menu's silence is explained, and it is not the driver.** RGUI initialises,
+loads its fonts from the assets now bundled under `assets/rgui/font/`, holds a
+320x240 framebuffer, and `rgui_set_texture` is called every frame - but
+`GFX_DISP_FLAG_FB_DIRTY` is 0 on every one of those calls, so it returns before
+handing anything over and the driver reports `no-menu-source` for every frame.
+That flag is set at the end of `rgui_render`, which is only reached through
+`menu->driver_ctx->render` under `if (BIT64_GET(menu->state, MENU_STATE_BLIT))`.
+The menu's renderer is never running; finding which condition above it is false is
+the next step.
+
+**The evidence.** `bash tools/run-title.sh` → built, published with eboot.bin
+verified by its own markers, ran 25 s, closed by the script; `/app0/trace.txt`
+shows `ps5_frame 1500: no-menu-source 4x4 present=1`, i.e. a healthy loop
+presenting frames and no menu pixels. `tools/verify.sh` → PASS (format unit build
+integration evidence). Port changes against upstream: `retroarch.c` 10 lines,
+`gfx/video_driver.{c,h}` 5, `input/input_driver.c` 6, `runloop.c` and
+`menu/drivers/rgui.c` 0 - every probe removed, verified by diff.
+
+**One thing to check later.** `sce_sys/icon0.png` shows as modified and I cannot
+account for it: the worktree file and `title/assets/retroarch.png` are both
+512x512 but differently encoded, and nothing in this round touches it. It is
+committed as it stands rather than reverted, and flagged here so it is not a
+silent change.

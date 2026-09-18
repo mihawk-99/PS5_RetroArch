@@ -1059,3 +1059,44 @@ running.
 **Boundary.** The console's VideoOut ABI as this project's SDK declares it.
 Anything that changes one of these five values is a console-side change, not a
 build option.
+
+## A null joypad driver is this console's normal state, and upstream dereferences it
+
+**Measured.** With every joypad driver upstream ships unavailable - udev, linuxraw,
+SDL, XInput, dinput all need a library or a header this SDK does not carry -
+`input_st->primary_joypad` is NULL. `input_driver_collect_system_input` passes it
+straight to `input_joypad_analog_axis`, which reads `drv->axis` without checking
+`drv`: the function guards every axis member against `AXIS_NONE` and never guards
+the struct.
+
+**What it looked like.** Nothing like a null pointer. The title started, the
+display opened, the first frame was presented, and then it died on the *second*
+pass through the runloop with SIGSEGV and fault address 0x18. The reason it
+survived the first pass is that the call is inside `if (menu_is_alive)`, and
+`MENU_ST_FLAG_ALIVE` is set after the first frame. Finding it took a probe in the
+caller, then one at the function entry, then reading the loop: the fault address
+0x18 is `joypad_info.joy_idx` (0x10) plus the `auto_binds` member (0x18).
+
+**Fix.** `patches/series` 0004 returns 0 when `drv` is NULL, which is what the
+function already answers when there is no axis to read.
+
+## The menu is alive but its framebuffer is never marked dirty
+
+**Measured.** `/app0/trace.txt` from a 25-second run: `rgui_fonts_init` completes,
+RGUI holds a 320x240 framebuffer, and `rgui_set_texture` is called every frame -
+but `GFX_DISP_FLAG_FB_DIRTY` is 0 on every one of those calls, so it returns
+before handing anything to the driver. The driver therefore reports
+`no-menu-source 4x4` for every frame: nothing is ever drawn, which is what "the
+screen stayed black" is.
+
+**Where the flag should come from.** `GFX_DISP_FLAG_FB_DIRTY` is set at the end of
+`rgui_render`, and `rgui_render` is only reached through
+`menu->driver_ctx->render` inside `if (BIT64_GET(menu->state, MENU_STATE_BLIT))`.
+So the menu's renderer is never running. That is the next thing to measure: which
+of the conditions above the call is false.
+
+**Also measured, and separately true.** RGUI's bitmap fonts are downloaded assets,
+not built-ins: `bitmapfont_10x10_load` returns NULL when
+`<assets>/rgui/font/bitmap10x10_eng.bin` is missing, `rgui_fonts_init` then fails,
+and `rgui_init` jumps to its error label with the menu dead. They are now bundled
+under `assets/rgui/font/` and shipped in the title folder.

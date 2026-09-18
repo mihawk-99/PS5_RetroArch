@@ -17,9 +17,19 @@
  *   -f              fullscreen, which on a console is the only mode
  *   -c <path>       the config to read and write, inside the title's own folder
  *   --verbose       so the run is readable in the console's log
+ *
+ * Why this file writes a trace. The first run of this title on the console ended
+ * with the kernel reporting `eboot.bin calls exit() exit_value=0` and nothing
+ * else: no output, no crash, no message. A program that exits zero and says
+ * nothing is indistinguishable from one that never reached `main`, and the
+ * console's log cannot be asked which it was. So the entry point and the video
+ * driver append a line per step to /app0/trace.txt, and after a run that file
+ * says how far it got. See src/trace.hpp.
  */
 
 #include <cstddef>
+
+#include "trace.hpp"
 
 /* RetroArch's entry, in C. */
 extern "C" int rarch_main(int argc, char *argv[], void *data);
@@ -33,6 +43,10 @@ constexpr const char *config_path = "/app0/retroarch.cfg";
 
 int main()
 {
+    /* First thing: prove that control reached this function at all, before
+     * anything that could fail. */
+    ps5::debug::mark("main() entered; static constructors have already run");
+
     /* argv must be writable and NULL-terminated: RetroArch's option parsing
      * walks it the way the C runtime would have. */
     char arg0[] = "retroarch";
@@ -45,5 +59,13 @@ int main()
     };
     (void)config_path;
 
-    return rarch_main(static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1, argv, nullptr);
+    ps5::debug::mark("argv built: retroarch -f -c /app0/retroarch.cfg --verbose");
+
+    const int status =
+        rarch_main(static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1, argv, nullptr);
+
+    /* If this line is on the console, the frontend ran and returned by itself. */
+    ps5::debug::mark_value("rarch_main returned", status);
+
+    return status;
 }
