@@ -380,4 +380,4 @@ copies on this machine share that header, so the pairing is inherent, which is
 why the project pins Clang 18 (`extra/clang18 18.1.8-2` is available). Installing
 it needs administrator rights, so the build waits on that.
 
-**Commit.** `{{SHA}}` — Change route: build a native title on the pipeline that works.
+**Commit.** `80dc8d4` — Change route: build a native title on the pipeline that works.
