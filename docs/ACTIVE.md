@@ -4,46 +4,45 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Bounded XMB allocation diagnostic is built on `codex/xmb-allocation-diagnostics`.**
-Uploads are always authorized; console launches require the owner's intervention.
-They authorized the first diagnostic run, which froze and was manually closed.
-Do not launch the revised build automatically. No next core is assigned.
+**The bounded allocation diagnostic captured the original XMB crash.** Branch:
+`codex/xmb-allocation-diagnostics`. This is a diagnostic result, not a crash fix.
+Uploads are authorized; launch only with owner intervention. Owner authorized this
+run and reports crash reproduced. Final logs are preserved; capture is stopped.
 
-- Revised build identity: `a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be`.
-- Uploaded and verified; not launched. Raw: `klog/xmb-memory-bounded-upload.log`.
-- Output: `dist/PPSA99169/`; matching executable/symbols/map/inspection under
-  `klog/xmb-memory-a4a751e58339/`. Evidence: `evidence/xmb-memory-bounded-logging/`.
+- Running identity: `a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be`.
+- Raw: `klog/xmb-memory-run-20260919-184732/`; evidence:
+  `evidence/xmb-memory-crash/`. Exact symbols: `klog/xmb-memory-a4a751e58339/`.
+- Kernel records one post-launch SIGSEGV: NULL write in Mesa `__vk_log_impl`.
+  Stack matches the original crash: XMB wallpaper/context update, texture unload,
+  `vkQueueWaitIdle`, allocation-error reporting, NULL dereference.
+- Allocation log is 3,217 bytes. First failure: 6,429 ms, 15,488-byte request in
+  `xmb_list_insert` (inlined `xmb_alloc_node`). Native requested bytes rise from
+  4,625,679 at 5 s to 11,616,951 at first failure; tracked mappings stay 5,498,938.
+  Image creations minus destructions stay 131. dropped=0; native coverage remains
+  incomplete because system-internal allocations are not intercepted.
+- Only first four failures are logged immediately, so subsequent failures before
+  this crash may be suppressed. Their absence is not proof of successful calls.
+- This reproduces the original failure without the first diagnostic's log flood.
+  It does not establish heap limit, fragmentation, leak or corruption as cause.
+- Owner clarifies reproduction: holding a button to make the menu scroll fast.
+  Next investigation is navigation-driven list allocations and native heap behavior.
+  Do not silently disable XMB or switch away from Vulkan.
+- First diagnostic `000adf3edc25` froze; owner manually closed it. Raw:
+  `klog/xmb-memory-run-20260919-183305/`. It emitted 12,793 failure records plus
+  summaries / 5,404,264 bytes. Bounded logging corrected that diagnostic defect.
+
+## Diagnostic readiness and limits
+
 - `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five host gates,
   68 tests; `tools/check-memory-diagnostics.py` passed. Raw build log:
-  `klog/xmb-memory-bounded-verify.log`.
-- First four failure records are immediate; subsequent details and summaries are
-  limited to one per five seconds. Every failure still increments the counters.
-  Injected-clock test: 10,006 failures, five records, 10,001 suppressed, <8 KiB.
-- `/app0/memory-diagnostics.log` contains periodic requested live bytes/counts/
-  peaks, caller groups and image/queue-idle counters. Allocator policy unchanged.
-- Four archive hashes match the first diagnostic. PS5_Vulkan was not modified.
-  No revised console launch. Procedure/coverage: `docs/MEMORY_DIAGNOSTICS.md`.
-
-## Console findings and limits
-
-- Original crash: `klog/xmb-crash-20260919-181233/`; SIGSEGV `0x45b1ae`
-  in Mesa `__vk_log_impl`, after `vk_sync_create` allocation failure during
-  XMB texture unload's `vkQueueWaitIdle`. Error logging dereferenced NULL.
-- First diagnostic `000adf3edc25` was uploaded/verified and launched with owner
-  authorization. Raw: `klog/xmb-memory-run-20260919-183305/`. Owner reports
-  complete freeze, then explicitly confirms manual close. No post-launch kernel
-  fatal signal. Preserve this outcome, not a passing crash reproduction.
-- First failure at 13,187 ms: 15,488-byte XMB node allocation; later 648-byte
-  menu callback allocation. Unbounded logging produced 12,793 failure records
-  plus summaries / 5,404,264 bytes. It distorted the run and may amplify a stall.
-- Observed native requested bytes rose from 4,559,423 (5 s sample) to 11,627,255;
-  tracked mappings stayed 5,498,938 bytes. Image creations minus destructions
-  stayed 131. Tracking dropped=0, but thousands of foreign frees expose incomplete
-  native-heap coverage. These observations do not prove a leak or heap limit.
-- Native malloc returned NULL with observed errno=22; errno may be stale. Do not
-  label that as a proven invalid request. Underlying failure/freeze is unresolved.
-- The bounded logger fixes diagnostic I/O flooding only. Console validation of
-  the revision is pending. Do not claim it fixes XMB or the driver's OOM logger.
+  `klog/xmb-memory-bounded-verify.log`. Output remains `dist/PPSA99169/`.
+- First four failures are immediate; thereafter one detail/summary per five
+  seconds, every failure counted. Injected-clock test: 10,006 failures, five
+  records, 10,001 suppressed, <8 KiB. No allocator policy changes.
+- Four linked archive hashes match the first diagnostic (which already used a
+  newer libps5vk than the original baseline). PS5_Vulkan remains unmodified.
+- Procedure/coverage: `docs/MEMORY_DIAGNOSTICS.md`. The diagnostic itself now ran
+  and captured the crash; this does not accept application stability.
 
 ## Previous console-verified baseline (Genesis Plus GX)
 
@@ -110,7 +109,7 @@ See `docs/DEPLOYMENT.md` for procedures and metadata-listed BIOS filenames.
 
 ## Operating notes
 
-Uploads are authorized; check console idle before deployment. No automatic launch
-of the revised diagnostic. When the owner authorizes a test, start klog first,
-preserve old logs and capture memory-diagnostics.log during the run. Never
-interrupt another title. Preserve crash/freeze logs before relaunch.
+Uploads are authorized; check console idle before deployment. A new launch needs
+owner intervention. Start klog first, preserve old logs and capture allocation,
+frontend and trace logs. Never interrupt another title. Preserve crash/freeze logs
+before relaunch. No new core or unrelated driver work is assigned by this file.

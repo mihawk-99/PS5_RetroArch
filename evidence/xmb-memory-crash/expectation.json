@@ -1,0 +1,20 @@
+{
+  "step": "xmb-memory-crash",
+  "note": "Successful diagnostic capture of a failing application; not acceptance of a crash fix.",
+  "must_contain": [
+    "Diagnostic build identity: a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be",
+    "Owner: crash reproduced.",
+    "Post-launch kernel: 1 SIGSEGV, NULL write, __vk_log_impl.",
+    "Allocation log: 3217 bytes; first failure at 6429 ms requesting 15488 bytes in xmb_list_insert.",
+    "First sample native requested bytes: 4625679; first failure summary: 11616951.",
+    "Mapped requested bytes remained 5498938; image create minus destroy remained 131.",
+    "Stack: XMB wallpaper/context update -> texture unload -> vkQueueWaitIdle -> Mesa error logger NULL write.",
+    "Bounded diagnostics captured the original crash without the prior failure-log flood.",
+    "Underlying native allocation failure remains unresolved; no fix claimed.",
+    "Owner reproduction: hold a button to make the menu scroll fast; direction/list unspecified."
+  ],
+  "must_not_contain": [
+    "XMB crash fixed"
+  ],
+  "human_check": "Owner reports crash reproduced; kernel independently records SIGSEGV."
+}

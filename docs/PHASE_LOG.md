@@ -2388,3 +2388,33 @@ No revised console launch: further console validation awaits owner intervention.
 Revised diagnostic was uploaded under the owner's standing upload authorization
 and verified by `tools/deploy-title.py` after confirming console idle. Raw:
 `klog/xmb-memory-bounded-upload.log`. No launch command was sent.
+
+## 2026-09-19 — Bounded diagnostic reproduces original XMB SIGSEGV
+
+Owner authorized record/run, then reported the crash reproduced. Verified the
+already-uploaded `a4a751e58339` build identity, preserved old logs, started klog
+before launch, and captured memory-diagnostics.log, retroarch.log, trace.txt and
+configuration. No rebuild or additional driver change preceded this run.
+Raw: `klog/xmb-memory-run-20260919-184732/`. Local collector stopped after final
+retrieval; no automatic relaunch. Sanitized evidence: `evidence/xmb-memory-crash/`.
+
+Kernel records one post-launch SIGSEGV at runtime `0x45f30e`, NULL write. Exact
+preserved ELF and klog base symbolize the same chain as the original crash:
+XMB wallpaper/context update -> white-texture unload -> vkQueueWaitIdle -> Mesa
+allocation-error logging -> NULL dereference. First allocation failure at
+6,429 ms requests 15,488 bytes at xmb_list_insert (inlined xmb_alloc_node).
+Observed native requested bytes rise from 4,625,679 at 5,004 ms to 11,616,951 at
+first failure. Tracked mappings stay 5,498,938 bytes; net tracked image count
+stays 131; dropped records remain zero. The allocation log is only 3,217 bytes,
+with four immediate failure records: later failures can be suppressed by rate
+limiting. No exact heap limit, leak, fragmentation or corruption cause is proved.
+
+This confirms that the bounded diagnostic can capture the original crash without
+the previous unbounded failure-log flood. It is not a fix or a stable-runtime
+acceptance. Asked the owner which menu/list they were entering to correlate the
+allocation spike; that context is pending. Evidence checks reproduce the measured
+record and match its expected failing outcome. No PS5_Vulkan writes occurred.
+
+Owner clarification: “It was just holding a button and making the menu scroll
+fast.” Reproduction does not require an explicit folder-open step in the owner's
+account. Exact navigation direction/list was not specified; do not infer either.
