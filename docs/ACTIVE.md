@@ -9,39 +9,38 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Frames run.** An unattended `tools/run-title.sh --no-build --watch 25` records **644
-frames** and **643 menu draws** and is still alive when the script closes it: *"VERDICT:
-it ran for 25s and this script closed it"* (`klog/run-PPSA99169-022103.log`,
-`klog/trace-r3o.txt`). The probe-free shipping image behaves the same way on its own run
-(`klog/run-shipping-r3.log`, `klog/run-PPSA99169-023553.log`: *"it ran for 20s and this
-script closed it"*, no fatal signal, `grep -c 'fatal signal'` = 0). `video_vulkan` is
-selected, the device and the 3840x2160 `khr_display` swapchain are created, the stock
-shaders compile through the driver's own compiler, and `vulkan_frame` -> chain draw ->
-`vkQueueSubmit` repeats for the whole run.
+**The RetroArch menu is on the console's screen.** `PPSA99169` runs this project's
+own `video_ps5` driver, receives RGUI's 320x240 framebuffer, presents it, and the
+console owner confirms the menu is visible on the television. That is the objective
+the project was built for; `docs/FINDINGS.md` carries the trace and the captures.
 
-**The driver's own messages were what made this ordinary.** The messenger patch (0019)
-put every refusal in the trace, and each one named its reason:
+One unattended `bash tools/run-title.sh --watch 20` run is the evidence: one EXEC,
+zero fatal-signal lines, the script launching, watching and closing it itself.
+`/app0/trace.txt` from that run:
 
-| Refusal | What it was | Fix |
-| --- | --- | --- |
-| `set 0 binding 1: a combined image sampler write names no sampler` | all four display samplers were refused at creation (`borderColor` opaque white; the driver creates only transparent black), so the menu quad wrote a NULL sampler | 0024 (the colour the driver names), 0025 (a refused sampler falls back to the nearest one) |
-| `set 0 binding 2 is not bound or holds no write` | the display layout's **second** sampler binding: the driver requires a write for every binding its stage metadata names | 0026 (write the same image at binding 2, as the HDR path already does) |
-| `samples a view whose component mapping is not the identity` | the menu texture used B4G4R4A4 with a B/R view swizzle | 0027 (32-bit, swizzle-free path), 0028 (the CPU conversion's channels in R8G8B8A8 order) |
+    ps5_init: told the frontend the display is 1920x1080
+    input: pad opened, user=515310723 handle=51447552
+    display: flip 1 of buffer 0, status=0 marker=1
+    ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1 (was 0)
+    menu: framebuffer commit 1 is a new picture (1 of 1 changed so far)
+    ps5_frame 1: menu 320x240 pitch=640 present=1
+    ps5_frame 600: menu commits=3 changes=2 presented=yes
 
-**What is still refused, all at init and none of them fatal:** seven triangle-strip
-clears and one storage-image compute upload of the frontend's blank texture, plus the
-filter chain's non-clamp sampler modes (the chain's sampler table is repaired by 0023).
-They cost the frontend work, not the frame.
+The framebuffer changed twice, once immediately after a pad press, so the pad
+reaches the menu and the menu redraws.
 
-**Nothing proves pixels yet, and the capture path is now half-built.** The port has no
-screenshot: `--max-frames`/`--max-frames-ss` were compiled out (`#ifdef HAVE_SCREENSHOTS`),
-and `tools/build-retroarch.sh` now defines it, so the frontend builds and links with the
-options present. They still do not fire: `runloop.h`'s `RUNLOOP_TIME_TO_EXIT` compares
-`max_frames` against the **core's** `frame_count`, and this title loads no content, so the
-counter never advances - three runs with `--max-frames=200` ran the full watch window and
-wrote no `shot.png`. `src/main.cpp` reads `/app0/args.txt` (one argument per line) so a run
-can be given those options without the launcher, verified by the mark
-`argv extras from /app0/args.txt = 3`.
+**What unblocked it was one anchoring mistake, twice.** The video driver is chosen
+by `config_get_default_video()`, whose switch is over `VIDEO_DEFAULT_DRIVER`; this
+build has `HAVE_VULKAN`, so it returns at `case VIDEO_VULKAN:` and never reaches the
+`case VIDEO_NULL:` arm patch 0010 was editing. And the driver-table edit inserted
+`&video_ps5` *after* the `#ifdef HAVE_VULKAN` block, leaving `&video_vulkan` at
+index 0 - which is RetroArch's fallback when a name is empty or unfindable. Both are
+fixed: the patch anchors on `case VIDEO_VULKAN:` and returns `"ps5"`, and
+`&video_ps5` is inserted before the block.
+
+**Left open, and recorded.** The flip status marker reads 1 at flips 1, 300, 600,
+900 and 1200 - never advancing - while the buffers rotate correctly and the frames
+are on screen. The marker is not a usable instrument on this console.
 
 ## Next
 
