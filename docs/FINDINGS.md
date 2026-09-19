@@ -1989,3 +1989,56 @@ inside `video_driver_init_internal` before our driver is called - and the new
 The candidates are therefore the graphics-context step and the `[Video] Found video
 driver` lookup, not the ICD, not the dlopen path, and not the delivered object. That
 is a much smaller space than "exits 1 with no message".
+
+## A PS5 title cannot dlopen a driver, so Vulkan has to be linked - and the link is now the only gap
+
+**Measured by ../PS5_Vulkan, on the console, with their e2-module runner.** This
+overturns the delivery route this port has been built around for three sessions:
+
+    sceKernelLoadStartModule("/app0/libvulkan.so.1")        -> 0x80020008 (ENOEXEC)
+    the same for the FSELF-wrapped, soname-as-path and control variants
+    "libvulkan.so.1" bare                                   -> 0x80020002 (ENOENT)
+    dlopen answered NULL for all twelve candidates, including modules the process
+    already holds, with dlerror() NULL every time
+    sceKernelDlsym -> ESRCH for every name, on modules that do load
+
+The discriminator is the module shape: a PS5 module image carries SCE module
+parameters and an export table, which a linker-produced `.so` does not. So no name,
+path or container fixes this, and RetroArch's `dylib_load("libvulkan.so.1")` can
+never succeed here. The route that is proven on this console is their runner title's:
+**link `libps5vk.ps5.a` into `eboot.bin` and call `vkGetInstanceProcAddr` as an
+ordinary symbol.**
+
+**Two corrections this forces, both recorded rather than quietly dropped.**
+
+1. The "the console re-signs on write" observation in the previous entry is wrong.
+   The byte difference is this project's own FTP tooling: `RETR` decrypts a SELF on
+   read (the driver 16,695,760 -> 16,706,040, and `libc.prx` 1,284,674 ->
+   1,335,962). Nothing re-signs on write, and the title sees the staged containers
+   at their staged sizes. The `.so` marker verification added on the strength of
+   that claim is harmless but was justified by the wrong reason.
+2. `/app0` and `/app0/sce_module` are the only paths a title can see; `/data/homebrew/`
+   and `/temp0` do not exist inside a title. The `/app0` dlopen fallbacks are
+   therefore moot - the load is refused for every path, not just the bare name.
+
+**What is in place now, and it is most of the work.** `patches/series` 0012 replaces
+RetroArch's `dylib_load`/`dylib_proc` pair with a direct reference to the linked
+`vkGetInstanceProcAddr` (with a local prototype, because RetroArch's Vulkan headers
+declare the `PFN_` type but not the function). The frontend compiles **276 of 276**
+with Vulkan on and no longer contains a dynamic load. `tools/build-title.sh` names
+the sibling's four released archives - `libps5vk.ps5.a`, Mesa's
+`libvk_runtime.ps5.a`, `libpsbc_driver.ps5.a`, `libpsbc_support.ps5.a` - and
+`PS5_VULKAN_DIR` overrides their root; `tools/build.sh` links them whole
+(`--whole-archive`) with the sibling's `--no-dynamic-linker
+-z nodynamic-undefined-weak`, and adds `libc++.a`, `libc++abi.a`, `libunwind.a` and
+the compiler builtins in a `--start-group`, because the shader compiler and Mesa's
+runtime are C++.
+
+**What the link still wants, and it is a short list.** With all of the above the
+linker reports `__eh_frame_start`, `__eh_frame_end`, `__eh_frame_hdr_start`,
+`__eh_frame_hdr_end`, `u_thread_create` and `util_barrier_init`. The first four come
+from ../PS5_Vulkan's own linker script, `tooling/psbc/ps5-pie-unwind.ld`, which its
+`tools/psbc-link.sh` passes with `-T`; the last two are Mesa's threading util, which
+that script satisfies from its psbc runtime group. So the remaining work is to adopt
+that link recipe rather than to discover anything: archives, the unwind script, and
+the group ordering, all named in their `tools/psbc-link.sh`.

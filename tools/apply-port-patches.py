@@ -134,51 +134,70 @@ EDITS = [
         "   &input_ps5,",
     ),
     (
-        # Vulkan is loaded from the title's own folder, because the console's
-        # loader does not search it.
+        # Vulkan is linked, not loaded: a PS5 title cannot dlopen a driver.
         #
-        # RetroArch does not link Vulkan; it dlopens by bare name
-        # (gfx/common/vulkan_common.c):
+        # RetroArch obtains every Vulkan entry point through one symbol,
+        # vkGetInstanceProcAddr, which it fetches by dlopen of "libvulkan.so.1".
+        # That cannot work in a title on this console, and ../PS5_Vulkan measured
+        # it rather than assumed it - their e2-module runner asked the console's
+        # loader directly:
         #
-        #     vulkan_library = dylib_load("libvulkan.so.1");
-        #     if (!vulkan_library)
-        #        vulkan_library = dylib_load("libvulkan.so");
+        #   sceKernelLoadStartModule("/app0/libvulkan.so.1")  -> 0x80020008 (ENOEXEC)
+        #   the same for FSELF-wrapped, soname-as-path and control variants
+        #   "libvulkan.so.1" bare                             -> 0x80020002 (ENOENT)
+        #   dlopen answered NULL for all twelve candidates, including modules the
+        #   process already holds, with dlerror() NULL every time
+        #   sceKernelDlsym -> ESRCH for every name on the modules that do load
         #
-        # A bare dlopen resolves through the loader's search path, which on this
-        # console is the system module directories - not the folder the title was
-        # started from. So the driver ../PS5_Vulkan delivers is invisible to it
-        # even when it sits beside eboot.bin, and the failure is silent: the title
-        # returns 1 with no line in its log, because a failed dylib_load logs
-        # nothing. That is the shape the Vulkan build has failed in all along.
+        # A linker-produced .so is not a PS5 module image (it has no SCE module
+        # parameters and no export table), so no name or path fixes this. The
+        # route that is proven on this console is the one their runner title uses:
+        # link libps5vk.ps5.a and call the entry point as an ordinary symbol.
         #
-        # The title folder is mounted at /app0, so naming it absolutely is what
-        # makes the delivered object reachable. The bare names are tried first, so
-        # a future table that does search the app directory still wins and this
-        # changes nothing.
+        # So the loader path is replaced by a direct reference. Everything below
+        # this point in RetroArch is unchanged: it still goes through
+        # vkGetInstanceProcAddr for every other entry point, which is exactly what
+        # the driver expects (it exports the loader-facing spelling).
+        #
+        # The archives this needs are the sibling's released set, named in
+        # tools/build-title.sh: libps5vk.ps5.a, Mesa's libvk_runtime.ps5.a, the
+        # shader compiler libpsbc_driver.ps5.a, and libpsbc_support.ps5.a.
         "gfx/common/vulkan_common.c",
-        "      vulkan_library = dylib_load(\"libvulkan.so.1\");\n"
-        "      if (!vulkan_library)\n"
-        "         vulkan_library = dylib_load(\"libvulkan.so\");\n",
-        "      /* Fallbacks added by this port (patches/series, 0011): the title's\n"
-        "       * own folder, which the console mounts at /app0. */\n"
+        "#else\n"
         "      vulkan_library = dylib_load(\"libvulkan.so.1\");\n"
         "      if (!vulkan_library)\n"
         "         vulkan_library = dylib_load(\"libvulkan.so\");\n"
+        "#endif\n"
+        "   }\n"
+        "\n"
+        "   if (!vulkan_library)\n"
+        "   {\n"
+        "      RARCH_ERR(\"[Vulkan] Failed to open Vulkan loader.\\n\");\n"
+        "      return false;\n"
+        "   }\n"
+        "\n"
+        "   RARCH_LOG(\"[Vulkan] Vulkan dynamic library loaded.\\n\");\n"
+        "\n"
+        "   GetInstanceProcAddr =\n"
+        "      (PFN_vkGetInstanceProcAddr)dylib_proc(vulkan_library, \"vkGetInstanceProcAddr\");\n",
+        "#else\n"
+        "      vulkan_library = dylib_load(\"libvulkan.so.1\");\n"
         "      if (!vulkan_library)\n"
-        "         vulkan_library = dylib_load(\"/app0/libvulkan.so.1\");\n"
-        "      if (!vulkan_library)\n"
-        "         vulkan_library = dylib_load(\"/app0/libvulkan.so\");\n"
-        "      if (!vulkan_library)\n"
-        "         vulkan_library = dylib_load(\"/app0/sce_module/libvulkan.so.1\");\n"
-        "      /* A failed load is silent in upstream - dylib_load only returns NULL -\n"
-        "       * and a silent Vulkan failure is what made this path undiagnosable for\n"
-        "       * three sessions. The four names and the loader's own message go to the\n"
-        "       * log so a console run says which path was tried and why it failed. */\n"
-        "      if (!vulkan_library)\n"
-        "         RARCH_ERR(\"[Vulkan] libvulkan not loadable; tried libvulkan.so.1, "
-        "libvulkan.so, /app0/libvulkan.so.1, /app0/libvulkan.so, "
-        "/app0/sce_module/libvulkan.so.1: %s\\n\", dylib_error());\n",
-        "/app0/libvulkan.so.1",
+        "         vulkan_library = dylib_load(\"libvulkan.so\");\n"
+        "#endif\n"
+        "   }\n"
+        "\n"
+        "   /* Changed by this port (patches/series, 0012): this console refuses a\n"
+        "    * title's dlopen, so the entry point is linked, not loaded. It is the\n"
+        "    * same symbol the loader path looked up, taken from ../PS5_Vulkan's\n"
+        "    * libps5vk.ps5.a, which tools/build-title.sh links into the title. The\n"
+        "    * declaration is local because the Vulkan headers RetroArch carries\n"
+        "    * declare the PFN_ type but not the function. */\n"
+        "   extern VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL\n"
+        "      vkGetInstanceProcAddr(VkInstance instance, const char *pName);\n"
+        "   GetInstanceProcAddr =\n"
+        "      (PFN_vkGetInstanceProcAddr)vkGetInstanceProcAddr;\n",
+        "(PFN_vkGetInstanceProcAddr)vkGetInstanceProcAddr",
     ),
     (
         # A core that has not loaded registers no controller-port callback, and

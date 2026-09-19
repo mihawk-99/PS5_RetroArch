@@ -93,6 +93,42 @@ echo "==> [title] compiling src/ with ${#title_definition_names[@]} frontend def
 # cannot disagree about what this build is.
 cp -f -- "$root/build/ra-conf/config.h" "$root/build/config.h"
 
+# The Vulkan driver is linked, not loaded. ../PS5_Vulkan measured that a PS5 title
+# cannot dlopen a driver (sceKernelLoadStartModule refuses a linker-produced .so
+# with ENOEXEC, a bare name gives ENOENT, dlopen answers NULL for every candidate
+# and sceKernelDlsym gives ESRCH even for modules the process holds), so RetroArch's
+# dlopen of "libvulkan.so.1" can never succeed here. The route proven on this
+# console is their runner title's: link the driver and call its entry point as an
+# ordinary symbol.
+#
+# Their released set, exactly as tools/build.sh links it for a driver-enabled title:
+#   libps5vk.ps5.a        the driver            (build/driver/ps5/)
+#   libvk_runtime.ps5.a   Mesa's Vulkan runtime (.deps/native/vulkan-runtime/lib/)
+#   libpsbc_driver.ps5.a  the shader compiler   (build/driver/ps5/)
+#   libpsbc_support.ps5.a the package writer    (.deps/native/psbc/lib/)
+# PS5_VULKAN_DIR overrides the sibling's root, so a release kept elsewhere works.
+vulkan_dir="${PS5_VULKAN_DIR:-$root/../PS5_Vulkan}"
+vulkan_archives=(
+    "$vulkan_dir/build/driver/ps5/libps5vk.ps5.a"
+    "$vulkan_dir/.deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a"
+    "$vulkan_dir/build/driver/ps5/libpsbc_driver.ps5.a"
+    "$vulkan_dir/.deps/native/psbc/lib/libpsbc_support.ps5.a"
+)
+vulkan_missing=()
+for archive in "${vulkan_archives[@]}"; do
+    [[ -f $archive ]] || vulkan_missing+=("$archive")
+done
+if (( ${#vulkan_missing[@]} )); then
+    printf 'error: the Vulkan driver archives are missing; the title would link with\n' >&2
+    printf '       vkGetInstanceProcAddr unresolved. Build them in ../PS5_Vulkan\n' >&2
+    printf '       (tools/build-driver.sh) or set PS5_VULKAN_DIR.\n' >&2
+    printf '       missing: %s\n' "${vulkan_missing[@]}" >&2
+    exit 2
+fi
+# Mesa's weak entry points resolve at link time, and the driver's own symbols must
+# survive the archive boundary (--whole-archive), which is how the sibling links it.
+vulkan_flags="--no-dynamic-linker -z nodynamic-undefined-weak"
+
 echo "==> [title] step 2/3: the title"
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
@@ -100,6 +136,8 @@ PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
 APP_DEFINITIONS="${title_definition_names[*]}" \
 APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch vendor/retroarch/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
+APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
+APP_LINK_FLAGS="$vulkan_flags" \
     make app
 
 title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \

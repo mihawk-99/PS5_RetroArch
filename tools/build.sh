@@ -209,6 +209,40 @@ agc_driver_stub=$(build_system_link_stub libSceAgcDriver vendor/ps5/sdk/stubs/ag
 
 link_inputs=("$build/obj/app_crt.o" "$build/obj/app_cpp_runtime.o" "${objects[@]}")
 link_inputs+=("$agc_stub" "$agc_driver_stub")
+# The Vulkan driver, linked whole. These archives are the reason this title does
+# not dlopen: a PS5 title cannot (../PS5_Vulkan measured ENOEXEC/ENOENT/NULL from
+# sceKernelLoadStartModule and dlopen, and ESRCH from sceKernelDlsym), so the
+# driver's entry points are ordinary symbols here. --whole-archive keeps its
+# command tables, and the two flags are the sibling's, for Mesa's weak entry
+# points (tools/build.sh there links its runner title the same way).
+if [[ -n ${APP_VULKAN_ARCHIVES:-} ]]; then
+    read -r -a vulkan_archives <<< "$APP_VULKAN_ARCHIVES"
+    for archive in "${vulkan_archives[@]}"; do
+        [[ $archive =~ ^[A-Za-z0-9_./+-]+(/[A-Za-z0-9_.+-]+)*\.a$ && -f $archive ]] || {
+            echo "invalid Vulkan archive: $archive" >&2; exit 2;
+        }
+    done
+    link_inputs+=(--whole-archive "${vulkan_archives[@]}" --no-whole-archive)
+    # The shader compiler and Mesa's runtime are C++, so they need libc++,
+    # libc++abi and libunwind - the same three the sibling project links, plus the
+    # compiler's own builtins archive. They are grouped because the dependency runs
+    # both ways between them.
+    vulkan_cxx=(
+        "$sdk_root/target/lib/libc++.a"
+        "$sdk_root/target/lib/libc++abi.a"
+        "$sdk_root/target/lib/libunwind.a"
+    )
+    builtins="$("$PS5_CLANG" --print-resource-dir 2>/dev/null)/lib/linux/libclang_rt.builtins-x86_64.a"
+    [[ -f $builtins ]] || builtins=""
+    for archive in "${vulkan_cxx[@]}"; do
+        [[ -f $archive ]] || {
+            echo "missing Vulkan C++ runtime archive: $archive" >&2; exit 2;
+        }
+    done
+    link_inputs+=(-L "$sdk_root/target/lib" --start-group "${vulkan_cxx[@]}")
+    [[ -n $builtins ]] && link_inputs+=("$builtins")
+    link_inputs+=(--end-group)
+fi
 for archive in "${archives[@]}"; do
     [[ $archive =~ ^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\.a$ && -f $root/$archive ]] || {
         echo "invalid static archive: $archive" >&2; exit 2;
@@ -219,6 +253,7 @@ if (( ${#pacbrew_libs[@]} > 0 )); then
     link_inputs+=(--start-group "${pacbrew_libs[@]}" --end-group)
 fi
 "$sdk_root/bin/prospero-lld" -T "$native/ps5-pie.ld" --eh-frame-hdr \
+    ${APP_LINK_FLAGS:-} \
     --version-script "$native/app-symbols.map" \
     --exclude-libs=ALL -L "$build/obj" \
     -e _start -o "$build/llvm-pie.elf" "${link_inputs[@]}" \
