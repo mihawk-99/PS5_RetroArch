@@ -7,6 +7,7 @@
 #include <cstring>
 #include <pthread.h>
 #include <sys/mman.h>
+#include "memory_diagnostics.hpp"
 
 extern "C"
 {
@@ -38,9 +39,8 @@ Mapping **find(void *pointer)
         entry = &(*entry)->next;
     return entry;
 }
-} // namespace
 
-extern "C" void *__wrap_malloc(size_t size)
+void *allocate(size_t size)
 {
     if (size < threshold)
         return __real_malloc(size ? size : 1);
@@ -63,7 +63,7 @@ extern "C" void *__wrap_malloc(size_t size)
     return entry + 1;
 }
 
-extern "C" void __wrap_free(void *pointer)
+void release(void *pointer)
 {
     if (!pointer)
         return;
@@ -79,27 +79,13 @@ extern "C" void __wrap_free(void *pointer)
         __real_free(pointer);
 }
 
-extern "C" void *__wrap_calloc(size_t count, size_t size)
-{
-    if (size && count > SIZE_MAX / size)
-    {
-        errno = ENOMEM;
-        return nullptr;
-    }
-    const size_t bytes = count * size;
-    if (bytes < threshold)
-        return bytes ? __real_calloc(count, size) : __real_calloc(1, 1);
-    /* Anonymous mappings are zero-initialized by the kernel. */
-    return __wrap_malloc(bytes);
-}
-
-extern "C" void *__wrap_realloc(void *pointer, size_t size)
+void *resize(void *pointer, size_t size)
 {
     if (!pointer)
-        return __wrap_malloc(size);
+        return allocate(size);
     if (!size)
     {
-        __wrap_free(pointer);
+        release(pointer);
         return nullptr;
     }
     pthread_mutex_lock(&lock);
@@ -110,10 +96,85 @@ extern "C" void *__wrap_realloc(void *pointer, size_t size)
      * this ABI. Never guess it or read a private libc allocation header. */
     if (!entry)
         return __real_realloc(pointer, size);
-    void *replacement = __wrap_malloc(size);
+    void *replacement = allocate(size);
     if (!replacement)
         return nullptr;
     std::memcpy(replacement, pointer, old_size < size ? old_size : size);
-    __wrap_free(pointer);
+    release(pointer);
     return replacement;
 }
+
+} // namespace
+
+extern "C" void *__wrap_malloc(size_t size)
+{
+    const auto caller = uintptr_t(__builtin_return_address(0));
+    void *p = allocate(size);
+    if (p)
+        ps5::memory::add(
+            {p, size, caller,
+             size < threshold ? ps5::memory::Route::Native : ps5::memory::Route::Mapped});
+    else
+        ps5::memory::failure("malloc", size, 0, caller, errno);
+    return p;
+}
+extern "C" void __wrap_free(void *pointer)
+{
+    ps5::memory::take(pointer);
+    release(pointer);
+}
+extern "C" void *__wrap_calloc(size_t count, size_t size)
+{
+    const auto caller = uintptr_t(__builtin_return_address(0));
+    if (size && count > SIZE_MAX / size)
+    {
+        errno = ENOMEM;
+        ps5::memory::failure("calloc-overflow", size, count, caller, errno);
+        return nullptr;
+    }
+    const size_t bytes = count * size;
+    void *p = bytes < threshold ? (bytes ? __real_calloc(count, size) : __real_calloc(1, 1))
+                                : allocate(bytes);
+    if (p)
+        ps5::memory::add(
+            {p, bytes, caller,
+             bytes < threshold ? ps5::memory::Route::Native : ps5::memory::Route::Mapped});
+    else
+        ps5::memory::failure("calloc", bytes, 0, caller, errno);
+    return p;
+}
+extern "C" void *__wrap_realloc(void *pointer, size_t size)
+{
+    const auto caller = uintptr_t(__builtin_return_address(0));
+    const auto old = ps5::memory::take(pointer, true);
+    void *p = resize(pointer, size);
+    if (p)
+    {
+        // Realloc of a native pointer stays native even when it crosses 1 MiB.
+        const bool mapped =
+            (!pointer || old.route == ps5::memory::Route::Mapped) && size >= threshold;
+        ps5::memory::add(
+            {p, size, caller, mapped ? ps5::memory::Route::Mapped : ps5::memory::Route::Native});
+    }
+    else if (size)
+    {
+        ps5::memory::add(old); // Failed realloc retains ownership and contents.
+        ps5::memory::failure("realloc", size, 0, caller, errno);
+    }
+    return p;
+}
+#ifdef PS5_MEMORY_DIAGNOSTICS
+extern "C" int __real_posix_memalign(void **, size_t, size_t);
+extern "C" int __wrap_posix_memalign(void **out, size_t alignment, size_t size)
+{
+    const auto caller = uintptr_t(__builtin_return_address(0));
+    const int saved = errno;
+    const int result = __real_posix_memalign(out, alignment, size);
+    if (!result && *out)
+        ps5::memory::add({*out, size, caller, ps5::memory::Route::Aligned});
+    else if (result)
+        ps5::memory::failure("posix_memalign", size, alignment, caller, result);
+    errno = saved; // POSIX reports its error through the return value.
+    return result;
+}
+#endif

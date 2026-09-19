@@ -4,16 +4,38 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Genesis Plus GX is ported and owner-confirmed working.** The owner reports
-“Sega Genesis works flawlessly” and explicitly confirms “Yes, transitions and
-next game are clean.” Build and console evidence: `evidence/genesis-plus-gx-native/`.
-No next core is selected.
+**XMB allocation diagnostic is built on `codex/xmb-allocation-diagnostics`.**
+This is instrumentation, not a crash fix. Owner explicitly requests no automatic
+upload or launch while working on another project. Wait for their intervention.
+The baseline's next-core work is not the assignment; this crash investigation is.
 
-The public README now describes this verified baseline, with a table of contents,
-scoped core coverage, roadmap, native build/install guidance and upstream credits.
-This documentation update does not change the accepted binaries.
+- Build identity: `000adf3edc2538bc563f833f0ccd2e91a01053aa6dac19dd568a580cdbbbb3cb`.
+- Output: `dist/PPSA99169/`; preserved executable/symbols/map/inspection under
+  `klog/xmb-memory-000adf3edc25/`. Evidence: `evidence/xmb-memory-diagnostic/`.
+- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five host gates.
+  Final format/unit check passed; 68 tests. Raw: `klog/xmb-memory-verify.log`,
+  `klog/xmb-memory-final-checks.log`. `tools/check-memory-diagnostics.py` passes.
+- No upload, launch, console settings change or PS5_Vulkan modification.
+  Current libps5vk differs from the crashing build; local archive snapshots and
+  their hashes identify the diagnostic's inputs. Other three archives match.
+- Log: `/app0/memory-diagnostics.log`; periodic requested live bytes/counts/peaks,
+  caller groups, image/queue-idle counters; immediate allocation failure records.
+  Metadata saturation/coverage gaps are explicit. No allocator policy change.
+- Reproduction and interpretation: `docs/MEMORY_DIAGNOSTICS.md`. Console validation
+  remains pending, including whether the crash reproduces with the newer driver.
 
-## Verified build and evidence
+## Crash evidence
+
+Owner reproduced rapid XMB navigation crash. Raw capture:
+`klog/xmb-crash-20260919-181233/` (kernel, frontend, trace, config, diagnosis).
+Matching baseline symbols locate SIGSEGV at runtime `0x45b1ae` in
+`__vk_log_impl`, reached through `vk_sync_create` allocation failure inside
+`vkQueueWaitIdle`, called from XMB texture unload. Logger's second allocation
+returns NULL and is dereferenced. Why allocation failed is unresolved: heap
+exhaustion, fragmentation, retention/leak, unobserved usage or corruption remain
+possible. Do not call this a GPU hang or a resolved frontend/driver leak.
+
+## Previous console-verified baseline (Genesis Plus GX)
 
 - Frontend identity: `ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445`.
 - Genesis Plus GX source: `c2838c7dc4236fc2fe94e5dbd08b41486067918e`.
@@ -43,21 +65,6 @@ This documentation update does not change the accepted binaries.
   fbneo-native/ under evidence/.
 - PS5_Vulkan was not modified. Four archive hashes matched before/after build;
   exact linked hashes are in the evidence. The owner develops it concurrently.
-
-## What changed
-
-- `make genesis-plus-gx`: pinned official source and metadata using explicit
-  project SDK wrappers, native import union and .info in both lookup locations.
-  Attached metadata was reference only. No ROM or BIOS is shipped.
-- Preserve RGB565 software rendering, filters/cursors and cached bitmap; convert
-  into a separate bounded XRGB8888 callback buffer. Honour cropped byte offsets
-  and the 720-pixel row pitch. The frontend's existing RGBA upload/cropping path
-  remains unchanged, as does the Vulkan driver.
-- Disable host-detected physical CD-ROM support and optional zstd weak tracing
-  hooks. Keep CHD/disc-image codecs and useful logs. Correct update_geometry's
-  unused return type. Reasons/pins and procedures are in REFERENCE/TESTING/DEPLOYMENT.
-- Host tests cover every RGB565 colour through upstream packing and the actual
-  GPU upload helper, viewport changes/crops, cached frames and rejected bounds.
 
 ## Named errors and remaining limits
 
@@ -93,9 +100,7 @@ See `docs/DEPLOYMENT.md` for procedures and metadata-listed BIOS filenames.
 
 ## Operating notes
 
-Uploads/runs are authorized without further permission. Never interrupt an
-existing title; the runner checks idle before deployment and launch. Core/game
-selection is manual. Keep private filenames and console details in ignored logs.
-Separate appended trace launches by bss check and build identity. Preserve live
-logs before relaunch. Owner supplies visual confirmation; camera cadence can
-hide flicker. Do not infer manual closure solely from the final process count.
+Console testing is paused by the owner's explicit instruction for this step.
+When they are ready, start passive klog before reproduction and preserve current
+logs. Never interrupt another title. After a crash, capture logs before relaunch.
+No new core or unrelated driver work is authorized by the active-file context.

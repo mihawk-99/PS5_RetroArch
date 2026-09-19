@@ -1,0 +1,19 @@
+{
+  "step": "xmb-memory-diagnostic",
+  "recorded": "2026-09-19",
+  "revision": "a18cec6 + allocation diagnostics",
+  "command": "PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh; bash tools/verify.sh format unit; python3 tools/check-memory-diagnostics.py",
+  "console_run": null,
+  "raw_capture": "klog/xmb-memory-verify.log",
+  "lines": [
+    "Scope: host-verified diagnostic build only; no console upload or launch.",
+    "Diagnostic build identity: 000adf3edc2538bc563f833f0ccd2e91a01053aa6dac19dd568a580cdbbbb3cb",
+    "Allocation semantics and OOM logging: PASS; concurrency and saturation: PASS.",
+    "Five-second sampling with injected clock: PASS; Vulkan dispatch preservation: PASS.",
+    "Host verification: PASS format unit build integration evidence; final suite 68 tests.",
+    "Diagnostic symbols and pinned driver snapshots: PASS.",
+    "Console reproduction: PENDING. XMB crash is not fixed by this change."
+  ],
+  "raw_lines": 6265,
+  "raw_bytes": 3051670
+}

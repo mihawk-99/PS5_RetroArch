@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cstdint>
 #include <ctime>
+#include "memory_diagnostics.hpp"
 
 namespace
 {
@@ -260,6 +261,7 @@ VKAPI_ATTR VkResult VKAPI_CALL traced_present(VkQueue queue, const VkPresentInfo
 {
     static Results results;
     static Results images;
+    ps5::memory::tick();
     ApiTimer timer(Present);
     const VkResult result = queue_present(queue, present);
     const uint64_t completed = timer.finish();
@@ -354,8 +356,62 @@ extern "C" void ps5_vulkan_profile_end()
 /* Called by both frontend symbol loaders. Keep the driver's real function,
  * preserve NULL lookups and return every result unchanged. Reloading a device
  * must neither reset the run totals nor wrap our own wrapper recursively. */
+#ifdef PS5_MEMORY_DIAGNOSTICS
+namespace
+{
+PFN_vkCreateImage memory_create_image;
+PFN_vkDestroyImage memory_destroy_image;
+PFN_vkQueueWaitIdle memory_queue_idle;
+VKAPI_ATTR VkResult VKAPI_CALL memory_create(VkDevice device, const VkImageCreateInfo *info,
+                                             const VkAllocationCallbacks *alloc, VkImage *image)
+{
+    const VkResult result = memory_create_image(device, info, alloc, image);
+    ps5::memory::event("image_create", result == VK_SUCCESS);
+    return result;
+}
+VKAPI_ATTR void VKAPI_CALL memory_destroy(VkDevice device, VkImage image,
+                                          const VkAllocationCallbacks *alloc)
+{
+    memory_destroy_image(device, image, alloc);
+    if (image)
+        ps5::memory::event("image_destroy");
+}
+VKAPI_ATTR VkResult VKAPI_CALL memory_idle(VkQueue queue)
+{
+    ps5::memory::event("idle_begin");
+    const VkResult result = memory_queue_idle(queue);
+    ps5::memory::event("idle_end", result == VK_SUCCESS);
+    return result;
+}
+} // namespace
+#endif
+
 extern "C" void ps5_vulkan_trace_symbol(const char *name, PFN_vkVoidFunction *symbol)
 {
+#ifdef PS5_MEMORY_DIAGNOSTICS
+    if (symbol && *symbol)
+    {
+        if (!std::strcmp(name, "vkCreateImage"))
+        {
+            if (*symbol != reinterpret_cast<PFN_vkVoidFunction>(memory_create))
+                memory_create_image = reinterpret_cast<PFN_vkCreateImage>(*symbol);
+            *symbol = reinterpret_cast<PFN_vkVoidFunction>(memory_create);
+        }
+        else if (!std::strcmp(name, "vkDestroyImage"))
+        {
+            if (*symbol != reinterpret_cast<PFN_vkVoidFunction>(memory_destroy))
+                memory_destroy_image = reinterpret_cast<PFN_vkDestroyImage>(*symbol);
+            *symbol = reinterpret_cast<PFN_vkVoidFunction>(memory_destroy);
+        }
+        else if (!std::strcmp(name, "vkQueueWaitIdle"))
+        {
+            if (*symbol != reinterpret_cast<PFN_vkVoidFunction>(memory_idle))
+                memory_queue_idle = reinterpret_cast<PFN_vkQueueWaitIdle>(*symbol);
+            *symbol = reinterpret_cast<PFN_vkVoidFunction>(memory_idle);
+        }
+    }
+#endif
+
     if (!*symbol)
         return;
     if (std::strcmp(name, "vkEndCommandBuffer") == 0)

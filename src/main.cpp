@@ -40,6 +40,7 @@
 #include <cxxabi.h>
 
 #include "trace.hpp"
+#include "memory_diagnostics.hpp"
 #include "../build/title_build_identity.h"
 
 /* RetroArch's entry, in C. */
@@ -143,6 +144,7 @@ int main()
 
     std::set_terminate(on_terminate);
     ps5::debug::mark(PS5_RETROARCH_BUILD_ID);
+    ps5::memory::init("/app0/memory-diagnostics.log", PS5_RETROARCH_BUILD_ID);
     ps5_vulkan_profile_init();
 
     /* The shell's splash covers the title until it explicitly dismisses it.
@@ -227,6 +229,7 @@ int main()
 
     /* If this line is on the console, the frontend ran and returned by itself. */
     ps5::debug::mark_value("rarch_main returned", status);
+    ps5::memory::finish();
 
     return status;
 }

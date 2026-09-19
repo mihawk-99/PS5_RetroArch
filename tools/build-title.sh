@@ -36,6 +36,11 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
+# Opt-in diagnostics do not change allocation routing or normal builds.
+memory_diagnostics=${PS5_MEMORY_DIAGNOSTICS:-0}
+[[ $memory_diagnostics == 0 || $memory_diagnostics == 1 ]] || {
+    echo "PS5_MEMORY_DIAGNOSTICS must be 0 or 1" >&2; exit 2;
+}
 stage=false
 case "${1:-}" in
     '') ;;
@@ -89,6 +94,12 @@ for define in "${title_defines[@]}"; do
     title_definition_names+=("${define#-D}")
 done
 (( ${#title_definition_names[@]} > 0 )) || { echo "error: no feature defines to pass" >&2; exit 2; }
+memory_wrap_flags=""
+if [[ $memory_diagnostics == 1 ]]; then
+    title_definition_names+=(PS5_MEMORY_DIAGNOSTICS)
+    # Mesa's default Vulkan host allocator uses posix_memalign, not malloc.
+    memory_wrap_flags="--wrap=posix_memalign"
+fi
 echo "==> [title] compiling src/ with ${#title_definition_names[@]} frontend defines"
 
 # RetroArch's headers reach their generated config as "../../config.h", a relative
@@ -132,6 +143,33 @@ if (( ${#vulkan_missing[@]} )); then
     printf '       missing: %s\n' "${vulkan_missing[@]}" >&2
     exit 2
 fi
+# The driver may be developed concurrently. A diagnostic link uses stable local
+# archive copies; hashes describe exactly which driver went into this build.
+if [[ $memory_diagnostics == 1 ]]; then
+    if ! snapshot_list=$(python3 - "$root" "${vulkan_archives[@]}" <<'PY_SNAPSHOT'
+import hashlib, json, pathlib, shutil, sys
+out = pathlib.Path(sys.argv[1]) / "build/memory-diagnostic-inputs"
+out.mkdir(parents=True, exist_ok=True)
+records = {}
+for argument in sys.argv[2:]:
+    source = pathlib.Path(argument)
+    before = hashlib.sha256(source.read_bytes()).hexdigest()
+    target = out / source.name
+    shutil.copyfile(source, target)
+    copied = hashlib.sha256(target.read_bytes()).hexdigest()
+    after = hashlib.sha256(source.read_bytes()).hexdigest()
+    if before != copied or before != after:
+        raise SystemExit("Driver archive changed during snapshot; retry when its build finishes")
+    records[source.name] = copied
+    print(target)
+(out / "archives.json").write_text(json.dumps(records, indent=2) + "\n")
+PY_SNAPSHOT
+    ); then
+        echo "error: driver snapshot failed" >&2; exit 2
+    fi
+    mapfile -t vulkan_archives <<< "$snapshot_list"
+fi
+
 # Mesa's weak entry points resolve at link time, and the driver's own symbols must
 # survive the archive boundary (--whole-archive), which is how the sibling links it.
 vulkan_flags="--no-dynamic-linker -z nodynamic-undefined-weak"
@@ -153,7 +191,7 @@ mapfile -t vulkan_objects <<< "$vulkan_object_list"
 
 # Bind the running trace and FTP readback to these exact source/archive inputs.
 # The console transforms the SELF container, so its whole-file digest differs.
-python3 - "$root" "${vulkan_archives[@]}" "${vulkan_objects[@]}" <<'PY'
+python3 - "$root" "$memory_diagnostics" "${vulkan_archives[@]}" "${vulkan_objects[@]}" <<'PY'
 import hashlib, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
@@ -165,8 +203,9 @@ inputs += [root / name for name in (
     "build/cores/stage/cores/fbneo_libretro.so",
     "build/cores/stage/cores/genesis_plus_gx_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
-inputs += [pathlib.Path(name) for name in sys.argv[2:]]
+inputs += [pathlib.Path(name) for name in sys.argv[3:]]
 digest = hashlib.sha256()
+digest.update(b"memory-diagnostics=" + sys.argv[2].encode() + b"\0")
 for path in inputs:
     digest.update(path.name.encode() + b"\0")
     digest.update(hashlib.sha256(path.read_bytes()).digest())
@@ -186,7 +225,7 @@ APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-c
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
-APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free" \
+APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free $memory_wrap_flags" \
     make app
 
 title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \

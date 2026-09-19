@@ -330,3 +330,10 @@ Capture frontend/trace/kernel logs, match the exact build identity, and check fo
 Vulkan refusals, GPU API failures, invalid bitmap views and unexpected runtime
 errors before committing. Record systems actually tested and preserve user
 confirmation separately from machine-readable loader and runtime evidence.
+
+## XMB allocation diagnostics
+
+The opt-in build, host allocator/Vulkan-dispatch tests, raw log fields, ownership
+coverage limits and manual reproduction protocol are specified in
+[MEMORY_DIAGNOSTICS.md](MEMORY_DIAGNOSTICS.md). Its build inspection is host-only;
+it must not be cited as a passing console reproduction or a fixed crash.

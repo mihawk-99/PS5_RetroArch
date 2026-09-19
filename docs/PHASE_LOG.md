@@ -2313,3 +2313,37 @@ Documentation-only validation:
   existing committed artifacts, especially evidence/genesis-plus-gx-native/.
 - `git diff --check`: PASS. No source, dependency, binary or console changes;
   the accepted gameplay build remains 93a1332's recorded build identity.
+
+## 2026-09-19 — XMB allocation diagnostic branch, host verified only
+
+Owner requested a branch and diagnostic build, explicitly withholding automatic
+upload/launch while working on another project. Created
+`codex/xmb-allocation-diagnostics`. Added opt-in live allocation accounting to the
+existing native/mapped wrappers, plus observation of `posix_memalign`, frontend
+Vulkan image lifetimes and queue-idle calls. Fixed-capacity metadata and stack-only
+`write` logging preserve OOM evidence without allocating. Allocation policy is
+unchanged. Five-second summaries include counts, requested bytes, peaks, largest
+caller groups, failure counts and explicit coverage/saturation limits.
+
+The prior capture (`klog/xmb-crash-20260919-181233/`) maps the null write to Mesa's
+error-reporting allocation following `vk_sync_create` allocation failure in
+`vkQueueWaitIdle` during XMB texture unload. That diagnoses the immediate crash,
+not the reason memory allocation failed. No driver fix or console result is claimed.
+
+Command: `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` — PASS all five host gates.
+The first unit pass had 67 tests; the added Vulkan dispatch test ran in the final
+integration pass and final `bash tools/verify.sh format unit` (68 tests, PASS).
+`python3 tools/check-memory-diagnostics.py` — PASS required symbols and archive
+hashes. Machine-readable inspection and capture/expectation:
+`evidence/xmb-memory-diagnostic/`. Raw host logs are in `klog/xmb-memory-verify.log`
+and `klog/xmb-memory-final-checks.log`. Existing upstream core/compiler warnings
+remain in the full build log; no diagnostic-source warning was observed.
+
+Build identity: `000adf3edc2538bc563f833f0ccd2e91a01053aa6dac19dd568a580cdbbbb3cb`.
+Output: `dist/PPSA99169/`; matching executable, symbol ELF and map preserved under
+`klog/xmb-memory-000adf3edc25/`. The current libps5vk archive differs from the
+crashing baseline; the other three archives match its recorded digests. The
+opt-in build snapshots all four locally to avoid mutable archive inputs while
+the owner develops PS5_Vulkan. Mode and linked bytes participate in identity.
+No sibling writes, console access, upload, launch or settings change occurred.
+Manual protocol and limitations are in `docs/MEMORY_DIAGNOSTICS.md`.
