@@ -2227,3 +2227,60 @@ sampler address-mode restriction (`driver/ps5vk_image.c:800-806`, C4 scope) cann
 be worked around from this side. Until it is lifted, or until the frontend is
 changed to request only clamp-to-edge samplers, the menu's draws do not reach the
 GPU. Both are changes in `../PS5_Vulkan`, which this project does not modify.
+
+## The RetroArch menu is on the console's screen, drawn by this project's own driver
+
+**Measured, by the console's owner.** `PPSA99169` runs this port's `video_ps5`
+driver, receives RGUI's 320x240 framebuffer, presents it, and the RetroArch menu is
+visible on the television. That is the objective this project was built for.
+
+**The evidence, in one unattended `tools/run-title.sh` run** (capture
+`klog/run-PPSA99169-080439.log`: one EXEC, **zero fatal-signal lines**; the script
+launched it, watched 20 s, found it still running and closed it itself):
+
+    ps5_init entered (video=present width=960 height=720)
+    display: virtual=200200000 physical=0x200000 bytes=0x2000000 two buffers at +0
+             and +0x1000000 registered from 0 set 0, 1920x1080, format=0x8000000022000000
+    ps5_init: told the frontend the display is 1920x1080
+    input: pad opened, user=515310723 handle=51447552
+    display: flip 1 of buffer 0, status=0 marker=1
+    ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1 (was 0)
+    menu: framebuffer commit 1 is a new picture (1 of 1 changed so far)
+    ps5_frame 1: menu 320x240 pitch=640 present=1
+    ps5_frame 60: sources so far: menu=yes core=yes
+    ps5_frame 600: menu commits=3 changes=2 presented=yes
+    ps5_frame 1200: menu commits=3 changes=2 presented=yes
+
+Three things in that trace are worth naming, because each was a fault this document
+previously recorded as open:
+
+- **`menu 320x240`** - RGUI's framebuffer reaches the driver. The commit that fixed
+  `width=0, height=0` is why: the driver now tells the frontend the display is
+  1920x1080, so the menu renders into a real frame instead of a degenerate one.
+- **`rgb32=0 ... 320x240 frame=present`** - the menu's RGB565 buffer arrives, and
+  `ps5_frame`'s conversion path handles the 16-bit source rather than dropping it.
+- **`menu commits=3 changes=2`** - the framebuffer is not a static image. It changed
+  twice, once on a pad press (`input: press, pad=0x00000040 retropad=0x00000020`
+  appears immediately before a new commit), so the pad reaches the menu and the menu
+  responds by redrawing.
+
+**What actually unblocked it, and it was one anchoring mistake twice over.** The
+video driver is chosen by `config_get_default_video()`, whose switch is over
+`VIDEO_DEFAULT_DRIVER`; in this build that resolves to `VIDEO_VULKAN`, so the
+function returns at `case VIDEO_VULKAN:` and never reaches the `case VIDEO_NULL:`
+arm patch 0010 was editing. Changing that arm had no effect for exactly that reason.
+Two corrections, both from ../PS5_Vulkan's maintainer and both verified here:
+
+1. `tools/apply-port-patches.py` now anchors on `case VIDEO_VULKAN:` and returns
+   `"ps5"` there - the arm that fires.
+2. The driver-table edit inserted `&video_ps5` *after* the `#ifdef HAVE_VULKAN`
+   block, leaving `&video_vulkan` at index 0, and index 0 is what RetroArch falls
+   back to when a name is empty or unfindable. It is now inserted **before** the
+   block, so this project's driver is first as well as named.
+
+**One thing not explained.** The flip status marker reads 1 at flips 1, 300, 600,
+900 and 1200 - it never advances, while the buffers rotate correctly (0, 1, 0, 1) and
+the frames are visibly on screen. So the marker is not a usable instrument for
+"has the display taken a newer frame" on this console, whatever it reports. The
+display work was read through it for several rounds; the pictures on the screen are
+the evidence that matters.

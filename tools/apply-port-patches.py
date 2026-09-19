@@ -49,8 +49,12 @@ EDITS = [
         # never be the fallback.
         "gfx/video_driver.c",
         "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n",
-        "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n   &video_ps5,\n",
-        "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n   &video_ps5,\n",
+        "/* Before the Vulkan block, not after it: this is what makes this port's\n"
+        " * driver video_drivers[0] and therefore the fallback as well as the named\n"
+        " * default. Inserting it after the block leaves &video_vulkan at index 0\n"
+        " * and any fallback still lands on Vulkan, which defeats the point. */\n"
+        "   &video_ps5,\n#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n",
+        "   &video_ps5,\n#ifdef HAVE_VULKAN",
     ),
     (
         # qb/config.params.sh declares the default state of every optional
@@ -283,22 +287,25 @@ EDITS = [
         # the title the load fails, and with --log-file the frontend now says so
         # instead of exiting silently.
         "configuration.c",
-        "      case VIDEO_NULL:\n         break;",
-        "      case VIDEO_NULL:\n"
-        "          /* Named by this port (patches/series, 0010). The compiled default is\n"
-        "           * what runs: content loading rebuilds argv and drops the title's `-c`,\n"
-        "           * so the config's own video_driver is never read, and this value is\n"
-        "           * the whole of the choice.\n"
+        "      case VIDEO_VULKAN:\n         return \"vulkan\";",
+        "      case VIDEO_VULKAN:\n"
+        "          /* Named by this port (patches/series, 0010). This is the arm that\n"
+        "           * fires: VIDEO_DEFAULT_DRIVER resolves to VIDEO_VULKAN because this\n"
+        "           * build has HAVE_VULKAN, so the function returns here and never\n"
+        "           * reaches the VIDEO_NULL arm an earlier version of this patch\n"
+        "           * edited - which is why changing that arm had no effect.\n"
         "           *\n"
-        "           * It names this project's own driver, video_ps5, because that is the\n"
-        "           * one that can finish: its display path is proven as far as the buffer\n"
-        "           * (bands read back 0 of 2,073,600 pixels wrong, flip accepted, marker\n"
-        "           * reported), while the linked libps5vk refuses the frontend's draws -\n"
-        "           * 21 topology, 3 descriptor-type and 16 sampler address-mode refusals\n"
-        "           * in one run - and a refusal ends recording with an error at\n"
-        "           * vkEndCommandBuffer, so those command buffers are never submitted.\n"
-        "           * The sampler restriction needs a \"../PS5_Vulkan\" change, which this\n"
-        "           * project does not make. docs/FINDINGS.md carries both records. */\n"
+        "           * It names this project's own driver because that is the one that\n"
+        "           * can finish: video_ps5's display path is proven as far as the\n"
+        "           * buffer (bands read back 0 of 2,073,600 pixels wrong, flip\n"
+        "           * accepted, the display reporting marker 1), while the linked\n"
+        "           * libps5vk refuses this frontend's draws and a refusal ends\n"
+        "           * recording with an error at vkEndCommandBuffer, so those command\n"
+        "           * buffers never submit.\n"
+        "           *\n"
+        "           * The config cannot make this choice: content loading rebuilds\n"
+        "           * argv and drops the title's `-c`, so /app0/retroarch.cfg's\n"
+        "           * video_driver is never parsed. */\n"
         "          return \"ps5\";",
         "return \"ps5\";",
     ),
