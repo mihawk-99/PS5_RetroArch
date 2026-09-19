@@ -33,22 +33,34 @@ clears and one storage-image compute upload of the frontend's blank texture, plu
 filter chain's non-clamp sampler modes (the chain's sampler table is repaired by 0023).
 They cost the frontend work, not the frame.
 
-**Nothing proves pixels yet.** The port has no screenshot path: the evidence stops at
-the driver accepting and submitting every frame. A shot of the console's screen during a
-run is the missing artifact, and `../PS5_Vulkan`'s own runner is what can take it.
+**Nothing proves pixels yet, and the capture path is now half-built.** The port has no
+screenshot: `--max-frames`/`--max-frames-ss` were compiled out (`#ifdef HAVE_SCREENSHOTS`),
+and `tools/build-retroarch.sh` now defines it, so the frontend builds and links with the
+options present. They still do not fire: `runloop.h`'s `RUNLOOP_TIME_TO_EXIT` compares
+`max_frames` against the **core's** `frame_count`, and this title loads no content, so the
+counter never advances - three runs with `--max-frames=200` ran the full watch window and
+wrote no `shot.png`. `src/main.cpp` reads `/app0/args.txt` (one argument per line) so a run
+can be given those options without the launcher, verified by the mark
+`argv extras from /app0/args.txt = 3`.
 
 ## Next
 
-1. **Ask the console what is on screen** during one of these runs (the driver's
-   `ps5vk_debug_*` entry points exist for its runner's capture, and `eboot.bin` links
-   them), or take a photograph. Without it the goal's "frames reaching the screen" is
-   inferred from 644 accepted submissions.
-2. **Then the init refusals**: triangle strips at init (the same topology patch 0016
-   applies to the chain's quad) and the blank texture's compute upload (the staging
-   texture's format could match its destination, as 0027 does for the menu texture).
-3. **Config loading is still parked** (`parked/config-path.patch.py`, step 0006): the
+1. **Make the count the frontend's**: a port block in `runloop.c` that counts frontend
+   frames for the `--max-frames-ss` comparison when no core is loaded, then take the
+   screenshot, read it back over FTP and look at it (`klog/shot-*.png`). That is the
+   artifact the goal's "frames reaching the screen" needs, and the readback is the Vulkan
+   driver's own path (`vulkan_readback`, `VK_FLAG_READBACK_PENDING`), so it also tests one
+   more driver entry point.
+2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
+   the chain's quad) and the blank texture's compute upload (its staging texture could
+   match its destination, as 0027 does for the menu texture).
+3. **`/app0/retroarch.log` is still the stale 1200 bytes** from an earlier round: the
+   frontend's file logger is set up (`--log-file=/app0/retroarch.log`) but never flushes,
+   and a run that exits by itself would flush it - which is the same exit the screenshot
+   step needs.
+4. **Config loading is still parked** (`parked/config-path.patch.py`, step 0006): the
    command line passes `-c /app0/retroarch.cfg` and the port does not yet prove the file
-   is read. Now that frames run, a saved config is worth re-checking.
+   is read.
 3. **Then the first frame**, and with it the objective: frames in the trace, the menu
    on screen, and `tools/verify.sh` green.
 4. **Then the config file.** Content loading still discards the title's `-c`; the fix
