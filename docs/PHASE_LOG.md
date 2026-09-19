@@ -1245,3 +1245,51 @@ result code.
 **Verified.** `bash tools/verify.sh` PASS (format unit build integration evidence);
 20 unit tests; `strings build/llvm-pie.elf | grep -c 'probe DRAW|probe REC|...'` = 0
 after deleting `build/ra/obj`, which a probe revert needs to take effect.
+
+## 2026-09-19 - the Vulkan driver draws: 644 frames in one unattended run
+
+Run: `bash tools/run-title.sh --no-build --watch 25` ->
+`VERDICT: it ran for 25s and this script closed it` (`klog/run-PPSA99169-022103.log`).
+The trace (`klog/trace-r3o.txt`, fetched over FTP from `/app0/trace.txt`) counts
+644 x `probe REC: frame entered`, 643 x `probe QUAD: menu quad`, 180 x `probe TRI`, and
+40 driver refusals - all of them at init (21 triangle strips, 16 sampler address modes,
+3 storage-image compute uploads), none inside a frame. `vkQueueSubmit`'s assertion,
+which had ended every earlier run, does not appear.
+
+Then the probes were reverted, `build/ra/obj` removed, the frontend rebuilt (276 of 276
+sources), and the shipping image run the same way: `klog/run-shipping-r3.log` ->
+`VERDICT: it ran for 20s and this script closed it`, `klog/run-PPSA99169-023553.log`
+with `grep -c 'fatal signal'` = 0. `bash tools/verify.sh` -> `PASS (format unit build
+integration evidence)`.
+
+The four patches this step needed, each one named by a refusal the driver logged once
+patch 0019's `VK_EXT_debug_utils` messenger was in place:
+
+- 0024: `vulkan_init_samplers` asked for `VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE`, and
+  `../PS5_Vulkan`'s `ps5vk_CreateSampler` creates no sampler for any border colour but
+  transparent black, so all four display samplers stayed `VK_NULL_HANDLE`. A NULL
+  sampler is the descriptor write the driver refuses ("names no sampler"), and one
+  refused draw ends the frame.
+- 0025: any sampler the driver still refuses now falls back to `vk->samplers.nearest`
+  instead of reaching a draw as NULL.
+- 0026: the display layout declares binding 2 as a second combined image sampler (its
+  HDR shaders read their source there) and the driver requires a write for **every**
+  binding a stage's metadata names, so the quad descriptor writer writes the same image
+  at binding 2. `PS5VK_PUSH_CONSTANT_BINDING` is 32, not 2 - the reserved
+  push-constant binding was ruled out by reading `psbc_compile.h`.
+- 0027/0028: the menu texture took the B4G4R4A4 path with a B/R swizzle in the view, and
+  the driver samples only identity component mappings. It now takes the 32-bit path the
+  device-without-B4G4R4A4 branch already implemented, in `R8G8B8A8_UNORM` (the format
+  this driver reports as sampled, so the staging texture and its destination agree and
+  the upload stays a copy), with the CPU conversion's channels in that order.
+
+One diagnostic was tried and dropped: a probe in
+`gfx_ctx_khr_display_swap_buffers` (the swap-buffers/acquire path) made the run die in
+`vulkan_acquire_next_image` with `abort is called(system)` - the frames had run without
+it, so it was removed rather than chased (`klog/run-PPSA99169-022734.log`).
+
+Still refused, and named here so the next step does not rediscover them: the frontend's
+first-frame clears are triangle strips, the blank texture's upload takes the compute
+path (storage-image descriptor, no table entry in the driver), and the filter chain asks
+for sampler address modes the driver has no word for (patch 0023 makes the chain use its
+clamp-to-edge entry instead).

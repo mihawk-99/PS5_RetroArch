@@ -586,6 +586,123 @@ PROBES = [
         'probe DRAW: binding for the second triangle',
         'the second triangle of the quad, drawn through the binding offset',
     ),
+    (
+        # The driver refuses to sample an untiled image whose width is not a whole
+        # number of 256-byte rows, and says only "set 0 binding 2". This names the
+        # texture the chain is handed as its input, which is the one it samples.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   input_texture = texture;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe TEX: input texture %ux%u format=%d image=%p\\n\",\n"
+        "                      texture.width, texture.height, (int)texture.format,\n"
+        "                      (void*)texture.image); fclose(f); } }\n",
+        "probe TEX: input texture",
+        "which texture the draw samples, and how wide it is",
+    ),
+
+    (
+        # A combined image sampler write was refused for naming no sampler, and the
+        # fallback that fills the refused entries did not change it, so the suspicion
+        # moved to whether the write happens at all: this probe prints before the guard
+        # that decides, so it reports the declaration as well as the values. `set` is
+        # printed to compare against the set the draw binds, and `binding` against the
+        # binding the driver names in its refusal.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   if (reflection.semantic_textures[semantic][0].texture)\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SEM: set=%p semantic=%d declared=%d binding=%u filter=%u mip=%u address=%u sampler=%p view=%p\\n\",\n"
+        "                      (void*)set, (int)semantic,\n"
+        "                      (int)(reflection.semantic_textures[semantic][0].texture ? 1 : 0),\n"
+        "                      (unsigned)reflection.semantic_textures[semantic][0].binding,\n"
+        "                      texture.filter, texture.mip_filter, texture.address,\n"
+        "                      (void*)common->samplers[texture.filter][texture.mip_filter][texture.address],\n"
+        "                      (void*)texture.texture.view); fclose(f); } }\n",
+        "probe SEM: set=",
+        "whether the write happens, to which set and binding, and with what values",
+    ),
+
+    (
+        # The refusal after the samplers exist names a binding that "is not bound or
+        # holds no write", which is only true of a set that is not the one written: this
+        # prints the set the pass binds, to compare with the set the writes name.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,\n"
+        "         pipeline_layout,\n"
+        "         0, 1, &sets[sync_index], 0, nullptr);\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe BIND: set=%p sync_index=%u pipeline_layout=%p\\n\",\n"
+        "                      (void*)sets[sync_index], (unsigned)sync_index,\n"
+        "                      (void*)pipeline_layout); fclose(f); } }\n",
+        "probe BIND: set=",
+        "the descriptor set the pass draws with, against the one its writes name",
+    ),
+
+    (
+        # The chain's own draw and the menu quad that follows it are two commands in the
+        # same frame, and the refusal that ends the frame is one of them: this marks the
+        # menu quad, so the trace says which.
+        "gfx/drivers/vulkan.c",
+        "            vulkan_draw_quad(vk, &quad);\n",
+        "            { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "              if (f) { fprintf(f, \"probe QUAD: menu quad, texture=%p view=%p sampler=%p pipeline=%p\\n\",\n"
+        "                               (void*)quad.texture, (void*)quad.texture->view,\n"
+        "                               (void*)quad.sampler, (void*)quad.pipeline); fclose(f); } }\n",
+        "probe QUAD: menu quad",
+        "the menu quad draw that follows the chain's pass in the same frame",
+    ),
+
+    (
+        # The four samplers the display driver creates are the ones every quad draw in
+        # vulkan.c names, and ../PS5_Vulkan creates only the state its sampler canary
+        # ran: a refused creation leaves the handle NULL, and a NULL sampler is a draw
+        # the driver refuses, which ends the frame. This prints the handles after
+        # vulkan_init_samplers has run, so a NULL one is visible in the capture instead
+        # of only in the refusal it causes.
+        "gfx/drivers/vulkan.c",
+        "}\n"
+        "\n"
+        "static void vulkan_buffer_chain_free(\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SAMP: nearest=%p linear=%p mipmap_nearest=%p mipmap_linear=%p\\n\",\n"
+        "                      (void*)vk->samplers.nearest, (void*)vk->samplers.linear,\n"
+        "                      (void*)vk->samplers.mipmap_nearest,\n"
+        "                      (void*)vk->samplers.mipmap_linear); fclose(f); } }\n",
+        "probe SAMP: nearest=",
+        "the display driver's four samplers, after the fallback that fills a refused one",
+    ),
+
+    (
+        # The driver's refusals are sticky: one sets the command buffer's error, after
+        # which its vkCmdBindDescriptorSets does nothing at all, so every later draw in
+        # that buffer is refused for a binding the application did write. The frame's
+        # buffer is the one the init uploads used, and the refusals that precede the
+        # frame are draws, so this marks each one with the pipeline it used.
+        "gfx/drivers/vulkan.c",
+        "   if (call->texture && call->texture->image)\n"
+        "      vulkan_transition_texture(vk, vk->cmd, call->texture);\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe TRI: pipeline=%p vertices=%u texture=%p sampler=%p\\n\",\n"
+        "                      (void*)call->pipeline, call->vertices, (void*)call->texture,\n"
+        "                      (void*)call->sampler); fclose(f); } }\n",
+        "probe TRI: pipeline=",
+        "every triangle draw the display driver records, and the pipeline it names",
+    ),
+
+    (
+        # The other refusal before the frame is a compute upload: the staging texture is
+        # always RGB565, so a destination in another format takes the compute path, whose
+        # storage-image descriptor the driver has no table entry for. This prints both
+        # formats, which is what decides whether the copy path could carry it instead.
+        "gfx/drivers/vulkan.c",
+        "   bool compute_upload = dynamic->format != staging->format;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe COMPUTE: %ux%u staging_fmt=%d dynamic_fmt=%d\\n\",\n"
+        "                      dynamic->width, dynamic->height, (int)staging->format,\n"
+        "                      (int)dynamic->format); fclose(f); } }\n",
+        "probe COMPUTE: ",
+        "the uploads that take the compute path, and the two formats that choose it",
+    ),
+
 ]
 
 

@@ -9,55 +9,46 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The Vulkan driver initialises, creates the stock shader's pipeline, and runs the
-runloop - the first frame's draw is refused by the driver.** `video_vulkan` is
-selected, the console's `khr_display` WSI resolves, a device and a swapchain at
-3840x2160 are created, four textures and a vertex buffer are built, both stock shaders
-compile through the driver's own compiler, `vkCreateGraphicsPipelines` returns 0,
-`vulkan_init` hands back a live pointer, the input driver opens the pad, and
-`runloop_iterate` reaches `vulkan_frame` -> the backbuffer pass -> the chain's draw ->
-`vkQueueSubmit`. Nothing is on screen.
+**Frames run.** An unattended `tools/run-title.sh --no-build --watch 25` records **644
+frames** and **643 menu draws** and is still alive when the script closes it: *"VERDICT:
+it ran for 25s and this script closed it"* (`klog/run-PPSA99169-022103.log`,
+`klog/trace-r3o.txt`). The probe-free shipping image behaves the same way on its own run
+(`klog/run-shipping-r3.log`, `klog/run-PPSA99169-023553.log`: *"it ran for 20s and this
+script closed it"*, no fatal signal, `grep -c 'fatal signal'` = 0). `video_vulkan` is
+selected, the device and the 3840x2160 `khr_display` swapchain are created, the stock
+shaders compile through the driver's own compiler, and `vulkan_frame` -> chain draw ->
+`vkQueueSubmit` repeats for the whole run.
 
-**The two rounds spent on "a render pass is already open" were this port's own probe.**
-A probe insert had duplicated the `vkCmdBeginRenderPass` call - the tool writes
-`insert + anchor`, the insert ended with the anchor, and the statement appeared twice,
-so the second call found the pass the first had begun. The duplicate detector (diff the
-configured tree against `vendor/retroarch` for lines that appear more often) found five
-such pairs; the file was restored from upstream and the port patches re-applied.
-`tests/test_frontend.py`'s `ProbeSet` now checks that an insert does not contain its
-anchor *at all*, which is the property that matters, and it caught one more while this
-was written up.
+**The driver's own messages were what made this ordinary.** The messenger patch (0019)
+put every refusal in the trace, and each one named its reason:
 
-**The real remaining failure**, from the trace (assert messages are readable because
-stderr is unbuffered):
+| Refusal | What it was | Fix |
+| --- | --- | --- |
+| `set 0 binding 1: a combined image sampler write names no sampler` | all four display samplers were refused at creation (`borderColor` opaque white; the driver creates only transparent black), so the menu quad wrote a NULL sampler | 0024 (the colour the driver names), 0025 (a refused sampler falls back to the nearest one) |
+| `set 0 binding 2 is not bound or holds no write` | the display layout's **second** sampler binding: the driver requires a write for every binding its stage metadata names | 0026 (write the same image at binding 2, as the HDR path already does) |
+| `samples a view whose component mapping is not the identity` | the menu texture used B4G4R4A4 with a B/R view swizzle | 0027 (32-bit, swizzle-free path), 0028 (the CPU conversion's channels in R8G8B8A8 order) |
 
-    probe REC: begin render pass
-    probe DRAW: binding for the second triangle
-    probe DRAW: the quad draw is recorded
-    assertion failed: cmd_buffer->state == MESA_VK_COMMAND_BUFFER_STATE_INITIAL ||
-      ... EXECUTABLE || ... PENDING  (vk_queue.c:362, vk_queue_submit_add_command_buffer)
+**What is still refused, all at init and none of them fatal:** seven triangle-strip
+clears and one storage-image compute upload of the frontend's blank texture, plus the
+filter chain's non-clamp sampler modes (the chain's sampler table is repaired by 0023).
+They cost the frontend work, not the frame.
 
-That state is what a **recording refusal** leaves, so the draw is refused. The driver
-refuses in three places, and two are silent here: `pipeline->draw_refusal` (a string
-computed at pipeline creation) and `ps5vk_pipeline_prepare_shaders` - its AGC
-`sceAgcCreateShader`/`sceAgcLinkShaders` step, which it runs at the **first draw**
-rather than at pipeline creation. The viewport/scissor check passes (one of each).
-
-**Its messages are compiled out**, which is why this cannot be read from here:
-`src/vulkan/runtime/vk_log.c` drops every message unless `MESA_DEBUG` was set at build
-time, or the instance has debug logging on, or a debug callback is installed - and
-`enable_debug_logging` is never assigned anywhere in that tree.
+**Nothing proves pixels yet.** The port has no screenshot path: the evidence stops at
+the driver accepting and submitting every frame. A shot of the console's screen during a
+run is the missing artifact, and `../PS5_Vulkan`'s own runner is what can take it.
 
 ## Next
 
-1. **Make that driver speak, from this side**: patch the frontend's Vulkan instance
-   creation to enable `VK_EXT_debug_utils` and install a messenger whose callback
-   writes to stderr (which is the trace file). Then every refusal names its reason, and
-   the remaining work is ordinary. If the extension is refused, the failure is
-   immediate and visible.
-2. **Or take the answer from `../PS5_Vulkan`**: what `sceAgcCreateShader` /
-   `sceAgcLinkShaders` return for this pipeline, or a build whose `vk_log` is not
-   compiled out. One value settles it.
+1. **Ask the console what is on screen** during one of these runs (the driver's
+   `ps5vk_debug_*` entry points exist for its runner's capture, and `eboot.bin` links
+   them), or take a photograph. Without it the goal's "frames reaching the screen" is
+   inferred from 644 accepted submissions.
+2. **Then the init refusals**: triangle strips at init (the same topology patch 0016
+   applies to the chain's quad) and the blank texture's compute upload (the staging
+   texture's format could match its destination, as 0027 does for the menu texture).
+3. **Config loading is still parked** (`parked/config-path.patch.py`, step 0006): the
+   command line passes `-c /app0/retroarch.cfg` and the port does not yet prove the file
+   is read. Now that frames run, a saved config is worth re-checking.
 3. **Then the first frame**, and with it the objective: frames in the trace, the menu
    on screen, and `tools/verify.sh` green.
 4. **Then the config file.** Content loading still discards the title's `-c`; the fix

@@ -601,6 +601,374 @@ EDITS = [
         "static bool gfx_ctx_khr_display_set_resize(void *data,\n",
         "the signal-handler state is",
     ),
+    (
+        # Every refusal ../PS5_Vulkan states by name goes through Mesa's vk_log,
+        # which drops the message unless the instance has debug logging on or a
+        # debug callback installed - and its `enable_debug_logging` is never
+        # assigned anywhere in that tree, so a console run saw only a bare
+        # VK_ERROR_UNKNOWN. A messenger created here puts those messages on stderr,
+        # which src/main.cpp points at the trace. The three edits are the callback,
+        # the extension request, and the messenger itself.
+        "gfx/common/vulkan_common.c",
+        "static VkInstance vulkan_context_create_instance_wrapper(void *opaque, const VkInstanceCreateInfo *create_info)\n",
+        "/* Added by this port (patches/series, 0019): the driver's refusals, into the\n"
+        " * trace. See the extension and messenger edits below. */\n"
+        "static VKAPI_ATTR VkBool32 VKAPI_CALL ps5_vulkan_debug_callback(\n"
+        "      VkDebugUtilsMessageSeverityFlagBitsEXT severity,\n"
+        "      VkDebugUtilsMessageTypeFlagsEXT types,\n"
+        "      const VkDebugUtilsMessengerCallbackDataEXT *data, void *user_data)\n"
+        "{\n"
+        "   (void)severity;\n"
+        "   (void)types;\n"
+        "   (void)user_data;\n"
+        "   if (data && data->pMessage)\n"
+        "      fprintf(stderr, \"vulkan: %s\\n\", data->pMessage);\n"
+        "   return VK_FALSE;\n"
+        "}\n"
+        "\n"
+        "static VkInstance vulkan_context_create_instance_wrapper(void *opaque, const VkInstanceCreateInfo *create_info)\n",
+        "ps5_vulkan_debug_callback",
+    ),
+    (
+        "gfx/common/vulkan_common.c",
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "   /* Check if HDR colorspace extension was enabled */\n",
+        "   /* Added by this port (patches/series, 0019): VK_EXT_debug_utils, when the\n"
+        "    * driver reports it, so the messenger below can be created. The list is\n"
+        "    * reallocated rather than appended in place: the buffer vulkan_find_\n"
+        "    * instance_extensions filled was sized for the extensions it knows. */\n"
+        "   {\n"
+        "      uint32_t probe_count = 0;\n"
+        "      VkExtensionProperties probe_list[256];\n"
+        "      if (   vkEnumerateInstanceExtensionProperties(NULL, &probe_count, NULL) == VK_SUCCESS\n"
+        "          && probe_count > 0 && probe_count <= ARRAY_SIZE(probe_list)\n"
+        "          && vkEnumerateInstanceExtensionProperties(NULL, &probe_count, probe_list) == VK_SUCCESS)\n"
+        "      {\n"
+        "         uint32_t probe_index;\n"
+        "         for (probe_index = 0; probe_index < probe_count; probe_index++)\n"
+        "         {\n"
+        "            if (string_is_equal(probe_list[probe_index].extensionName, \"VK_EXT_debug_utils\"))\n"
+        "            {\n"
+        "               const char **bigger = (const char**)malloc((info.enabledExtensionCount + 1)\n"
+        "                     * sizeof(const char*));\n"
+        "               if (bigger)\n"
+        "               {\n"
+        "                  memcpy((void*)bigger, info.ppEnabledExtensionNames,\n"
+        "                        info.enabledExtensionCount * sizeof(const char*));\n"
+        "                  bigger[info.enabledExtensionCount++] = \"VK_EXT_debug_utils\";\n"
+        "                  instance_extensions               = bigger;\n"
+        "                  info.ppEnabledExtensionNames      = instance_extensions;\n"
+        "               }\n"
+        "               break;\n"
+        "            }\n"
+        "         }\n"
+        "      }\n"
+        "   }\n"
+        "\n"
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "   /* Check if HDR colorspace extension was enabled */\n",
+        "VK_EXT_debug_utils, when the",
+    ),
+    (
+        "gfx/common/vulkan_common.c",
+        "end:\n"
+        "   free((void*)instance_extensions);\n"
+        "   free((void*)instance_layers);\n"
+        "   return instance;\n",
+        "   /* Added by this port (patches/series, 0019): the messenger. Its callback\n"
+        "    * prints through stderr, which is the trace file, so every refusal the\n"
+        "    * driver states by name is readable on this console. Harmless when the\n"
+        "    * driver has no such entry point. */\n"
+        "   if (instance != VK_NULL_HANDLE)\n"
+        "   {\n"
+        "      static VkDebugUtilsMessengerEXT ps5_debug_messenger;\n"
+        "      PFN_vkGetInstanceProcAddr ps5_get_proc =\n"
+        "         vulkan_symbol_wrapper_instance_proc_addr();\n"
+        "      PFN_vkCreateDebugUtilsMessengerEXT ps5_create_messenger =\n"
+        "         ps5_get_proc\n"
+        "            ? (PFN_vkCreateDebugUtilsMessengerEXT)ps5_get_proc(\n"
+        "                  instance, \"vkCreateDebugUtilsMessengerEXT\")\n"
+        "            : NULL;\n"
+        "      if (ps5_create_messenger)\n"
+        "      {\n"
+        "         VkDebugUtilsMessengerCreateInfoEXT ps5_messenger_info;\n"
+        "         memset(&ps5_messenger_info, 0, sizeof(ps5_messenger_info));\n"
+        "         ps5_messenger_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;\n"
+        "         ps5_messenger_info.messageSeverity =\n"
+        "              VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT\n"
+        "            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT\n"
+        "            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;\n"
+        "         ps5_messenger_info.messageType =\n"
+        "              VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT\n"
+        "            | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT\n"
+        "            | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;\n"
+        "         ps5_messenger_info.pfnUserCallback = ps5_vulkan_debug_callback;\n"
+        "         (void)ps5_create_messenger(instance, &ps5_messenger_info, NULL,\n"
+        "               &ps5_debug_messenger);\n"
+        "      }\n"
+        "   }\n"
+        "\n"
+        "end:\n"
+        "   free((void*)instance_extensions);\n"
+        "   free((void*)instance_layers);\n"
+        "   return instance;\n",
+        "static VkDebugUtilsMessengerEXT ps5_debug_messenger;",
+    ),
+    (
+        # RetroArch remaps RGB565 textures to RGBA8888 because some hardware cannot
+        # sample RGB565, and uploads them through a compute shader that needs a
+        # storage-image descriptor. ../PS5_Vulkan reports RGB565 as sampleable, and
+        # has no descriptor table entry for a storage image at all - its own message
+        # is "set 0 binding 3: descriptor type 3 has no proven table entry" - so the
+        # compute pipeline is never created, the dispatch is refused, the command
+        # buffer carries the error and vkQueueSubmit asserts. Keeping the format the
+        # driver can sample removes the compute path from the frame entirely.
+        "gfx/drivers/vulkan.c",
+        "   /* Compatibility concern. Some Apple hardware does not support rgb565.\n",
+        "   /* Added by this port (patches/series, 0020): this driver samples the format\n"
+        "    * it was given. A remap here costs more than it buys: the compute upload it\n"
+        "    * switches to needs a storage-image descriptor this driver does not have. */\n"
+        "   {\n"
+        "      VkFormatProperties remap_probe;\n"
+        "      memset(&remap_probe, 0, sizeof(remap_probe));\n"
+        "      vkGetPhysicalDeviceFormatProperties(vk->context->gpu, format, &remap_probe);\n"
+        "      if (remap_probe.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)\n"
+        "         remap_tex_fmt                  = format;\n"
+        "   }\n"
+        "\n"
+        "   /* Compatibility concern. Some Apple hardware does not support rgb565.\n",
+        "this driver samples the format",
+    ),
+    (
+        # ../PS5_Vulkan refuses to sample an untiled image whose width is not a
+        # whole number of 256-byte rows - "the descriptor's row pitch needs a runner
+        # probe" - and RetroArch's two fallback textures are 4x4 and 1x1, whose rows
+        # are 16 and 4 bytes padded to 256. Both are one uniform colour, so their
+        # size is nothing a shader can read: 64 texels wide is whole rows, and the
+        # first draw of the menu stops being refused.
+        "gfx/drivers/vulkan.c",
+        "}\n"
+        "\n"
+        "static void vulkan_deinit_static_resources(vk_t *vk)\n",
+        "   /* Added by this port (patches/series, 0021): whole rows, one colour. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_blank[64] = {[0 ... 63] = 0xffffffffu};\n"
+        "      vk->display.blank_texture = vulkan_create_texture(vk, NULL,\n"
+        "            64, 1, VK_FORMAT_B8G8R8A8_UNORM,\n"
+        "            ps5_wide_blank, NULL, VULKAN_TEXTURE_STATIC);\n"
+        "   }\n"
+        "}\n"
+        "\n"
+        "static void vulkan_deinit_static_resources(vk_t *vk)\n",
+        "ps5_wide_blank",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "}\n"
+        "\n"
+        "static void vulkan_deinit_textures(vk_t *vk)\n",
+        "   /* Added by this port (patches/series, 0021): whole rows, all zero. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_zero[64] = {0};\n"
+        "      vk->default_texture = vulkan_create_texture(vk, NULL,\n"
+        "            64, 1, VK_FORMAT_B8G8R8A8_UNORM,\n"
+        "            ps5_wide_zero, NULL, VULKAN_TEXTURE_STATIC);\n"
+        "   }\n"
+        "}\n"
+        "\n"
+        "static void vulkan_deinit_textures(vk_t *vk)\n",
+        "ps5_wide_zero",
+    ),
+    (
+        # ../PS5_Vulkan samples only untiled images whose width is a whole number of
+        # 256-byte rows: its own message is "samples a 4-texel-wide image whose rows
+        # are padded to 256 bytes". RetroArch creates several small ones - a 4x4
+        # blank, a 1x1 default, an 8x8 checkerboard, and whatever a core hands
+        # load_texture - and the chain is handed the blank as its input on the first
+        # frames, so the draw is refused. The image is widened to whole rows and the
+        # logical width is left alone: the extra columns hold what the row padding
+        # held anyway, which for a flat colour is nothing.
+        "gfx/drivers/vulkan.c",
+        "      if (request != format)\n",
+        "      /* Added by this port (patches/series, 0022): whole 256-byte rows. */\n"
+        "      if (info.extent.width % 64u != 0u)\n"
+        "         info.extent.width = (info.extent.width + 63u) & ~63u;\n"
+        "      if (request != format)\n",
+        "whole 256-byte rows",
+    ),
+    (
+        # This driver supports the clamp-to-edge samplers alone and leaves the handle
+        # untouched for every other address mode, so sixteen of the twenty in this
+        # matrix are VK_NULL_HANDLE. A NULL sampler is a refused descriptor write at
+        # draw time - "set 0 binding 1: a combined image sampler write names no
+        # sampler" - and a draw that refuses leaves the command buffer in error, which
+        # is what vkQueueSubmit then asserts on. The clamp-to-edge entry of the same
+        # filters stands in: the difference is how a texture edge is addressed, and a
+        # driver that cannot repeat can still sample it.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "}\n"
+        "\n"
+        "CommonResources::~CommonResources()\n",
+        "   /* Added by this port (patches/series, 0023): see the note above this edit. */\n"
+        "   {\n"
+        "      unsigned ps5_i, ps5_j, ps5_k;\n"
+        "      for (ps5_i = 0; ps5_i < GLSLANG_FILTER_CHAIN_COUNT; ps5_i++)\n"
+        "         for (ps5_j = 0; ps5_j < GLSLANG_FILTER_CHAIN_COUNT; ps5_j++)\n"
+        "            for (ps5_k = 0; ps5_k < GLSLANG_FILTER_CHAIN_ADDRESS_COUNT; ps5_k++)\n"
+        "               if (samplers[ps5_i][ps5_j][ps5_k] == VK_NULL_HANDLE)\n"
+        "                  samplers[ps5_i][ps5_j][ps5_k] =\n"
+        "                     samplers[ps5_i][ps5_j][GLSLANG_FILTER_CHAIN_ADDRESS_CLAMP_TO_EDGE];\n"
+        "   }\n"
+        "}\n"
+        "\n"
+        "CommonResources::~CommonResources()\n",
+        "a combined image sampler write names no sampler",
+    ),
+    (
+        # The display driver's own four samplers are created with an opaque-white
+        # border, and ../PS5_Vulkan creates a sampler only for the transparent black
+        # its texture canary ran: vkCreateSampler refuses every other colour by name
+        # and leaves the handle untouched, so all four stay VK_NULL_HANDLE. A NULL
+        # sampler is a refused descriptor write at draw time - "set 0 binding 1: a
+        # combined image sampler write names no sampler" - and that refusal leaves the
+        # frame's command buffer in error, which is the vkQueueSubmit assertion the run
+        # ends on. A clamp-to-edge address mode never samples the border, so the colour
+        # is invisible to the application: transparent black is the one the driver can
+        # name.
+        "gfx/drivers/vulkan.c",
+        "   info.borderColor             = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;\n",
+        "   /* Added by this port (patches/series, 0024): the border colour the driver's\n"
+        "    * own sampler canary ran. A clamp-to-edge address mode reads no border, and\n"
+        "    * ../PS5_Vulkan creates no other colour. */\n"
+        "   info.borderColor             = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;\n",
+        "patches/series, 0024",
+    ),
+    (
+        # A sampler this driver did not create is a draw the driver refuses, and one
+        # refused draw ends the frame. The block above repairs the four the display
+        # driver asks for; this keeps any later refusal from reaching a draw as
+        # VK_NULL_HANDLE at all, by standing the nearest sampler in for one that is
+        # missing. The difference is a filter, not a dead frame.
+        "gfx/drivers/vulkan.c",
+        "   info.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR;\n"
+        "   vkCreateSampler(vk->context->device,\n"
+        "         &info, NULL, &vk->samplers.mipmap_linear);\n"
+        "}\n",
+        "   info.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR;\n"
+        "   vkCreateSampler(vk->context->device,\n"
+        "         &info, NULL, &vk->samplers.mipmap_linear);\n"
+        "   /* Added by this port (patches/series, 0025): no draw names a sampler the\n"
+        "    * driver refused to create. */\n"
+        "   {\n"
+        "      if (vk->samplers.linear         == VK_NULL_HANDLE)\n"
+        "         vk->samplers.linear          = vk->samplers.nearest;\n"
+        "      if (vk->samplers.mipmap_nearest == VK_NULL_HANDLE)\n"
+        "         vk->samplers.mipmap_nearest  = vk->samplers.nearest;\n"
+        "      if (vk->samplers.mipmap_linear  == VK_NULL_HANDLE)\n"
+        "         vk->samplers.mipmap_linear   = vk->samplers.nearest;\n"
+        "   }\n"
+        "}\n",
+        "patches/series, 0025",
+    ),
+    (
+        # ../PS5_Vulkan builds the stage's set-0 table from the bindings the shader
+        # compiler reports and refuses a table entry with no write: "set 0 binding 2 is
+        # not bound or holds no write". This driver's display layout declares binding 2
+        # as a combined image sampler as well as binding 1 - the HDR shaders read their
+        # source there (vulkan_shaders/hdr.frag, and vulkan_run_hdr_pipeline writes it) -
+        # and a display draw is refused for it even though no display shader reads it.
+        # The same image the draw samples is written to it, which is what the layout
+        # declares and what the HDR path already writes there.
+        "gfx/drivers/vulkan.c",
+        "      write.dstSet                    = set;\n"
+        "      write.dstBinding                = 1;\n"
+        "      write.descriptorCount           = 1;\n"
+        "      write.descriptorType            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;\n"
+        "      write.pImageInfo                = &image_info;\n"
+        "      vkUpdateDescriptorSets(device, 1, &write, 0, NULL);\n"
+        "   }\n"
+        "}\n",
+        "      write.dstSet                    = set;\n"
+        "      write.dstBinding                = 1;\n"
+        "      write.descriptorCount           = 1;\n"
+        "      write.descriptorType            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;\n"
+        "      write.pImageInfo                = &image_info;\n"
+        "      vkUpdateDescriptorSets(device, 1, &write, 0, NULL);\n"
+        "      /* Added by this port (patches/series, 0026): the same image at the layout's\n"
+        "       * second sampler binding, which the console driver's draw requires a write\n"
+        "       * for (../PS5_Vulkan, ps5vk_draw.c). */\n"
+        "      write.dstBinding                = 2;\n"
+        "      vkUpdateDescriptorSets(device, 1, &write, 0, NULL);\n"
+        "   }\n"
+        "}\n",
+        "patches/series, 0026",
+    ),
+    (
+        # ../PS5_Vulkan builds a binding's descriptor from the image the view names and
+        # refuses a view whose component mapping is not the identity: "set 0 binding 1
+        # samples a view whose component mapping is not the identity". This path takes
+        # the B4G4R4A4 texture with a B/R view swizzle whenever the device reports that
+        # format's tiling, which this one does, and the menu draw is then refused. The
+        # 32-bit texture with the CPU conversion below carries the same pixels with no
+        # swizzle at all - it is the branch a device without B4G4R4A4 tiling already
+        # takes - so the format and the swizzle both go, and the conversion stays.
+        "gfx/drivers/vulkan.c",
+        "   if (!rgb32)\n"
+        "   {\n"
+        "       VkFormatProperties formatProperties;\n"
+        "       vkGetPhysicalDeviceFormatProperties(vk->context->gpu, VK_FORMAT_B4G4R4A4_UNORM_PACK16, &formatProperties);\n"
+        "       if (formatProperties.optimalTilingFeatures != 0)\n"
+        "       {\n"
+        "          static const VkComponentMapping br_swizzle =\n"
+        "          {VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_A};\n"
+        "          /* B4G4R4A4 must be supported, but R4G4B4A4 is optional,\n"
+        "           * just apply the swizzle in the image view instead. */\n"
+        "          fmt          = VK_FORMAT_B4G4R4A4_UNORM_PACK16;\n"
+        "          ptr_swizzle  = &br_swizzle;\n"
+        "       }\n"
+        "       else\n"
+        "           do_memcpy   = false;\n"
+        "   }\n",
+        "   if (!rgb32)\n"
+        "   {\n"
+        "      /* Added by this port (patches/series, 0027): ../PS5_Vulkan samples only\n"
+        "       * views whose component mapping is the identity (ps5vk_draw.c,\n"
+        "       * V0-formats), so the B4G4R4A4 texture and its B/R view swizzle cannot be\n"
+        "       * sampled: the draw is refused. The 32-bit texture and the CPU conversion\n"
+        "       * below carry the same pixels with no swizzle, which is the branch a device\n"
+        "       * without B4G4R4A4 tiling already takes. The format is named rather than\n"
+        "       * left at B8G8R8A8 because the staging texture keeps the format it is\n"
+        "       * created with: ../PS5_Vulkan's B8G8R8A8 entry is not a sampled one, so the\n"
+        "       * image is substituted to R8G8B8A8 and a staging texture in B8G8R8A8 would\n"
+        "       * make the two formats differ - which takes the compute path, whose\n"
+        "       * storage-image descriptor the driver has no entry for. */\n"
+        "      do_memcpy   = false;\n"
+        "      fmt         = VK_FORMAT_R8G8B8A8_UNORM;\n"
+        "   }\n",
+        "patches/series, 0027",
+    ),
+    (
+        # The conversion above writes byte 0 from the source's high nibble, because the
+        # texture it was written for is B8G8R8A8. The texture this port asks for is
+        # R8G8B8A8 - the format ../PS5_Vulkan reports as sampled - so byte 0 takes the
+        # nibble B4G4R4A4 packs red in and byte 2 takes blue's. Without this the menu
+        # draws with red and blue exchanged, which is what the previous round's capture
+        # would have shown had the frame reached the screen.
+        "gfx/drivers/vulkan.c",
+        "            *dstpix      = (\n"
+        "                  (pix & 0xf000) >>  8)\n"
+        "               | ((pix & 0x0f00) <<  4)\n"
+        "               | ((pix & 0x00f0) << 16)\n"
+        "               | ((pix & 0x000f) << 28);\n",
+        "            /* Added by this port (patches/series, 0028): R8G8B8A8's byte order,\n"
+        "             * from the B4G4R4A4 source the caller hands over. */\n"
+        "            *dstpix      = (\n"
+        "                  (pix & 0x00f0)      )\n"
+        "               | ((pix & 0x0f00) <<  4)\n"
+        "               | ((pix & 0xf000) <<  8)\n"
+        "               | ((pix & 0x000f) << 28);\n",
+        "patches/series, 0028",
+    ),
 ]
 
 
