@@ -45,17 +45,14 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **The pixels: read the frame back in the port's own code - carefully.** Patch 0031's
-   trigger works every run (`capture: frame 90 of 90, take_screenshot -> failed`), and
-   three runs (`.png`, `.bmp`, and with `video_gpu_screenshot = "true"` published) failed
-   with **no** new `vulkan:` message in the trace, so the frontend's writer bails before
-   the driver is asked (`take_screenshot_viewport`'s silent paths: a zero viewport from
-   `video_driver_get_viewport_info`, or a failed `malloc`). The first attempt at the
-   replacement - call `vulkan_read_viewport` from `vulkan_frame` and write a PPM - did not
-   compile (a `static` forward declaration inside the function body; see
-   `docs/PHASE_LOG.md`, 2026-09-19) and was reverted. Retry it with the declaration at
-   file scope next to the driver's own prototype (`gfx/drivers/vulkan.c:1239` has the
-   pattern), then read the PPM back over FTP and look at it.
+1. **Run the capture - it is built and waiting.** The port now reads the frame with the
+   driver's own `vulkan_read_viewport` and writes a PPM itself (patches 0031/0032,
+   committed as `949fdb9`; the frontend builds 276 of 276 and the path is in the image).
+   It has **not** been run: the console stopped answering ("No route to host") before the
+   run, and the run that was attempted failed at its deploy step for that reason. Arm
+   `/app0/args.txt` with `--ps5-capture=90` and `--ps5-capture-path=/app0/shot.ppm`, run
+   `tools/run-title.sh --no-build --watch 18`, fetch `/app0/shot.ppm` and look at it. The
+   trace line says `view viewport WxH, read_viewport -> ok|failed`.
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).

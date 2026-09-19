@@ -1432,3 +1432,31 @@ rebuilt from that, and `make test-unit` is green. The lesson for the next attemp
 the error itself - the local declaration and the driver's own definition have to agree
 exactly, and a `static` forward declaration inside a function body is where that attempt
 went wrong.
+
+## 2026-09-19 - the readback patch compiles; the console left before the run
+
+The rewritten capture compiles and is in the image: the frontend builds 276 of 276
+sources and `strings build/llvm-pie.elf | grep -c "read_viewport ->"` is 1
+(`build/r8b-build.log`). The two errors from the first attempt - a `static` declaration
+inside a function body, and `vk` referenced before its declaration - are fixed by
+declaring the readback prototype at file scope (patch 0032, next to the driver's own
+`vulkan_viewport_info` prototype) and by moving the capture block below
+`vk_t *vk = (vk_t*)data;`.
+
+The run that would have produced `/app0/shot.ppm` did not happen: the console stopped
+answering partway through the round - `ping` and the FTP both report "No route to host" -
+and the run that was attempted first failed at its deploy step for the same reason
+(`klog/run-shot-r8c.log`: "the upload did not take"). Nothing in the port is implicated:
+the same image had deployed and run repeatedly earlier in the day.
+
+So the round ends with the patch built but the pixels still unverified, and that is how
+it is committed (`949fdb9`). The next round starts by running it:
+
+    # arm the capture, then run and read the picture back
+    (upload /app0/args.txt: --ps5-capture=90 --ps5-capture-path=/app0/shot.ppm)
+    bash tools/run-title.sh --no-build --watch 18
+    (fetch /app0/shot.ppm, convert to PNG, look at it)
+
+The trace line to expect is `capture: frame 90 of 90, viewport WxH, read_viewport -> ok
+(/app0/shot.ppm)`; if it says `failed`, the trace line now carries the viewport size,
+which is the value the frontend's own writer never showed.
