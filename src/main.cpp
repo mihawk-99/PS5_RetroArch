@@ -57,12 +57,20 @@ int main()
     char arg_config_path[] = "/app0/retroarch.cfg";
     char arg_verbose[] = "--verbose";
     char arg_menu[] = "--menu";
+    /* RetroArch's own log, on the console, from the first line of main.
+     *
+     * This matters more than the config's log settings: `--log-file` sets the
+     * override and enables file logging *before* the config is parsed, so it
+     * records what happens during startup - which is exactly where the Vulkan
+     * path dies silently. A failure that says nothing is the one thing a console
+     * run cannot diagnose, and this is how the frontend is made to speak. */
+    char arg_log[] = "--log-file=/app0/retroarch.log";
     char *argv[] = {
-        arg0, arg_fullscreen, arg_config, arg_config_path, arg_verbose, arg_menu, nullptr,
+        arg0, arg_fullscreen, arg_config, arg_config_path, arg_verbose, arg_log, arg_menu, nullptr,
     };
     (void)config_path;
 
-    ps5::debug::mark("argv built: retroarch -f -c /app0/retroarch.cfg --verbose");
+    ps5::debug::mark("argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file");
 
     const int status =
         rarch_main(static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1, argv, nullptr);

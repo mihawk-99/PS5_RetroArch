@@ -1902,3 +1902,43 @@ config "walks the title into a blocked syscall" and implied the file path was at
 fault. The probes above show the file path completing; the refused syscall is downstream,
 in the joypad step. The correction matters because it changes the fix: nothing about
 `retroarch.cfg`, `fopen`, `stat` or the working directory needs to change.
+
+## RetroArch now keeps its own log on the console, and it is the instrument the Vulkan path needs
+
+**Measured.** With `--log-file=/app0/retroarch.log` added to the title's argument
+list, a run leaves a real frontend log beside the title - 24 lines on this build,
+alongside the ten-line `/app0/trace.txt` this project writes by hand:
+
+    [INFO] Version: 1.22.2
+    [ERROR] Couldn't find any audio driver named "ext"
+    [INFO] Available audio drivers are:
+    [INFO]   null
+    [WARN] Going to default to first audio driver...
+    [INFO] [Input] Found input driver: "ps5".
+    [INFO] [Video] Graphics driver did not initialize an input driver. Attempting to pick a suitable driver.
+    [INFO] [Video] Found display server: "null".
+    [ERROR] Failed to initialize audio driver. Will continue without audio.
+    [Core] Geometry: 320x240, Aspect: 1.333, FPS: 60.00
+
+**Why the flag and not the config.** RetroArch initialises the file logger after it
+parses its config, so the config's `log_to_file` settings are inert while the config
+path is parked - and a crash during startup happens before that point anyway. The
+`--log-file` argument is handled in *argument parsing*, which calls
+`rarch_log_file_init` before the config is read
+(`retroarch.c`: the "Enable logging to file if verbosity and log-file arguments were
+passed" block, which precedes `config_load`). So it records startup, which is exactly
+where the frontend has been silent.
+
+**This closes the one gap that made the Vulkan path unworkable.** The recorded reason
+Vulkan is off is that the title "exits 1 within a second of EXEC, with no signal and
+no message from RetroArch". A failure that says nothing cannot be diagnosed from a
+console run; now the frontend's own words land in a file after every run, Vulkan
+included. Nothing else about the Vulkan path has changed - it still needs
+`--enable-vulkan`, and the ICD still has to reach the title - but the next failure
+will be readable instead of silent.
+
+**Two facts the log already settles.** The audio driver the frontend looks for is
+literally `"ext"` and the only one compiled is `null`, so audio is expected to fail
+and the frontend continues - that is not a fault to chase. And the input driver is
+found as `"ps5"` and the display server is `"null"`, which is correct for a build with
+no graphics backend: the "display server" is a separate slot from the video driver.
