@@ -30,8 +30,17 @@ void initialize(void *)
                                  "/app0/system",   "/app0/savefiles", "/app0/savestates",
                                  "/app0/playlists"};
     for (const char *path : directories)
-        if (mkdir(path, 0755) != 0 && errno != EEXIST)
+    {
+        if (mkdir(path, 0777) != 0 && errno != EEXIST)
+        {
             std::fprintf(stderr, "frontend ps5: mkdir %s failed errno=%d\n", path, errno);
+            continue;
+        }
+        // FTP still denies uploads with group-write 0775 on this console. Apply
+        // the authorized 0777 after creation, defeating umask and repairing old folders.
+        if (chmod(path, 0777) != 0)
+            std::fprintf(stderr, "frontend ps5: chmod %s to 0777 failed errno=%d\n", path, errno);
+    }
 
     /* A packaged seed can change on update; the user's live config must survive it. */
     struct stat st{};

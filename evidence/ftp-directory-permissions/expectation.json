@@ -1,0 +1,21 @@
+{
+  "step": "ftp-directory-permissions",
+  "note": "Actual FTP writes distinguish the unsuccessful 0775 attempt from the authorized 0777 fix. Raw user data and ownership identifiers remain ignored.",
+  "must_contain": [
+    "0775 applied to all seven managed folders; FTP STOR still returned 550 Permission denied in all seven.",
+    "0777 final run: 30 seconds alive; script closed title; chmod errors=0; Vulkan refusals=0; API failures=0; successful presentation observed.",
+    "config: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "cores: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "content: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "system: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "savefiles: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "savestates: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "playlists: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "[Audio] Started synchronous audio driver.",
+    "[XMB] Assets missing: no; fonts ready: yes"
+  ],
+  "must_not_contain": [
+    "cleanup=False",
+    "upload=False"
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "step": "ftp-directory-permissions",
+  "recorded": "2026-09-19T17:21:15.269410+00:00",
+  "revision": "828f0e1 + managed-directory permissions",
+  "commands": [
+    "tools/run-title.sh --no-build --watch 30",
+    "python3 tools/check-ftp-write.py",
+    "tools/verify.sh"
+  ],
+  "raw_capture": "klog/permissions-open-run.log",
+  "build_identity": "347655429cf4a60f3d7608c3ba4e46ec1c1972f81704cbea9f9e654c9942cfed",
+  "lines": [
+    "0775 applied to all seven managed folders; FTP STOR still returned 550 Permission denied in all seven.",
+    "0777 final run: 30 seconds alive; script closed title; chmod errors=0; Vulkan refusals=0; API failures=0; successful presentation observed.",
+    "config: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "cores: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "content: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "system: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "savefiles: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "savestates: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "playlists: mode=drwxrwxrwx upload=True readback=True cleanup=True PASS",
+    "Host regression: existing 0755 and 0775 directories plus umask 0077 become 0777; seed configuration preservation passes.",
+    "PS5_Vulkan unchanged at 6f0ce0d; directory-only repair, no recursive user file mode changes.",
+    "[INFO] [PS5] build identity: 347655429cf4a60f3d7608c3ba4e46ec1c1972f81704cbea9f9e654c9942cfed",
+    "[INFO] [Audio] Started synchronous audio driver.",
+    "[INFO] [XMB] Assets missing: no; fonts ready: yes"
+  ],
+  "runs": [
+    {
+      "mode": "0775",
+      "raw_capture": "klog/permissions-run.log",
+      "raw_sha256": "cf3f79303fe03e8635939d9eebbfb8ed740b5c4da5fd5c81909ca5481cda48e5",
+      "build_identity": "88367c83a15584015a71805f5599effc29875fd419a144ca042a5c59f2148a4f",
+      "ftp_report": "ftp-write-0b3aeb61d2d04a9cb22968a6cbb872d3.json",
+      "ftp_report_sha256": "a975f47acc7914ceb8e282926bf00ce7f5b41279593416747434c976ffb3972d",
+      "ftp_results": {
+        "command": "python3 tools/check-ftp-write.py",
+        "directories": [
+          {
+            "directory": "config",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "cores",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "content",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "system",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "savefiles",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "savestates",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          },
+          {
+            "directory": "playlists",
+            "upload": false,
+            "readback": false,
+            "cleanup": true,
+            "error": "error_perm: 550 Permission denied",
+            "mode": "drwxrwxr-x",
+            "passed": false
+          }
+        ],
+        "passed": false
+      },
+      "permission_errors": [],
+      "refusals": [],
+      "api_failures": [],
+      "presentation_observed": true,
+      "script_closed_after_30_seconds": true
+    },
+    {
+      "mode": "0777",
+      "raw_capture": "klog/permissions-open-run.log",
+      "raw_sha256": "4a84a900248580ed1cf7fbff34ccb38fbd3792f08ed8d0fd68460be2a701ae65",
+      "build_identity": "347655429cf4a60f3d7608c3ba4e46ec1c1972f81704cbea9f9e654c9942cfed",
+      "ftp_report": "ftp-write-99aafc8b78d2462192376b0a730b48a7.json",
+      "ftp_report_sha256": "38c887768bd810bfb38cb6fed04ad728611c9ce6046ca35e90aa0a38beb8786e",
+      "ftp_results": {
+        "command": "python3 tools/check-ftp-write.py",
+        "directories": [
+          {
+            "directory": "config",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "cores",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "content",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "system",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "savefiles",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "savestates",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          },
+          {
+            "directory": "playlists",
+            "upload": true,
+            "readback": true,
+            "cleanup": true,
+            "mode": "drwxrwxrwx",
+            "passed": true
+          }
+        ],
+        "passed": true
+      },
+      "permission_errors": [],
+      "refusals": [],
+      "api_failures": [],
+      "presentation_observed": true,
+      "script_closed_after_30_seconds": true
+    }
+  ]
+}

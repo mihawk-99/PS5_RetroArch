@@ -139,3 +139,10 @@ again without overwriting it to prove parsing/persistence across runs. No core o
 ROM execution is implied by seeing directory entries. Raw filenames, settings,
 crash dumps and console information stay in ignored captures; commit sanitized
 counts, known port paths, crash symbols and acceptance results only.
+
+The platform fixture also creates existing `0755` cores and `0775` content
+directories and uses umask `0077`; every managed directory must become `0777` after initialization.
+This test fails against the former mkdir-only implementation. After console
+startup, `python3 tools/check-ftp-write.py` requires both mode `0777` and successful
+FTP upload/readback/cleanup in all seven managed directories. Mode listings alone
+are insufficient evidence that the FTP process can write.

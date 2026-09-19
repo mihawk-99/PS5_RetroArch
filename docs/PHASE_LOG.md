@@ -1897,3 +1897,36 @@ No core/ROM execution, USB availability or complete storage milestone is claimed
 PS5_Vulkan and ProsperoLight are unchanged; Vulkan and CPU/RGUI fallback registration
 are preserved. Packaged seed changes after the run are comments only; the tested
 binary identity is unchanged and the saved live configuration is byte-identical.
+
+## 2026-09-19 — Repair managed directory permissions for FTP
+
+Scope: the owner requested `0775` or `0777` after FTP could create downloads but
+could not place files in app-created cores/content. Existing folder listings
+showed `0755`. No sibling project changes or core implementation were assigned.
+
+- Regression: the former mkdir-only code fails the host permission assertion
+  with existing `0755` directories and umask `0077`. The final fixture covers
+  existing `0755` and `0775` plus new folders; all become `0777`, while seed and
+  existing configuration preservation checks still pass.
+- First console run: `tools/run-title.sh --no-build --watch 30`, identity
+  `88367c83a15584015a71805f5599effc29875fd419a144ca042a5c59f2148a4f`.
+  Alive throughout, script-closed; chmod worked, all seven modes were `0775`.
+  `python3 tools/check-ftp-write.py` returned 1: all seven uploads denied with
+  `550 Permission denied`. No probes remained. This was not acceptance.
+- An initial attempt to deploy the fallback refused because a title was running.
+  No title was interrupted; the owner closed it and confirmed availability.
+- Final console run: same runner command, identity
+  `347655429cf4a60f3d7608c3ba4e46ec1c1972f81704cbea9f9e654c9942cfed`.
+  Upload readback matched, 30 seconds alive and script-closed. Zero permission
+  errors, Vulkan refusals, GPU API failures or frontend ERROR lines; presentation,
+  XMB assets/fonts and native audio initialization observed.
+- Final FTP command returned 0: all seven directories `0777`, each disposable
+  upload/readback/cleanup passed. No existing files were overwritten by probes.
+- All five `tools/verify.sh` gates PASS; 35 unit tests, 16 evidence records.
+  Machine-readable capture and expectations: `evidence/ftp-directory-permissions/`.
+  Raw captures: `klog/permissions-{run,open-run}.log`, `retroarch-131931.log`,
+  `ftp-write-*.json`; host/gate logs: `/tmp/permissions-*.log`.
+
+Only the seven managed directory modes are repaired; user file modes are not
+changed recursively. Error logging remains enabled. PS5_Vulkan is unchanged at
+`6f0ce0d`. Actual core/content execution remains a separate, unverified step.

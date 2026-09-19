@@ -334,3 +334,11 @@ The title compiles against the configured libretro-common include tree. Its
 headers resolve relative `config.h` includes there; using the pristine vendor
 include tree fails as soon as the native frontend includes the menu interfaces.
 No new dependency, SDK version or graphics-driver change is involved.
+
+Managed directories (`config`, `cores`, `content`, `system`, `savefiles`,
+`savestates`, `playlists`) use mode `0777`. Startup applies `chmod` after `mkdir`,
+including when the directory already exists, so an inherited umask cannot remove
+FTP write access and older `0755` directories are repaired. Mode `0775` was
+applied but still denied real FTP uploads on this console, despite matching
+groups in directory listings; the owner authorized `0777`. This policy
+changes only those directory modes; it does not recursively rewrite user files.

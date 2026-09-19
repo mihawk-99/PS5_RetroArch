@@ -171,3 +171,10 @@ A directory can correctly be empty: this filesystem step installs no emulator
 cores or ROMs. A core must be built for this PS5 port; copying a desktop `.so`
 does not make it loadable. USB/data roots appear only when the title can open
 them; FTP visibility alone does not prove title access to an external mount.
+
+The seven app-managed directories use owner-authorized `0777`; `0775` still
+denied actual FTP uploads on this console. Starting the current build repairs
+older `0755`/`0775` directories.
+`python3 tools/check-ftp-write.py` verifies upload/readback/cleanup in every managed
+folder with uniquely named disposable files and records the result under `klog/`.
+It does not overwrite cores, ROMs, saved settings or other existing files.

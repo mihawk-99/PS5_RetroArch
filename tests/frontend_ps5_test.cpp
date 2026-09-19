@@ -30,6 +30,7 @@ extern "C"
     FILE *__real_fopen(const char *, const char *);
     int __real_stat(const char *, struct stat *);
     int __real_mkdir(const char *, mode_t);
+    int __real_chmod(const char *, mode_t);
     int __real_rename(const char *, const char *);
     int __real_remove(const char *);
     FILE *__wrap_fopen(const char *p, const char *mode)
@@ -43,6 +44,10 @@ extern "C"
     int __wrap_mkdir(const char *p, mode_t mode)
     {
         return __real_mkdir(physical(p).c_str(), mode);
+    }
+    int __wrap_chmod(const char *p, mode_t mode)
+    {
+        return __real_chmod(physical(p).c_str(), mode);
     }
     int __wrap_rename(const char *from, const char *to)
     {
@@ -81,7 +86,19 @@ int main(int argc, char **argv)
     std::filesystem::create_directories(fixture + "/app0");
     std::filesystem::create_directories(fixture + "/mnt/usb0");
     std::ofstream(fixture + "/app0/retroarch.cfg") << "audio_driver = \"ps5\"\n";
+    umask(0077); // Creation alone must not lose FTP write permission.
+    std::filesystem::create_directories(fixture + "/app0/cores");
+    assert(__real_chmod((fixture + "/app0/cores").c_str(), 0755) == 0);
+    std::filesystem::create_directories(fixture + "/app0/content");
+    assert(__real_chmod((fixture + "/app0/content").c_str(), 0775) == 0);
     frontend_ctx_ps5.init(nullptr);
+    for (const char *name :
+         {"config", "cores", "content", "system", "savefiles", "savestates", "playlists"})
+    {
+        struct stat metadata{};
+        assert(__real_stat((fixture + "/app0/" + name).c_str(), &metadata) == 0);
+        assert((metadata.st_mode & 0777) == 0777);
+    }
     assert(read(fixture + "/app0/config/retroarch.cfg") == "audio_driver = \"ps5\"\n");
     assert(std::string(g_defaults.path_config) == "/app0/config/retroarch.cfg");
     assert(std::string(g_defaults.dirs[DEFAULT_DIR_CORE]) == "/app0/cores");

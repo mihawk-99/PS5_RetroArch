@@ -2615,3 +2615,19 @@ run completed changed the local identity header and falsely rejected its log.
 The runner now snapshots the selected identity before deployment/launch. That
 intermediate run remains a partial result, not final acceptance. Sanitized
 captures and the failure sequence are in `evidence/native-paths/`.
+
+## 2026-09-19 — Managed directory modes and actual FTP writes
+
+The app-created folders listed as `0755`; the owner's FTP-created downloads
+folder listed as `0777`. Owner identities differed, while the displayed group
+matched. Applying `0775` successfully changed all seven managed directory modes,
+but disposable FTP uploads still returned `550 Permission denied` in each. The
+listing alone does not establish the FTP process's effective access credentials.
+
+The owner-authorized `0777` fallback passed actual upload, exact readback and
+cleanup in `config`, `cores`, `content`, `system`, `savefiles`, `savestates` and
+`playlists`. Startup calls chmod even after mkdir reports EEXIST, repairing older
+folders and defeating creation-time umask restrictions. No recursive file-mode
+change is needed for this verified upload case. Evidence and both outcomes:
+`evidence/ftp-directory-permissions/`; reproduce using
+`tools/run-title.sh --no-build --watch 30` and `python3 tools/check-ftp-write.py`.

@@ -11,7 +11,7 @@ class PlatformPaths(unittest.TestCase):
     def test_config_and_browser_roots(self):
         with tempfile.TemporaryDirectory() as td:
             binary = str(Path(td) / 'paths-test')
-            functions = ['fopen', 'stat', 'mkdir', 'rename', 'remove']
+            functions = ['fopen', 'stat', 'mkdir', 'chmod', 'rename', 'remove']
             subprocess.run(['c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-Ivendor/retroarch', '-Ivendor/retroarch/libretro-common/include',
                             'tests/frontend_ps5_test.cpp', '-o', binary,
