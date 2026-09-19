@@ -29,7 +29,35 @@ three sources and the frontend-side fix for each.
 | A3 | Every sampler the frontend creates uses clamp-to-edge on all three axes | `vendor/retroarch/gfx/drivers_shader/shader_vulkan.cpp:2034-2036` (hardcoded REPEAT) and `:2087-2108` (preset-driven, mapping to repeat / mirrored-repeat / clamp-to-border / mirror-clamp) | the trace has **zero** `sampler address modes` lines |
 | A4 | The refusal count is zero, not merely lower | all of the above | `grep -c '^vulkan: ' /app0/trace.txt` is **0** over a full run |
 
-A2 is a decision, not only a patch, and it is now settled: **request RGB8888**.
+A2 is a decision, not only a patch, and **the first decision was wrong**. It was
+settled as "request RGB8888"; reading the menu's format chooser shows that cannot
+work. Corrected as follows.
+
+**Why RGB8888 cannot work.** RGUI picks its output pixel format from the *video
+driver's identity*, not from any request:
+`rgui_set_pixel_format_function` (`menu/drivers/rgui.c:1359-1394`) switches on
+`video_driver_get_ident()` and falls through to `argb32_to_rgba4444` for any driver
+it does not name - and it names ps2, gx, psp1, rsx, d3d10/11/12, sdl_dingux, sdl_rs90
+and xvideo, not "ps5". So this port's menu is produced as **RGBA4444, 16 bits per
+pixel**, and there is no RGB8888 path in RGUI at all. Requesting RGB8888 would leave
+the menu's buffer 16-bit, the dynamic and staging formats would still differ, and the
+compute path would still fire.
+
+**The fix that follows.** Make the two texture formats match by using the format the
+menu actually sends. `vulkan_set_texture_frame` already computes it - `fmt` becomes
+`VK_FORMAT_B4G4R4A4_UNORM_PACK16` for a non-rgb32 frame (`gfx/drivers/vulkan.c`, the
+`if (!rgb32)` branch). The corrected change is in the same function: allocate the
+staging texture in that same remapped format, so `dynamic->format == staging->format`
+and `vulkan_copy_staging_to_dynamic` takes its `vkCmdCopyBufferToImage` branch.
+
+**The quality objection to the earlier decision does not apply.** I rejected the
+matching-format route because it "stores the menu in B4G4R4A4, four bits per
+channel". That is what RGUI *already produces* - `argb32_to_rgba4444` - and what the
+optimal texture already holds. The staging texture being 32-bit was the odd one out,
+not the thing to preserve. Matching it is not a quality loss; it is the removal of a
+conversion nothing needed.
+
+**Corrected A2 criterion, first decision kept for the record: request RGB8888.**
 
 The menu is sent as RGB565 (`rgb32 == false`), and `vulkan_set_texture_frame`
 answers that by remapping `fmt` to `VK_FORMAT_B4G4R4A4_UNORM_PACK16` while the
