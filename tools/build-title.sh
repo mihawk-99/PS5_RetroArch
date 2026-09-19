@@ -129,6 +129,21 @@ fi
 # survive the archive boundary (--whole-archive), which is how the sibling links it.
 vulkan_flags="--no-dynamic-linker -z nodynamic-undefined-weak"
 
+# Three Mesa utility sources the archives above reference but do not carry:
+# ../PS5_Vulkan's PS5 object list filters u_thread.c, anon_file.c and os_file.c
+# out, and its own libvulkan.so.1 only links because a shared object may leave
+# symbols undefined. A title may not, so they are compiled here from that
+# project's sources with its PS5 configuration and linked as plain objects.
+# tools/build-mesa-util.sh says which symbols each one is for. It prints the
+# object paths on stdout, so a compile failure has to be caught here: a process
+# substitution would let the link fail later on symbols this step was to supply.
+if ! vulkan_object_list=$(PS5_VULKAN_DIR="$vulkan_dir" PS5_PAYLOAD_SDK="$sdk" \
+        PS5_CLANG=/usr/bin/clang bash "$root/tools/build-mesa-util.sh"); then
+    echo "error: the driver's Mesa utility objects did not build" >&2
+    exit 2
+fi
+mapfile -t vulkan_objects <<< "$vulkan_object_list"
+
 echo "==> [title] step 2/3: the title"
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
@@ -137,6 +152,7 @@ APP_DEFINITIONS="${title_definition_names[*]}" \
 APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch vendor/retroarch/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
+APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
 APP_LINK_FLAGS="$vulkan_flags" \
     make app
 

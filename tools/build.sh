@@ -204,8 +204,8 @@ build_system_link_stub() {
     printf '%s\n' "$output"
 }
 
-agc_stub=$(build_system_link_stub libSceAgc vendor/ps5/sdk/stubs/agc_link_stub.c)
-agc_driver_stub=$(build_system_link_stub libSceAgcDriver vendor/ps5/sdk/stubs/agc_driver_link_stub.c)
+agc_stub=$(build_system_link_stub libSceAgc tooling/ps5-stubs/agc_link_stub.c)
+agc_driver_stub=$(build_system_link_stub libSceAgcDriver tooling/ps5-stubs/agc_driver_link_stub.c)
 
 link_inputs=("$build/obj/app_crt.o" "$build/obj/app_cpp_runtime.o" "${objects[@]}")
 link_inputs+=("$agc_stub" "$agc_driver_stub")
@@ -223,6 +223,19 @@ if [[ -n ${APP_VULKAN_ARCHIVES:-} ]]; then
         }
     done
     link_inputs+=(--whole-archive "${vulkan_archives[@]}" --no-whole-archive)
+    # Plain objects the driver needs and its archives do not carry: Mesa's
+    # u_thread.c, anon_file.c and os_file.c, which ../PS5_Vulkan's PS5 object list
+    # filters out and only a shared link can survive without. tools/build-title.sh
+    # compiles them with tools/build-mesa-util.sh and passes them here.
+    if [[ -n ${APP_EXTRA_OBJECTS:-} ]]; then
+        read -r -a extra_objects <<< "$APP_EXTRA_OBJECTS"
+        for object in "${extra_objects[@]}"; do
+            [[ $object =~ ^[A-Za-z0-9_./+-]+(/[A-Za-z0-9_.+-]+)*\.o$ && -f $object ]] || {
+                echo "invalid extra object: $object" >&2; exit 2;
+            }
+        done
+        link_inputs+=("${extra_objects[@]}")
+    fi
     # The shader compiler and Mesa's runtime are C++, so they need libc++,
     # libc++abi and libunwind - the same three the sibling project links, plus the
     # compiler's own builtins archive. They are grouped because the dependency runs
@@ -252,7 +265,9 @@ done
 if (( ${#pacbrew_libs[@]} > 0 )); then
     link_inputs+=(--start-group "${pacbrew_libs[@]}" --end-group)
 fi
-"$sdk_root/bin/prospero-lld" -T "$native/ps5-pie.ld" --eh-frame-hdr \
+# --error-limit=0 lists every unresolved symbol instead of stopping at twenty,
+# which is the difference between one link-failure diagnosis and several.
+"$sdk_root/bin/prospero-lld" -T "$native/ps5-pie.ld" --eh-frame-hdr --error-limit=0 \
     ${APP_LINK_FLAGS:-} \
     --version-script "$native/app-symbols.map" \
     --exclude-libs=ALL -L "$build/obj" \

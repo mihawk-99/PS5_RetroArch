@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import struct
@@ -637,6 +638,95 @@ class FrameLayout(unittest.TestCase):
                 self.assertEqual(self.table[key], expected,
                                  f"the frame layout changed at {key}: "
                                  f"{self.table[key]:#x} instead of {expected:#x}")
+
+
+class LinkedDriver(unittest.TestCase):
+    """What linking ../PS5_Vulkan's driver into this title needs and used to lack.
+
+    Two facts, both of which failed a link that had already compiled: the
+    libraries' imports are declared, and the layout defines the boundary symbols
+    libunwind looks for.
+    """
+
+    vulkan = Path(os.environ.get("PS5_VULKAN_DIR", ROOT.parent / "PS5_Vulkan"))
+    archives = (
+        vulkan / "build/driver/ps5/libps5vk.ps5.a",
+        vulkan / "build/driver/ps5/libpsbc_driver.ps5.a",
+        vulkan / ".deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a",
+    )
+    stubs = (
+        ROOT / "tooling/ps5-stubs/agc_link_stub.c",
+        ROOT / "tooling/ps5-stubs/agc_driver_link_stub.c",
+    )
+
+    def nm(self) -> str | None:
+        """The SDK's llvm-nm, or any nm that can read these archives."""
+        sdk = ROOT / ".deps/native/ps5-payload-sdk/bin/llvm-nm"
+        if sdk.is_file():
+            return str(sdk)
+        return shutil.which("llvm-nm") or shutil.which("nm")
+
+    def test_every_agc_entry_point_the_driver_calls_is_declared(self) -> None:
+        """The AGC stubs cover the driver's whole import surface.
+
+        The console provides libSceAgc and libSceAgcDriver and the SDK ships no
+        stub for either, so tooling/ps5-stubs/ declares what the driver calls.
+        A missing declaration is not a warning: it stops the link, which is how
+        the first Vulkan build of this port ended, on twelve entry points at once.
+        The lists are compared rather than a count, because rebuilding the driver
+        can add one.
+        """
+        if not all(archive.is_file() for archive in self.archives):
+            self.skipTest("the driver archives are not built; run ../PS5_Vulkan/tools/build-driver.sh")
+        nm = self.nm()
+        if nm is None:
+            self.skipTest("no llvm-nm or nm on PATH to read the archives with")
+
+        declared = set()
+        # A definition line starts with its return type; a comment that mentions
+        # one of these names starts with an asterisk, which is the difference.
+        definition = re.compile(r"^[A-Za-z_][\w ]*?\**\s*(sceAgc\w+)\s*\(", re.M)
+        for stub in self.stubs:
+            declared |= set(definition.findall(stub.read_text(encoding="utf-8")))
+        self.assertTrue(declared, "the AGC stubs declare nothing at all")
+
+        referenced = set()
+        for archive in self.archives:
+            done = subprocess.run([nm, "-u", str(archive)], capture_output=True, text=True, check=True)
+            for line in done.stdout.splitlines():
+                fields = line.split()
+                # `                 U sceAgcCreateShader`, and a member heading
+                # line that ends in a colon rather than a symbol name.
+                if fields and fields[-1].startswith("sceAgc"):
+                    referenced.add(fields[-1])
+        self.assertTrue(referenced, "no AGC entry point is referenced at all; the archives changed shape")
+
+        missing = referenced - declared
+        self.assertEqual(missing, set(),
+                         f"the driver calls {sorted(missing)}, which tooling/ps5-stubs/ does not declare")
+
+    def test_the_linked_title_defines_the_unwind_boundaries(self) -> None:
+        """libunwind finds the unwind tables through four boundary symbols.
+
+        The shader compiler is C++ and links the SDK's libunwind, which cannot use
+        dl_iterate_phdr in a title, so tooling/native/ps5-pie.ld provides the four
+        symbols the sibling project's tooling/psbc/ps5-pie-unwind.ld defines. The
+        check is on the linked image rather than on the script, so regenerating
+        the script from the boilerplate - which is how they went missing - fails
+        here instead of at the next link.
+        """
+        image = ROOT / "build" / "llvm-pie.elf"
+        if not image.is_file():
+            self.skipTest("nothing linked; run tools/build-title.sh")
+        nm = self.nm()
+        if nm is None:
+            self.skipTest("no llvm-nm or nm on PATH to read the image with")
+        done = subprocess.run([nm, str(image)], capture_output=True, text=True, check=True)
+        defined = {line.split()[-1] for line in done.stdout.splitlines() if len(line.split()) >= 2}
+        for symbol in ("__eh_frame_start", "__eh_frame_end",
+                       "__eh_frame_hdr_start", "__eh_frame_hdr_end"):
+            self.assertIn(symbol, defined,
+                          f"{symbol} is not in the linked image; the layout no longer provides it")
 
 
 class Artifact(unittest.TestCase):

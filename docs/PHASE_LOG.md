@@ -955,3 +955,62 @@ duplicate pairs, three legitimate edits to `input_driver.c` at different anchors
 **State.** `bash tools/build-title.sh` from a wiped tree, then
 `bash tools/run-title.sh --watch 12` -> title runs, no fatal signal;
 `bash tools/verify.sh` -> PASS; 16 host tests.
+
+## 2026-09-18: The driver is linked into the title, and the link completes
+
+**The step.** `../PS5_Vulkan`'s driver stops being a library RetroArch loads at run
+time and becomes ordinary symbols in `eboot.bin`. The alternative was measured and
+closed in `0cc661d`: a PS5 title cannot dlopen a driver. This is the commit that makes
+the replacement actually link.
+
+**What the first link said.** Twenty-four undefined symbols, and the count is only
+knowable because the link line now carries `--error-limit=0`; before that lld stopped
+at twenty and the tail of the list was invisible. The 24 are three unrelated problems:
+
+- **Four `__eh_frame_*` boundaries** (`__eh_frame_start/end`,
+  `__eh_frame_hdr_start/end`). Their shader compiler is C++ and links the SDK's
+  libunwind, which finds the unwind tables through these boundary symbols rather than
+  through `dl_iterate_phdr`. `../PS5_Vulkan/tooling/psbc/ps5-pie-unwind.ld` defines
+  them; this project's `tooling/native/ps5-pie.ld` is byte-identical to the
+  `ps5-pie.ld` that script includes, so the same four `PROVIDE`s were added to it
+  rather than adopting their `-T` path.
+- **Eight Mesa utility symbols** from `u_queue.ps5.o`, `os_memory_fd.ps5.o` and
+  `ac_spm_config.ps5.o`: `u_thread_create`, `u_thread_setname`,
+  `util_barrier_init/destroy/wait`, `util_thread_get_time_nano`,
+  `os_create_anonymous_file`, `os_read_file`. Their
+  `toolchain/Makefile.opengnm-psbc-ps5` filters `src/util/{u_thread,anon_file,os_file}.c`
+  out of `UTIL_SRCS`, and `tools/build-psbc-ps5.sh` compiles only a five-file support
+  list, so nothing in that tree defines them. Their own `libvulkan.so.1` links because
+  a shared object may leave symbols undefined; a title's link may not. Mesa's own
+  definitions are compiled here (`tools/build-mesa-util.sh`) with their PS5
+  configuration rather than reimplemented, because `u_thread.c`'s `util_barrier` and
+  its `mtx_t`/`cnd_t` come from that tree's `c11/threads.h`, the same header the
+  `u_queue.ps5.o` inside the archive was compiled against. Two of the three needed a
+  flag that configuration does not set: `HAVE_PTHREAD_NP_H` for
+  `pthread_set_name_np`, and for `anon_file.c` the `-D_XOPEN_SOURCE=700` drop that
+  `tooling/psbc/support.mk` already documents for `usleep` and `getprogname`, because
+  `SHM_ANON` is declared under `__BSD_VISIBLE`. `os_file.c` needed `-D__ORBIS__`, the
+  same switch their mak uses for `futex.ps5.o`: its FreeBSD branch walks the kernel's
+  file table through `sysctl(KERN_FILE)` and a `kvaddr_t` the SDK does not have.
+- **Twelve `sceAgc*` entry points.** The console provides libSceAgc and
+  libSceAgcDriver and the SDK stubs neither. The declarations come from
+  `../PS5_Vulkan/vendor/ps5/sdk/stubs/agc_canary_link_stub.c`, signatures unchanged,
+  because those are the imports that project's own titles already record.
+
+**The stubs moved.** They had been edited in `vendor/ps5/sdk/stubs/`, which
+`.gitignore` excludes, so the fix would have built here and vanished at the next
+checkout. They are `tooling/ps5-stubs/agc_link_stub.c` and
+`tooling/ps5-stubs/agc_driver_link_stub.c` now, and `tools/build.sh` reads them there.
+
+**Evidence.** `bash tools/build-title.sh` -> exit 0, no undefined symbols,
+`dist/PPSA99169/eboot.bin` 29,859,722 bytes against 8,225,706 before: 21.6 MB of
+driver and shader compiler. `bash tools/verify.sh` -> PASS (format unit build
+integration evidence). `python3 -m unittest discover -s tests` -> 18 tests, two new:
+every `sceAgc*` the three driver archives reference is declared by the stubs (20
+referenced, 21 declared, none missing), and the linked `build/llvm-pie.elf` defines
+the four `__eh_frame_*` symbols - the check is on the image rather than on the script,
+so regenerating the script from the boilerplate fails the test instead of the link.
+
+**Not proven.** The driver has not been on the console since it was linked. The next
+run is `bash tools/run-title.sh --watch 20` and the answers are in
+`/app0/retroarch.log`.

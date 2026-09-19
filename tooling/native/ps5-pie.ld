@@ -30,6 +30,16 @@ SECTIONS {
         KEEP(*(.eh_frame_hdr))
     } : ro
     .eh_frame : { KEEP(*(.eh_frame)) } : ro
+    /* The SDK's libunwind finds the unwind tables through these four boundary
+     * symbols rather than through dl_iterate_phdr, which a title does not have.
+     * The Vulkan driver's shader compiler is C++ and links libunwind, so the
+     * link fails on them without this. Same four definitions as ../PS5_Vulkan's
+     * tooling/psbc/ps5-pie-unwind.ld, kept here so the layout stays this
+     * project's own file. */
+    PROVIDE(__eh_frame_start = ADDR(.eh_frame));
+    PROVIDE(__eh_frame_end = ADDR(.eh_frame) + SIZEOF(.eh_frame));
+    PROVIDE(__eh_frame_hdr_start = ADDR(.eh_frame_hdr));
+    PROVIDE(__eh_frame_hdr_end = ADDR(.eh_frame_hdr) + SIZEOF(.eh_frame_hdr));
     .gcc_except_table : { *(.gcc_except_table .gcc_except_table.*) } : ro
     .rodata : { *(.rodata .rodata.*) } : ro
 
