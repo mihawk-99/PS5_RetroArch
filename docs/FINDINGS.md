@@ -1631,3 +1631,47 @@ build flag: `rarch_log_file_init` is compiled unconditionally.
    multi-line `#if` block and produced `undefined symbol: char_list_new_special` at
    link time. Markers must be placed at statements, and the result must be compiled
    before it is trusted; two attempts this round were lost to this.
+
+## The input driver is selected but never initialised, and that is one early return
+
+**Measured.** With the compiled default changed to `"ps5"` (`patches/series` 0008),
+a probe inside our own video driver - which does run - reports what the frontend
+believes its drivers are:
+
+    probe drivers: input="ps5" joypad="null" video="ext"
+
+So the selection works and the name reaches the input subsystem. And
+`ps5_input_init` still never runs: no `input:` line appears in the trace, and its
+first statement is a trace call.
+
+**Why, read out of the object.** `input_drivers[]` in this build holds exactly two
+entries, and ours is first:
+
+    R_X86_64_64   input_ps5
+    R_X86_64_64   .data.input_null
+
+`HAVE_TEST_DRIVERS` is `#undef`, so the test-driver branch is gone. What remains in
+`video_driver_init_input` is:
+
+    if (*input)
+       return true;          /* <- taken */
+    ...
+    if (!(new_data = input_driver_init_wrap(...)))   /* never reached */
+
+`input_driver_st.current_driver` is already non-NULL when that function is called,
+because the pre-initialisation pass in `retroarch_main_init` runs
+`input_driver_find_driver`, which *selects* a driver and deliberately does not
+initialise it. So the configured driver is named, never wrapped, `current_data`
+stays NULL, and the pad is a driver with no state.
+
+**This corrects the earlier entry in this file.** Disabling `HAVE_TEST_DRIVERS` was
+necessary but not sufficient: that flag removed one early return from that function,
+and a second one - the `if (*input)` guard that upstream intends for the case where
+a *video* driver pre-initialised input - is taken in this build for a different
+reason, because pre-init already selected the driver. The fix has to make the input
+driver actually initialise on this path, not just be selected.
+
+**A process note that cost a run.** `strings` defaults to a four-character minimum,
+so it reports nothing for a three-character literal like `"ps5"`; that made a
+correctly patched and rebuilt object look unpatched. `grep -a` is the right check
+for short literals.

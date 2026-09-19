@@ -154,6 +154,31 @@ EDITS = [
         "registers no callbacks, so this member can be NULL",
     ),
     (
+        # The console's pad is this build's input driver, so it is also the
+        # compiled default.
+        #
+        # This is what makes the driver reachable without a config file. There is
+        # no config file at runtime yet: content loading rebuilds argv and drops
+        # the title's `-c`, and the fix for that is parked because reading the
+        # config still crashes the launch. With no config read, the whole input
+        # path runs on compiled defaults - `probe init_input entered: *input=ba4dc0
+        # configured="null" joypad="null"` is that measurement - so naming this
+        # project's driver here is what puts it in `input_drivers[]`'s place before
+        # the frontend initialises anything.
+        #
+        # One line, and reversible: when the config file is readable again the
+        # config's own `input_driver` wins at parse time and this default stops
+        # mattering, at which point it can be deleted.
+        "configuration.c",
+        "      case INPUT_NULL:\n          break;",
+        "      case INPUT_NULL:\n"
+        "          /* Named by this port (patches/series, 0008): the console's own pad\n"
+        "           * driver is the only input driver this build can run, and with no\n"
+        "           * config file read it has to come from the compiled default. */\n"
+        "          return \"ps5\";",
+        "the only input driver this build can run",
+    ),
+    (
         # A null joypad driver is a normal state on this console, and upstream
         # dereferences it. input_driver_collect_system_input calls
         # input_joypad_analog_axis with input_st->primary_joypad, which is NULL
