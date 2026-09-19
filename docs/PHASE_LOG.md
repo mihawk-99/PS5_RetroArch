@@ -1644,3 +1644,53 @@ the pre-upload busy check (one running title). The owner-confirmed fixed diagnos
 build remains installed; no running title was interrupted. No performance or
 core-execution claim is made. Criteria documentation now reflects the actual
 settled upload mechanism and the user's driver-change authorization.
+
+## 2026-09-19 — Quiet Vulkan timing locates the severe slowdown
+
+Request: measure frame preparation, submission and presentation independently
+before assigning the poor responsiveness to the unfinished Vulkan driver.
+This is new performance work after the completed GPU menu acceptance.
+
+Patch 0056 adds callback boundaries and limits five formerly unbounded texture
+messages to four calls each. `src/vulkan_trace.cpp` measures monotonic elapsed
+wall time in memory, emits one summary per >=5-second window after four warmup
+callbacks, and preserves API arguments/results and error reporting. The refined
+version also measures menu texture updates outside `vulkan_frame`. No driver
+change or graphics-route switch was made. Patch count grows from 68 to 77.
+
+Commands: `bash tools/verify.sh`; shared-console idle check;
+`bash tools/run-title.sh --no-build --watch 45` for each build. Both runs completed
+and their scripts closed the title. The first build
+`1c14ef0e4f69b4fc559ba20d5b8bea6e6e5fff42060b0b029f029cc71da18b79`
+still logged texture creation/staging asks repeatedly: seven windows fell from
+35.907 to 1.630–1.985 FPS, with up to 958.226 ms outside the video callback.
+The owner reported better responsiveness initially but a falling estimate.
+
+The final build
+`38ada4be3b74b8230ec13aae97b7d3618c4635760c30e90b29a54f0008e14450`
+limits those remaining logs. Eight windows hold 53.760–57.942 FPS: 2,239 frames
+in 40.039 seconds, aggregate 55.920 FPS. Per-frame weighted means: preparation
+5.344 ms, end 0.020, submit 3.525, present 8.075, fence/acquire 0.041, menu texture
+0.153, remaining outside time 0.724; total 17.882 ms. Phase averages sum within
+printed rounding. Each of the five quieted diagnostics appears exactly four times.
+Both traces have zero refusals and no recorded API errors; final successful
+command-end, submit and present counters reach 1,800. CPU fallback is absent.
+
+The owner reports "Noticeable improvement" with the estimated refresh rate
+starting at 40 Hz and increasing. Source inspection confirms the estimate uses
+average frame intervals, not the driver's output-mode rate. This and the timing
+support a major diagnostic-I/O bottleneck in the port, not long submit/present
+stalls. They do not establish a steady 60 FPS or eliminate all latency: final
+frame maxima include 282 ms early and 167–184 ms in later windows. Sparse logs
+and summary I/O remain possible contributors to investigate separately.
+
+All five gates PASS with 26 tests. The added fake-clock regression validates
+warmup/window boundaries, phase accounting, unchanged dispatch and failed API
+results. Applying all 77 patches to a fresh vendor copy and applying them again
+produces identical hashes. No toolchain flag/dependency changed. PS5_Vulkan is
+clean at 6f0ce0d. The final profiling build is installed.
+
+Evidence: `evidence/vulkan-quiet-timing/{capture,expectation}.json`, replay with
+`python3 tools/evidence.py compare evidence/`. Private raw captures:
+`klog/gpu-quiet-timing-run.log`, `klog/gpu-quiet-texture-timing-run.log` and their
+`*-latest-trace.txt` extracts. Timing definitions: `docs/GPU_TIMING.md`.

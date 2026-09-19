@@ -1958,6 +1958,121 @@ EDITS = [
         "                  | ((pix & 15u) << 24)) * 17u;\n",
         "patches/series, 0055",
     ),
+    (
+        "menu/drivers/rgui.c",
+        "   fprintf(stderr, \"rgui set_texture: rgui=%s dirty=%u data=%s\\n\",\n"
+        "         rgui ? \"yes\" : \"no\",\n"
+        "         (p_disp->flags & GFX_DISP_FLAG_FB_DIRTY) ? 1u : 0u,\n"
+        "         (rgui && rgui->frame_buf.data) ? \"yes\" : \"no\");\n",
+        "   /* patches/series, 0056: quiet rgui_set_texture */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)\n"
+        "         fprintf(stderr, \"rgui set_texture: rgui=%s dirty=%u data=%s\\n\",\n"
+        "               rgui ? \"yes\" : \"no\",\n"
+        "               (p_disp->flags & GFX_DISP_FLAG_FB_DIRTY) ? 1u : 0u,\n"
+        "               (rgui && rgui->frame_buf.data) ? \"yes\" : \"no\");\n"
+        "   }\n",
+        "patches/series, 0056: quiet rgui_set_texture",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   fprintf(stderr, \"vulkan set_texture_frame: rgb32=%u %ux%u frame=%s\\n\",\n"
+        "         rgb32 ? 1u : 0u, width, height, frame ? \"yes\" : \"no\");\n",
+        "   /* patches/series, 0056: quiet vulkan_set_texture_frame */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)\n"
+        "         fprintf(stderr, \"vulkan set_texture_frame: rgb32=%u %ux%u frame=%s\\n\",\n"
+        "               rgb32 ? 1u : 0u, width, height, frame ? \"yes\" : \"no\");\n"
+        "   }\n",
+        "patches/series, 0056: quiet vulkan_set_texture_frame",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   fprintf(stderr, \"vulkan copy_staging_to_dynamic: dynamic %ux%u fmt=%d type=%d, staging fmt=%d type=%d, compute=%u\\n\",\n"
+        "         dynamic->width, dynamic->height, (int)dynamic->format, (int)dynamic->type,\n"
+        "         (int)staging->format, (int)staging->type,\n"
+        "         (dynamic->format != staging->format) ? 1u : 0u);\n",
+        "   /* patches/series, 0056: quiet vulkan_copy_staging_to_dynamic */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)\n"
+        "         fprintf(stderr, \"vulkan copy_staging_to_dynamic: dynamic %ux%u fmt=%d type=%d, staging fmt=%d type=%d, compute=%u\\n\",\n"
+        "               dynamic->width, dynamic->height, (int)dynamic->format, (int)dynamic->type,\n"
+        "               (int)staging->format, (int)staging->type,\n"
+        "               (dynamic->format != staging->format) ? 1u : 0u);\n"
+        "   }\n",
+        "patches/series, 0056: quiet vulkan_copy_staging_to_dynamic",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   ps5_mark_vulkan_frame();\n",
+        "   /* patches/series, 0056: time the video callback through swap. */\n"
+        "   extern void ps5_vulkan_profile_begin(void);\n"
+        "   extern void ps5_vulkan_profile_end(void);\n"
+        "   ps5_vulkan_profile_begin();\n"
+        "   ps5_mark_vulkan_frame();\n",
+        "   ps5_vulkan_profile_begin();",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   if (vk->ctx_driver->swap_buffers)\n"
+        "      vk->ctx_driver->swap_buffers(vk->ctx_data);\n",
+        "   if (vk->ctx_driver->swap_buffers)\n"
+        "      vk->ctx_driver->swap_buffers(vk->ctx_data);\n"
+        "   ps5_vulkan_profile_end();\n",
+        "   ps5_vulkan_profile_end();",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   fprintf(stderr, \"vulkan create_texture: asked=%d type=%d %ux%u fmt=%d image=%s buffer=%s\\n\",\n"
+        "         (int)type, (int)tex.type, width, height, (int)format,\n"
+        "         tex.image ? \"yes\" : \"no\", tex.buffer ? \"yes\" : \"no\");\n",
+        "   /* patches/series, 0056: quiet vulkan_create_texture */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)\n"
+        "         fprintf(stderr, \"vulkan create_texture: asked=%d type=%d %ux%u fmt=%d image=%s buffer=%s\\n\",\n"
+        "               (int)type, (int)tex.type, width, height, (int)format,\n"
+        "               tex.image ? \"yes\" : \"no\", tex.buffer ? \"yes\" : \"no\");\n"
+        "   }\n",
+        "patches/series, 0056: quiet vulkan_create_texture",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   fprintf(stderr, \"vulkan menu staging ask: streamed=%d staging=%d dynamic=%d static=%d\\n\",\n"
+        "         (int)VULKAN_TEXTURE_STREAMED, (int)VULKAN_TEXTURE_STAGING,\n"
+        "         (int)VULKAN_TEXTURE_DYNAMIC, (int)VULKAN_TEXTURE_STATIC);\n",
+        "   /* patches/series, 0056: quiet vulkan_menu_staging_ask */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)\n"
+        "         fprintf(stderr, \"vulkan menu staging ask: streamed=%d staging=%d dynamic=%d static=%d\\n\",\n"
+        "               (int)VULKAN_TEXTURE_STREAMED, (int)VULKAN_TEXTURE_STAGING,\n"
+        "               (int)VULKAN_TEXTURE_DYNAMIC, (int)VULKAN_TEXTURE_STATIC);\n"
+        "   }\n",
+        "patches/series, 0056: quiet vulkan_menu_staging_ask",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   /* Added by this port (patches/series, 0047): what the menu handed over. */\n",
+        "   /* patches/series, 0056: texture updates happen outside vulkan_frame. */\n"
+        "   extern uint64_t ps5_vulkan_profile_texture_begin(void);\n"
+        "   extern void ps5_vulkan_profile_texture_end(uint64_t);\n"
+        "   uint64_t ps5_texture_start = ps5_vulkan_profile_texture_begin();\n"
+        "   /* Added by this port (patches/series, 0047): what the menu handed over. */\n",
+        "uint64_t ps5_texture_start = ps5_vulkan_profile_texture_begin();",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   vk->menu.dirty[idx] = true;\n"
+        "}\n",
+        "   vk->menu.dirty[idx] = true;\n"
+        "   ps5_vulkan_profile_texture_end(ps5_texture_start);\n"
+        "}\n",
+        "   ps5_vulkan_profile_texture_end(ps5_texture_start);",
+    ),
 ]
 
 

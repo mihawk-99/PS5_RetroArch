@@ -34,3 +34,6 @@
 
 # 0055  convert the RGUI producer RGBA4444 channels to full-range RGBA8888
 0055-correct-rgui-rgba8888-upload
+
+# 0056  quiet steady-frame diagnostics and time Vulkan video preparation/submission/presentation
+0056-quiet-vulkan-frame-timing

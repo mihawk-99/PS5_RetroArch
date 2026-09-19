@@ -1,0 +1,640 @@
+{
+  "step": "vulkan-quiet-timing",
+  "command": "bash tools/verify.sh; confirm console idle; bash tools/run-title.sh --no-build --watch 45",
+  "raw_capture": "klog/gpu-quiet-texture-timing-latest-trace.txt",
+  "raw_lines": 127,
+  "tested_build_identity": "38ada4be3b74b8230ec13aae97b7d3618c4635760c30e90b29a54f0008e14450",
+  "driver_commit": "6f0ce0d",
+  "driver_modified": false,
+  "measurement": "CLOCK_MONOTONIC CPU-observed wall time, first four completed callbacks excluded; milliseconds per frame",
+  "windows": [
+    {
+      "frames": 269.0,
+      "seconds": 5.004,
+      "fps": 53.76,
+      "metrics": {
+        "interval": {
+          "avg_ms": 18.601,
+          "max_ms": 282.353
+        },
+        "outside": {
+          "avg_ms": 0.269,
+          "max_ms": 31.831
+        },
+        "texture": {
+          "avg_ms": 0.955,
+          "max_ms": 87.3
+        },
+        "prepare": {
+          "avg_ms": 5.707,
+          "max_ms": 240.057
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.027
+        },
+        "submit": {
+          "avg_ms": 3.432,
+          "max_ms": 4.569
+        },
+        "present": {
+          "avg_ms": 8.176,
+          "max_ms": 8.442
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.061
+        }
+      }
+    },
+    {
+      "frames": 290.0,
+      "seconds": 5.005,
+      "fps": 57.942,
+      "metrics": {
+        "interval": {
+          "avg_ms": 17.259,
+          "max_ms": 166.847
+        },
+        "outside": {
+          "avg_ms": 0.689,
+          "max_ms": 156.312
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.05
+        },
+        "prepare": {
+          "avg_ms": 4.873,
+          "max_ms": 16.731
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.026
+        },
+        "submit": {
+          "avg_ms": 3.532,
+          "max_ms": 4.674
+        },
+        "present": {
+          "avg_ms": 8.06,
+          "max_ms": 12.817
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.058
+        }
+      }
+    },
+    {
+      "frames": 271.0,
+      "seconds": 5.005,
+      "fps": 54.146,
+      "metrics": {
+        "interval": {
+          "avg_ms": 18.469,
+          "max_ms": 166.835
+        },
+        "outside": {
+          "avg_ms": 0.917,
+          "max_ms": 156.691
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.06
+        },
+        "prepare": {
+          "avg_ms": 5.881,
+          "max_ms": 101.012
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.026
+        },
+        "submit": {
+          "avg_ms": 3.533,
+          "max_ms": 4.629
+        },
+        "present": {
+          "avg_ms": 8.034,
+          "max_ms": 12.263
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.049
+        }
+      }
+    },
+    {
+      "frames": 289.0,
+      "seconds": 5.005,
+      "fps": 57.742,
+      "metrics": {
+        "interval": {
+          "avg_ms": 17.318,
+          "max_ms": 183.532
+        },
+        "outside": {
+          "avg_ms": 0.696,
+          "max_ms": 158.814
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.071
+        },
+        "prepare": {
+          "avg_ms": 4.876,
+          "max_ms": 16.971
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.027
+        },
+        "submit": {
+          "avg_ms": 3.542,
+          "max_ms": 4.682
+        },
+        "present": {
+          "avg_ms": 8.1,
+          "max_ms": 16.081
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.058
+        }
+      }
+    },
+    {
+      "frames": 271.0,
+      "seconds": 5.005,
+      "fps": 54.146,
+      "metrics": {
+        "interval": {
+          "avg_ms": 18.469,
+          "max_ms": 166.824
+        },
+        "outside": {
+          "avg_ms": 0.918,
+          "max_ms": 156.808
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.066
+        },
+        "prepare": {
+          "avg_ms": 5.902,
+          "max_ms": 107.53
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.026
+        },
+        "submit": {
+          "avg_ms": 3.539,
+          "max_ms": 4.69
+        },
+        "present": {
+          "avg_ms": 8.006,
+          "max_ms": 8.173
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.058
+        }
+      }
+    },
+    {
+      "frames": 290.0,
+      "seconds": 5.005,
+      "fps": 57.942,
+      "metrics": {
+        "interval": {
+          "avg_ms": 17.259,
+          "max_ms": 166.844
+        },
+        "outside": {
+          "avg_ms": 0.686,
+          "max_ms": 155.988
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.061
+        },
+        "prepare": {
+          "avg_ms": 4.875,
+          "max_ms": 17.699
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.039
+        },
+        "submit": {
+          "avg_ms": 3.536,
+          "max_ms": 4.668
+        },
+        "present": {
+          "avg_ms": 8.057,
+          "max_ms": 11.885
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.058
+        }
+      }
+    },
+    {
+      "frames": 270.0,
+      "seconds": 5.005,
+      "fps": 53.946,
+      "metrics": {
+        "interval": {
+          "avg_ms": 18.537,
+          "max_ms": 183.521
+        },
+        "outside": {
+          "avg_ms": 0.922,
+          "max_ms": 160.158
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.06
+        },
+        "prepare": {
+          "avg_ms": 5.895,
+          "max_ms": 102.676
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.026
+        },
+        "submit": {
+          "avg_ms": 3.543,
+          "max_ms": 4.676
+        },
+        "present": {
+          "avg_ms": 8.072,
+          "max_ms": 14.847
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.06
+        }
+      }
+    },
+    {
+      "frames": 289.0,
+      "seconds": 5.005,
+      "fps": 57.742,
+      "metrics": {
+        "interval": {
+          "avg_ms": 17.318,
+          "max_ms": 183.501
+        },
+        "outside": {
+          "avg_ms": 0.701,
+          "max_ms": 161.245
+        },
+        "texture": {
+          "avg_ms": 0.043,
+          "max_ms": 0.066
+        },
+        "prepare": {
+          "avg_ms": 4.879,
+          "max_ms": 18.002
+        },
+        "end": {
+          "avg_ms": 0.02,
+          "max_ms": 0.025
+        },
+        "submit": {
+          "avg_ms": 3.537,
+          "max_ms": 4.672
+        },
+        "present": {
+          "avg_ms": 8.097,
+          "max_ms": 13.684
+        },
+        "wait": {
+          "avg_ms": 0.041,
+          "max_ms": 0.049
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "frames": 2239,
+    "seconds": 40.039,
+    "fps": 55.92047753440396,
+    "weighted_avg_ms": {
+      "interval": 17.8824836980795,
+      "outside": 0.724014738722644,
+      "texture": 0.15257034390352833,
+      "prepare": 5.344413130861992,
+      "end": 0.02,
+      "submit": 3.5247347029924074,
+      "present": 8.075251004912907,
+      "wait": 0.041
+    }
+  },
+  "preliminary_run": {
+    "raw_capture": "klog/gpu-quiet-timing-latest-trace.txt",
+    "tested_build_identity": "1c14ef0e4f69b4fc559ba20d5b8bea6e6e5fff42060b0b029f029cc71da18b79",
+    "note": "Three unbounded diagnostics limited; texture creation and staging-ask logs still unbounded. Outside includes texture updates in this version.",
+    "windows": [
+      {
+        "frames": 181.0,
+        "seconds": 5.041,
+        "fps": 35.907,
+        "metrics": {
+          "interval": {
+            "avg_ms": 27.85,
+            "max_ms": 286.056
+          },
+          "outside": {
+            "avg_ms": 10.107,
+            "max_ms": 190.776
+          },
+          "prepare": {
+            "avg_ms": 6.126,
+            "max_ms": 239.864
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.027
+          },
+          "submit": {
+            "avg_ms": 3.378,
+            "max_ms": 3.567
+          },
+          "present": {
+            "avg_ms": 8.178,
+            "max_ms": 8.715
+          },
+          "wait": {
+            "avg_ms": 0.041,
+            "max_ms": 0.048
+          }
+        }
+      },
+      {
+        "frames": 53.0,
+        "seconds": 5.088,
+        "fps": 10.416,
+        "metrics": {
+          "interval": {
+            "avg_ms": 96.008,
+            "max_ms": 316.987
+          },
+          "outside": {
+            "avg_ms": 79.986,
+            "max_ms": 296.886
+          },
+          "prepare": {
+            "avg_ms": 4.871,
+            "max_ms": 5.737
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.027
+          },
+          "submit": {
+            "avg_ms": 3.459,
+            "max_ms": 3.58
+          },
+          "present": {
+            "avg_ms": 7.63,
+            "max_ms": 11.514
+          },
+          "wait": {
+            "avg_ms": 0.041,
+            "max_ms": 0.045
+          }
+        }
+      },
+      {
+        "frames": 129.0,
+        "seconds": 5.005,
+        "fps": 25.774,
+        "metrics": {
+          "interval": {
+            "avg_ms": 38.798,
+            "max_ms": 166.875
+          },
+          "outside": {
+            "avg_ms": 22.35,
+            "max_ms": 154.816
+          },
+          "prepare": {
+            "avg_ms": 4.917,
+            "max_ms": 16.811
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.022
+          },
+          "submit": {
+            "avg_ms": 3.413,
+            "max_ms": 4.5
+          },
+          "present": {
+            "avg_ms": 8.058,
+            "max_ms": 12.986
+          },
+          "wait": {
+            "avg_ms": 0.041,
+            "max_ms": 0.057
+          }
+        }
+      },
+      {
+        "frames": 18.0,
+        "seconds": 5.739,
+        "fps": 3.136,
+        "metrics": {
+          "interval": {
+            "avg_ms": 318.837,
+            "max_ms": 834.16
+          },
+          "outside": {
+            "avg_ms": 302.724,
+            "max_ms": 812.563
+          },
+          "prepare": {
+            "avg_ms": 4.909,
+            "max_ms": 4.957
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.021
+          },
+          "submit": {
+            "avg_ms": 3.555,
+            "max_ms": 3.593
+          },
+          "present": {
+            "avg_ms": 7.588,
+            "max_ms": 13.078
+          },
+          "wait": {
+            "avg_ms": 0.041,
+            "max_ms": 0.044
+          }
+        }
+      },
+      {
+        "frames": 10.0,
+        "seconds": 5.038,
+        "fps": 1.985,
+        "metrics": {
+          "interval": {
+            "avg_ms": 503.837,
+            "max_ms": 967.635
+          },
+          "outside": {
+            "avg_ms": 487.426,
+            "max_ms": 953.721
+          },
+          "prepare": {
+            "avg_ms": 4.903,
+            "max_ms": 4.94
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.021
+          },
+          "submit": {
+            "avg_ms": 3.544,
+            "max_ms": 3.586
+          },
+          "present": {
+            "avg_ms": 7.903,
+            "max_ms": 15.413
+          },
+          "wait": {
+            "avg_ms": 0.042,
+            "max_ms": 0.047
+          }
+        }
+      },
+      {
+        "frames": 9.0,
+        "seconds": 5.522,
+        "fps": 1.63,
+        "metrics": {
+          "interval": {
+            "avg_ms": 613.576,
+            "max_ms": 950.959
+          },
+          "outside": {
+            "avg_ms": 596.591,
+            "max_ms": 934.12
+          },
+          "prepare": {
+            "avg_ms": 4.925,
+            "max_ms": 4.97
+          },
+          "end": {
+            "avg_ms": 0.02,
+            "max_ms": 0.021
+          },
+          "submit": {
+            "avg_ms": 3.559,
+            "max_ms": 3.618
+          },
+          "present": {
+            "avg_ms": 8.438,
+            "max_ms": 16.139
+          },
+          "wait": {
+            "avg_ms": 0.041,
+            "max_ms": 0.042
+          }
+        }
+      },
+      {
+        "frames": 10.0,
+        "seconds": 5.038,
+        "fps": 1.985,
+        "metrics": {
+          "interval": {
+            "avg_ms": 503.836,
+            "max_ms": 967.649
+          },
+          "outside": {
+            "avg_ms": 488.835,
+            "max_ms": 958.226
+          },
+          "prepare": {
+            "avg_ms": 4.913,
+            "max_ms": 4.97
+          },
+          "end": {
+            "avg_ms": 0.021,
+            "max_ms": 0.025
+          },
+          "submit": {
+            "avg_ms": 3.538,
+            "max_ms": 3.568
+          },
+          "present": {
+            "avg_ms": 6.487,
+            "max_ms": 10.339
+          },
+          "wait": {
+            "avg_ms": 0.042,
+            "max_ms": 0.047
+          }
+        }
+      }
+    ],
+    "owner": "Noticeably more responsive, the estimated screen refresh rate is now 20hz but it only keeps decreasing"
+  },
+  "interpretation": "Limiting the remaining texture logs removes the progressive collapse in this run. Strong evidence of port diagnostic I/O overhead, not long Vulkan submit/present stalls. Occasional spikes remain; these are not GPU execution timestamps.",
+  "lines": [
+    "build identity: 38ada4be3b74b8230ec13aae97b7d3618c4635760c30e90b29a54f0008e14450",
+    "video driver: video_vulkan init entered",
+    "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+    "gpu result: swapchain image calls=1 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+    "gpu result: swapchain image calls=2 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+    "gpu result: swapchain image calls=3 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0",
+    "gpu timing: frames=269 seconds=5.004 fps=53.760 ms_avg/max interval=18.601/282.353 outside=0.269/31.831 texture=0.955/87.300 prepare=5.707/240.057 end=0.020/0.027 submit=3.432/4.569 present=8.176/8.442 wait=0.041/0.061",
+    "gpu timing: frames=290 seconds=5.005 fps=57.942 ms_avg/max interval=17.259/166.847 outside=0.689/156.312 texture=0.043/0.050 prepare=4.873/16.731 end=0.020/0.026 submit=3.532/4.674 present=8.060/12.817 wait=0.041/0.058",
+    "gpu result: vkEndCommandBuffer calls=600 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=600 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=600 failures=0 result=0",
+    "gpu result: swapchain image calls=600 failures=0 result=0",
+    "gpu timing: frames=271 seconds=5.005 fps=54.146 ms_avg/max interval=18.469/166.835 outside=0.917/156.691 texture=0.043/0.060 prepare=5.881/101.012 end=0.020/0.026 submit=3.533/4.629 present=8.034/12.263 wait=0.041/0.049",
+    "gpu timing: frames=289 seconds=5.005 fps=57.742 ms_avg/max interval=17.318/183.532 outside=0.696/158.814 texture=0.043/0.071 prepare=4.876/16.971 end=0.020/0.027 submit=3.542/4.682 present=8.100/16.081 wait=0.041/0.058",
+    "gpu result: vkEndCommandBuffer calls=1200 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1200 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1200 failures=0 result=0",
+    "gpu result: swapchain image calls=1200 failures=0 result=0",
+    "gpu timing: frames=271 seconds=5.005 fps=54.146 ms_avg/max interval=18.469/166.824 outside=0.918/156.808 texture=0.043/0.066 prepare=5.902/107.530 end=0.020/0.026 submit=3.539/4.690 present=8.006/8.173 wait=0.041/0.058",
+    "gpu timing: frames=290 seconds=5.005 fps=57.942 ms_avg/max interval=17.259/166.844 outside=0.686/155.988 texture=0.043/0.061 prepare=4.875/17.699 end=0.020/0.039 submit=3.536/4.668 present=8.057/11.885 wait=0.041/0.058",
+    "gpu result: vkEndCommandBuffer calls=1800 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1800 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1800 failures=0 result=0",
+    "gpu result: swapchain image calls=1800 failures=0 result=0",
+    "gpu timing: frames=270 seconds=5.005 fps=53.946 ms_avg/max interval=18.537/183.521 outside=0.922/160.158 texture=0.043/0.060 prepare=5.895/102.676 end=0.020/0.026 submit=3.543/4.676 present=8.072/14.847 wait=0.041/0.060",
+    "gpu timing: frames=289 seconds=5.005 fps=57.742 ms_avg/max interval=17.318/183.501 outside=0.701/161.245 texture=0.043/0.066 prepare=4.879/18.002 end=0.020/0.025 submit=3.537/4.672 present=8.097/13.684 wait=0.041/0.049",
+    "audit: fresh trace refusals=0; all recorded API results successful; CPU fallback absent",
+    "audit: all five formerly unbounded texture diagnostics emitted exactly four lines each",
+    "runner: completed 45-second watch; script closed title",
+    "timing audit: 8 windows; 2239 frames; phase averages sum to interval within rounding",
+    "host: all five gates PASS; 26 tests; fresh vendor patch replay and idempotence PASS (77 edits)",
+    "owner: Noticeable improvement; estimated refresh starts near 40 Hz and rises"
+  ],
+  "owner_final": "Noticeable improvement but weird behavior: estimated screen refresh rate started at 40hz and kept only increasing rather than being a fix 60hz"
+}

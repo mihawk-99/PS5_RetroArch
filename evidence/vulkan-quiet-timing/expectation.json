@@ -1,0 +1,16 @@
+{
+  "step": "vulkan-quiet-timing",
+  "note": "Final quiet build: all timing categories measured, no progressive collapse across eight windows; no claim of zero latency spikes.",
+  "must_contain": [
+    "refusals=0",
+    "vkEndCommandBuffer calls=1800 failures=0 result=0",
+    "vkQueueSubmit calls=1800 failures=0 result=0",
+    "vkQueuePresentKHR calls=1800 failures=0 result=0",
+    "fps=53.760",
+    "fps=57.742",
+    "all five formerly unbounded texture diagnostics emitted exactly four lines each",
+    "phase averages sum to interval within rounding",
+    "completed 45-second watch"
+  ],
+  "must_not_contain": []
+}
