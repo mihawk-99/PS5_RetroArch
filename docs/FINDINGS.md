@@ -2195,3 +2195,35 @@ is why it is recorded as unverified rather than as working. The next run with th
 console free should be judged on the trace alone: `video_ps5`'s marks
 (`ps5_init entered`, `ps5_frame ...`) appear if it was selected, and the `vulkan:`
 refusals appear if it was not.
+
+## The compiled default is `ps5` and the console still runs Vulkan
+
+**Measured, and this closes the route.** `build/ra-conf/configuration.c` line 1152's
+`case VIDEO_NULL:` returns `"ps5"` - confirmed by reading the configured tree, not
+by grepping a binary. The title was rebuilt from it (33,793,610 bytes) and the
+console still produced the linked libps5vk's refusals:
+
+    vulkan: only triangle lists without primitive restart are supported (VK_ERROR_UNKNOWN)  x21
+    vulkan: set 0 binding 3: descriptor type 3 has no proven table entry (VK_ERROR_UNKNOWN)  x3
+    vulkan: sampler address modes ... (VK_ERROR_UNKNOWN)  x16
+
+So `config_get_default_video()` is not what selects the video driver on this build,
+and changing it has no effect. The frontend's own log names no video driver either -
+it reports the *input* driver (`ps5`) and the display server (`null`), never the
+video driver - so the frontend cannot say which driver it chose and the refusals in
+the trace are the only witness.
+
+Two candidates remain, and both are outside this project: `frontend_driver_get_video_driver()`
+(`gfx/video_driver.c` returns early if the frontend context supplies a driver,
+before any name lookup) and RetroArch's own runner/profile mechanism. Neither was
+determined.
+
+**The blocker, stated once and for the last time in this document.** The frontend's
+draws are refused by the linked libps5vk. A refusal ends recording with an error at
+`vkEndCommandBuffer` (`driver/ps5vk_private.h`), so those command buffers are never
+submitted, which is why frames are accepted and the screen is black. Of the three
+refusal sources the maintainer classified all three as expected gaps, and the
+sampler address-mode restriction (`driver/ps5vk_image.c:800-806`, C4 scope) cannot
+be worked around from this side. Until it is lifted, or until the frontend is
+changed to request only clamp-to-edge samplers, the menu's draws do not reach the
+GPU. Both are changes in `../PS5_Vulkan`, which this project does not modify.
