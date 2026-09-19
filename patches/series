@@ -28,3 +28,6 @@
 #       second pass through the runloop (see tools/apply-port-patches.py)
 #       input/input_driver.c
 0004-guard-the-joypad-analog-read
+
+# 0054  observe command completion, queue submission, presentation and menu draw inputs
+0054-observe-vulkan-api-results

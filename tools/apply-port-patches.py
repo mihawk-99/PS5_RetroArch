@@ -1895,6 +1895,50 @@ EDITS = [
         "      vulkan_transition_texture(vk, vk->cmd, quad->texture);\n",
         "vulkan draw_quad %u: texture=",
     ),
+    (
+        "libretro-common/vulkan/vulkan_symbol_wrapper.c",
+        "    *ppSymbol = GetInstanceProcAddr(instance, name);\n",
+        "    /* Added by this port (patches/series, 0054): observe every API result. */\n"
+        "    extern void ps5_vulkan_trace_symbol(const char *, PFN_vkVoidFunction *);\n"
+        "    *ppSymbol = GetInstanceProcAddr(instance, name);\n"
+        "    ps5_vulkan_trace_symbol(name, ppSymbol);\n",
+        "    *ppSymbol = GetInstanceProcAddr(instance, name);\n"
+        "    ps5_vulkan_trace_symbol",
+    ),
+    (
+        "libretro-common/vulkan/vulkan_symbol_wrapper.c",
+        "    *ppSymbol = vkGetDeviceProcAddr(device, name);\n",
+        "    /* Added by this port (patches/series, 0054): observe every API result. */\n"
+        "    extern void ps5_vulkan_trace_symbol(const char *, PFN_vkVoidFunction *);\n"
+        "    *ppSymbol = vkGetDeviceProcAddr(device, name);\n"
+        "    ps5_vulkan_trace_symbol(name, ppSymbol);\n",
+        "    *ppSymbol = vkGetDeviceProcAddr(device, name);\n"
+        "    ps5_vulkan_trace_symbol",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   /* Draw the quad */\n"
+        "   vkCmdDraw(vk->cmd, 6, 1, 0, 0);\n",
+        "   /* Added by this port (patches/series, 0054): measure the draw inputs. */\n"
+        "   {\n"
+        "      static unsigned ps5_draw_inputs;\n"
+        "      if (ps5_draw_inputs++ < 4)\n"
+        "      {\n"
+        "         unsigned ps5_m;\n"
+        "         fprintf(stderr, \"gpu quad: alpha=%f viewport=%f,%f %fx%f depth=%f,%f\\n\",\n"
+        "               quad->color.a, vk->vk_vp.x, vk->vk_vp.y,\n"
+        "               vk->vk_vp.width, vk->vk_vp.height,\n"
+        "               vk->vk_vp.minDepth, vk->vk_vp.maxDepth);\n"
+        "         fprintf(stderr, \"gpu quad mvp:\");\n"
+        "         for (ps5_m = 0; ps5_m < 16; ps5_m++)\n"
+        "            fprintf(stderr, \" %f\", quad->mvp->data[ps5_m]);\n"
+        "         fprintf(stderr, \"\\n\");\n"
+        "      }\n"
+        "   }\n"
+        "   /* Draw the quad */\n"
+        "   vkCmdDraw(vk->cmd, 6, 1, 0, 0);\n",
+        "gpu quad: alpha=",
+    ),
 ]
 
 

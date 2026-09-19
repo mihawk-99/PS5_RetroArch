@@ -1,0 +1,16 @@
+{
+  "step": "vulkan-api-results-splash",
+  "note": "Diagnostic run, manually closed before 90 seconds. Initial API successes prove these calls ran, not a full-window acceptance or menu visibility.",
+  "must_contain": [
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0",
+    "alpha=1.000000",
+    "refusals=0"
+  ],
+  "must_not_contain": [
+    "vulkan: "
+  ],
+  "human_check": "Owner saw the app background indefinitely and manually closed the title. B4 failed; no full-window A4/B2/B3 pass is claimed."
+}

@@ -1528,3 +1528,28 @@ format" were answers about a path that was not being taken, and the refusal name
 binding rather than an upload. The second is that a leftover file on the console
 (`/app0/args.txt`, which deploy never deletes) silently changed what the title did;
 `tools/run-title.sh` now clears it before every run.
+
+## 2026-09-19 — Vulkan API diagnostics expose a covered title
+
+Added three named 0054 edits and `src/vulkan_trace.cpp`: wrappers observe all
+frontend command-buffer endings, submissions and presentations without changing
+arguments or results. Host tests cover failed returns, per-image results, missing
+symbols and repeated loading. `bash tools/verify.sh` passed all five gates with
+21 tests. The initial test harness used an enum absent from the older frontend
+headers; using its numeric VkResult value fixed that harness compilation failure.
+
+`bash tools/run-title.sh --no-build --watch 90` first failed at socket creation
+under the sandbox; the approved network retry uploaded and launched. The owner
+saw the app background and manually closed it. The script mislabels that as an
+exit on its own. The fresh startup segment contains 537 lines and zero refusal
+lines, with the first four end/submit/present/per-image results all VK_SUCCESS.
+The menu alpha is 1 and its matrix/viewport are plausible. This is a diagnostic
+result, not full-window GPU acceptance. Capture and expectation are committed in
+`evidence/vulkan-api-results-splash/`; raw console data stays ignored.
+
+Reading the CPU display startup and the sibling's diagnostic title found splash
+dismissal on both, but none on RetroArch's Vulkan route. The kernel log retained
+the splash scene until manual closure. The next step is a title-side splash fix.
+No sibling file was changed. A fresh port-patch replay also exposed repeated 0023
+sampler blocks in the configured shader source; record separately from the
+display diagnosis.

@@ -2445,3 +2445,24 @@ Left open, precisely: with the menu texture filled, the quad drawn every frame w
 screen is still black. The next question is what the driver does with that draw -
 `../PS5_Vulkan`'s `ps5vk_draw.c`, the AGC stream it writes for the quad and the
 viewport it programs - not any further gate on this side.
+
+## 2026-09-19 — Successful Vulkan calls behind the shell splash
+
+The diagnostic title's symbol loaders now observe every frontend call to
+vkEndCommandBuffer, vkQueueSubmit and vkQueuePresentKHR. In the manually closed
+run recorded in `evidence/vulkan-api-results-splash/`, the first four calls to
+each returned VK_SUCCESS, including per-swapchain presentation results; the
+537-line fresh startup segment contains no refusal. The quad's alpha is 1 and
+its 2880x2160 viewport begins at x=480 inside the 3840x2160 swapchain.
+
+The owner saw the application background rather than RGUI and confirmed a manual
+close. The kernel log kept SplashScreen.PPSA99169 focused until the close.
+`src/display.cpp` dismisses that splash in the CPU display's open method, which
+Vulkan never calls. The sibling's diagnostic title also explicitly hides the
+splash before its Vulkan work. This identifies a missing title-lifecycle call;
+it does not yet establish whether rendered menu pixels underneath are correct.
+
+The raw trace appends across launches, including after a truncated prior line.
+The newest startup must therefore be selected by the last `bss check=` substring
+rather than a line-anchored match. The run script's "exited on its own" message
+means only that its final process query found no running title.
