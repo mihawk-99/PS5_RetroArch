@@ -1776,6 +1776,125 @@ EDITS = [
         "         (int)VULKAN_TEXTURE_DYNAMIC, (int)VULKAN_TEXTURE_STATIC);\n",
         "vulkan menu staging ask:",
     ),
+    (
+        # The last silent return: the menu texture is created and never filled.
+        #
+        # vulkan_frame draws the menu from vk->menu.textures_optimal[]. That image is
+        # filled by exactly one thing - vulkan_copy_staging_to_dynamic, called from
+        # vulkan_frame's upload block, which runs only when vk->menu.dirty[] is set -
+        # and the pixels RGUI hands over go into vk->menu.textures[], the staging
+        # texture. This function marks dirty[] at its end for both cases, but it
+        # fills the optimal image itself only in the first case:
+        #
+        #   if (texture->type == VULKAN_TEXTURE_STAGING)
+        #      *texture_optimal = vulkan_create_texture(..., VULKAN_TEXTURE_DYNAMIC);
+        #   else
+        #      VULKAN_SYNC_TEXTURE_TO_GPU_COND_PTR(vk, texture);   /* <-- no copy */
+        #
+        # On the first handover texture->type is STAGING, so a DYNAMIC optimal
+        # texture is created - an image with no data. From the second handover on,
+        # texture_optimal->memory is non-NULL, so the else branch is taken: the
+        # staging pixels are flushed to the GPU and then never copied into the
+        # image the draw samples. The result is an optimal texture that exists and
+        # holds whatever the allocation gave it, which is black, drawn every frame
+        # over a black clear. Confirmed on the console by the state probe:
+        # staging(img=0 buf=1) optimal(img=1 buf=0) with no upload between them.
+        #
+        # The copy is what the dirty flag is for, and the flag is set at the end of
+        # both branches, so the upload block does run - but by then this function
+        # has already returned and the only work it does is the copy from the
+        # staging texture this branch just flushed. Removing the guard makes the
+        # flush unconditional, which is what it needs to be: the staging texture is
+        # rewritten every time RGUI hands a frame over, and the optimal image has
+        # to be told so. The copy itself is the frontend's own
+        # vkCmdCopyBufferToImage path, which this port already verified as the
+        # branch taken when both formats match (patch 0027 names the one format).
+        "gfx/drivers/vulkan.c",
+        "   if (texture->type == VULKAN_TEXTURE_STAGING)\n"
+        "      *texture_optimal = vulkan_create_texture(vk,\n"
+        "              texture_optimal->memory\n"
+        "            ? texture_optimal\n"
+        "            : NULL,\n"
+        "            width,\n"
+        "            height,\n"
+        "            fmt,\n"
+        "            NULL,\n"
+        "            ptr_swizzle,\n"
+        "            VULKAN_TEXTURE_DYNAMIC);\n"
+        "   else\n"
+        "   {\n"
+        "      VULKAN_SYNC_TEXTURE_TO_GPU_COND_PTR(vk, texture);\n"
+        "   }\n",
+        "   if (texture->type == VULKAN_TEXTURE_STAGING)\n"
+        "      *texture_optimal = vulkan_create_texture(vk,\n"
+        "              texture_optimal->memory\n"
+        "            ? texture_optimal\n"
+        "            : NULL,\n"
+        "            width,\n"
+        "            height,\n"
+        "            fmt,\n"
+        "            NULL,\n"
+        "            ptr_swizzle,\n"
+        "            VULKAN_TEXTURE_DYNAMIC);\n"
+        "   /* Added by this port (patches/series, 0051): the flush is unconditional.\n"
+        "    * The else branch used to sync the staging texture to the GPU without ever\n"
+        "    * copying it into the optimal image the draw samples, so from the second\n"
+        "    * handover on the menu was drawn from an image nothing had written. See the\n"
+        "    * note above this edit. */\n"
+        "   VULKAN_SYNC_TEXTURE_TO_GPU_COND_PTR(vk, texture);\n",
+        "patches/series, 0051",
+    ),
+    (
+        # Whether the upload runs at all, and which branch of it. The optimal image
+        # still is not filled after patch 0051, and this function is the only
+        # writer, so the question is now inside it: is it called, does the format
+        # comparison send it to the compute path whose descriptor this driver
+        # refuses (it would log that itself), or does its vkCmdCopyBufferToImage
+        # path run and the image simply stay unread by the draw.
+        "gfx/drivers/vulkan.c",
+        "   bool compute_upload = dynamic->format != staging->format;\n",
+        "   /* Added by this port (patches/series, 0052): whether the upload runs. */\n"
+        "   fprintf(stderr, \"vulkan copy_staging_to_dynamic: dynamic %ux%u fmt=%d type=%d, staging fmt=%d type=%d, compute=%u\\n\",\n"
+        "         dynamic->width, dynamic->height, (int)dynamic->format, (int)dynamic->type,\n"
+        "         (int)staging->format, (int)staging->type,\n"
+        "         (dynamic->format != staging->format) ? 1u : 0u);\n"
+        "   bool compute_upload = dynamic->format != staging->format;\n",
+        "vulkan copy_staging_to_dynamic: dynamic",
+    ),
+    (
+        # The draw the menu actually uses. The probe in gfx_display_vk_draw watched
+        # the display-list path and reported nothing, which was true and misleading:
+        # this driver composites the menu itself, in vulkan_frame, through
+        # vulkan_draw_quad - so "no draw" meant "not that kind of draw". This marks
+        # the quad path, with the three things that decide whether the quad becomes
+        # pixels: the texture it samples, whether that texture has an image, and
+        # the image's layout at the moment of the draw.
+        "gfx/drivers/vulkan.c",
+        "static void vulkan_draw_quad(vk_t *vk, const struct vk_draw_quad *quad)\n"
+        "{\n"
+        "   if (quad->texture && quad->texture->image)\n"
+        "      vulkan_transition_texture(vk, vk->cmd, quad->texture);\n",
+        "static void vulkan_draw_quad(vk_t *vk, const struct vk_draw_quad *quad)\n"
+        "{\n"
+        "   /* Added by this port (patches/series, 0053): the quad the menu uses. */\n"
+        "   {\n"
+        "      static unsigned ps5_quad_marks;\n"
+        "\n"
+        "      if (ps5_quad_marks < 4 || (ps5_quad_marks % 600) == 0)\n"
+        "         fprintf(stderr, \"vulkan draw_quad %u: texture=%s image=%s layout=%d %ux%u pipe=%s\\n\",\n"
+        "               ps5_quad_marks,\n"
+        "               quad->texture ? \"yes\" : \"no\",\n"
+        "               (quad->texture && quad->texture->image) ? \"yes\" : \"no\",\n"
+        "               quad->texture ? (int)quad->texture->layout : -1,\n"
+        "               quad->texture ? quad->texture->width : 0u,\n"
+        "               quad->texture ? quad->texture->height : 0u,\n"
+        "               quad->pipeline ? \"yes\" : \"no\");\n"
+        "      ps5_quad_marks++;\n"
+        "   }\n"
+        "   if (quad->texture && quad->texture->image)\n"
+        "      vulkan_transition_texture(vk, vk->cmd, quad->texture);\n",
+        "vulkan draw_quad %u: texture=",
+    ),
 ]
 
 
