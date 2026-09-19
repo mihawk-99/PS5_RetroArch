@@ -1675,3 +1675,57 @@ driver actually initialise on this path, not just be selected.
 so it reports nothing for a three-character literal like `"ps5"`; that made a
 correctly patched and rebuilt object look unpatched. `grep -a` is the right check
 for short literals.
+
+## Selection is not initialisation: `ps5_input_init` has never run
+
+**Measured, from inside our own driver.** The frontend calls a video driver's `init`
+with two pointers whose documented purpose is "the video driver may pre-initialise
+an input driver" (`gfx/video_driver.h`). Printing them from `ps5_init` gives:
+
+    probe handed: input=be3ed0 input_data=be3ed8 *input=ba41e0 *input_data=0
+
+So when our video driver starts, an input driver is already **selected**
+(`*input` non-NULL) and its state is **zero** (`*input_data` NULL). `ps5_input_init`
+has never been called - not on this run, not on any run: the trace holds no `input:`
+line at all, and that function's first statement is a trace call.
+
+**The path that should initialise it.** `input_driver_find_driver` runs during driver
+pre-initialisation and only *selects* (`current_driver = input_drivers[i]`).
+Initialisation is `input_driver_init_wrap`, whose only call on this path is the tail
+of `video_driver_init_input` - and that function returns early when
+`current_driver` is already set:
+
+    if (*input)
+       return true;                 <- taken, because pre-init selected
+    ...
+    input_driver_init_wrap(...)     <- never reached
+
+Upstream intends that early return for a *video* driver that pre-initialised an
+input driver itself. This build's video driver does not - it ignores the pointers on
+purpose - so the early return is taken for a reason upstream never designed for, and
+the wrap below is dead code.
+
+**A fix that is compiled in and was not sufficient.** `patches/series` 0009 clears
+the stale selection when `tmp` is NULL, so the code below re-selects and then wraps.
+The object shows it is really there:
+
+    test %rdi,%rdi          ; tmp == NULL?
+    je   0x3e               ; -> store tmp (the video driver's own input driver)
+    cmpq $0x0, ...+0x19b    ; current_driver
+    jne  0xe6               ; -> still the early return
+    movl $0xffffffff, ...+0x19c
+    mov  %r14, ...+0x19c    ; store tmp
+
+and it did **not** make the driver initialise: `ps5_input_init` still does not run.
+So either that function is not reached at all on the second
+`video_driver_init_internal`, or the re-selection inside it does not find `"ps5"`.
+That is the one measurement left, and it needs a probe inside
+`video_driver_init_input` itself - the last two rounds' probes were placed outside it
+and could not see this.
+
+**Why the earlier checks in this round were worthless.** Twice I grepped a compiled
+object for a patch's *comment* text and concluded the patch was missing. Comments do
+not survive compilation, and `strings` additionally has a four-character minimum, so
+it reports nothing for a three-character literal like `"ps5"`. Both checks were
+incapable of the answer they were asked for. The instruction stream is the only
+reliable evidence that a code change was compiled.

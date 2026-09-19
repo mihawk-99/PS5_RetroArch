@@ -154,6 +154,46 @@ EDITS = [
         "registers no callbacks, so this member can be NULL",
     ),
     (
+        # Select is not initialise: the input driver was named and never wrapped.
+        #
+        # `input_driver_find_driver` runs during driver pre-initialisation and
+        # *selects* a driver into `input_driver_st.current_driver`; it deliberately
+        # does not initialise one. Initialisation is `input_driver_init_wrap`, and
+        # on this path the only call to it is at the end of
+        # `video_driver_init_input` - which returns early when
+        # `input_driver_st.current_driver` is already set:
+        #
+        #     if (*input)
+        #        return true;                      <- taken, because pre-init selected
+        #     ...
+        #     input_driver_init_wrap(...)           <- never reached
+        #
+        # Upstream's intent for that early return is a *video* driver that
+        # pre-initialised an input driver of its own. This build's video driver does
+        # not: it leaves the pointers alone on purpose, so that RetroArch's own
+        # input path is used. The result was measured - the driver is named
+        # (`probe drivers: input="ps5"`), `ps5_input_init` never runs, `current_data`
+        # stays NULL, and every button read answers 0.
+        #
+        # Clearing the selection here makes the existing code below re-select and
+        # then wrap it, which is exactly what that code is for. It is a no-op for a
+        # video driver that did pre-initialise input, because that case still
+        # returns above via `tmp`.
+        "input/input_driver.c",
+        "   input_driver_t         **input = &input_driver_st.current_driver;\n"
+        "   if (*input)\n",
+        "   input_driver_t         **input = &input_driver_st.current_driver;\n"
+        "   /* Changed by this port (patches/series, 0009): a driver selected during\n"
+        "    * pre-initialisation is not an initialised one, and leaving it here makes\n"
+        "    * the wrap below unreachable. Since `tmp` is NULL - the video driver did\n"
+        "    * not provide an input driver - the selection is discarded so that the\n"
+        "    * code below re-selects from the settings and then initialises it. */\n"
+        "   if (tmp == NULL)\n"
+        "      *input = NULL;\n"
+        "   if (*input)\n",
+        "a driver selected during",
+    ),
+    (
         # The console's pad is this build's input driver, so it is also the
         # compiled default.
         #
