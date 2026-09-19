@@ -1225,6 +1225,81 @@ EDITS = [
         "#include \"../../command.h\"\n",
         "patches/series, 0033",
     ),
+    (
+        # A3 of docs/GPU_PATH_CRITERIA.md: libps5vk's sampler refuses any address
+        # mode but clamp-to-edge (driver/ps5vk_image.c:800-806), and a refusal ends
+        # recording with an error at vkEndCommandBuffer, so the draw never submits.
+        # The maintainer's reading of this port's log is that these refusals come
+        # from the shader path, not the menu's own sampler: gfx/drivers/vulkan.c
+        # already asks clamp-to-edge, while this file hardcodes REPEAT here and
+        # maps the preset's wrap mode further down.
+        #
+        # Both become clamp-to-edge. That is a real behaviour change - a filter
+        # preset asking for repeat gets clamp - and it is the honest consequence of
+        # a decoder that has only proven clamp: the alternative is a refused draw,
+        # which is no picture at all. Lifting the restriction properly is a runner
+        # probe in ../PS5_Vulkan (V0-sampler, C4 scope) and is not this project's
+        # change to make.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   info.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT;\n"
+        "   info.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT;\n"
+        "   info.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT;\n",
+        "   /* Named by this port (patches/series, 0012): the console's decoder has\n"
+        "    * only proven clamp-to-edge, and any other mode ends the command buffer\n"
+        "    * with an error so the draw never submits. See tools/apply-port-patches.py. */\n"
+        "   info.addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "   info.addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "   info.addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n",
+        "only proven clamp-to-edge",
+    ),
+    (
+        # The same change for the preset-driven path: every mode a filter preset can
+        # ask for becomes clamp-to-edge, because that is the only one the decoder
+        # accepts. The switch is kept rather than collapsed so each case's intent
+        # stays visible and a future driver can restore them one at a time.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_REPEAT:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;\n"
+        "                  break;\n"
+        "\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_MIRRORED_REPEAT:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;\n"
+        "                  break;\n",
+        "               /* patches/series 0012: only clamp-to-edge is proven on this\n"
+        "                * console, so a preset's repeat modes are asked for as clamp. */\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_REPEAT:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "                  break;\n"
+        "\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_MIRRORED_REPEAT:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "                  break;\n",
+        "only clamp-to-edge is proven on this",
+    ),
+    (
+        # And the two border modes, refused for a second reason: they need
+        # descriptor word 11 set to a border colour, which the decoder keeps at the
+        # canary's transparent black.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_CLAMP_TO_BORDER:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;\n"
+        "                  break;\n"
+        "\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_MIRROR_CLAMP_TO_EDGE:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;\n"
+        "                  break;\n",
+        "               /* patches/series 0012: the border modes need descriptor word 11\n"
+        "                * set to a border colour, which the decoder keeps at the\n"
+        "                * canary's transparent black, so they are refused too. */\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_CLAMP_TO_BORDER:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "                  break;\n"
+        "\n"
+        "               case GLSLANG_FILTER_CHAIN_ADDRESS_MIRROR_CLAMP_TO_EDGE:\n"
+        "                  mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;\n"
+        "                  break;\n",
+        "the border modes need descriptor word 11",
+    ),
 ]
 
 
