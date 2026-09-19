@@ -51,6 +51,7 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
+bash "$root/tools/build-fceumm.sh"
 
 # The title's own sources are compiled with the same feature defines as the
 # frontend, because the two share a header full of #ifdefs and a struct whose
@@ -188,6 +189,11 @@ dist="$root/dist/$title_id"
 # title, because naming a driver whose library is missing makes RetroArch fail to
 # initialise and the title exit 1 saying nothing. See config/retroarch.cfg.
 cp -a -- "$root/config/retroarch.cfg" "$dist/retroarch.cfg"
+mkdir -p "$dist/cores" "$dist/info"
+cp -- "$root/build/cores/stage/cores/fceumm_libretro.so" "$dist/cores/"
+cp -- "$root/build/cores/stage/info/fceumm_libretro.info" "$dist/info/"
+# Older saved configs have an empty info path: upstream then searches cores/.
+cp -- "$root/build/cores/stage/info/fceumm_libretro.info" "$dist/cores/"
 
 # The Vulkan driver, beside the title, when it exists.
 #

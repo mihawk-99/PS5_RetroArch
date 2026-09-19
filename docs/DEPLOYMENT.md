@@ -178,3 +178,19 @@ older `0755`/`0775` directories.
 `python3 tools/check-ftp-write.py` verifies upload/readback/cleanup in every managed
 folder with uniquely named disposable files and records the result under `klog/`.
 It does not overwrite cores, ROMs, saved settings or other existing files.
+
+
+## Built-in core artifacts
+
+The title build stages FCEUmm under `cores/fceumm_libretro.so` and its metadata
+under `info/fceumm_libretro.info`, with an identical copy beside the core for
+saved configurations whose core-info path is empty. The manifest and FTP
+readback cover all three files.
+`make fceumm` builds the core alone without uploading or running anything.
+Runtime acceptance remains separate from the artifact checks; see
+`docs/ACTIVE.md` for the current console result. No game or BIOS is bundled.
+
+After uploading each `.info`, deployment writes and reads back RetroArch's
+`core_info.refresh` marker in the same directory. RetroArch consumes it when
+rebuilding its metadata cache; it is not a shipped manifest file. This also
+refreshes entries previously cached as having no metadata.

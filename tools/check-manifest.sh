@@ -94,6 +94,10 @@ else
 fi
 
 echo "==> [manifest] the two files the console reads"
+python3 tools/check-core.py "$folder/cores/fceumm_libretro.so" || bad "FCEUmm core ABI check failed"
+[[ -s $folder/info/fceumm_libretro.info ]] || bad "FCEUmm core info is missing"
+cmp -s "$folder/info/fceumm_libretro.info" "$folder/cores/fceumm_libretro.info" ||
+    bad "FCEUmm metadata fallback differs or is missing"
 for required in eboot.bin sce_sys/param.json sce_sys/icon0.png; do
     [[ -f $folder/$required ]] || bad "$required is missing"
 done

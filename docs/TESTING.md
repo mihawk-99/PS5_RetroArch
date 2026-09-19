@@ -23,7 +23,7 @@ step. A step is never closed by a mock of the console.
 | --- | --- | --- |
 | format | `tools/verify.sh format` | `tools/lint-shell.sh` parses every script in `tools/` (`bash -n`) and every python tool (`ast.parse`), rejects CRLF and byte-order marks, and refuses a committed console address or credential; `tools/lint-format.sh` then runs `clang-format --dry-run --Werror` over `src/`, `tests/` and `tooling/native/` against the repository's `.clang-format`. Formatters are not installed for shell or python on this machine, so this gate is syntax and policy rather than style. |
 | unit | `tools/verify.sh unit` | `make test-unit` runs `tests/test_frontend.py`. Four kinds of check, none of which needs a console: the built `gfx_video_driver.c.o` really lists `video_ps5` before `video_null` in `video_drivers[]` (read from its relocations); the title and the frontend agree on `video_driver_t`, by compiling RetroArch's header with the frontend's own defines from `tools/retroarch-flags.sh` and comparing `sizeof` and the `poke_interface` offset against the object the title links - the fault that kept the menu off the screen, see `docs/FINDINGS.md`; the frame-layout function from `src/display.cpp` is compiled from the source by the host compiler, compared against `../PS5_Vulkan`'s own addressing over all 2,073,600 pixels, and pinned against a table of values so a change to it cannot be silent; and the built `dist/<TITLE_ID>/` is a fake self wrapping a 64-bit x86-64 ELF whose `param.json` names its own folder. |
-| build | `tools/verify.sh build` | `bash tools/build-title.sh` fetches nothing, compiles RetroArch's sources with the cross toolchain, archives them, compiles `src/` with the same `-D` flags the archive was compiled with, links it with the pipeline's CRT, signs the result and records the folder's manifest. It is not bare `make app`: the things the link needs, and the defines the two sides must share, are set by that script and by nothing else. |
+| build | `tools/verify.sh build` | `bash tools/build-title.sh` fetches verified core inputs on first use, compiles RetroArch's sources with the cross toolchain, archives them, compiles `src/` with the same `-D` flags the archive was compiled with, links it with the pipeline's CRT, signs the result and records the folder's manifest. It is not bare `make app`: the things the link needs, and the defines the two sides must share, are set by that script and by nothing else. |
 | integration | `tools/verify.sh integration` | `make test-integration` (the same tests as `unit`, from the other side of the build) followed by `tools/check-manifest.sh` on the built tree: every recorded file present and unchanged, nothing extra, `eboot.bin` a fake self, and `param.json` naming the folder it sits in. |
 | evidence | `tools/verify.sh evidence` | `tools/evidence.py compare evidence/` replays every committed capture against its expectation and exits non-zero on a difference. It never contacts the console. |
 
@@ -156,3 +156,28 @@ ELF relocations verify joypad registration and the built-in profile in the shipp
 frontend. On console, confirm left-stick menu navigation, button/axis capture in
 Settings > Input > RetroPad Binds > Port 1 Controls, and saved bindings after a
 restart. Preserve the owner's live configuration when deploying.
+
+
+## Libretro core artifacts
+
+`tools/check-core.py <core.so> --report <report.json>` requires an ELF64 x86-64
+FreeBSD/PS5 shared object, 16 KiB-compatible load segments, native runtime imports
+including `libkernel_web.sprx`, and all 25 libretro callbacks in the dynamic symbol
+table. It rejects Linux ELF ABI, payload kernel imports and absent callbacks.
+The report deliberately keeps `console_loading_verified` false: ELF structure
+cannot establish runtime loading. The title manifest check also checks the
+staged FCEUmm artifact and requires identical `.info` metadata in `info/` and
+`cores/`, covering both explicit and legacy empty core-info paths.
+
+`tests/test_core_abi.py` builds real host fixture ELFs, marking only test fixtures
+with the PS5 OSABI. Positive and negative cases exercise the parser through
+readelf: missing callback, wrong runtime library, wrong ABI, 4 KiB segments and
+truncated header. These fixtures are never staged or run on the console.
+
+For the target test, upload a verified build, open RetroArch normally, and let
+the owner select FCEUmm under Load Core and then a game under Load Content.
+Collect `retroarch.log`, trace and kernel log with the build identity. Record
+core load, content initialization and presented frames separately; a visible
+core entry or `.info` name is not proof of loaded executable code. Owner game
+paths remain in ignored logs. Keep normal XMB, Vulkan and audio startup working
+when no core is selected.

@@ -75,6 +75,7 @@ void initialize(void *)
     set_directory(DEFAULT_DIR_MENU_CONFIG, "/app0/config");
     set_directory(DEFAULT_DIR_MENU_CONTENT, "/app0");
     set_directory(DEFAULT_DIR_CORE, "/app0/cores");
+    set_directory(DEFAULT_DIR_CORE_INFO, "/app0/info");
     set_directory(DEFAULT_DIR_CORE_ASSETS, "/app0/content");
     set_directory(DEFAULT_DIR_SYSTEM, "/app0/system");
     set_directory(DEFAULT_DIR_SRAM, "/app0/savefiles");

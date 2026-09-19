@@ -2653,3 +2653,23 @@ within a frame. Errors, disconnect samples and interception suppress input.
 The owner tested left-stick navigation and button/stick binding capture on build
 `e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9`
 and replied "Everything works flawlessly!" Evidence: `evidence/native-joypad/`.
+
+
+## 2026-09-19 — FCEUmm metadata and executable loading are separate gates
+
+An empty saved `libretro_info_path` overrides the new platform default.
+`core_info_init_list()` then searches the core directory, so staging only
+`info/fceumm_libretro.info` is insufficient for existing configurations. Staging
+an identical file beside the `.so` and forcing a metadata cache refresh produced
+a console cache entry with `has_info: true`, full FCEUmm name and NES extensions.
+The user's provided Gambatte `.info` uses the same ordinary libretro format;
+metadata does not select a different executable ABI or install a loader.
+
+The pinned native-SDK FCEUmm ELF exports all 25 callbacks and imports kernel_web,
+libc and Posix stubs. Its final bytes survive FTP unchanged. Nonetheless native
+core open returns failure and a null error string. A subsequent manual content
+launch reinitializes without a core path, then dereferences a null Vulkan video
+context at `vulkan_alive+0x26` (ELF 0x6b3066) reading address 0x80. The owner
+confirmed the crash. This is not evidence that FCEUmm reached emulation or that
+libps5vk refused GPU work. Keep loader and error-recovery acceptance open.
+Evidence: `evidence/fceumm-build/`; next work: `parked/native-core-loading/`.

@@ -1,0 +1,15 @@
+{
+  "step": "fceumm-build",
+  "note": "Build and metadata evidence with an explicit unresolved native-loader/recovery failure; this is not a playable-core acceptance.",
+  "must_contain": [
+    "core bytes: 4836144; sha256: d1afcd2ea84de627f4a28d8ec4e81d63d23ca5b531811ba57357d98f8b31759f",
+    "Console cache decoded: display_name=Nintendo - NES / Famicom (FCEUmm); core_name=FCEUmm; supported_extensions=fds|nes|unif|unf; has_info=true",
+    "[ERROR] [Core] Failed to open libretro core: \"/app0/cores/fceumm_libretro.so\"",
+    "Kernel SIGSEGV: read address 0x80; RIP 0xab3066; title base 0x400000; ELF offset 0x6b3066",
+    "Build/ABI/staging/metadata: PASS; runtime core loading and game execution: FAIL (open blocker)"
+  ],
+  "must_not_contain": [
+    "runtime core loading and game execution: PASS"
+  ],
+  "human_check": "Owner attempted game launch and reported a crash. No game frames, audio, saves or controller gameplay were verified."
+}

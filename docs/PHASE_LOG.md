@@ -1967,3 +1967,53 @@ full window alive and script-closed (`klog/input-joypad-followup.log`, frontend
 presented XMB with native audio initialization, zero GPU refusals/API errors and
 no frontend ERROR lines. All five `tools/verify.sh` gates PASS: 37 unit tests,
 17 evidence records. Sanitized capture/expectations: `evidence/native-joypad/`.
+
+
+## 2026-09-19 — FCEUmm reproducible build; native core loading blocked
+
+Requested step: build FCEUmm with this repository's SDK and native-title pipeline.
+The websrv SNES9x2010 script supplied the fetch/build/stage pattern only. Added
+`tools/build-fceumm.sh`, `make fceumm`, shared-ELF ABI verification, title staging
+and core metadata defaults. Pinned source/info archives are digest-checked.
+Upstream source remains untouched. Link uses the compiler driver, explicit native
+runtime stubs, no payload CRT/static libc, and a content-derived build ID; reasons
+and paths are in `docs/REFERENCE.md`.
+
+Initial link experiments rejected raw-linker `-Wl` arguments/missing `-lm`, then
+host Clang rejected `-nostdlibc`. The final command uses the compiler link driver,
+`LIBM=` with the libc math stub, and supported `-nostdlib -nodefaultlibs`.
+Clang's implicit `--build-id=uuid` changed hashes between identical builds;
+`--build-id=sha1` fixed this. Multiple fresh builds now give core SHA-256
+`d1afcd2ea84de627f4a28d8ec4e81d63d23ca5b531811ba57357d98f8b31759f`.
+
+First console command: `tools/run-title.sh --no-build --watch 180` (manual
+selection), identity `b6c7c509098a466630da0215a52bec1f3fd12e9ee1fe071bb39937faa0b5d7e4`.
+Core open failed with null loader error. The user reported missing detection.
+The `.info` was in `/app0/info`, but saved config had an empty info path; upstream
+therefore searched `/app0/cores`. This was an actual placement compatibility bug.
+That run ended early without a fatal signal; manual close was not confirmed.
+
+Corrected staging includes identical info beside the core and in `info/`.
+Cache refresh is required because upstream can cache missing metadata. Deployment
+now writes/readbacks `core_info.refresh` after info upload; the running deployment
+had loaded the earlier script, so equivalent markers were uploaded/read back
+explicitly before the corrected run. Unit checks cover refresh location/content
+and failed readback. Core uploads require exact SHA-256, without the old driver
+marker fallback. No live user settings were rewritten.
+
+Second command: `tools/run-title.sh --no-build --watch 120`, identity
+`261d33099adec97c231205beb21d6011e1587436df099d4e6ac6f29949c50c8f`.
+Full FTP core readback matches all 4,836,144 bytes and the final hash. Decoding the
+console's RZIP metadata cache confirms full FCEUmm name, NES extensions and
+`has_info: true`. Core open still fails. Owner: "App crashed after I started game".
+The log reports missing dynamic-core path during content reinitialization; klog
+records SIGSEGV at 0x80. Symbolization after subtracting image base 0x400000 shows
+`vulkan_alive(NULL)` -> `runloop_iterate` -> `rarch_main` -> `main` -> `_start`.
+This is a frontend failure path after a failed core load, not proof of core or
+Vulkan-driver execution failure. Runtime loading/game acceptance remains FAIL.
+
+Host verification: `tools/verify.sh` passes all five gates, 45 tests. Artifact:
+`evidence/fceumm-build/` contains the ABI report, metadata result and explicit
+failed target result. `parked/native-core-loading/README.md` records the remaining
+loader/recovery work and its acceptance. PS5_Vulkan unchanged at 6f0ce0d; no ROM
+or BIOS is distributed. This commit completes build tooling, not a playable port.

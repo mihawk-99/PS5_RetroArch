@@ -360,3 +360,42 @@ axis-threshold handling. A zero-sample read preserves the previous sample (the
 binding screen may poll twice); errors/disconnects and shell interception suppress
 input. No per-frame or per-button logging is added. Rumble and multiple controllers
 remain unsupported in this backend.
+
+
+## FCEUmm core build
+
+`make fceumm` (or `tools/build-fceumm.sh`) cross-builds the pinned upstream
+FCEUmm revision and its pinned core-info metadata. The script verifies both
+input SHA-256 digests, extracts fresh sources into `build/cores/fceumm`, and
+uses this project's `.deps/native/ps5-payload-sdk` wrappers for CC/CXX/AR/LD.
+It does not modify the fetched upstream source. `platform=unix` selects upstream
+source/features, while explicit compiler and linker make variables prevent a
+host build. The linker is the compiler driver because upstream passes `-Wl`
+options; `-nostdlib -nodefaultlibs` excludes payload CRT/static libc defaults.
+The `--build-id=sha1` override replaces Clang's random PS5 UUID with a
+content-derived ELF ID so repeated builds have stable hashes.
+Math and libc imports come from the native runtime stubs, with `libkernel_web`
+rather than the payload `libkernel_sys`. No SDL or decoder is added.
+
+Outputs are `build/cores/stage/cores/fceumm_libretro.so` and
+`build/cores/stage/info/fceumm_libretro.info`. `tools/build-title.sh` builds and
+copies both after assembling the title, before recording its manifest. Native
+core metadata defaults to `/app0/info`. The same `.info` file is also staged
+beside the core because older saved configs set `libretro_info_path = ""`;
+upstream then searches the core directory. Existing settings are preserved.
+`build/cores/fceumm/build.json` records
+source/metadata pins, hashes, ELF imports, exported callbacks and compiler-wrapper
+identity. First use requires network access; verified cached inputs allow offline
+rebuilds. `JOBS` controls build parallelism.
+
+The reference was john-tornblom's websrv
+[core build script](https://github.com/ps5-payload-dev/websrv/blob/master/homebrew/RetroArch/build-snes9x2010.sh).
+Only its fetch/build/stage pattern applies here: this application uses the native
+title pipeline and its own SDK. A shared ELF passing the ABI gate is not proof
+that the native title's dynamic loader can load it. FCEUmm renders NES frames in
+software; RetroArch presents those frames through the existing Vulkan driver.
+
+After uploading each `.info`, deployment writes and reads back RetroArch's
+`core_info.refresh` marker in the same directory. RetroArch consumes it when
+rebuilding its metadata cache; it is not a shipped manifest file. This also
+refreshes entries previously cached as having no metadata.

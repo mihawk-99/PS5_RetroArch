@@ -93,6 +93,15 @@ def remote_bytes(ftp, path: str) -> bytes:
     return buffer.getvalue()
 
 
+def refresh_core_info(ftp, remote_info: str) -> None:
+    """Invalidate cached missing/stale metadata after its verified upload."""
+    import io
+    refresh = join(remote_info.rsplit('/', 1)[0], 'core_info.refresh')
+    ftp.storbinary(f"STOR {refresh}", io.BytesIO(b'\0'))
+    if remote_bytes(ftp, refresh) != b'\0':
+        raise SystemExit('core metadata refresh marker readback failed')
+
+
 def sizes(ftp, path: str) -> dict[str, int]:
     previous = ftp.pwd()
     ftp.cwd(path)
@@ -238,6 +247,13 @@ def do_deploy(settings: dict, tid: str) -> int:
                 print(f"    {relative:28} {len(served):>10,} bytes stored; all "
                       f"{len(markers)} of this build's markers present  ok")
                 continue
+            if relative.startswith('cores/') and relative.endswith('.so'):
+                # The FCEUmm ELF is served unchanged on this native-title route.
+                # Never accept a stale core via the legacy driver marker fallback.
+                if digest != expected:
+                    raise SystemExit(f'{relative}: core SHA-256 readback mismatch')
+                print(f"    {relative:28} {size:>10,} bytes; full core SHA-256 verified  ok")
+                continue
             if relative.endswith(".so") or relative.endswith(".so.1"):
                 # A shared object is re-signed by the console on write, so it is
                 # checked the same way the program image is: a byte string this
@@ -279,6 +295,10 @@ def do_deploy(settings: dict, tid: str) -> int:
                     f"{digest[:16]}, the file here is {local.stat().st_size} bytes "
                     f"with {expected[:16]}")
             print(f"    {relative:28} {size:>10,} bytes  {digest[:16]}  ok")
+            if relative.endswith('.info'):
+                # RetroArch caches missing metadata too. Ask it to re-read the
+                # newly uploaded info on next startup without changing settings.
+                refresh_core_info(ftp, remote)
         present_root = list_names(ftp, remote_root)
         present_sys = list_names(ftp, join(remote_root, "sce_sys"))
     for required, where in (("eboot.bin", present_root), ("param.json", present_sys)):
