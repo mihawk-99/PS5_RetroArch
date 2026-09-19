@@ -1076,6 +1076,11 @@ EDITS = [
         "                     ps5_ok ? \"ok\" : \"failed\", ps5_capture_file);\n"
         "               fclose(ps5_trace);\n"
         "            }\n"
+
+        "            /* A capture run is over. The frontend's own shutdown is what\n"
+        "             * flushes /app0/retroarch.log, the log that never flushes while\n"
+        "             * the title is killed instead of exiting. */\n"
+        "            command_event(CMD_EVENT_QUIT, NULL);\n"
         "         }\n"
         "      }\n"
         "   }\n"
@@ -1094,6 +1099,17 @@ EDITS = [
         "/* Added by this port (patches/series, 0032): the capture's readback entry point. */\n"
         "static bool vulkan_read_viewport(void *data, uint8_t *buffer, bool is_idle);\n",
         "patches/series, 0032",
+    ),
+    (
+        # `command_event` is how the frontend quits, and quitting is what flushes its log
+        # file: the goal's evidence names /app0/retroarch.log, and a title that is killed
+        # from the outside never writes it (it has been the same 1200 bytes all along).
+        "gfx/drivers/vulkan.c",
+        "#include \"../../retroarch.h\"\n",
+        "#include \"../../retroarch.h\"\n"
+        "/* Added by this port (patches/series, 0033): the capture ends the run cleanly. */\n"
+        "#include \"../../command.h\"\n",
+        "patches/series, 0033",
     ),
 ]
 

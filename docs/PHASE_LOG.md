@@ -1460,3 +1460,26 @@ it is committed (`949fdb9`). The next round starts by running it:
 The trace line to expect is `capture: frame 90 of 90, viewport WxH, read_viewport -> ok
 (/app0/shot.ppm)`; if it says `failed`, the trace line now carries the viewport size,
 which is the value the frontend's own writer never showed.
+
+## 2026-09-19 - a capture run now ends by itself (the console is still away)
+
+The console answered nothing this round either - `ping -c 2 -W 3` exits 1, and the FTP
+attempt before it failed the same way - so the capture run could not be made. What was
+built instead is the half of the objective's evidence that a killed title can never
+produce: a capture run now asks the frontend to quit once it has written its trace line.
+
+- patch 0033 includes `command.h`, next to the `retroarch.h` the file already includes;
+- patch 0031's capture calls `command_event(CMD_EVENT_QUIT, NULL)` after the trace line.
+  That is how the frontend itself quits, and quitting is what flushes
+  `/app0/retroarch.log` - the same 1200 bytes since the first round for exactly one
+  reason: this title has always been killed from outside, never exited by itself.
+
+The frontend builds 276 of 276 sources with both patches (`build/r9-build.log`), the
+capture string is in `build/llvm-pie.elf`, `make test-unit` is green (37 patches pinned),
+and `bash tools/verify.sh` is PASS (format unit build integration evidence).
+
+The run that proves it is the one the previous entry left waiting, unchanged: arm
+`/app0/args.txt` with `--ps5-capture=90` and `--ps5-capture-path=/app0/shot.ppm`, run
+`tools/run-title.sh --no-build --watch 20`, then read `/app0/shot.ppm` and
+`/app0/retroarch.log` back. With the quit in place the verdict should read "it exited on
+its own" instead of "this script closed it", and the log should finally have content.

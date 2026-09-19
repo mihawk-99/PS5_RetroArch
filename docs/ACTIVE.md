@@ -45,14 +45,16 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **Run the capture - it is built and waiting.** The port now reads the frame with the
+1. **Run the capture - it is built, waiting, and now ends by itself.** The port now reads the frame with the
    driver's own `vulkan_read_viewport` and writes a PPM itself (patches 0031/0032,
    committed as `949fdb9`; the frontend builds 276 of 276 and the path is in the image).
    It has **not** been run: the console stopped answering ("No route to host") before the
    run, and the run that was attempted failed at its deploy step for that reason. Arm
    `/app0/args.txt` with `--ps5-capture=90` and `--ps5-capture-path=/app0/shot.ppm`, run
    `tools/run-title.sh --no-build --watch 18`, fetch `/app0/shot.ppm` and look at it. The
-   trace line says `view viewport WxH, read_viewport -> ok|failed`.
+   trace line says `viewport WxH, read_viewport -> ok|failed`; patch 0033 then asks
+   the frontend to quit, which should finally write `/app0/retroarch.log` (still the
+   same 1200 bytes, because the title has always been killed rather than exiting).
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).
