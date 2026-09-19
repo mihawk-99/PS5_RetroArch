@@ -2042,3 +2042,46 @@ from ../PS5_Vulkan's own linker script, `tooling/psbc/ps5-pie-unwind.ld`, which 
 that script satisfies from its psbc runtime group. So the remaining work is to adopt
 that link recipe rather than to discover anything: archives, the unwind script, and
 the group ordering, all named in their `tools/psbc-link.sh`.
+
+## The Vulkan path is the one running, and its refusals are now readable
+
+**Measured.** A fresh run's `/app0/trace.txt` (952 KB) opens with the driver's own
+refusals, which are readable only because `src/main.cpp` points `stderr` at the
+trace file unbuffered. They are, by name and count:
+
+- `only triangle lists without primitive restart are supported (VK_ERROR_UNKNOWN)`
+  - 21 times, raised at `driver/ps5vk_pipeline.c:903`;
+- `set 0 binding 3: descriptor type 3 has no proven table entry (VK_ERROR_UNKNOWN)`
+  - 3 times, raised at `driver/ps5vk_pipeline.c:137`;
+- `sampler address modes N, N and N are not the clamp-to-edge ...` - 16 times,
+  raised at `driver/ps5vk_image.c:804`.
+
+So the frontend is running RetroArch's Vulkan video driver against
+`../PS5_Vulkan`'s libps5vk, not this port's hand-written `video_ps5`.
+
+**A contradiction to resolve, and it is the next thing to measure.** The title's
+config says `video_driver = "ps5"` (both `config/retroarch.cfg` and the deployed
+copy), yet the trace's refusals come from the Vulkan driver. And
+`/app0/retroarch.log` is 1,200 bytes with no timestamps and was byte-identical
+across two runs, which is what a stale file looks like - so it may have been
+written by an earlier build and may not describe the run just made. Its contents
+are at least consistent with an older `video_ps5` run: `[Input] Found input driver:
+"ps5"`, `[Core] Geometry: 320x240`, `[Environ] SET_PIXEL_FORMAT: RGB565`,
+`[Video] Found display server: "null"`, and no mention of Vulkan at all.
+
+**Why the refusals matter more than they look.** `driver/ps5vk_private.h`
+documents `ps5vk_cmd_buffer_refuse`: a refusal *"records that cmd_buffer cannot
+encode a command: logs why, and recording ends with result at vkEndCommandBuffer"*.
+A command buffer that ends in error is not submitted, so a refused command means
+the draws never reached the GPU - and the flip can still succeed, which is exactly
+the shape of "644 presents accepted, black screen". RetroArch calls
+`vkEndCommandBuffer` at `gfx/drivers/vulkan.c:4212` and **discards the result**, so
+the frontend cannot see this on its own. The driver's refusals in the trace are the
+only witness.
+
+**Consequence.** Everything this port learned about its own `video_ps5` display
+path - the correct buffer, the accepted flip, the marker, the splash call - is
+about a driver that is not the one running. The display work is not wasted (it is
+the fallback path and it is proven to the buffer), but it is not the current
+blocker. The current blocker is that the Vulkan driver refuses commands the
+frontend issues.
