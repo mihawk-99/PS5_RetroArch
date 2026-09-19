@@ -1,0 +1,21 @@
+{
+  "step": "vulkan-a4-zero-refusals",
+  "recorded": "2026-09-19T08:37:51Z",
+  "console_run": "PPSA99169 launched by the resident control payload; klog captured on port 3232; the title's own /app0/trace.txt read back over FTP after the run (bash tools/run-title.sh --watch 30)",
+  "revision": "the commit that adds this record",
+  "command": "bash tools/run-title.sh --watch 30",
+  "raw_capture": "klog/trace-a4-zero-refusals.txt",
+  "raw_lines": 9,
+  "raw_bytes": 446,
+  "lines": [
+    "bss check=0 (must be 0), data check=7 (must be 7)",
+    "main() entered; static constructors have already run",
+    "stderr is the trace file (unbuffered)",
+    "argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file",
+    "argv extras from /app0/args.txt = 0",
+    "video driver: video_vulkan init entered",
+    "input: pad opened, user=515310723 handle=51840768",
+    "capture: frame 90 of 90, viewport 3840x2160, read_viewport -> failed (/app0/shot.ppm)",
+    "rarch_main returned = 0"
+  ]
+}

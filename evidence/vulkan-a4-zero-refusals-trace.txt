@@ -1,0 +1,17 @@
+bss check=0 (must be 0), data check=7 (must be 7)
+main() entered; static constructors have already run
+stderr is the trace file (unbuffered)
+argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file
+argv extras from /app0/args.txt = 0
+input: pad opened, user=515310723 handle=51775232
+capture: frame 90 of 90, viewport 3840x2160, read_viewport -> failed (/app0/shot.ppm)
+rarch_main returned = 0
+bss check=0 (must be 0), data check=7 (must be 7)
+main() entered; static constructors have already run
+stderr is the trace file (unbuffered)
+argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file
+argv extras from /app0/args.txt = 0
+video driver: video_vulkan init entered
+input: pad opened, user=515310723 handle=51840768
+capture: frame 90 of 90, viewport 3840x2160, read_viewport -> failed (/app0/shot.ppm)
+rarch_main returned = 0

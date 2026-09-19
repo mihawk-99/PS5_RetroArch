@@ -1,0 +1,18 @@
+{
+  "step": "vulkan-a4-zero-refusals",
+  "note": "A4 of docs/GPU_PATH_CRITERIA.md is reached: the trace carries no 'vulkan: ' refusal line at all. The refusals were libps5vk's, and a refusal ends command-buffer recording with an error, so the buffers never submitted and the screen stayed black while every call returned success. Three named causes were fixed: every pipeline is created with TRIANGLE_LIST rather than a strip, every sampler asks clamp-to-edge, and no compute pipeline is compiled - ../PS5_Vulkan's ps5vk_descriptor_options refuses any set-0 binding whose stride is zero, a storage image's stride is zero by design, and this frontend's shared set declares a compute-only storage image at binding 3, so vkCreateComputePipelines for the unused rgb565_to_rgba8888 upload shader was refused once per pipeline initialisation. The same trace is B1's evidence: 'video driver: video_vulkan init entered' is this port's mark inside RetroArch's Vulkan driver, and the absence of 'ps5_init entered' shows the CPU driver did not run.",
+  "must_contain": [
+    "argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file",
+    "video driver: video_vulkan init entered",
+    "input: pad opened, user=515310723",
+    "rarch_main returned = 0"
+  ],
+  "must_not_contain": [
+    "vulkan: ",
+    "ps5_init entered",
+    "fatal signal",
+    "fault address",
+    "calls exit"
+  ],
+  "human_check": "Not yet given for this run: whether the menu is on screen through the GPU path is the owner's to confirm, and B4 is not claimed until it is."
+}

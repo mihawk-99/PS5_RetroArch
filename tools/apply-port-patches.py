@@ -1334,6 +1334,76 @@ EDITS = [
         "                  break;\n",
         "the border modes need descriptor word 11",
     ),
+    (
+        # A2 of docs/GPU_PATH_CRITERIA.md, and the last of the refusals.
+        #
+        # The surviving line is `vulkan: set 0 binding 3: descriptor type 3 has no
+        # proven table entry`, and it does NOT come from an upload: it comes from
+        # vkCreateComputePipelines. ../PS5_Vulkan's ps5vk_descriptor_options
+        # (driver/ps5vk_pipeline.c:120-150) walks every binding of set 0 whose
+        # stage flags match the stage being compiled, and refuses any whose stride
+        # is zero - and ps5vk_descriptor_stride gives a storage image zero
+        # deliberately, "pipelines refuse them until a probe proves their entries"
+        # (driver/ps5vk_descriptor_set_layout.c:24-40).
+        #
+        # This frontend's set 0 declares binding 3 as a compute-stage storage image
+        # (vulkan_init_pipeline_layout, "bindings[3]"), and exactly one pipeline is
+        # ever compiled against the layout with COMPUTE set: rgb565_to_rgba8888,
+        # the upload shader below. So the refusal fires once per
+        # vulkan_init_pipelines call, which is once at init and once per swapchain
+        # recreation - three times in the recorded run, all three the same line.
+        #
+        # The pipeline is not needed here. It exists for the compute upload, and
+        # patch 0027 already names the one format this port uses for a menu frame
+        # (R8G8B8A8), so the formats cannot differ and
+        # vulkan_copy_staging_to_dynamic never takes its compute branch: the branch
+        # is guarded by `retro_assert(staging->format == VK_FORMAT_R5G6B5_UNORM_PACK16)`,
+        # which this port would fail rather than pass. Compiling a shader whose only
+        # caller is unreachable buys nothing and costs a refusal per pipeline init,
+        # so the handle stays null. vkDestroyPipeline(NULL) is a defined no-op, and
+        # the compute branch's bind is never reached.
+        #
+        # This is deliberately the smallest change that removes the refusal. The
+        # layout keeps binding 3, so the compute branch stays consistent with the
+        # set it writes, and retiring the binding itself is a separate step that
+        # waits on the upload path first being proven unnecessary rather than
+        # assumed to be.
+        "gfx/drivers/vulkan.c",
+        "   module_info.codeSize   = sizeof(rgb565_to_rgba8888_comp);\n"
+        "   module_info.pCode      = rgb565_to_rgba8888_comp;\n"
+        "   vkCreateShaderModule(vk->context->device,\n"
+        "         &module_info, NULL, &cpipe.stage.module);\n"
+        "   vkCreateComputePipelines(vk->context->device, vk->pipelines.cache,\n"
+        "         1, &cpipe, NULL, &vk->pipelines.rgb565_to_rgba8888);\n"
+        "   vkDestroyShaderModule(vk->context->device, cpipe.stage.module, NULL);\n",
+        "   /* Added by this port (patches/series, 0036): see the note above this edit.\n"
+        "    * No compute pipeline is compiled, so set 0's compute-only storage image\n"
+        "    * (binding 3) is never presented to the driver's descriptor check, which is\n"
+        "    * the check that refused this frontend once per pipeline initialisation. */\n"
+        "   vk->pipelines.rgb565_to_rgba8888 = VK_NULL_HANDLE;\n",
+        "patches/series, 0036",
+    ),
+    (
+        # B1 of docs/GPU_PATH_CRITERIA.md. "The title runs on video_vulkan, not
+        # video_ps5" has to be a record, not an inference: the frontend logs which
+        # *display server* it found and never which video driver ran, and on this
+        # console the driver's own log file does not exist to be read
+        # (/app0/retroarch.log answers "no such file" over FTP). The port's own
+        # driver proves itself with "ps5_init entered" in the trace; this is the
+        # same mark for the other driver, so a trace names exactly one of them.
+        # stderr reaches the trace file (src/main.cpp), which is why fprintf and
+        # not RARCH_LOG: the frontend's log is the record that is missing.
+        "gfx/drivers/vulkan.c",
+        "   vk_t *vk                           = (vk_t*)calloc(1, sizeof(*vk));\n"
+        "   if (!vk)\n"
+        "      return NULL;\n",
+        "   /* Added by this port (patches/series, 0038): names the driver that ran. */\n"
+        "   fprintf(stderr, \"video driver: video_vulkan init entered\\n\");\n"
+        "   vk_t *vk                           = (vk_t*)calloc(1, sizeof(*vk));\n"
+        "   if (!vk)\n"
+        "      return NULL;\n",
+        "video_vulkan init entered",
+    ),
 ]
 
 
