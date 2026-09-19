@@ -2481,3 +2481,14 @@ Patch 0028 instead writes the blue nibble into the R8G8B8A8 texture's red byte a
 red into blue, and shifts four-bit channels into only the high nibble of each
 byte (15 becomes 240). This is a frontend conversion defect, independently of
 the still-unexplained flicker; fixing it preserves matching 32-bit upload formats.
+
+## 2026-09-19 — RGUI upload and remaining visual corruption
+
+The RGUI producer packs R in bits 12-15, G in 8-11, B in 4-7 and A in 0-3.
+Patch 0028 reversed R/B and expanded to 240 rather than 255; 0055 corrects both.
+The exhaustive producer-to-upload test covers all 65,536 words. Evidence is in
+`evidence/vulkan-menu-rgba/`; the owner sees green RGUI but blue flicker and fixed
+black triangles remain. Successful Vulkan calls alone do not prove correct pixels.
+Read-only driver findings record an earlier similar blue blending defect fixed by
+FP16 exports; current code skips blend-register writes on opaque draws. This
+suggests a mixed-pipeline diagnostic, not a confirmed cause of this title's issue.

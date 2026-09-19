@@ -1,0 +1,30 @@
+{
+  "step": "vulkan-menu-rgba",
+  "command": "bash tools/verify.sh; bash tools/run-title.sh --no-build --watch 30",
+  "revision": "44c6fb7 plus RGBA correction (also tested before identity instrumentation)",
+  "raw_capture": "klog/gpu-colour-latest-trace.txt",
+  "raw_lines": 385,
+  "lines": [
+    "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+    "gpu result: swapchain image calls=1 failures=0 result=0",
+    "vulkan copy_staging_to_dynamic: dynamic 320x240 fmt=37 type=2, staging fmt=37 type=1, compute=0",
+    "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+    "gpu result: swapchain image calls=2 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+    "gpu result: swapchain image calls=3 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0",
+    "audit: refusals=0; recorded API failures=0",
+    "runner: completed 30-second watch, final process count=1, script closed title",
+    "host: all 65536 RGBA4444 inputs match producer and RGBA8888 bytes",
+    "owner: green RGUI visible, blue flickers and fixed-position black triangles remain"
+  ]
+}

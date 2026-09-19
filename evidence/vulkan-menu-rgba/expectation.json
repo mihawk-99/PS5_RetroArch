@@ -1,0 +1,11 @@
+{
+  "step": "vulkan-menu-rgba",
+  "note": "Corrects upload channel order/range only; GPU flicker remains unresolved.",
+  "must_contain": [
+    "host: all 65536",
+    "refusals=0",
+    "vkEndCommandBuffer calls=4 failures=0 result=0",
+    "green RGUI visible"
+  ],
+  "must_not_contain": []
+}

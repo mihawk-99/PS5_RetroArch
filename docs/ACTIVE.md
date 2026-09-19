@@ -35,30 +35,31 @@ frontend. Previously only the CPU video driver's open method called it.
 
 ## Current diagnosis
 
-The RGBA conversion is corrected and exhaustively tested over all 65,536 inputs,
-but the owner still reports wrong colours. The 30-second colour run completed
-and the script closed it, with zero refusals/errors in the retrieved trace.
-A subsequent identity build proves the console runs the intended input set:
+The owner now clarifies that the menu is green, with blue flickers everywhere and
+black triangles appearing/disappearing in fixed positions. The RGBA4444 conversion
+correction is exhaustive over all 65,536 inputs. The 30-second colour run completed
+and the script closed it, with zero refusals or recorded API errors. Evidence:
+`evidence/vulkan-menu-rgba/`. Flicker remains unresolved.
+
+The identity build proves the console runs the intended input set:
 `df3a593a85388d58bc9fcc847dbd1deac6d9f1de8e4170493e84a84f87e362e3`.
 `evidence/vulkan-build-identity/` records local/remote/trace agreement. All five
-gates and 25 tests pass. Generic startup markers alone cannot prove a build.
+gates and 25 tests passed. Generic startup markers alone cannot prove a build.
 
-The next diagnostic is to read the uploaded texture and rendered image through
-the released driver's test-only image-storage API, without hardware writes or
-sibling changes, to separate upload pixels from rendered pixels.
+Read-only driver inspection found a relevant historical blue-channel corruption:
+`../PS5_Vulkan/docs/HARDWARE_FINDINGS.md` records source-alpha blending needing
+FP16_ABGR pixel exports. The current driver chooses that for blend-enabled
+pipelines, while opaque pipelines use 32_ABGR and omit explicit blend registers.
+This is a hypothesis for mixed opaque/blended draws, not a proven root cause.
 
 ## Next smallest step
 
-Correct the colour conversion using the RGUI producer's actual RGBA4444 nibble
-order (R in bits 12-15) and expand each nibble to 8 bits. The current 0028 code
-reverses red/blue and scales 15 to 240 instead of 255. Preserve A2's matching
-32-bit RGBA textures and plain-copy path. Diagnose flicker separately from colour.
-
-A host regression test also caught the existing 0023 patch marker missing from
-its own replacement. The marker-only fix is verified separately: all five gates and 22 host tests
-pass. Evidence is in `evidence/frontend-patch-idempotence/`. A fresh upstream replay is byte-identical on its second application.
-The configured shader source was regenerated from upstream plus the named edits
-to remove the accumulated duplicates. No colour or rendering code was changed.
+Test a frontend-only, equivalent ONE/ZERO blend state for the opaque stock shader
+pass, to force explicit blend programming and FP16 exports. Compare the same menu
+on the same unchanged driver; keep source-alpha menu blending unchanged. If that
+does not resolve the defect, retire the diagnostic and report the remaining
+uncertainty rather than claiming a driver fix. Public debug image readback is
+another possible way to separate correct upload pixels from corrupt rendering.
 
 ## Working notes
 
@@ -74,7 +75,7 @@ to remove the accumulated duplicates. No colour or rendering code was changed.
 - A2 remains the matching 32-bit RGBA upload and plain copy path; do not reopen
   the settled choice. The traced menu dynamic/staging formats are both 37.
 - CPU fallback sources and registration have not been changed.
-- Patch count is 68 with the pending RGBA conversion correction. `vendor/` is untouched.
+- Patch count is 68 including the RGBA conversion correction. `vendor/` is untouched.
 - Fresh replay of all port patches succeeds. The configured shader file contains
   only the intended 0023 sampler fallback block after regeneration. Its marker
   now appears in its replacement, so repeated builds cannot accumulate it.

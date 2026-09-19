@@ -1939,6 +1939,25 @@ EDITS = [
         "   vkCmdDraw(vk->cmd, 6, 1, 0, 0);\n",
         "gpu quad: alpha=",
     ),
+    (
+        "gfx/drivers/vulkan.c",
+        "            /* Added by this port (patches/series, 0028): R8G8B8A8's byte order,\n"
+        "             * from the B4G4R4A4 source the caller hands over. */\n"
+        "            *dstpix      = (\n"
+        "                  (pix & 0x00f0)      )\n"
+        "               | ((pix & 0x0f00) <<  4)\n"
+        "               | ((pix & 0xf000) <<  8)\n"
+        "               | ((pix & 0x000f) << 28);\n",
+        "            /* Supersedes patches/series, 0028. */\n"
+        "            /* Added by this port (patches/series, 0055): RGUI produces RGBA4444,\n"
+        "             * red in the high nibble. Expand all channels to 0..255 and store\n"
+        "             * R,G,B,A bytes for the matching R8G8B8A8 staging/dynamic textures. */\n"
+        "            *dstpix = (((pix >> 12) & 15u)\n"
+        "                  | (((pix >> 8) & 15u) << 8)\n"
+        "                  | (((pix >> 4) & 15u) << 16)\n"
+        "                  | ((pix & 15u) << 24)) * 17u;\n",
+        "patches/series, 0055",
+    ),
 ]
 
 

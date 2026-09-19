@@ -1601,3 +1601,15 @@ reported exactly the staged identity in its trace; see
 but does not prove correct pixels. The identity run closed before its final query.
 No driver project files were modified and no new dependency or compiler flag was
 introduced. The generated header is not committed.
+
+## 2026-09-19 — Correct the RGUI upload channel order and range
+
+Patch 0055 expands the producer's RGBA4444 nibbles to RGBA8888 bytes, preserving
+A2's matching 32-bit textures and plain-copy route. Its regression test failed
+before the fix and checks all 65,536 inputs after it. The five gates passed with
+25 tests. The full 30-second colour run ended with a live title which the script
+closed; its fresh trace has zero refusals and successful initial API results.
+`evidence/vulkan-menu-rgba/` records the capture and expectations. The subsequent
+identity run was verified as the intended input set. The owner's clarified report
+is a green menu with blue flicker and black triangles; upload correction does not
+resolve GPU corruption, and the overall goal remains open.
