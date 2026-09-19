@@ -90,6 +90,15 @@ defines+=(
     # link time rather than a message at run time. NDEBUG is what a release build
     # of RetroArch uses in any case, so nothing is lost that was meant to ship.
     -DNDEBUG
+    # Screenshots, which is the only capture path this port has. RetroArch's own
+    # `--max-frames=N --max-frames-ss --max-frames-ss-path=FILE` writes one at the end
+    # of a fixed number of frames, and the goal this round is working toward asks for
+    # frames *reaching the screen*: a picture read back from the frame the console was
+    # handed is that evidence without a camera pointed at the display. The flag is off
+    # in the configured tree (the whole block is `#ifdef HAVE_SCREENSHOTS`), so the
+    # options do not exist and the run exits with nothing to read. Nothing else in the
+    # build changes: the readback is the Vulkan driver's own path.
+    -DHAVE_SCREENSHOTS
     # zstd enables its tracing hooks whenever it sees GNUC, ELF and an x86-64
     # target, and a tracing hook is emitted as a weak undefined symbol on the
     # promise that the linker may leave it unresolved. This title's eboot.bin

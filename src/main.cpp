@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <typeinfo>
 
@@ -154,8 +155,49 @@ int main()
 
     ps5::debug::mark("argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file");
 
+    /* Extra arguments, one per line, from /app0/args.txt when that file is there.
+     *
+     * Why a file rather than the launch arguments: the console starts this title
+     * from its own launcher, which passes none, and the frontend's most useful
+     * unattended options are exactly the ones a run needs to change - RetroArch
+     * already knows how to take a screenshot at the end of a fixed number of frames
+     * (`--max-frames=N --max-frames-ss --max-frames-ss-path=FILE`), which is the
+     * only way this port can show what the GPU produced without a camera at the
+     * screen. The file is optional, empty lines and `#` comments are skipped, and
+     * the storage is static because RetroArch's option parsing keeps pointers into
+     * it for the whole run. */
+    constexpr int max_extra_args = 16;
+    constexpr std::size_t max_extra_arg_len = 256;
+    static char extra_storage[max_extra_args][max_extra_arg_len];
+    int extra_count = 0;
+
+    if (std::FILE *extra = std::fopen("/app0/args.txt", "r"))
+    {
+        while (extra_count < max_extra_args &&
+               std::fgets(extra_storage[extra_count], max_extra_arg_len, extra))
+        {
+            char *line = extra_storage[extra_count];
+            std::size_t len = std::strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+                line[--len] = '\0';
+            if (len == 0 || line[0] == '#')
+                continue;
+            extra_count++;
+        }
+        std::fclose(extra);
+        ps5::debug::mark_value("argv extras from /app0/args.txt", extra_count);
+    }
+
+    char *argv_with_extras[sizeof(argv) / sizeof(argv[0]) + max_extra_args];
+    std::size_t base_count = sizeof(argv) / sizeof(argv[0]) - 1;
+    for (std::size_t i = 0; i < base_count; i++)
+        argv_with_extras[i] = argv[i];
+    for (int i = 0; i < extra_count; i++)
+        argv_with_extras[base_count + i] = extra_storage[i];
+    argv_with_extras[base_count + extra_count] = nullptr;
+
     const int status =
-        rarch_main(static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1, argv, nullptr);
+        rarch_main(static_cast<int>(base_count + extra_count), argv_with_extras, nullptr);
 
     /* If this line is on the console, the frontend ran and returned by itself. */
     ps5::debug::mark_value("rarch_main returned", status);

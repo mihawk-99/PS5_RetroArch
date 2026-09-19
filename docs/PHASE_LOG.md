@@ -1293,3 +1293,29 @@ first-frame clears are triangle strips, the blank texture's upload takes the com
 path (storage-image descriptor, no table entry in the driver), and the filter chain asks
 for sampler address modes the driver has no word for (patch 0023 makes the chain use its
 clamp-to-edge entry instead).
+
+## 2026-09-19 - an unattended argument file, and screenshots compiled in
+
+The goal's last gap is a picture of what the console was handed, and the port had no
+capture path at all. Two things were missing, both now in place and both verified on the
+console:
+
+- `src/main.cpp` reads `/app0/args.txt` when that file exists - one extra argument per
+  line, blank lines and `#` comments skipped, stored statically because RetroArch's
+  option parsing keeps pointers into argv for the whole run. Evidence:
+  `probe ... "argv extras from /app0/args.txt = 3"` in the trace
+  (`klog/trace-r4.txt`) after staging three lines over FTP; without the file nothing
+  changes.
+- `tools/build-retroarch.sh` now defines `HAVE_SCREENSHOTS`. RetroArch's
+  `--max-frames=N --max-frames-ss --max-frames-ss-path=FILE` is entirely inside
+  `#ifdef HAVE_SCREENSHOTS`, so on this build the options did not exist and a run had
+  nothing to write. With the flag the frontend compiles and links 276 of 276 sources and
+  the title runs (`klog/run-shot-r4b.log`: "it ran for 20s and this script closed it").
+
+The capture still does not fire, and the reason is precise: `runloop.h`'s
+`RUNLOOP_TIME_TO_EXIT` compares `runloop_state.max_frames` against `frame_count`, which
+is the **core's** frame count. This title loads no content - the menu is the whole
+program - so that counter never advances and frame 200 never arrives (three runs with
+`--max-frames=200` all ran the full watch window and wrote no `shot.png`). Next step: a
+port block in `runloop.c` that counts the frontend's own frames for that comparison when
+`--max-frames-ss` is asked for, then read the file back over FTP and look at it.
