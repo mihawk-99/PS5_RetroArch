@@ -2284,3 +2284,36 @@ the frames are visibly on screen. So the marker is not a usable instrument for
 "has the display taken a newer frame" on this console, whatever it reports. The
 display work was read through it for several rounds; the pictures on the screen are
 the evidence that matters.
+
+## A1 is one choke point, not many sites - and the static buffers are exactly a quad
+
+**Measured by reading the code.** The strip topology the driver refuses is not chosen
+in one place: `gfx_display.c:538`, `:678`, `:937`, `gfx_thumbnail.c:1005`,
+`gfx_widgets.c:645` and `materialui.c:2583` all set
+`draw.prim_type = GFX_DISPLAY_PRIM_TRIANGLESTRIP`, and the Vulkan driver derives the
+pipeline from it - `disp_pipeline = ((draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP) << 1) | blend`
+(`gfx/drivers/vulkan.c:1470`). So topology and geometry are chosen together, and
+patching the pipeline alone would draw wrong triangles rather than refuse - a silent
+wrong picture, which is worse than a refusal. Patching every call site is the wrong
+shape for a port whose changes are meant to be a short named list.
+
+**The choke point is `gfx_display_vk_draw`** (`gfx/drivers/vulkan.c:1379`). Every menu
+draw passes through it, and it already re-bakes the caller's separate vertex,
+tex-coord and colour arrays into an interleaved VBO. A strip can be expanded to a
+triangle list inside that loop, and the only other change is to report
+`GFX_DISPLAY_PRIM_TRIANGLESTRIP` as the list pipeline, so the menu's own vertex data
+does not have to change at all.
+
+**The trap that makes it delicate.** For four strip vertices the loop reads eight
+floats from `vertex` - and when the caller supplies no coordinates, `vertex` is
+`&vk_vertexes[0]`, a **static array of exactly 8 floats** (`:1246`), with
+`vk_tex_coords[8]` (`:1253`) the same. A conversion that reads six interleaved
+vertices instead of four therefore reads past the end of a static array. The
+expansion has to be done as an index mapping - emitting `(N-2)*3` list vertices while
+reading source index `s(i)` from the original arrays - not by duplicating the
+interleaved values after the fact.
+
+**Not started.** The change is small but lands in the middle of the frontend's draw
+path, next to the shader pipeline ids (`VIDEO_SHADER_MENU` .. `_5`, which have their
+own `to_menu_pipeline` mapping at `:1453`). It wants a fresh round with the console
+free, and it is the first of the three refusals rather than the whole job.
