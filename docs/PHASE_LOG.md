@@ -1613,3 +1613,34 @@ closed; its fresh trace has zero refusals and successful initial API results.
 identity run was verified as the intended input set. The owner's clarified report
 is a green menu with blue flicker and black triangles; upload correction does not
 resolve GPU corruption, and the overall goal remains open.
+
+## 2026-09-19 — Resolve GPU flicker in the driver compiler
+
+The user's detailed observation distinguished a green menu from blue flicker and
+fixed-position dark triangles. An equivalent ONE/ZERO opaque-pass diagnostic
+passed host gates and completed a 30-second run but left both defects unchanged;
+it is retired in `parked/explicit-stock-blend/`. The user then authorized driver
+changes provided they were documented and committed in PS5_Vulkan.
+
+The bounded readback diagnostic (`parked/gpu-readback/`) captured correct menu
+texels and white vertex colours, but corrupt completed GPU frames. A host compile
+of RetroArch's fragment shader showed both texture coordinates and colour at
+NIR base 0; ACO read both from attr0. PS5_Vulkan now assigns fragment input
+locations as RADV does before shader-info gathering. Its fix and documentation
+are committed in **6f0ce0d**, with dense/sparse compiler regressions, full driver
+checks, `make test`, `make lint` and `make` passing.
+
+`bash tools/run-title.sh --no-build --watch 30` against that compiler completed
+and the script closed the title. The fresh trace has zero refusals and no observed
+end/submit/present error. The owner confirms correct colours, no flicker and no
+triangles. All 909 opaque-white sampled texels are correct, and frames 8 and 9
+are byte-identical. `evidence/vulkan-fragment-inputs/` records the build identity,
+trace and pixel hashes; raw captures remain ignored. A1-A4 and B1-B4 are verified.
+
+Temporary capture hooks were then removed from the configured source and final
+build. All five RetroArch gates and 25 tests pass; ELF symbols retain both video
+drivers and omit the capture function. Two final deployment attempts stopped at
+the pre-upload busy check (one running title). The owner-confirmed fixed diagnostic
+build remains installed; no running title was interrupted. No performance or
+core-execution claim is made. Criteria documentation now reflects the actual
+settled upload mechanism and the user's driver-change authorization.

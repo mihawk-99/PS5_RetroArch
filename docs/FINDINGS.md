@@ -2492,3 +2492,20 @@ black triangles remain. Successful Vulkan calls alone do not prove correct pixel
 Read-only driver findings record an earlier similar blue blending defect fixed by
 FP16 exports; current code skips blend-register writes on opaque draws. This
 suggests a mixed-pipeline diagnostic, not a confirmed cause of this title's issue.
+
+## 2026-09-19 — Fragment input aliasing explains the visible corruption
+
+The uploaded menu texture and six white vertex colours are correct. Captured GPU
+frames are already corrupt before presentation: opaque-white source samples never
+render white, and colour gradients follow the two quad triangles. The driver's
+standalone compiler maps both fragment varyings to base 0 because it omits
+`ac_nir_assign_fs_input_locations` before shader info. ACO therefore reads colour
+from texture-coordinate components, including undefined blue/alpha. Empty input
+semantics and unresolved AGC linkage accompany an otherwise successful compile.
+
+The user authorized driver modifications during this investigation. PS5_Vulkan
+commit **6f0ce0d** fixes its compiler work copy without SDK edits. The resulting
+RetroArch run has zero refusals/errors, 909/909 correct opaque-white samples,
+identical consecutive frames, and owner confirmation of correct colours without
+flicker or triangles. Evidence: `evidence/vulkan-fragment-inputs/`. The earlier
+blend-state hypothesis did not fix the defect and is not the established cause.

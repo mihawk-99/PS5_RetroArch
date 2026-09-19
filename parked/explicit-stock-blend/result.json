@@ -1,0 +1,24 @@
+{
+  "build_identity": "8958ff2aee490a89b788269d647223e713483781f588b5e4b3f23452da1ac481",
+  "refusals": 0,
+  "api_results": [
+    "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+    "gpu result: swapchain image calls=1 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+    "gpu result: swapchain image calls=2 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+    "gpu result: swapchain image calls=3 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0"
+  ],
+  "owner": "Both defects remain",
+  "full_watch_seconds": 30
+}

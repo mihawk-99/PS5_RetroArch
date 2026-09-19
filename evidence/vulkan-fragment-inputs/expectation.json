@@ -1,0 +1,14 @@
+{
+  "step": "vulkan-fragment-inputs",
+  "note": "GPU acceptance A1-A4 and B1-B4 for the corrected compiler; no frame-rate/core claim.",
+  "must_contain": [
+    "refusals=0",
+    "vkEndCommandBuffer calls=4 failures=0 result=0",
+    "vkQueueSubmit calls=4 failures=0 result=0",
+    "vkQueuePresentKHR calls=4 failures=0 result=0",
+    "Colours correct; no flicker or triangles",
+    "samples 909/909",
+    "frame difference=0"
+  ],
+  "must_not_contain": []
+}

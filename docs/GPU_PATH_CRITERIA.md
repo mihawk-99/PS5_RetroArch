@@ -29,51 +29,12 @@ three sources and the frontend-side fix for each.
 | A3 | Every sampler the frontend creates uses clamp-to-edge on all three axes | `vendor/retroarch/gfx/drivers_shader/shader_vulkan.cpp:2034-2036` (hardcoded REPEAT) and `:2087-2108` (preset-driven, mapping to repeat / mirrored-repeat / clamp-to-border / mirror-clamp) | the trace has **zero** `sampler address modes` lines |
 | A4 | The refusal count is zero, not merely lower | all of the above | `grep -c '^vulkan: ' /app0/trace.txt` is **0** over a full run |
 
-A2 is a decision, not only a patch, and **the first decision was wrong**. It was
-settled as "request RGB8888"; reading the menu's format chooser shows that cannot
-work. Corrected as follows.
-
-**Why RGB8888 cannot work.** RGUI picks its output pixel format from the *video
-driver's identity*, not from any request:
-`rgui_set_pixel_format_function` (`menu/drivers/rgui.c:1359-1394`) switches on
-`video_driver_get_ident()` and falls through to `argb32_to_rgba4444` for any driver
-it does not name - and it names ps2, gx, psp1, rsx, d3d10/11/12, sdl_dingux, sdl_rs90
-and xvideo, not "ps5". So this port's menu is produced as **RGBA4444, 16 bits per
-pixel**, and there is no RGB8888 path in RGUI at all. Requesting RGB8888 would leave
-the menu's buffer 16-bit, the dynamic and staging formats would still differ, and the
-compute path would still fire.
-
-**The fix that follows.** Make the two texture formats match by using the format the
-menu actually sends. `vulkan_set_texture_frame` already computes it - `fmt` becomes
-`VK_FORMAT_B4G4R4A4_UNORM_PACK16` for a non-rgb32 frame (`gfx/drivers/vulkan.c`, the
-`if (!rgb32)` branch). The corrected change is in the same function: allocate the
-staging texture in that same remapped format, so `dynamic->format == staging->format`
-and `vulkan_copy_staging_to_dynamic` takes its `vkCmdCopyBufferToImage` branch.
-
-**The quality objection to the earlier decision does not apply.** I rejected the
-matching-format route because it "stores the menu in B4G4R4A4, four bits per
-channel". That is what RGUI *already produces* - `argb32_to_rgba4444` - and what the
-optimal texture already holds. The staging texture being 32-bit was the odd one out,
-not the thing to preserve. Matching it is not a quality loss; it is the removal of a
-conversion nothing needed.
-
-**Corrected A2 criterion, first decision kept for the record: request RGB8888.**
-
-The menu is sent as RGB565 (`rgb32 == false`), and `vulkan_set_texture_frame`
-answers that by remapping `fmt` to `VK_FORMAT_B4G4R4A4_UNORM_PACK16` while the
-staging texture is allocated in the 32-bit `fmt` it started as - so the two formats
-differ and `vulkan_copy_staging_to_dynamic` (`gfx/drivers/vulkan.c:1098`) takes the
-compute path, which writes the storage image at binding 3 that libps5vk refuses.
-
-The alternative - allocate the staging texture in the remapped format so the formats
-match - would also clear the refusal, but it stores the menu in **B4G4R4A4: four
-bits per channel**, and RGUI's palette and antialiased text would visibly degrade.
-Requesting RGB8888 makes the menu 32-bit end to end, so the formats match, the plain
-`vkCmdCopyBufferToImage` path runs, and the picture is full 8-bit colour.
-
-The risk to watch is that `SET_PIXEL_FORMAT: RGB8888` is a frontend-wide setting; if
-it has side effects, the remapped-staging fallback is the alternative and the
-quality tradeoff gets recorded here rather than hidden.
+A2 is settled as the RGB8888 route. RGUI itself still produces packed RGBA4444
+for the Vulkan driver; the port expands that data to full-range R,G,B,A bytes and
+allocates both staging and dynamic textures as `VK_FORMAT_R8G8B8A8_UNORM`.
+Matching formats select `vkCmdCopyBufferToImage`. The unused storage-image compute
+upload shader is not compiled, since its descriptor is unsupported. This preserves
+the agreed 32-bit texture route without claiming RGUI produces native 8-bit colour.
 
 ## B - the menu reaches the screen through the GPU
 
@@ -104,7 +65,7 @@ established what happens when an unverified assumption is treated as a result.
 
 | # | Criterion |
 | --- | --- |
-| D1 | `../PS5_Vulkan` is not modified. Every change is in this tree. |
+| D1 | Driver changes require explicit user authorization and are documented and committed in `../PS5_Vulkan`. The user granted that authorization on 2026-09-19 for this rendering defect. |
 | D2 | `tools/verify.sh` passes: format, unit, build, integration, evidence. |
 | D3 | The port's changes to upstream remain named edits in `patches/series`, applied by `tools/apply-port-patches.py` to `build/ra-conf` only; `vendor/retroarch` is never edited. |
 | D4 | Every step is verified by a command or an artifact, committed with its evidence, and written up in `docs/ACTIVE.md` and `docs/FINDINGS.md`. |
@@ -130,36 +91,8 @@ established what happens when an unverified assumption is treated as a result.
 If A4 cannot be reached, the work stops there, the CPU path stays, and what was
 learned is recorded. The menu on the screen is not put at risk for an optimisation.
 
-## Where this stands now
+## Current evidence
 
-A4 and B1 are met. A1, A2 and A3 were each fixed and the refusals are gone: the
-trace carries no `vulkan: ` line at all.
-
-**The A2 decision recorded above was right for the wrong reason, and the criterion
-it names was wrong about the mechanism.** The storage-image refusal did not come
-from an upload taking its compute branch. It came from `vkCreateComputePipelines`:
-libps5vk's `ps5vk_descriptor_options` walks every set-0 binding whose stage flags
-match the stage being compiled and refuses any whose stride is zero, a storage
-image's stride is zero by design, and this frontend's shared set declares a
-compute-only storage image at binding 3. So the fix is not a format decision at
-all - patch 0027's name-the-one-format change had already made the formats match
-and the compute branch was already unreachable. The fix is to stop compiling the
-upload shader (0036): the branch it serves would fail its own `retro_assert`.
-
-The lesson is in the criteria's own terms: "request RGB8888" and "match the menu's
-format" were both answers about a path that was not being taken. The refusal named
-the binding, not the upload, and reading it as an upload fault cost two rounds.
-
-**What B actually needed was five more faults, none of them about formats.** They
-are listed in `docs/ACTIVE.md` and each has a patch: widgets claiming the driver
-before the display context is resolved (0042); nothing ever enabling the menu
-texture, because the frontend's only `true` is a libretro concept this content-less
-title never reaches (0046); the optimal menu image never being copied into after
-the first handover (0051); a stale `/app0/args.txt` ending every run by itself
-(0043); and the driver's own menu draw living in `vulkan_draw_quad` rather than in
-the display-list `gfx_display_vk_draw` that was instrumented first.
-
-**B2, B3 and B4 remain unmet.** The screen is black with the menu texture filled,
-the quad drawn, and no error anywhere. That is where the work stops for now, and
-the next step is the driver's own draw path in `../PS5_Vulkan`, not another
-frontend gate.
+Current acceptance and artifacts live in `docs/ACTIVE.md`; dated runs are in
+`docs/PHASE_LOG.md`. Successful Vulkan calls establish completion, while captured
+pixels and the console owner's confirmation establish visible rendering.

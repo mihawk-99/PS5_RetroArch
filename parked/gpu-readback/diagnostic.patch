@@ -1,0 +1,39 @@
+diff --git a/patches/series b/patches/series
+index 42fba5a..f097afb 100644
+--- a/patches/series
++++ b/patches/series
+@@ -34,3 +34,6 @@
+ 
+ # 0055  convert the RGUI producer RGBA4444 channels to full-range RGBA8888
+ 0055-correct-rgui-rgba8888-upload
++
++# 0056  temporary synchronized texture and swapchain readback
++0056-capture-gpu-images
+diff --git a/tests/test_frontend.py b/tests/test_frontend.py
+index 399aac2..f757b48 100644
+--- a/tests/test_frontend.py
++++ b/tests/test_frontend.py
+@@ -300,7 +300,7 @@ class PortPatches(unittest.TestCase):
+         change deliberately, in a commit that says why.
+         """
+         self.assertEqual(
+-            len(self.blocks()), 68,
++            len(self.blocks()), 69,
+             "the patch count changed: if a block was added or removed on purpose, "
+             "update this number in the same commit and say why in its message")
+ 
+diff --git a/tools/apply-port-patches.py b/tools/apply-port-patches.py
+index 0e789a8..ca7907d 100755
+--- a/tools/apply-port-patches.py
++++ b/tools/apply-port-patches.py
+@@ -1958,6 +1958,10 @@ EDITS = [
+         "                  | ((pix & 15u) << 24)) * 17u;\n",
+         "patches/series, 0055",
+     ),
++    ('gfx/drivers/vulkan.c',
++        '   if (vk->ctx_driver->swap_buffers)\n      vk->ctx_driver->swap_buffers(vk->ctx_data);\n',
++        '   /* Added by this port (patches/series, 0056): bounded debug image capture. */\n   {\n      static unsigned ps5_capture_frame;\n      if (++ps5_capture_frame == 8 || ps5_capture_frame == 9)\n      {\n         extern void ps5_capture_images(unsigned, VkImage, VkImage, VkDevice);\n         struct vk_texture *ps5_menu = &vk->menu.textures[vk->menu.last_index];\n         struct vk_texture *ps5_optimal = &vk->menu.textures_optimal[vk->menu.last_index];\n         if (ps5_optimal->memory != VK_NULL_HANDLE)\n            ps5_menu = ps5_optimal;\n         if (vkQueueWaitIdle(vk->context->queue) == VK_SUCCESS)\n            ps5_capture_images(ps5_capture_frame, ps5_menu->image, backbuffer->image, vk->context->device);\n      }\n   }\n   if (vk->ctx_driver->swap_buffers)\n      vk->ctx_driver->swap_buffers(vk->ctx_data);\n',
++        'patches/series, 0056'),
+ ]
+ 
+ 

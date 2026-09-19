@@ -1,0 +1,62 @@
+{
+  "step": "vulkan-fragment-inputs",
+  "command": "bash tools/verify.sh; bash tools/run-title.sh --no-build --watch 30",
+  "raw_capture": "klog/gpu-fixed-inputs-latest-trace.txt",
+  "raw_lines": 339,
+  "driver_fix": "../PS5_Vulkan/tooling/psbc/patch-fragment-inputs.py",
+  "tested_build_identity": "dc4d5d48081967fb97de05b14a0b5b27258ca35836e0f08297abb7361dab8265",
+  "clean_build_identity": "495909992c86981ec06da2eacf8cca9e585f2e76f1043ca5013df72778f58d78",
+  "pixels": {
+    "opaque_white_texels": 909,
+    "correct_white_centres": 909,
+    "changed_target_pixels": 0,
+    "files": {
+      "gpu-menu-8.bin": {
+        "bytes": 307200,
+        "sha256": "611be7969671f1510cacc5f676bb8dbca40b3be66716234894023087e9af7a6e"
+      },
+      "gpu-target-8.bin": {
+        "bytes": 33554432,
+        "sha256": "30d6eefb63354325f1334b0e37d380ab7699290f9f5a01ac096c09047bea2bce"
+      },
+      "gpu-menu-9.bin": {
+        "bytes": 307200,
+        "sha256": "611be7969671f1510cacc5f676bb8dbca40b3be66716234894023087e9af7a6e"
+      },
+      "gpu-target-9.bin": {
+        "bytes": 33554432,
+        "sha256": "30d6eefb63354325f1334b0e37d380ab7699290f9f5a01ac096c09047bea2bce"
+      }
+    }
+  },
+  "lines": [
+    "build identity: dc4d5d48081967fb97de05b14a0b5b27258ca35836e0f08297abb7361dab8265",
+    "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+    "gpu result: swapchain image calls=1 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+    "gpu result: swapchain image calls=2 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+    "gpu result: swapchain image calls=3 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0",
+    "gpu capture: menu frame=8 bytes=307200 written=307200 close=0",
+    "gpu capture: target frame=8 bytes=33554432 written=33554432 close=0",
+    "gpu capture: menu frame=9 bytes=307200 written=307200 close=0",
+    "gpu capture: target frame=9 bytes=33554432 written=33554432 close=0",
+    "audit: fresh trace refusals=0; CPU ps5_init absent",
+    "runner: completed 30-second watch; script closed title",
+    "owner: Colours correct; no flicker or triangles",
+    "pixels: opaque white samples 909/909; consecutive frame difference=0",
+    "host: all five RetroArch gates PASS, 25 tests; capture hook removed from final source/build",
+    "final deployment: skipped twice because shared console process count=1; verified diagnostic build remains installed"
+  ],
+  "driver_commit": "6f0ce0d"
+}
