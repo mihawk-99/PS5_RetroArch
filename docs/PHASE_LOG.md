@@ -2233,3 +2233,54 @@ FBNeo SHA-256: `0e4231a238af2e5cc2630568abcaec2d3fe5356d647ec87ab9d9c13e8da66e44
 hashes stayed unchanged; four linked Vulkan archive hashes stayed unchanged.
 Symbol-bearing ELF: `klog/fbneo-41cb59a9-symbols.elf`. Committable evidence and
 expectations: `evidence/fbneo-native/`, replay with `bash tools/verify.sh evidence`.
+
+## 2026-09-19 — Native Genesis Plus GX, colours and transitions accepted
+
+Task: add Genesis Plus GX through the existing native pipeline, use the supplied
+.info as reference only, and verify gameplay/menu colours before committing.
+Source c2838c7dc4236fc2fe94e5dbd08b41486067918e and official core-info
+5a74858ab2f7a50cebb5a6330895bc38899531c0 are hash pinned. New script/target,
+packaging/import union/build identity and loader selector are integrated. The
+script preserves disc-image codecs while disabling host-detected physical CD-ROM
+support and optional zstd weak tracing imports with no linked provider. The
+core's RGB565 renderer remains intact; a bounded XRGB8888 adapter uses the actual
+viewport offset and row pitch. update_geometry's unused return type is corrected.
+Frontend video and PS5_Vulkan are unchanged.
+
+Commands and results:
+- `python3 -m unittest discover -s tests -p test_genesis_plus_gx_video.py -v`:
+  three tests passed, including every RGB565 colour through upstream packing and
+  the frontend upload helper, cropped/resized cached views and invalid bounds.
+- `bash tools/verify.sh > /tmp/genesis-verify.log 2>&1`: all five gates passed,
+  66 tests, existing 22 evidence captures replayed. Build source/ABI/import/SDK
+  records are copied into `evidence/genesis-plus-gx-native/`.
+- `bash tools/verify.sh format > /tmp/genesis-format-final.log 2>&1`: passed
+  after the final build-script flags. Existing core hashes match all four
+  accepted builds. PS5_Vulkan's four archives matched before/after the build.
+- `bash tools/run-title.sh --no-build --core-test=genesis_plus_gx --watch 240
+  > klog/genesis-first-run.log 2>&1`: exit 0; idle guard, full FTP readback,
+  eight native loader cycles/25 callbacks/API/name and failed-load/menu recovery
+  passed. Identity ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445;
+  core 881b5118e6afe700d8de21df679b7e51a458c0bb2fe11603b96373d87f6a2fe0,
+  13,388,248 bytes. Symbol-bearing ELF/map preserved under klog/genesis-ecfcddd5-*.
+
+Two current-build launches appear in trace, both with rarch_main/native quit 0
+before the 240-second window ended. Kernel `klog/run-PPSA99169-171959.log` has no
+fatal signals. There are no Vulkan refusals or GPU API failures; eight audio
+close reports have errors=0. Frontend snapshots preserve both launches because
+relaunch truncates retroarch.log. They show an archive member with .md extension,
+XRGB8888 callbacks, 256x192 geometry, and return to the 320x240 dummy menu.
+
+Failures are retained: the first snapshot has five deliberate missing-core
+recovery errors plus two archive-extraction errors. The owner identified the
+latter content as ARCADE - Sega System 16 & 32, which belongs with FBNeo. No
+archive-structure inspection or parser fix is claimed. The second snapshot has
+zero ERROR lines. Core files and private filenames remain in ignored storage;
+only sanitized results are in evidence.
+
+Owner: “Sega Genesis works flawlessly”; explicit follow-up for Quick Menu/Close
+Content/next game: “Yes, transitions and next game are clean.” This accepts the
+requested colour and transition check, not every Sega system, BIOS/disc/CHD,
+filter/interlace option, save mechanism or long-run A/V/performance behaviour.
+Replay with `python3 tools/evidence.py compare evidence/`; the new capture and
+expectation are in `evidence/genesis-plus-gx-native/`.

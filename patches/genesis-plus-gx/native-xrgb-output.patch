@@ -1,0 +1,74 @@
+--- a/libretro/libretro.c
++++ b/libretro/libretro.c
+@@ -43,6 +43,10 @@
+ #include <stdbool.h>
+ #endif
+ #include <stddef.h>
++#include "ps5-video.h"
++#if !defined(USE_16BPP_RENDERING) || !defined(FRONTEND_SUPPORTS_RGB565)
++#error PS5 video adapter requires the upstream RGB565 renderer
++#endif
+ #include <stdarg.h>
+ #include <stdio.h>
+ 
+@@ -149,6 +153,7 @@
+ static uint8_t temp[0x10000];
+ static int16 soundbuffer[3068];
+ static uint16_t bitmap_data_[720 * 576];
++static uint32_t ps5_xrgb_data[720 * 576];
+ static uint8_t reg0_prev = 0;
+ 
+ static char g_rom_dir[256];
+@@ -1269,7 +1274,7 @@
+    return (videosamplerate / dotrate) * ((double)(vwidth - vwoffset) / ((double)vheight * 2.0));
+ }
+ 
+-static bool update_geometry(void)
++static void update_geometry(void)
+ {
+    struct retro_system_av_info info;
+    bool update_av_info = false;
+@@ -3484,14 +3489,17 @@
+       }
+    }
+ 
+-#ifdef FRONTEND_SUPPORTS_RGB565
+-   {
+-      unsigned rgb565 = RETRO_PIXEL_FORMAT_RGB565;
+-      if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
++   {
++      enum retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
++      if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format))
++      {
+          if (log_cb)
+-            log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+-   }
+-#endif
++            log_cb(RETRO_LOG_ERROR, "[Genesis PS5] XRGB8888 output rejected.\n");
++         goto error;
++      }
++      if (log_cb)
++         log_cb(RETRO_LOG_INFO, "[Genesis PS5] RGB565 renderer; callback XRGB8888.\n");
++   }
+ 
+    sms_ntsc = calloc(1, sizeof(sms_ntsc_t));
+    md_ntsc  = calloc(1, sizeof(md_ntsc_t));
+@@ -4006,9 +4014,16 @@
+       retro_led_interface();
+ 
+    if (!do_skip)
+-      video_cb(bitmap.data + bmdoffset, vwidth - vwoffset, vheight, 720 * 2);
++   {
++      const unsigned width = vwidth - vwoffset;
++      if (ps5_genesis_frame(ps5_xrgb_data, 720 * 576, bitmap_data_, 720 * 576,
++                           bitmap.pitch, bmdoffset, width, vheight))
++         video_cb(ps5_xrgb_data, width, vheight, (size_t)width * sizeof(uint32_t));
++      else if (log_cb)
++         log_cb(RETRO_LOG_ERROR, "[Genesis PS5] Invalid bitmap viewport.\n");
++   }
+    else
+-      video_cb(NULL, vwidth - vwoffset, vheight, 720 * 2);
++      video_cb(NULL, vwidth - vwoffset, vheight, (size_t)(vwidth - vwoffset) * sizeof(uint32_t));
+ 
+    audio_cb(soundbuffer, soundbuffer_size);
+ }

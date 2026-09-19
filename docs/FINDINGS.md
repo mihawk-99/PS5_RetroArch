@@ -2806,3 +2806,33 @@ Optional environment command 87 carries an endian-dependent serialization hint
 which this frontend does not recognize; gameplay succeeds, but cross-platform
 state compatibility is not established. See `evidence/fbneo-native/` for exact
 builds, failed iterations, reports, declared geometries/rates and linked hashes.
+
+## 2026-09-19 — Genesis Plus GX RGB565 renderer with XRGB8888 callbacks
+
+Pinned Genesis Plus GX c2838c7dc4236fc2fe94e5dbd08b41486067918e uses
+USE_16BPP_RENDERING and FRONTEND_SUPPORTS_RGB565 in its Unix libretro build.
+Changing the renderer to 32-bit would also affect NTSC filters, cursors and Game
+Gear LCD persistence. The port retains those internals and converts into a
+separate callback buffer, preserving the original bitmap across cached frames.
+The bitmap is 720x576 with a 1440-byte pitch; cropped SMS/NTSC viewports start at
+byte offsets 16/40. The conversion checks row, input and output bounds, accounts
+for that offset, and emits tightly packed 0x00RRGGBB. The existing frontend
+converts it to RGBA bytes for Vulkan without modifying core-owned storage.
+
+`tests/test_genesis_plus_gx_video.py` checks all 65,536 values using the pinned
+upstream PIXEL macro through the real upload helper, and exercises cropped,
+interlaced-size and maximum-size buffers, cached frames, resolution changes and
+invalid bounds. These host dimensions are not console feature acceptance.
+`evidence/genesis-plus-gx-native/` records the ABI, exact source/metadata/SDK/port
+hashes, driver archives, loader/recovery reports and sanitized console results.
+The owner confirmed gameplay and clean Close Content/next-game transitions.
+Two same-build launches report no Vulkan refusals or GPU API failures and both
+quit natively with status 0. The other four core bytes and four driver archive
+hashes are unchanged.
+
+Two ZIP extraction failures in the first frontend snapshot occurred before the
+core received content. The owner identified those selections as Sega System
+16/32 arcade archives, outside this core's system coverage. FBNeo has drivers
+for those boards. No archive parser change is warranted by this evidence, and
+no claim is made that the archive structures themselves were inspected. A later
+same-build frontend snapshot has no ERROR lines. See ACTIVE for current scope.

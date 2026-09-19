@@ -45,6 +45,10 @@ HOST_UNIT_TEST := build/tests/demo_renderer_tests
 all: app
 build: app
 
+.PHONY: genesis-plus-gx
+genesis-plus-gx:
+	@bash tools/build-genesis-plus-gx.sh
+
 .PHONY: fbneo
 fbneo:
 	@bash tools/build-fbneo.sh
@@ -177,6 +181,7 @@ help:
 	  'make test-unit       Run host-native GoogleTest application tests' \
 	  'make test-integration  Run host tooling integration tests' \
 	  'make deps            Fetch native dependencies into .deps/' \
+	  'make genesis-plus-gx Build and ABI-check the pinned PS5 Genesis Plus GX core' \
 	  'make fbneo           Build and ABI-check the pinned PS5 FBNeo core' \
 	  'make snes9x          Build and ABI-check the pinned PS5 Snes9x core' \
 	  'make mgba            Build and ABI-check the pinned PS5 mGBA core' \

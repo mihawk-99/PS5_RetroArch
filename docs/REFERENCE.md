@@ -415,7 +415,7 @@ release allocations and report the failing operation; successful handles are
 reference counted and unmapped on the final close.
 
 `tools/core-imports.py` derives the union of required native bindings from the
-explicitly shipped FCEUmm, mGBA, Snes9x and FBNeo ELFs; bindings and all cores participate in the title build
+explicitly shipped FCEUmm, mGBA, Snes9x, FBNeo and Genesis Plus GX ELFs; bindings and all cores participate in the title build
 identity. Directory imports use this port's directory adapters, including `rewinddir`.
 The `localtime_r` binding uses RetroArch's existing locked `rtime_localtime`
 helper, initialized before gameplay. The
@@ -621,3 +621,37 @@ allocations before changing driver pointers, and exit restores the original
 pointers before freeing storage. Repeated exit/reinitialization is safe.
 Initialization failure is logged and causes regular/subsystem content loads to
 return false. No partially initialized catalogue is used for game execution.
+
+## Genesis Plus GX native core contract
+
+`make genesis-plus-gx` uses official libretro/Genesis-Plus-GX source
+`c2838c7dc4236fc2fe94e5dbd08b41486067918e` (archive SHA-256
+`7ba2eab9d6dae71bb42e8208573300ad3475a4263e860178c4d19c36d85fc92b`).
+Official core-info comes from `5a74858ab2f7a50cebb5a6330895bc38899531c0`,
+SHA-256 `9793bff8d9e298a7ee0c94c0511dab242200ca60fbe87e3720eb9231a3e0166a`.
+The supplied .info is reference material; only the hash-checked official file is
+staged in info/ and cores/. The fresh source build uses this project's explicit
+SDK compiler/archiver wrappers and native linker script/import union, without a
+payload CRT. `HAVE_CDROM=0` disables Linux-host autodetection of physical CD-ROM
+access, retaining CHD and disc-image codecs. `ZSTD_TRACE=0` disables optional weak
+instrumentation hooks for which the title has no external provider. It does not
+disable core/frontend error logging. Source, metadata, SDK wrapper and port-input
+hashes are recorded in build/cores/genesis_plus_gx/build.json.
+
+The software renderer, NTSC filters, cursors and Game Gear LCD persistence retain
+upstream RGB565 storage. A separate bounded XRGB8888 callback buffer preserves the
+cached source and the existing frontend's RGBA Vulkan upload contract. Conversion
+uses the actual 720-pixel input stride and byte viewport offset; output is packed
+at width*4 bytes per row. Rejected XRGB8888 negotiation rejects content through
+upstream cleanup. Invalid views are logged and never read out of bounds. Skipped
+frames still submit NULL. The patch normalizes libretro.c line endings only in
+the disposable extraction and corrects the unused-return update_geometry helper
+to void. Frontend video code and PS5_Vulkan require no change.
+
+Upstream covers Mega Drive/Genesis, Master System, Game Gear, SG-1000 and Sega CD;
+this is a software core using Vulkan presentation, not a Vulkan hardware renderer.
+Its runtime uses need_fullpath=true and block_extract=false, allowing frontend
+archive extraction. Place region-specific Sega CD BIOS files in the configured
+system directory root, following the official .info names. No BIOS or ROM is
+bundled. Console acceptance is limited to the systems and transitions actually
+recorded in evidence; available build features do not establish full coverage.

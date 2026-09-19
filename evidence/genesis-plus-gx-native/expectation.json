@@ -1,0 +1,24 @@
+{
+  "step": "genesis-plus-gx-native",
+  "note": "Native software core with XRGB8888 callbacks presented through the existing Vulkan path.",
+  "must_contain": [
+    "frontend build identity: ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445",
+    "Genesis Plus GX SHA-256: 881b5118e6afe700d8de21df679b7e51a458c0bb2fe11603b96373d87f6a2fe0",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=Genesis Plus GX",
+    "core recovery test: passed=1",
+    "[Genesis PS5] RGB565 renderer; callback XRGB8888.",
+    "SET_PIXEL_FORMAT: XRGB8888.",
+    "native quit: frontend status = 0",
+    "current-build launches: 2; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signal reports: 0",
+    "owner transitions: Yes, transitions and next game are clean",
+    "Host verification: PASS format unit build integration evidence; 66 tests",
+    "Second-launch frontend snapshot: 0 error lines."
+  ],
+  "must_not_contain": [
+    "core loader test: passed=0",
+    "core recovery test: passed=0",
+    "[Genesis PS5] Invalid bitmap viewport.",
+    "[Genesis PS5] XRGB8888 output rejected."
+  ],
+  "human_check": "Owner reports Sega Genesis works flawlessly and explicitly confirms clean menu/next-game transitions. Two archive failures were identified as Sega System 16/32 arcade selections; those boards belong to FBNeo, not Genesis Plus GX. No comprehensive Sega-system coverage is claimed."
+}

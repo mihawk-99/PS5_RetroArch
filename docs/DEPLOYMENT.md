@@ -229,3 +229,12 @@ and a manual gameplay/colour-transition run. Place matching user arcade archives
 in content/ and BIOS files in system/fbneo/ under the FTP base above. Keep each
 ZIP/7z archive intact: FBNeo loads it directly. Deployment preserves those user
 folders and the live configuration. No BIOS, ROM or sample data is bundled.
+
+`make genesis-plus-gx` builds and ABI-checks Genesis Plus GX. Rebuild/deploy the
+frontend too: it binds the core's imports and includes the core in build identity.
+Use `tools/run-title.sh --no-build --core-test=genesis_plus_gx --watch 240` after
+host gates pass. Select Genesis Plus GX and a user game/archive manually; verify
+colours, sound, controls, Quick Menu, Close Content and the next game/core.
+Use content/ for games and the configured system/ root for Sega CD BIOS filenames
+listed by the official metadata (not system/fbneo/). Existing games, BIOS and live
+configuration are preserved. Other supported Sega systems need separate tests.

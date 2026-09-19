@@ -62,6 +62,12 @@ extern "C" void ps5_core_loader_test_if_requested()
         test_path = "/app0/cores/fbneo_libretro.so";
         test_name = "FinalBurn Neo";
     }
+    else if (fields == 1 && !std::strcmp(selection, "genesis_plus_gx"))
+    {
+        test_core = "genesis_plus_gx";
+        test_path = "/app0/cores/genesis_plus_gx_libretro.so";
+        test_name = "Genesis Plus GX";
+    }
     else if (fields != 1 || std::strcmp(selection, "fceumm"))
     {
         std::fprintf(stderr, "core loader test: unsupported selection\n");

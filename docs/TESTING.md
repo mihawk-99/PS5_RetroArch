@@ -310,3 +310,23 @@ drivers under a simulated 1 MiB small-allocation budget: two bulk allocations,
 each allocation failing independently, repeated initialize/exit, double exit,
 original pointer restoration and oversized-name rejection. ASan/UBSan runs cover
 both narrow and Unicode variants. The shipped console build remains narrow.
+
+### Genesis Plus GX
+
+`tests/test_genesis_plus_gx_video.py` compiles the C output adapter and the actual
+frontend RGBA upload helper. It tests all 65,536 RGB565 values packed by the
+hash-verified upstream renderer macro; cropped views, 720-pixel input rows,
+resolution changes up to 720x576, repeated cached frames, source immutability,
+output canaries and invalid viewport rejection. Fetch the pinned source with
+`make genesis-plus-gx` first; a missing archive produces an explicit skip, which
+cannot establish acceptance. Host geometry coverage does not prove a particular
+core option or system on the console.
+
+After all gates pass, `tools/run-title.sh --no-build
+--core-test=genesis_plus_gx --watch 240` checks eight load/export/API/name/unload
+cycles and failed-load/menu recovery. The owner then loads content manually and
+checks colours, audio/input, Quick Menu, Close Content and another game/core.
+Capture frontend/trace/kernel logs, match the exact build identity, and check for
+Vulkan refusals, GPU API failures, invalid bitmap views and unexpected runtime
+errors before committing. Record systems actually tested and preserve user
+confirmation separately from machine-readable loader and runtime evidence.
