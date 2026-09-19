@@ -1806,3 +1806,45 @@ selection survived to the wrap decision, what the wrap returned, the line before
 input driver's own init, the call into `video_driver_init_input`, and the two
 landmarks in `retroarch_main_init` that separated "the crash is in a driver" from
 "the crash is after every driver".
+
+## Reading the config makes the input driver work, and then the title dies on a refused syscall
+
+**Measured, and it corrects the shape of this whole problem.** Re-applying the parked
+config-path fix (0006) on top of everything since - 0007, 0008, 0009 - the config is
+finally read, and the effect is immediate:
+
+    ps5_init entered (video=present width=0 height=0)
+    ps5_init: own table ident=ps5 ...
+    ps5_get_poke_interface entered
+    input: pad opened, user=515310723 handle=51250944
+
+`input_joypad_driver = ""` was reaching the frontend at last, the input driver was
+initialised, and the pad opened. Then the title died, and the console named something
+new:
+
+    # signal: 12 (SIGSYS)
+    # rax: 0  r8: 0x80  r9: 0x80
+    # process pid=223, coredump.elf calls exit() exit_value=0.
+
+SIGSYS is a syscall the console refuses - not a null pointer, not a data fault. A
+second signal follows it (`SIGSEGV`, `rip: 0`) as the process tears down, which is
+the fault earlier rounds were reading, and why they kept looking for a null call.
+The config being read is what makes the title reach a blocked syscall; nothing in the
+config file is malformed.
+
+**So the config does not need to be read for the pad to work.** `patches/series` 0008
+names this project's driver as the compiled default, and with the config path parked
+the pad opens and responds anyway - `menu commits=5 changes=2` on a 15-second run
+with input live. That also means the config route is now purely about
+configurability and the file logger, not about whether the injector or the pad
+functions.
+
+**A self-inflicted fault that masqueraded as this one, and cost most of a round.**
+`tools/apply-port-patches.py` in the working tree held **14** patch blocks where the
+committed script holds **10**: the controller-port guard (0007) had been added twice,
+so `runloop.c` was patched twice in one build. Every run built from that tree died
+with `rip: 0` and an 8-line trace, and I misread it as progress on the config fault.
+`git checkout -- tools/apply-port-patches.py` restored the verified 10-block script,
+and the title immediately ran again. Twice now this session a patch-script edit made
+by slicing text has cost a round; the lesson is to count the blocks
+(`grep -c '^    ($'`) after every edit to that file.
