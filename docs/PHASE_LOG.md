@@ -1382,3 +1382,33 @@ The options this needs are the frontend's own and stay that way: a run without
 /app0/args.txt takes no picture and behaves exactly as before (verified by the same
 round's runs), and `bash tools/verify.sh` is PASS (format unit build integration
 evidence) with the capture patch in place.
+
+## 2026-09-19 - the capture fails inside the frontend's writer, not in the driver
+
+Three more console runs, all with the trigger working (patch 0031's line appears every
+time) and all ending in `take_screenshot -> failed`:
+
+- `/app0/shot.png` (klog/run-shot-r7.log) - failed, no file;
+- with `video_gpu_screenshot = "true"` added to `config/retroarch.cfg` and published, so
+  that `take_screenshot_choice` takes the viewport path (`take_screenshot_viewport` ->
+  the driver's `read_viewport`) - still failed, no file
+  (klog/run-shot-r7.log, klog/run-PPSA99169-032236.log);
+- `/app0/shot.bmp` instead of `.png`, to rule out the PNG encoder - still failed, no file
+  (klog/run-shot-r7b.log, klog/run-PPSA99169-032522.log).
+
+The decisive detail is what is *absent*: the trace around the `capture:` line has no new
+`vulkan:` message, and the driver's messenger writes every refusal there. So the failure
+is in the frontend, before the frame is ever asked for - `take_screenshot_viewport` returns
+false without a message on two of its three early paths: `video_driver_get_viewport_info`
+reporting a zero width or height, and `malloc` failing. (Its third path, the driver's
+`read_viewport` returning false, would have produced a driver message; the dump path
+would have produced a file.)
+
+The config change was **reverted**: `video_gpu_screenshot = "true"` was a hypothesis about
+which path is taken, and it did not change the outcome, so it does not belong in the
+shipping config.
+
+Next step, in order: print the viewport and the dump's result from the capture patch (one
+more line in the trace, which separates "no viewport" from "writer refused"), and if the
+viewport is the zero one, call the driver's `read_viewport` directly and write a PPM from
+the port's own code - a PPM is a header and the bytes, so no frontend writer is involved.

@@ -45,16 +45,16 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **The capture fires; make the readback work.** Patch 0031 counts frames in
-   `vulkan_frame` and calls `take_screenshot` at the budget, and the trace says
-   `capture: frame 90 of 90, take_screenshot -> failed (/app0/shot.png)`: the trigger is
-   done, the pixels are not. `take_screenshot`'s writer asks the driver for the frame and
-   `vulkan_readback` (blit to a staging texture, `vkQueueWaitIdle`, map) returns false -
-   and its reason goes to `/app0/retroarch.log`, which never flushes. Get that message
-   out first (write it to the trace from the readback path, or make the frontend's log
-   unbuffered), then fix the refusal, then read `klog/shot-*.png` back over FTP and look
-   at it. The readback is `VK_FLAG_READBACK_PENDING`/`vulkan_readback`, so this also
-   exercises one more driver entry point.
+1. **The pixels: the frontend's writer fails before the driver is asked.** Patch 0031's
+   trigger works every run (`capture: frame 90 of 90, take_screenshot -> failed`), and
+   three runs - `.png`, `.bmp`, and with `video_gpu_screenshot = "true"` published - all
+   failed with **no** new `vulkan:` message in the trace, which is where the driver's
+   messenger writes every refusal. So `take_screenshot_viewport` bails before
+   `read_viewport`: its silent paths are `video_driver_get_viewport_info` reporting a zero
+   width/height and `malloc` failing. Next: add one trace line to the capture patch
+   printing the viewport and the dump's result; if the viewport is zero, call the driver's
+   `read_viewport` from the port's own code and write a PPM (header plus bytes, no
+   frontend writer involved), then read it back over FTP and look at it.
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).
