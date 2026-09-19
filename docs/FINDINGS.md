@@ -1729,3 +1729,80 @@ not survive compilation, and `strings` additionally has a four-character minimum
 it reports nothing for a three-character literal like `"ps5"`. Both checks were
 incapable of the answer they were asked for. The instruction stream is the only
 reliable evidence that a code change was compiled.
+
+## The pad works, the picture is live, and the fault was one comparison
+
+**Measured, on the shipping build.** `bash tools/run-title.sh --watch 20`, with the
+console owner working the pad, and the title's own trace:
+
+    input: pad opened, user=515310723 handle=51119872
+    input: press, pad=0x00000040 retropad=0x00000020     DOWN
+    input: press, pad=0x00000010 retropad=0x00000010     UP
+    input: press, pad=0x00004000 retropad=0x00000001     CROSS -> RetroPad B
+    input: press, pad=0x00002000 retropad=0x00000100     CIRCLE -> RetroPad A
+    input: press, pad=0x00000020 retropad=0x00000080     RIGHT
+    input: press, pad=0x00000080 retropad=0x00000040     LEFT
+    menu: framebuffer commit 2 is a new picture (2 of 2 changed so far)
+    ps5_frame 600: menu commits=76 changes=14 presented=yes
+
+Every mapping is the one intended, including the pairing that matters for a
+PlayStation player: CIRCLE is RetroPad `A` (0x100) and CROSS is `B` (0x1). And the
+menu is **not one frozen frame**: 76 commits of its framebuffer, 14 of them a
+different picture, where every earlier run showed 1 and 1. Input is what made it
+redraw, which is the answer to the frozen-frame question - the picture was never
+frozen, the menu simply had nothing to redraw for.
+
+**The fault, and it is one comparison.** `ps5_input_init` had never run. It is
+reached through `input_driver_init_wrap`, whose only call on this path is the tail of
+`video_driver_init_input`, and that function opens with
+
+    if (*input)
+       return true;              /* upstream: "keep the selected driver" */
+
+Upstream intends this for a *video* driver that pre-initialised an input driver of
+its own, and the tell is `tmp`. `video_driver_init_internal` sets
+
+    tmp = input_state_get_ptr()->current_driver;
+
+*before* calling `video_driver_find_driver`, so once the pre-initialisation pass has
+selected a driver, `tmp` **is** that selection - not something a video driver
+supplied. Measured:
+
+    probe INV: entered tmp=ba41e0 *input=ba41e0 configured="ps5"
+    probe INV: after-clear *input=ba41e0        (with the first, wrong fix)
+
+The early return therefore fired for a reason upstream never designed for, the wrap
+was dead code, `current_data` stayed NULL, and every button read answered 0. The
+first fix - clearing the selection when `tmp == NULL` - never fired, because `tmp`
+is not NULL. The fix that works is `patches/series` 0009:
+
+    if (*input != NULL && *input == tmp)
+       *input = NULL;
+
+which says exactly what it means: no video driver supplied a *different* driver, so
+the stale selection is dropped and the code below re-selects from the settings and
+then initialises it.
+
+**Two corrections to earlier entries in this file.** Disabling `HAVE_TEST_DRIVERS`
+was necessary but not the whole story, and neither was `0008`: the driver was named
+and the naming was never the problem. Both earlier rounds concluded "selection is not
+initialisation" and both then assumed the remaining gate was somewhere they had not
+looked; it was one pointer comparison in the function they had already read twice.
+The probes that found it were inside `video_driver_init_input` - the three previous
+rounds placed probes *around* it and could not see it.
+
+## The probes are kept, because a rebuild destroys them
+
+Every probe in this project is written into the configured copy of RetroArch, and
+`tools/retroarch-sources.sh` rebuilds that copy from upstream - so the set that
+found the input fault was lost the moment the tree was reconfigured, mid-round.
+`tools/apply-runtime-probes.py` now holds them: version-controlled, applied with one
+command, reverted with `--revert`, listed with `--list`, and never part of the
+shipping build because `tools/build-title.sh` does not call it.
+
+They are the landmarks that were expensive to find: what the input-driver
+initialisation is handed (`tmp`, `*input`, the configured name), whether the
+selection survived to the wrap decision, what the wrap returned, the line before any
+input driver's own init, the call into `video_driver_init_input`, and the two
+landmarks in `retroarch_main_init` that separated "the crash is in a driver" from
+"the crash is after every driver".

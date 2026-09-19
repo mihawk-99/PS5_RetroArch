@@ -880,3 +880,50 @@ only reachable through the config file. Two self-inflicted process faults are
 recorded in `docs/FINDINGS.md`: a text-sliced patch park that emptied the parked file
 and desynced the script from the tree (recovered with `git checkout`), and probe
 lines inserted into a multi-line `#if` block that broke the link.
+
+## 2026-09-18: The pad works, the menu is live, and the pad's absence was one comparison
+
+**The milestone.** `bash tools/run-title.sh --watch 20` with the console owner working
+the pad: the title runs, the pad is read, and the menu responds. From the title's own
+trace on the shipping build:
+
+    input: pad opened, user=515310723 handle=51119872
+    input: press, pad=0x00000040 retropad=0x00000020     DOWN
+    input: press, pad=0x00004000 retropad=0x00000001     CROSS  -> RetroPad B
+    input: press, pad=0x00002000 retropad=0x00000100     CIRCLE -> RetroPad A
+    menu: framebuffer commit 2 is a new picture (2 of 2 changed so far)
+    ps5_frame 600: menu commits=76 changes=14 presented=yes
+
+Both halves of the round's goal are answered. Input works, with the mapping a
+PlayStation player expects - CIRCLE confirms, CROSS cancels. And the picture is not
+one frozen frame: 76 framebuffer commits, 14 of them a different picture, against 1
+and 1 in every earlier run. The image was never frozen; the menu had nothing to
+redraw for, which is exactly what input supplies.
+
+**The fault was one comparison.** `ps5_input_init` had never run, and the reason was
+not the driver, not the registration, and not the test-driver flag alone.
+`video_driver_init_input` opens with `if (*input) return true;`, which upstream means
+for a video driver that pre-initialised an input driver of its own - and the tell is
+`tmp`. `video_driver_init_internal` assigns `tmp = current_driver` *before* calling
+`video_driver_find_driver`, so after the pre-initialisation pass selects a driver,
+`tmp` is that same selection. Measured: `probe INV: entered tmp=ba41e0 *input=ba41e0
+configured="ps5"`. The early return therefore fired for a case upstream never
+designed for, and the wrap below was dead code. My first attempt - clearing the
+selection when `tmp == NULL` - never fired, because `tmp` is not NULL; the fix that
+works is `patches/series` 0009's `if (*input != NULL && *input == tmp)`, three lines
+that say what they mean.
+
+**The probes are kept.** They live in `tools/apply-runtime-probes.py` now, applied
+with one command and reverted with `--revert`, because a rebuild wipes any probe
+written into the configured tree - which is how the set that found this was lost
+mid-round. They are not part of the shipping build: `tools/build-title.sh` does not
+call that script.
+
+**Still open, and unchanged by this.** The config file is still not read: 0006 is
+parked in `parked/config-path.patch.py` because reading the config crashes the launch
+in `command_event`. That is the next task, and the probe set now covers the landmarks
+around it.
+
+**Verification.** `bash tools/verify.sh` → PASS (format unit build integration
+evidence). `bash tools/run-title.sh --watch 20` → pad working, menu redrawing, no
+fatal signal.

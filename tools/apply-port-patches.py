@@ -156,42 +156,44 @@ EDITS = [
     (
         # Select is not initialise: the input driver was named and never wrapped.
         #
-        # `input_driver_find_driver` runs during driver pre-initialisation and
-        # *selects* a driver into `input_driver_st.current_driver`; it deliberately
-        # does not initialise one. Initialisation is `input_driver_init_wrap`, and
-        # on this path the only call to it is at the end of
-        # `video_driver_init_input` - which returns early when
-        # `input_driver_st.current_driver` is already set:
+        # `input_driver_find_driver` runs during driver pre-initialisation and only
+        # *selects* a driver into `input_driver_st.current_driver`; initialisation is
+        # `input_driver_init_wrap`, whose only call on this path is the tail of
+        # `video_driver_init_input`. That function returns early when
+        # `current_driver` is already set, and upstream intends that early return
+        # for a *video* driver that pre-initialised an input driver of its own.
         #
-        #     if (*input)
-        #        return true;                      <- taken, because pre-init selected
-        #     ...
-        #     input_driver_init_wrap(...)           <- never reached
+        # What actually happens here is different, and `tmp` is the tell. Measured:
         #
-        # Upstream's intent for that early return is a *video* driver that
-        # pre-initialised an input driver of its own. This build's video driver does
-        # not: it leaves the pointers alone on purpose, so that RetroArch's own
-        # input path is used. The result was measured - the driver is named
-        # (`probe drivers: input="ps5"`), `ps5_input_init` never runs, `current_data`
-        # stays NULL, and every button read answers 0.
+        #   probe INV: entered tmp=ba41e0 *input=ba41e0 configured="ps5"
+        #   probe INV: after-clear *input=ba41e0
         #
-        # Clearing the selection here makes the existing code below re-select and
-        # then wrap it, which is exactly what that code is for. It is a no-op for a
-        # video driver that did pre-initialise input, because that case still
-        # returns above via `tmp`.
+        # `tmp` is not a driver the video driver supplied - `video_driver_init_internal`
+        # sets `tmp = input_state_get_ptr()->current_driver` *before* calling
+        # `video_driver_find_driver`, so after the pre-initialisation pass selected a
+        # driver, `tmp` is that same selection. The early return then fires and the
+        # wrap never runs; the wrap at the top of the function only stores `tmp` and
+        # does not initialise anything either. The result, measured from the video
+        # driver's own init: `*input` non-NULL and `*input_data` NULL - a driver with
+        # no state, every button read answering 0.
+        #
+        # So the selection is discarded when it is the same pointer as `tmp`, which
+        # means no video driver supplied a *different* driver, and the code below
+        # re-selects from the settings and then initialises it. A video driver that
+        # really did pre-initialise one passes a pointer that differs from the
+        # selected driver, or passes data, and is left alone.
         "input/input_driver.c",
-        "   input_driver_t         **input = &input_driver_st.current_driver;\n"
-        "   if (*input)\n",
+        "   void              *new_data    = NULL;\n"
+        "   input_driver_t         **input = &input_driver_st.current_driver;\n",
+        "   void              *new_data    = NULL;\n"
         "   input_driver_t         **input = &input_driver_st.current_driver;\n"
         "   /* Changed by this port (patches/series, 0009): a driver selected during\n"
-        "    * pre-initialisation is not an initialised one, and leaving it here makes\n"
-        "    * the wrap below unreachable. Since `tmp` is NULL - the video driver did\n"
-        "    * not provide an input driver - the selection is discarded so that the\n"
-        "    * code below re-selects from the settings and then initialises it. */\n"
-        "   if (tmp == NULL)\n"
-        "      *input = NULL;\n"
-        "   if (*input)\n",
-        "a driver selected during",
+        "    * pre-initialisation is not an initialised one. When the selected driver is\n"
+        "    * the same pointer the caller carried in, no video driver supplied one, so\n"
+        "    * the selection is discarded and the code below re-selects and wraps it. */\n"
+        "   if (*input != NULL && *input == tmp)\n"
+        "      *input = NULL;\n",
+        "the same pointer the caller carried in",
     ),
     (
         # The console's pad is this build's input driver, so it is also the
