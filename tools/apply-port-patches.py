@@ -365,6 +365,121 @@ EDITS = [
         "      return 0;\n",
         "if (drv == NULL)\n      return 0;",
     ),
+    (
+        # A swapchain may only use the usage bits its surface advertises, and
+        # this one advertises VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT alone: the
+        # console's VideoOut path has only been proven with swapchain images used
+        # as render targets. RetroArch asks for four bits unconditionally, which
+        # every desktop driver tolerates. ../PS5_Vulkan checks it in
+        # ps5vk_CreateSwapchainKHR, and that project's asserts are live - so the
+        # title aborted there, inside vulkan_init, before a single frame, with no
+        # message anywhere: the console reported only `abort is called(system)`
+        # and a frame that a link map resolves to that function. Clamping to what
+        # the surface reports changes nothing on a desktop driver.
+        "gfx/common/vulkan_common.c",
+        "   info.imageUsage             =  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT\n"
+        "                                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT\n"
+        "                                | VK_IMAGE_USAGE_TRANSFER_DST_BIT\n"
+        "                                | VK_IMAGE_USAGE_SAMPLED_BIT;\n",
+        "   info.imageUsage             =  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT\n"
+        "                                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT\n"
+        "                                | VK_IMAGE_USAGE_TRANSFER_DST_BIT\n"
+        "                                | VK_IMAGE_USAGE_SAMPLED_BIT;\n"
+        "   /* Added by this port (patches/series, 0013): a swapchain may only use\n"
+        "    * the usage bits its surface advertises, and this surface advertises\n"
+        "    * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT alone. Asking for the other\n"
+        "    * three is what fails ../PS5_Vulkan's own check inside\n"
+        "    * ps5vk_CreateSwapchainKHR and aborts the title. */\n"
+        "   info.imageUsage            &= surface_properties.supportedUsageFlags;\n",
+        "info.imageUsage            &= surface_properties.supportedUsageFlags;",
+    ),
+    (
+        # ../PS5_Vulkan enforces its format table with live asserts inside
+        # ps5vk_CreateImage, so a request the device cannot honour aborts the
+        # title instead of returning VK_ERROR_FORMAT_NOT_SUPPORTED. Its
+        # B8G8R8A8_UNORM entry advertises VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+        # alone, and RetroArch creates its 4x4 blank texture - and its 1x1 default
+        # texture - in that format with SAMPLED | TRANSFER_DST | TRANSFER_SRC.
+        # Both are one uniform colour, so neither cares which 32-bit format
+        # carries it, and R8G8B8A8_UNORM is the one this driver reports as
+        # sampled. The usage mask is the specification's own rule; the format
+        # substitution is what keeps a texture a texture.
+        "gfx/drivers/vulkan.c",
+        "   if (     (type != VULKAN_TEXTURE_STAGING)\n"
+        "         && (type != VULKAN_TEXTURE_READBACK))\n",
+        "   /* Added by this port (patches/series, 0014): a create-info may only ask\n"
+        "    * for usage bits the format advertises, and a texture that cannot be\n"
+        "    * sampled is not a texture. Masking handles the first; the second is\n"
+        "    * handled by asking for R8G8B8A8_UNORM, which this driver reports as\n"
+        "    * sampled and which is the same image for a uniform colour. Only image\n"
+        "    * types are touched: STAGING and READBACK are buffers here. */\n"
+        "   if (     (type != VULKAN_TEXTURE_STAGING)\n"
+        "         && (type != VULKAN_TEXTURE_READBACK))\n"
+        "   {\n"
+        "      VkFormatProperties format_properties;\n"
+        "      VkImageUsageFlags allowed = 0;\n"
+        "      VkFormat request          = info.format;\n"
+        "\n"
+        "      memset(&format_properties, 0, sizeof(format_properties));\n"
+        "      vkGetPhysicalDeviceFormatProperties(vk->context->gpu,\n"
+        "            request, &format_properties);\n"
+        "      if (   !(format_properties.optimalTilingFeatures\n"
+        "                  & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)\n"
+        "          && request != VK_FORMAT_R8G8B8A8_UNORM)\n"
+        "      {\n"
+        "         request = VK_FORMAT_R8G8B8A8_UNORM;\n"
+        "         memset(&format_properties, 0, sizeof(format_properties));\n"
+        "         vkGetPhysicalDeviceFormatProperties(vk->context->gpu,\n"
+        "               request, &format_properties);\n"
+        "      }\n"
+        "      if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)\n"
+        "         allowed |= VK_IMAGE_USAGE_SAMPLED_BIT;\n"
+        "      if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)\n"
+        "         allowed |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;\n"
+        "      if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)\n"
+        "         allowed |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;\n"
+        "      if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)\n"
+        "         allowed |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;\n"
+        "      if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)\n"
+        "         allowed |= VK_IMAGE_USAGE_STORAGE_BIT;\n"
+        "      info.format = request;\n"
+        "      info.usage &= allowed;\n"
+        "      if (request != format)\n"
+        "      {\n"
+        "         /* The view, the staging buffer's pitch and tex.format are all\n"
+        "          * built from this local, so a substituted format has to reach\n"
+        "          * all four or the view is created for a format the image is not. */\n"
+        "         format           = request;\n"
+        "         buffer_width     = (width * vulkan_format_to_bpp(format) + 3u) & ~3u;\n"
+        "         buffer_info.size = buffer_width * height;\n"
+        "      }\n"
+        "   }\n"
+        "\n"
+        "   if (     (type != VULKAN_TEXTURE_STAGING)\n"
+        "         && (type != VULKAN_TEXTURE_READBACK))\n",
+        "if (request != format)",
+    ),
+    (
+        # 0014 substitutes R8G8B8A8_UNORM for a format this driver cannot sample,
+        # and vulkan_format_to_bpp() did not know that format: the lookup answered
+        # 0, the staging buffer's size became 0, and ../PS5_Vulkan's vk_buffer_init
+        # aborted on `size > 0`. One missing case in a switch cost a console round.
+        # The format is the same 32 bits per pixel as the BGRA it replaces.
+        "gfx/drivers/vulkan.c",
+        "      case VK_FORMAT_R8_UNORM:\n"
+        "         return 1;\n"
+        "      default: /* Unknown format */\n",
+        "      case VK_FORMAT_R8_UNORM:\n"
+        "         return 1;\n"
+        "      /* Added by this port (patches/series, 0015): the format 0014 is\n"
+        "       * substituted with when a format cannot be sampled. Without this\n"
+        "       * case the staging buffer sized from it came out zero bytes long,\n"
+        "       * and the driver aborted inside vk_buffer_init. */\n"
+        "      case VK_FORMAT_R8G8B8A8_UNORM:\n"
+        "         return 4;\n"
+        "      default: /* Unknown format */\n",
+        "patches/series, 0015",
+    ),
 ]
 
 

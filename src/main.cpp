@@ -30,6 +30,12 @@
  */
 
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <exception>
+#include <typeinfo>
+
+#include <cxxabi.h>
 
 #include "trace.hpp"
 
@@ -41,6 +47,47 @@ namespace
 /* The title's own folder, as the console mounts it: the application image is at
  * /app0 and this is where a title may keep its configuration. */
 constexpr const char *config_path = "/app0/retroarch.cfg";
+
+/* Why a terminate handler exists.
+ *
+ * The driver's shader compiler is C++ and aborts the process from deep inside
+ * itself: the console reports `reason: abort is called(system)` with a backtrace
+ * through aco::visit_alu_instr, and nothing says what went wrong. The two abort
+ * sites in that function are clang's throw helpers for std::vector's length error
+ * and for a bad array length (`call __throw_length_error` followed by `ud2`), so
+ * something threw and the exception never came back as an error.
+ *
+ * An abort is also the one failure with no message anywhere: the title's trace
+ * says how far it got, and the frontend's log is a buffer that dies with the
+ * process. libc++abi still knows the exception while terminate runs, so the type
+ * and its what() are written to the trace here - the difference between "the
+ * compiler refused this shader" and "a wild size reached a container", which are
+ * not the same bug and were not distinguishable from the outside. */
+void on_terminate()
+{
+    const std::type_info *type = abi::__cxa_current_exception_type();
+    if (!type)
+    {
+        ps5::debug::mark("terminate: called with no active exception");
+        std::abort();
+    }
+
+    /* src/ is compiled without exceptions, so the exception cannot be rethrown
+     * here to read what(); libc++abi still reports its type, and the demangled
+     * name is what separates the two throw sites that were found in the shader
+     * compiler - std::length_error (a container asked for an impossible size)
+     * from std::bad_array_new_length (an array length that cannot be valid). */
+    int status = 0;
+    char *pretty = abi::__cxa_demangle(type->name(), nullptr, nullptr, &status);
+    char line[256];
+    std::snprintf(line, sizeof line, "terminate: exception type=%s",
+                  (status == 0 && pretty) ? pretty : type->name());
+    if (pretty)
+        std::free(pretty);
+    ps5::debug::mark(line);
+
+    std::abort();
+}
 } // namespace
 
 int main()
@@ -48,6 +95,8 @@ int main()
     /* First thing: prove that control reached this function at all, before
      * anything that could fail. */
     ps5::debug::mark("main() entered; static constructors have already run");
+
+    std::set_terminate(on_terminate);
 
     /* argv must be writable and NULL-terminated: RetroArch's option parsing
      * walks it the way the C runtime would have. */

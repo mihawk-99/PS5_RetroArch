@@ -267,7 +267,13 @@ if (( ${#pacbrew_libs[@]} > 0 )); then
 fi
 # --error-limit=0 lists every unresolved symbol instead of stopping at twenty,
 # which is the difference between one link-failure diagnosis and several.
+# --Map names the archive member every address came from. A crash backtrace from
+# the console is a list of bare addresses, and the regions this link produces -
+# the driver's compiler, the SDK's C++ runtime - carry no symbol table at all, so
+# the addresses cannot be symbolized from the image alone. The map turns one of
+# them back into "aco_select_nir_alu.ps5.cpp.o + 0x1234", which is a diagnosis.
 "$sdk_root/bin/prospero-lld" -T "$native/ps5-pie.ld" --eh-frame-hdr --error-limit=0 \
+    --Map="$build/title.map" \
     ${APP_LINK_FLAGS:-} \
     --version-script "$native/app-symbols.map" \
     --exclude-libs=ALL -L "$build/obj" \
