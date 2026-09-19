@@ -2085,3 +2085,48 @@ about a driver that is not the one running. The display work is not wasted (it i
 the fallback path and it is proven to the buffer), but it is not the current
 blocker. The current blocker is that the Vulkan driver refuses commands the
 frontend issues.
+
+## The frontend runs the linked libps5vk, and the driver refuses its draws
+
+**Measured, and this corrects the entry above it.** The stale-artefact reading was
+wrong: after truncating `/app0/trace.txt` to zero bytes and running once, the fresh
+trace contains the *same* refusals. They are produced by the run, not left over.
+
+**The build is the Vulkan build.** `build/ra-conf/config.h` has `HAVE_VULKAN 1` and
+`HAVE_VULKAN_DISPLAY 1`; `gfx_drivers_vulkan.c.o` is built (177,104 bytes); the
+image is 33,788,426 bytes, not the 8 MB of the hand-written driver. Two earlier
+measurements of mine were against a different, smaller build and misled me - the
+"zero video_vulkan strings" count and the 8,030,348-byte size.
+
+**The driver table is `video_vulkan` then `video_ps5`** (`video_drivers[]` in the
+configured `gfx/video_driver.c`, `&video_ps5` at line 354). Vulkan is registered
+first, and the trace's refusals quote `../PS5_Vulkan`'s own source
+(`driver/ps5vk_pipeline.c:903`, `:137`, `driver/ps5vk_image.c:804`), so the running
+video driver is the linked libps5vk and not this port's `video_ps5`.
+
+**`/app0/retroarch.log` is not stale and does not contradict this.** Its
+`[Input] Found input driver: "ps5"` is the *input* driver, which this port does
+supply (`src/` has a pad driver); `[Video] Found display server: "null"` is the
+display server, a different slot again. Neither names the video driver, so the file
+never said what I first thought it said. The config's `video_driver = "ps5"` names
+a driver that is registered second, so it is not the one used either.
+
+**The blocker.** The frontend's draws are refused by the linked driver, and by
+`driver/ps5vk_private.h`'s own rule a refusal ends recording with an error at
+`vkEndCommandBuffer`, so those command buffers are not submitted - which is why
+frames are accepted and the screen is black. RetroArch discards
+`vkEndCommandBuffer`'s result (`gfx/drivers/vulkan.c:4212`), so the refusals in
+this trace are the only witness the port has that its draws are going nowhere.
+
+Of the three refusal sources, the maintainer has already classified all three as
+expected gaps rather than bugs: triangle strips (`driver/ps5vk_pipeline.c:896-904`),
+storage images (`driver/ps5vk_descriptor_set_layout.c:20-38`, which would need a
+libpsbc shader-compiler change), and sampler address modes
+(`driver/ps5vk_image.c:800-806`, C4 scope). Two are avoidable from this side - the
+descriptor type and, in principle, the topology - but the sampler address modes are
+a driver-side gap.
+
+**What this means for the work so far.** The `video_ps5` display investigation
+stands on its own and is proven to the buffer, but it is a second, unused path
+while Vulkan is registered first. The live problem is the driver refusing the
+frontend's commands.
