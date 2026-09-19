@@ -57,6 +57,102 @@ EDITS = [
         "   &video_ps5,\n#ifdef HAVE_VULKAN",
     ),
     (
+        # A1 of docs/GPU_PATH_CRITERIA.md: libps5vk refuses a pipeline it did not
+        # build with a triangle list ("only triangle lists without primitive
+        # restart are supported", driver/ps5vk_pipeline.c:896-904), and a refusal
+        # ends recording with an error at vkEndCommandBuffer, so those command
+        # buffers never submit.
+        #
+        # The strip topology is chosen at six upstream call sites - gfx_display.c
+        # :538, :678 and :937, gfx_thumbnail.c:1005, gfx_widgets.c:645 and
+        # materialui.c:2583 - and the driver derives the pipeline from it
+        # (disp_pipeline = (prim_type == TRIANGLESTRIP) << 1 | blend). Topology and
+        # geometry therefore move together, and changing the pipeline alone would
+        # draw wrong triangles rather than refuse: a silently wrong picture, which
+        # is worse than a refusal. Six edits is also the wrong shape for a port
+        # whose changes are meant to be a short named list.
+        #
+        # So the conversion goes in the one place every menu draw passes through,
+        # gfx_display_vk_draw, which already re-bakes the caller's separate vertex,
+        # tex-coord and colour arrays into an interleaved VBO. The expansion is an
+        # INDEX MAPPING, not a duplication, and that detail is load-bearing: when
+        # the caller supplies no coordinates the arrays are the static
+        # vk_vertexes[8] and vk_tex_coords[8] - exactly enough for four vertices -
+        # so reading six interleaved vertices would read past the end of a static
+        # array. Emitting (N-2)*3 vertices while reading source index s(i) touches
+        # nothing beyond what the strip already touched.
+        "gfx/drivers/vulkan.c",
+        "   if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n"
+        "            draw->coords->vertices * sizeof(struct vk_vertex), &range))\n"
+        "      return;\n"
+        "\n"
+        "   pv = (struct vk_vertex*)range.data;\n"
+        "   for (i = 0; i < draw->coords->vertices; i++, pv++)\n"
+        "   {\n"
+        "      pv->x       = *vertex++;\n"
+        "      /* Y-flip. Vulkan is top-left clip space */\n"
+        "      pv->y       = 1.0f - (*vertex++);\n"
+        "      pv->tex_x   = *tex_coord++;\n"
+        "      pv->tex_y   = *tex_coord++;\n"
+        "      pv->color.r = *color++;\n"
+        "      pv->color.g = *color++;\n"
+        "      pv->color.b = *color++;\n"
+        "      pv->color.a = *color++;\n"
+        "   }\n",
+        "   /* Named by this port (patches/series, 0011): the console's decoder only\n"
+        "    * builds triangle lists, so a strip is expanded into one here and the\n"
+        "    * list pipeline is used. See the note in tools/apply-port-patches.py. */\n"
+        "   const bool as_strip = (draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP);\n"
+        "   const unsigned source_count = draw->coords->vertices;\n"
+        "   const unsigned output_count =\n"
+        "         (as_strip && source_count >= 3) ? (source_count - 2) * 3 : source_count;\n"
+        "\n"
+        "   if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n"
+        "            output_count * sizeof(struct vk_vertex), &range))\n"
+        "      return;\n"
+        "\n"
+        "   pv = (struct vk_vertex*)range.data;\n"
+        "   for (i = 0; i < output_count; i++, pv++)\n"
+        "   {\n"
+        "      /* Which source vertex this output vertex is: the first triangle of the\n"
+        "       * strip, then a pair per triangle after it. */\n"
+        "      const unsigned s = as_strip\n"
+        "            ? (i < 3 ? i : 3 + ((i - 3) / 2) * 2 + ((i - 3) % 2 ? 0 : 1))\n"
+        "            : i;\n"
+        "      /* Assigned to the arrays the function already declares, not shadowed:\n"
+        "       * the eight reads below must advance the same pointers as before. */\n"
+        "      vertex    = draw->coords->vertex ? &draw->coords->vertex[s * 2]\n"
+        "                                       : &vk_vertexes[s * 2];\n"
+        "      tex_coord = draw->coords->tex_coord ? &draw->coords->tex_coord[s * 2]\n"
+        "                                          : &vk_tex_coords[s * 2];\n"
+        "      color     = draw->coords->color ? &draw->coords->color[s * 4]\n"
+        "                                      : &vk_colors[s * 4];\n"
+        "\n"
+        "      pv->x       = *vertex++;\n"
+        "      /* Y-flip. Vulkan is top-left clip space */\n"
+        "      pv->y       = 1.0f - (*vertex++);\n"
+        "      pv->tex_x   = *tex_coord++;\n"
+        "      pv->tex_y   = *tex_coord++;\n"
+        "      pv->color.r = *color++;\n"
+        "      pv->color.g = *color++;\n"
+        "      pv->color.b = *color++;\n"
+        "      pv->color.a = *color++;\n"
+        "   }\n",
+        "Named by this port (patches/series, 0011)",
+    ),
+    (
+        # The other half of the same change: the pipeline index is derived from the
+        # primitive type, so a strip reported as a strip would still select the
+        # strip pipeline. Reporting it as a list selects the list pipeline, and the
+        # vertices already match because the expansion above produced a list.
+        "gfx/drivers/vulkan.c",
+        "                 ((draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP) << 1)\n",
+        "                 /* patches/series 0011: always the list pipeline, because the\n"
+        "                  * vertices were expanded into a list above. */\n"
+        "                 0u << 1\n",
+        "0u << 1",
+    ),
+    (
         # qb/config.params.sh declares the default state of every optional
         # library, and configure accepts a --enable/--disable switch for each one
         # it finds there. HAVE_XKBCOMMON is the single optional library upstream
