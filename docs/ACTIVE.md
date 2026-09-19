@@ -45,12 +45,15 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **Make the count the frontend's**: a port block in `runloop.c` that counts frontend
-   frames for the `--max-frames-ss` comparison when no core is loaded, then take the
-   screenshot, read it back over FTP and look at it (`klog/shot-*.png`). That is the
-   artifact the goal's "frames reaching the screen" needs, and the readback is the Vulkan
-   driver's own path (`vulkan_readback`, `VK_FLAG_READBACK_PENDING`), so it also tests one
-   more driver entry point.
+1. **Hook the path the menu actually takes.** The `--max-frames-ss` block is not reached
+   on a content-less run: it compares `video_st->frame_count`, which only
+   `video_driver_frame` increments, and the menu is drawn through
+   `video_driver_cached_frame` (patch 0029 tried a runloop-side counter and had no effect
+   on the console, so it was removed). Put the counter and the `take_screenshot` call
+   (`tasks/task_screenshot.c`) in `video_driver_cached_frame`, take the shot, read it back
+   over FTP and look at it (`klog/shot-*.png`). The readback is the Vulkan driver's own
+   `vulkan_readback`/`VK_FLAG_READBACK_PENDING` path, so it tests one more driver entry
+   point too.
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).

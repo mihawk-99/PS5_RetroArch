@@ -1319,3 +1319,33 @@ program - so that counter never advances and frame 200 never arrives (three runs
 `--max-frames=200` all ran the full watch window and wrote no `shot.png`). Next step: a
 port block in `runloop.c` that counts the frontend's own frames for that comparison when
 `--max-frames-ss` is asked for, then read the file back over FTP and look at it.
+
+## 2026-09-19 - the capture needs a hook the menu-only path reaches
+
+The screenshot still does not happen, and this round narrowed it to a single fact. The
+runloop's `--max-frames` block compares `frame_count`, which is refreshed from
+`video_st->frame_count` - and that counter is only incremented by `video_driver_frame`.
+With no content loaded this title draws the menu through `video_driver_cached_frame`, so
+the counter never advances and the block cannot be reached by a frame budget.
+
+A port patch was written to test exactly that (0029: a static counter of the runloop's own
+iterations, folded into `frame_count` just before `RUNLOOP_TIME_TO_EXIT`), the frontend
+rebuilt (276 of 276 sources) and deployed, and three console runs were made with
+`--max-frames=120`/`200 --max-frames-ss --max-frames-ss-path=/app0/shot.png` staged in
+`/app0/args.txt`:
+
+- `klog/run-shot-r5.log`, `klog/run-PPSA99169-030553.log`: "it ran for 20s and this script
+  closed it" - nothing exited at the budget;
+- no `shot.png` in the title folder (listed over FTP);
+- `/app0/retroarch.log` still the same 1200 bytes.
+
+So the block is not reached at all on a content-less run: the menu-only path returns
+before it. The patch was **removed** rather than committed, because it had no verified
+effect - the next attempt has to hook a path that runs without content.
+`gfx/video_driver.c`'s `video_driver_cached_frame` is that path (it is what draws each
+menu frame), and `take_screenshot` is `tasks/task_screenshot.c`'s, so the hook is a
+counter there plus a call to it, with the quit the same way the max-frames path quits.
+
+Everything else this round is unchanged from the last: 644 frames and 643 menu draws in an
+unattended run, the probe-free image alive for its whole watch window, and
+`bash tools/verify.sh` PASS (format unit build integration evidence).
