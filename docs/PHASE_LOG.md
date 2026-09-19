@@ -1730,3 +1730,63 @@ and outside this step's acceptance.
 All five host gates PASS, 28 tests; fresh patch replay/idempotence PASS, 86 edits.
 Evidence: evidence/vulkan-buffered-logging/{capture,expectation}.json. Replay:
 python3 tools/evidence.py compare evidence/. Raw logs and TSV remain in klog/.
+
+## 2026-09-19 — XMB default on the Vulkan path
+
+The user ended performance work; logging was committed as d46495d, then this step
+enabled upstream XMB while retaining RGUI/video_ps5. Official monochrome assets
+are pinned at 73106363e14e34c08a5854b4cfbc29f184e3b783 (120 fixed icons, M+ font,
+licenses). Configure arguments now invalidate the cached configured tree before
+feature flags are derived. The asset pin adds no build-time network dependency.
+ASSETS_DIR uses the Unix prefix convention; patch 0063 sets the actual title asset
+default because the null platform frontend never executes Unix initialization.
+
+Console commands were `tools/run-title.sh --no-build --watch N`; each upload was
+read back and the run trace selected by its last startup marker/build identity.
+Raw files below are ignored; per-run identities, counts and results are distilled
+in evidence/xmb-default/capture.json:
+
+- xmb-first-run.log (60 s): XMB aborted on an 8-byte UBO range; EndCommandBuffer
+  returned -13, then Mesa asserted on submission of the invalid command buffer.
+  Owner reported black/background/crash. Patch 0060 pads the ribbon upload.
+- xmb-corrected-run.log (60 s): the range refusal cleared; missing sampler binding
+  1 caused the next -13/assertion. Owner again saw no usable menu. Patch 0061 also
+  fixes the independently found strip bounds/count bug; patch 0062 binds the
+  unused sampler slots through the existing descriptor-fill path.
+- xmb-bindings-run.log (60 s): zero refusals/API errors; title survived until the
+  script closed it. Input worked, but the owner saw faint text and black output.
+- xmb-assets-run.log (60 s): explicit /app0/assets default, startup diagnostics
+  report assets present/fonts ready; zero refusals and full script-owned run.
+  Owner still reported corrupted icons/text. This ruled out missing assets.
+- xmb-capture-run.log (30 s): authorized readback on frames 120/121 reproduced the
+  narrow background, glyph fragments and repeated/cropped icon mip fragments.
+- xmb-textures-run.log (45 s): patch 0065 fixes physical-row alignment/UVs; 0066
+  uses one static texture level. Readback shows readable XMB with intact icons,
+  gradient and ribbon. Owner: "It's flawless!"; initial estimated refresh 25 Hz.
+  This diagnostic wrote large synchronous snapshots; no performance claim made.
+- xmb-final-run.log (45 s): screenshot source/hook removed. Identity
+  2df0e277df59faf661a37920988d1b804394c8ffe509c2b57296270f3dcaf7b3;
+  zero refusals, no API failures/assertion, successful presentations, current
+  frontend log, assets present/fonts ready, no framebuffer writes. Script closed
+  the still-running title. PS5_Vulkan remained unchanged at 6f0ce0d.
+
+Host verification: tools/verify.sh PASS (format/unit/build/integration/evidence),
+31 unit tests, 278/278 frontend sources. Fresh vendor replay and second-pass
+idempotence PASS for 100 edits (86 plus 14 XMB compatibility/diagnostic edits).
+The geometry test executes C and checks bounds/winding through the complete
+ribbon; row-alignment cases include 336/720-wide R8 atlases. Asset tests verify
+pinned checksums and every fixed icon named by upstream. Evidence replay after
+adding this record: 13 captures, zero failures.
+
+Intermediate host failures were fixed before deployment: the edit-count guard
+was updated after intentional additions; the asset logger needed verbosity.h;
+the temporary capture anchor was made distinct from the timing hook. Removing
+that capture initially left its call in the generated source and failed linking
+ps5_capture_images. Restoring that generated file from pristine vendor and
+reapplying the final named edits removed it; the normal rebuild and gates passed.
+The retired recipe documents this patch-removal requirement.
+
+Reproduce acceptance with tools/verify.sh, tools/run-title.sh --no-build --watch
+45 and python3 tools/evidence.py compare evidence/. Screenshot recipe:
+parked/xmb-readback/README.md. Known audio/config-save errors remain logged.
+No core, steady-state XMB FPS or general mip-chain correctness is claimed.

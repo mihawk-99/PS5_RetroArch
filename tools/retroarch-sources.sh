@@ -31,9 +31,9 @@ sdk="${PS5_PAYLOAD_SDK:-$root/../ps5-native-app-boilerplate-main/.deps/native/ps
 
 configure_flags=(
     --prefix=/user/homebrew
-    # The menu, and only the menu that needs no GPU display context.
-    --enable-menu --enable-rgui
-    --disable-materialui --disable-xmb --disable-ozone --disable-gfx_widgets
+    # XMB is the compiled default when enabled; retain RGUI as a menu fallback.
+    --enable-menu --enable-xmb --enable-rgui
+    --disable-materialui --disable-ozone --disable-gfx_widgets
     # Vulkan is ON. ../PS5_Vulkan is the graphics backend this project consumes
     # (docs/PLAN.md, M2 and the "no direct hardware access" invariant), and the
     # path to it is now measured rather than assumed:
@@ -121,7 +121,8 @@ fi
 [[ -d $upstream ]] || { echo "error: run tools/fetch-retroarch.sh first" >&2; exit 2; }
 [[ -d $sdk ]] || { echo "error: no SDK at $sdk" >&2; exit 2; }
 
-if [[ ! -f $work/config.mk || ! -f $work/config.h ]]; then
+configure_id=$(printf '%s\n' "${configure_flags[@]}" | sha256sum | cut -d' ' -f1)
+if [[ ! -f $work/config.mk || ! -f $work/config.h || ! -f $work/.configure-id || $(<"$work/.configure-id") != "$configure_id" ]]; then
     echo "==> [sources] configuring RetroArch in build/ra-conf (vendor/ is untouched)" >&2
     rm -rf "$work"
     mkdir -p "$(dirname "$work")"
@@ -146,6 +147,7 @@ if [[ ! -f $work/config.mk || ! -f $work/config.h ]]; then
         export OS=BSD DISTRO=
         ./configure "${configure_flags[@]}" >"$work/configure.log" 2>&1
     ) || { echo "error: configure failed; see $work/configure.log" >&2; exit 2; }
+    printf '%s\n' "$configure_id" > "$work/.configure-id"
 fi
 
 objects="$work/.rarch-obj"

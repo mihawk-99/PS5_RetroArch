@@ -1,0 +1,52 @@
+--- a/tools/apply-port-patches.py
++++ b/tools/apply-port-patches.py
+@@ -2258,6 +2258,26 @@
+         '#include "../../configuration.h"\n'
+         '#include "../../verbosity.h" /* patches/series, 0063: XMB asset logger */',
+         "patches/series, 0063: XMB asset logger",
++    ),
++    (
++        'gfx/drivers/vulkan.c',
++        '   if (vk->ctx_driver->swap_buffers)\n'
++        '      vk->ctx_driver->swap_buffers(vk->ctx_data);\n'
++        '   ps5_vulkan_profile_end();\n',
++        '   /* patches/series, 0064: temporary XMB framebuffer capture. */\n'
++        '   {\n'
++        '      static unsigned ps5_capture_frame;\n'
++        '      if (++ps5_capture_frame == 120 || ps5_capture_frame == 121)\n'
++        '      {\n'
++        '         extern void ps5_capture_images(unsigned, VkImage, VkImage, VkDevice);\n'
++        '         if (vkQueueWaitIdle(vk->context->queue) == VK_SUCCESS)\n'
++        '            ps5_capture_images(ps5_capture_frame, VK_NULL_HANDLE, backbuffer->image, vk->context->device);\n'
++        '      }\n'
++        '   }\n'
++        '   if (vk->ctx_driver->swap_buffers)\n'
++        '      vk->ctx_driver->swap_buffers(vk->ctx_data);\n'
++        '   ps5_vulkan_profile_end();\n',
++        'patches/series, 0064: temporary XMB framebuffer capture',
+     ),
+     (
+         'gfx/drivers/vulkan.c',
+--- a/patches/series
++++ b/patches/series
+@@ -59,6 +59,9 @@
+ # 0063  seed the title asset path without Unix platform initialization and log XMB startup
+ 0063-set-title-menu-asset-directory
+ 
++# 0064  temporary screenshot capture, removed after XMB diagnosis
++0064-capture-xmb-framebuffer
++
+ # 0065  address the logical image inside driver-required row padding, including R8 fonts
+ 0065-correct-padded-texture-coordinates
+ 
+--- a/tests/test_frontend.py
++++ b/tests/test_frontend.py
+@@ -300,7 +300,7 @@
+         change deliberately, in a commit that says why.
+         """
+         self.assertEqual(
+-            len(self.blocks()), 100,
++            len(self.blocks()), 101,
+             "the patch count changed: if a block was added or removed on purpose, "
+             "update this number in the same commit and say why in its message")
+ 

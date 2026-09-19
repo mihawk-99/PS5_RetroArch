@@ -43,13 +43,9 @@ tree="$root/build/ra-conf"
 # earlier version of this script left one there: a generated file, dirty in git,
 # that no source read. The include path does the work instead.
 configured="$tree/config.h"
-if [[ ! -f $configured ]]; then
-    # One command to build: if the configured tree is not there yet, make it. The
-    # ordering (configure before compiling) is a property of RetroArch, not
-    # something a caller should have to know.
-    echo "==> [ra] no configured tree yet; running tools/retroarch-sources.sh"
-    "$root/tools/retroarch-sources.sh" >/dev/null
-fi
+# Refresh configuration before deriving feature flags. The source script caches
+# by configure arguments so enabling a menu cannot reuse the old disabled build.
+"$root/tools/retroarch-sources.sh" >/dev/null
 [[ -f $configured ]] || { echo "error: configure did not produce build/ra-conf/config.h" >&2; exit 2; }
 
 # The -D flags are not written here. RetroArch passes each enabled feature on the
@@ -110,6 +106,7 @@ defines+=(
     # is zstd's own switch for a platform without weak symbols, which is what this
     # is as far as the stub table is concerned.
     -DZSTD_TRACE=0
+    # platform_unix appends /assets to ASSETS_DIR, so its prefix must be /app0.
     # Where this title's own files live. configure baked the /user/homebrew
     # prefix from tools/retroarch-sources.sh's --prefix, and tools/retroarch-flags.sh
     # drops those four flags rather than passing a path that does not exist here:
@@ -118,7 +115,7 @@ defines+=(
     # copy shipped inside the title; the paths RetroArch would write to point at
     # /app0 as well, because that is the only place it may write.
     -DGLOBAL_CONFIG_DIR='"/app0"'
-    -DASSETS_DIR='"/app0/assets"'
+    -DASSETS_DIR='"/app0"'
     -DFILTERS_DIR='"/app0/filters"'
     -DCORE_INFO_DIR='"/app0/info"'
 )

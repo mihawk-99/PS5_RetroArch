@@ -2509,3 +2509,37 @@ RetroArch run has zero refusals/errors, 909/909 correct opaque-white samples,
 identical consecutive frames, and owner confirmation of correct colours without
 flicker or triangles. Evidence: `evidence/vulkan-fragment-inputs/`. The earlier
 blend-state hypothesis did not fix the defect and is not the established cause.
+
+## 2026-09-19 — XMB exposes descriptor, geometry and texture assumptions
+
+XMB's ribbon uploads two floats (8 bytes); libps5vk currently requires whole
+16-byte UBO records. Padding the upload without moving those fields clears that
+refusal. Its untextured effect omits sampler writes, while the driver's metadata
+validates stage-visible layout entries even when the shader does not sample
+those slots. Binding the existing white texture/nearest sampler clears the second
+refusal. These are frontend compatibility measures, not expanded driver coverage.
+
+The port's old strip converter read beyond source arrays and submitted the
+unexpanded count. Its replacement emits each consecutive triple with alternating
+winding (a quad becomes 0,1,2,2,1,3) and submits the expanded count for both menu
+effects and icons. A host C regression exercises strips through 8,064 vertices.
+
+The title selects the null platform frontend. Merely defining ASSETS_DIR for
+platform_unix does not initialize the asset path; setting the title default to
+/app0/assets makes the shipped monochrome icons/font load. Startup logging now
+records the resolved paths and whether assets/fonts are ready.
+
+The earlier whole-row compatibility patch widened images but retained normalized
+coordinates for their logical width. Readback showed a thin background strip and
+font glyph fragments. Scaling display UVs and normalizing glyph offsets by the
+physical image width restores sampling of the intended content. Row alignment
+also depends on format: 256-byte rows mean 64 RGBA8 texels or 256 R8 texels.
+
+The 256x256 icons (whose base width is already aligned) showed repeated/cropped
+mip fragments. Single-level static images render correctly in the corrected
+capture. The driver internals behind mipmapped corruption are not established;
+this port keeps one mip level pending separate mip-chain investigation.
+
+Owner: "It's flawless!" after the rendering corrections. Final normal build:
+45 seconds, zero refusals/API errors, successful presentations, assets loaded,
+no screenshot writes. Evidence: `evidence/xmb-default/`. PS5_Vulkan was unchanged.

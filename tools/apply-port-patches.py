@@ -2150,6 +2150,159 @@ EDITS = [
         "      if (ps5_marks++ < 1) /* patches/series, 0059: once vulkan_menu_staging_ask */",
         "patches/series, 0059: once vulkan_menu_staging_ask",
     ),
+    (
+        "gfx/drivers/vulkan.c",
+        "         draw->backend_data_size          = 2 * sizeof(float);",
+        "         /* patches/series, 0060: libps5vk uses 16-byte UBO records.\n"
+        "          * Preserve the two shader fields and zero the trailing padding. */\n"
+        "         draw->backend_data_size          = 4 * sizeof(float);\n"
+        "         memset(ubo_scratch_data, 0, 4 * sizeof(float));",
+        "patches/series, 0060: libps5vk uses 16-byte UBO records",
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '   const bool as_strip = (draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP);\n'
+        '   const unsigned source_count = draw->coords->vertices;\n'
+        '   const unsigned output_count =\n'
+        '         (as_strip && source_count >= 3) ? (source_count - 2) * 3 : source_count;\n'
+        '\n'
+        '   if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n'
+        '            output_count * sizeof(struct vk_vertex), &range))\n'
+        '      return;\n'
+        '\n'
+        '   pv = (struct vk_vertex*)range.data;\n'
+        '   for (i = 0; i < output_count; i++, pv++)\n'
+        '   {\n'
+        '      /* Which source vertex this output vertex is: the first triangle of the\n'
+        '       * strip, then a pair per triangle after it. */\n'
+        '      const unsigned s = as_strip\n'
+        '            ? (i < 3 ? i : 3 + ((i - 3) / 2) * 2 + ((i - 3) % 2 ? 0 : 1))\n'
+        '            : i;\n',
+        '   /* patches/series, 0061: expand every strip triangle with alternating winding. */\n'
+        '   const bool as_strip = (draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP);\n'
+        '   const unsigned source_count = draw->coords->vertices;\n'
+        '   const unsigned output_count =\n'
+        '         as_strip ? (source_count >= 3 ? (source_count - 2) * 3 : 0) : source_count;\n'
+        '\n'
+        '   if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n'
+        '            output_count * sizeof(struct vk_vertex), &range))\n'
+        '      return;\n'
+        '\n'
+        '   pv = (struct vk_vertex*)range.data;\n'
+        '   for (i = 0; i < output_count; i++, pv++)\n'
+        '   {\n'
+        '      /* Triangle t uses t,t+1,t+2, swapping its first pair on odd t. */\n'
+        '      const unsigned s = as_strip\n'
+        '            ? i / 3 + (i % 3 == 2 ? 2 : ((i % 3) ^ ((i / 3) & 1)))\n'
+        '            : i;\n',
+        'patches/series, 0061: expand every strip triangle',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '            call.uniform_size = draw->backend_data_size;\n'
+        '            call.vbo          = &range;\n'
+        '            call.vertices     = draw->coords->vertices;',
+        '            call.uniform_size = draw->backend_data_size;\n'
+        '            call.vbo          = &range;\n'
+        '            call.vertices     = output_count; /* patches/series, 0061: effect vertex count */',
+        'patches/series, 0061: effect vertex count',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '            call.uniform_size = sizeof(math_matrix_4x4);\n'
+        '            call.vbo          = &range;\n'
+        '            call.vertices     = draw->coords->vertices;',
+        '            call.uniform_size = sizeof(math_matrix_4x4);\n'
+        '            call.vbo          = &range;\n'
+        '            call.vertices     = output_count; /* patches/series, 0061: icon vertex count */',
+        'patches/series, 0061: icon vertex count',
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "            call.texture      = NULL;\n"
+        "            call.sampler      = VK_NULL_HANDLE;",
+        "            /* patches/series, 0062: populate unused sampler layout slots. */\n"
+        "            call.texture      = &vk->display.blank_texture;\n"
+        "            call.sampler      = vk->samplers.nearest;",
+        "patches/series, 0062: populate unused sampler layout slots",
+    ),
+    (
+        "configuration.c",
+        "   *settings->paths.directory_assets = '\\0';",
+        "   /* patches/series, 0063: the title uses the null platform frontend. */\n"
+        "   strlcpy(settings->paths.directory_assets, \"/app0/assets\",\n"
+        "         sizeof(settings->paths.directory_assets));",
+        "patches/series, 0063: the title uses the null platform frontend",
+    ),
+    (
+        "menu/drivers/xmb.c",
+        "   xmb->font            = gfx_display_font_file(p_disp,",
+        "   /* patches/series, 0063: retain useful XMB startup asset diagnostics. */\n"
+        "   RARCH_LOG(\"[XMB] Icons: %s; font: %s\\n\", iconpath, fontpath);\n"
+        "   xmb->font            = gfx_display_font_file(p_disp,",
+        "patches/series, 0063: retain useful XMB startup asset diagnostics",
+    ),
+    (
+        "menu/drivers/xmb.c",
+        "      xmb_update_dynamic_wallpaper(xmb, true);",
+        "      /* patches/series, 0063: report the actual texture reset result. */\n"
+        "      RARCH_LOG(\"[XMB] Assets missing: %s; fonts ready: %s\\n\",\n"
+        "            xmb->assets_missing ? \"yes\" : \"no\",\n"
+        "            (xmb->font && xmb->font2) ? \"yes\" : \"no\");\n"
+        "      xmb_update_dynamic_wallpaper(xmb, true);",
+        "patches/series, 0063: report the actual texture reset result",
+    ),
+    (
+        "menu/drivers/xmb.c",
+        '#include "../../configuration.h"',
+        '#include "../../configuration.h"\n'
+        '#include "../../verbosity.h" /* patches/series, 0063: XMB asset logger */',
+        "patches/series, 0063: XMB asset logger",
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        'static void vulkan_transition_texture(',
+        '/* patches/series, 0065: physical rows must be a whole 256 bytes. */\n'
+        'static unsigned ps5_vulkan_texture_width(unsigned width, unsigned bytes_per_pixel)\n'
+        '{\n'
+        '   const unsigned alignment = 256u / bytes_per_pixel;\n'
+        '   return (width + alignment - 1u) & ~(alignment - 1u);\n'
+        '}\n'
+        '\n'
+        'static void vulkan_transition_texture(',
+        'patches/series, 0065: physical rows must',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '      if (info.extent.width % 64u != 0u)\n'
+        '         info.extent.width = (info.extent.width + 63u) & ~63u;',
+        '      /* patches/series, 0065: R8 needs 256 texels, RGBA8 needs 64. */\n'
+        '      info.extent.width = ps5_vulkan_texture_width(width, vulkan_format_to_bpp(format));',
+        'patches/series, 0065: R8 needs',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '      pv->tex_x   = *tex_coord++;',
+        '      /* patches/series, 0065: UVs address the logical region of the padded image. */\n'
+        '      pv->tex_x   = *tex_coord++ * (float)texture->width\n'
+        '            / ps5_vulkan_texture_width(texture->width, vulkan_format_to_bpp(texture->format));',
+        'patches/series, 0065: UVs address',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '   float inv_tex_size_x                   = 1.0f / font->texture.width;',
+        '   /* patches/series, 0065: glyph atlas offsets refer to the physical image. */\n'
+        '   float inv_tex_size_x                   = 1.0f / ps5_vulkan_texture_width(\n'
+        '         font->texture.width, vulkan_format_to_bpp(font->texture.format));',
+        'patches/series, 0065: glyph atlas offsets',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '         info.mipLevels     = vulkan_num_miplevels(width, height);',
+        '         /* patches/series, 0066: single-level menu images until mip sampling is verified. */\n'
+        '         info.mipLevels     = 1;',
+        'patches/series, 0066: single-level menu images',
+    ),
 ]
 
 

@@ -46,3 +46,21 @@
 
 # 0059  the first menu upload proves the handover; later updates must not write probes
 0059-log-menu-handover-once
+
+# 0060  pad the XMB ribbon uniform upload to the driver's 16-byte record size
+0060-pad-xmb-ribbon-uniform
+
+# 0061  expand XMB strips safely and submit the expanded vertex count
+0061-correct-display-triangle-strip-expansion
+
+# 0062  populate unused sampler layout slots for untextured menu effects
+0062-bind-menu-effect-placeholder-texture
+
+# 0063  seed the title asset path without Unix platform initialization and log XMB startup
+0063-set-title-menu-asset-directory
+
+# 0065  address the logical image inside driver-required row padding, including R8 fonts
+0065-correct-padded-texture-coordinates
+
+# 0066  isolate XMB sampling from unverified mip-chain layout
+0066-single-level-menu-textures

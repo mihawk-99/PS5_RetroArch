@@ -1,0 +1,167 @@
+{
+  "step": "xmb-default",
+  "recorded": "2026-09-19T16:13:24.443981+00:00",
+  "command": "tools/run-title.sh --no-build --watch 45",
+  "raw_capture": "klog/xmb-final-run.log",
+  "raw_lines": 6936,
+  "revision": "d46495d + XMB default changes",
+  "build_identity": "2df0e277df59faf661a37920988d1b804394c8ffe509c2b57296270f3dcaf7b3",
+  "lines": [
+    "XMB default: compiled and installed; RGUI and video_ps5 retained.",
+    "Final normal run: 45 seconds; refusals=0; API failures=0; successful Vulkan presentations.",
+    "Assets missing: no; fonts ready: yes; current build identity in retroarch.log.",
+    "No framebuffer capture writes in the final normal run.",
+    "Owner: \"It's flawless!\" after padded-coordinate and single-level texture correction.",
+    "GPU readback shows readable text, intact icons and full-screen gradient/ribbon.",
+    "All five gates PASS; 31 unit tests; fresh replay/idempotence PASS: 100 edits.",
+    "Earlier runs: uniform-range refusal, missing sampler refusal, missing assets, then texture corruption.",
+    "Single-level static/menu textures retained; general mip-chain correctness remains unverified.",
+    "PS5_Vulkan unchanged; no steady-state XMB performance measurement claimed."
+  ],
+  "runs": [
+    {
+      "name": "first",
+      "command": "tools/run-title.sh --no-build --watch 60",
+      "raw_capture": "klog/xmb-first-run.log",
+      "raw_sha256": "501d5bbfbc3ef556913832dfdc29b9018273258dc6cbbeb9bc4517a7ee6bb7d1",
+      "build_identity": "8817398711d080eb3b60f2a7815769e011992f1c834c445bde4905940caae080",
+      "refusal_lines": [
+        "vulkan: set 0 binding 0 covers 8 bytes, not a whole number of 16-byte elements (VK_ERROR_UNKNOWN)",
+        "vulkan: VK_ERROR_UNKNOWN"
+      ],
+      "api_failures": [
+        "gpu result: vkEndCommandBuffer calls=11 failures=1 result=-13"
+      ],
+      "assertion": true,
+      "presentation_observed": false,
+      "frontend_current": true,
+      "asset_diagnostics": [],
+      "capture_writes": [],
+      "verdict": "==> [run] VERDICT: it started and then died; the signal block above names where"
+    },
+    {
+      "name": "corrected",
+      "command": "tools/run-title.sh --no-build --watch 60",
+      "raw_capture": "klog/xmb-corrected-run.log",
+      "raw_sha256": "c634714639469c5acf75abb1f9ddb03009d619d15826f55067429c806ac73a4a",
+      "build_identity": "aac47ced9ef6af98eef281972a668eb8d053901b2ec6bfe5709abf598cf71cb0",
+      "refusal_lines": [
+        "vulkan: set 0 binding 1 is not bound or holds no write; the application has to bind and update it (docs/M5_REFERENCE.md, C3) (VK_ERROR_UNKNOWN)",
+        "vulkan: VK_ERROR_UNKNOWN"
+      ],
+      "api_failures": [
+        "gpu result: vkEndCommandBuffer calls=11 failures=1 result=-13"
+      ],
+      "assertion": true,
+      "presentation_observed": false,
+      "frontend_current": true,
+      "asset_diagnostics": [],
+      "capture_writes": [],
+      "verdict": "==> [run] VERDICT: it started and then died; the signal block above names where"
+    },
+    {
+      "name": "bindings",
+      "command": "tools/run-title.sh --no-build --watch 60",
+      "raw_capture": "klog/xmb-bindings-run.log",
+      "raw_sha256": "772248c972333c2a1f7f7b963c47dc5547095444a5cd260ee2d058f13d6b48d3",
+      "build_identity": "c7982b6de48cc871877a11f9ea1fdba195d6af6ac0e4a61d2baca76a8730c0c2",
+      "refusal_lines": [],
+      "api_failures": [],
+      "assertion": false,
+      "presentation_observed": true,
+      "frontend_current": true,
+      "asset_diagnostics": [],
+      "capture_writes": [],
+      "verdict": "==> [run] VERDICT: it ran for 60s and this script closed it"
+    },
+    {
+      "name": "assets",
+      "command": "tools/run-title.sh --no-build --watch 60",
+      "raw_capture": "klog/xmb-assets-run.log",
+      "raw_sha256": "aae2b89d5e1d3d35c57fe8e38b9a0e5c57481b99f8e1bee23bfdb5d0e95eeb9c",
+      "build_identity": "2bdf04f98c337ddfa39c38e4559d7fcb58216159dcd32b6b66356e0a33fedc61",
+      "refusal_lines": [],
+      "api_failures": [],
+      "assertion": false,
+      "presentation_observed": true,
+      "frontend_current": true,
+      "asset_diagnostics": [
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf"
+      ],
+      "capture_writes": [],
+      "verdict": "==> [run] VERDICT: it ran for 60s and this script closed it"
+    },
+    {
+      "name": "capture",
+      "command": "tools/run-title.sh --no-build --watch 30",
+      "raw_capture": "klog/xmb-capture-run.log",
+      "raw_sha256": "85b2f410f3f664de9baecac4641e1152c3969b68017f07e8599ad62b2cf5d328",
+      "build_identity": "4bbfa9a4346bed706d867e0fce5ed440dc7a1a8338df3004efc0d59ec48ead3b",
+      "refusal_lines": [],
+      "api_failures": [],
+      "assertion": false,
+      "presentation_observed": true,
+      "frontend_current": true,
+      "asset_diagnostics": [
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf"
+      ],
+      "capture_writes": [
+        "gpu capture: target frame=120 bytes=33554432 written=33554432 close=0",
+        "gpu capture: target frame=121 bytes=33554432 written=33554432 close=0"
+      ],
+      "verdict": "==> [run] VERDICT: it ran for 30s and this script closed it"
+    },
+    {
+      "name": "textures",
+      "command": "tools/run-title.sh --no-build --watch 45",
+      "raw_capture": "klog/xmb-textures-run.log",
+      "raw_sha256": "ff90c666379b8b326aa121e64dbe35ed75737b37725533bc6312f01b8fd9386d",
+      "build_identity": "5de34e4760a0a91b212b155da66de82dc8429cb82e2cb9f77b22c70f2a341542",
+      "refusal_lines": [],
+      "api_failures": [],
+      "assertion": false,
+      "presentation_observed": true,
+      "frontend_current": true,
+      "asset_diagnostics": [
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf"
+      ],
+      "capture_writes": [
+        "gpu capture: target frame=120 bytes=33554432 written=33554432 close=0",
+        "gpu capture: target frame=121 bytes=33554432 written=33554432 close=0"
+      ],
+      "verdict": "==> [run] VERDICT: it ran for 45s and this script closed it"
+    },
+    {
+      "name": "final",
+      "command": "tools/run-title.sh --no-build --watch 45",
+      "raw_capture": "klog/xmb-final-run.log",
+      "raw_sha256": "ad5f396c597813ce38c3a45eb160ee1c2abb2a3c630a06825cdd58bac6754031",
+      "build_identity": "2df0e277df59faf661a37920988d1b804394c8ffe509c2b57296270f3dcaf7b3",
+      "refusal_lines": [],
+      "api_failures": [],
+      "assertion": false,
+      "presentation_observed": true,
+      "frontend_current": true,
+      "asset_diagnostics": [
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [XMB] Icons: /app0/assets/xmb/monochrome/png; font: /app0/assets/xmb/monochrome/font.ttf"
+      ],
+      "capture_writes": [],
+      "verdict": "==> [run] VERDICT: it ran for 45s and this script closed it"
+    }
+  ],
+  "screenshot_hashes": {
+    "klog/xmb-capture/target-120.png": "ffb19331a9f54ab34d55880a6465a62c49a1c010b1d6b02e89cd45a5f23b7b24",
+    "klog/xmb-capture/target-121.png": "39213b50aba2b93f12d528fca022d65cd1feac89458ef17fc237d240b53a4229",
+    "klog/xmb-textures-capture/target-120.png": "7ecf62bb510a28e42bce8272291e524acbcc143f90cbe8c9832d0d5fd463d89e",
+    "klog/xmb-textures-capture/target-121.png": "b1b5b65e187f8f1f205cc4940c2098582960263a12399f2340c342fa4e1e918f"
+  },
+  "assets_revision": "73106363e14e34c08a5854b4cfbc29f184e3b783"
+}

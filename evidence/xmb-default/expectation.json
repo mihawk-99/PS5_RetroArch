@@ -1,0 +1,15 @@
+{
+  "step": "xmb-default",
+  "note": "Owner-confirmed XMB through Vulkan; final run has no capture hook. Failed diagnostic attempts are preserved in the run records.",
+  "must_contain": [
+    "refusals=0",
+    "API failures=0",
+    "Assets missing: no; fonts ready: yes",
+    "No framebuffer capture writes",
+    "Owner: \"It's flawless!\"",
+    "All five gates PASS",
+    "PS5_Vulkan unchanged"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirms flawless XMB after the final rendering correction; normal build removes only screenshot diagnostics."
+}

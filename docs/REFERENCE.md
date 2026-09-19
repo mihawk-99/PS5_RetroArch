@@ -228,3 +228,49 @@ The mandatory surface is small, and the rest is optional:
 Field order matters: the struct is initialised positionally, and `overlay_interface`
 sits inside `#ifdef HAVE_OVERLAY` before `poke_interface`, so an initialiser has to
 account for it.
+
+## XMB menu assets and build selection
+
+XMB uses RetroArch's existing Vulkan display driver; no new graphics backend or
+runtime dependency is added. Configure enables XMB and retains RGUI; upstream's
+default selection prefers XMB when Ozone/MaterialUI are disabled. The seed config
+matches that selection. Configure arguments are fingerprinted before feature
+flags are derived so an existing configured tree cannot silently retain RGUI-only
+objects. `ASSETS_DIR` is `/app0`, since platform_unix appends `/assets` itself.
+The title currently selects the null platform frontend, so that Unix initializer
+does not execute: patch 0063 seeds `/app0/assets` directly in configuration
+defaults and records the resolved XMB paths and load result at context reset.
+
+`assets/xmb/source.json` pins the official libretro/retroarch-assets revision
+73106363e14e34c08a5854b4cfbc29f184e3b783 and hashes the shipped subset: all 120
+fixed menu icons named by RetroArch 1.22.2's xmb_texture_path, the monochrome M+ 1p
+font, attribution and licenses. This pin makes the required menu artwork
+reproducible without downloading assets at build/run time. Per-system playlist
+icons are not shipped yet; standard default/content icons are included.
+
+The XMB ribbon retains its two-float shader layout but uploads a zero-padded
+16-byte uniform block (named patch 0060), matching libps5vk's current whole-record
+restriction. This is frontend compatibility padding, not general support for
+arbitrary UBO ranges in the driver. Named patch 0061 expands each triangle strip
+into list vertices with alternating winding and submits the expanded count for
+both effect and icon draws. `tests/test_xmb_assets.py` executes the C index mapping
+for strips through the full 8,064-vertex ribbon and checks bounds and winding.
+
+Named patch 0062 also binds the existing white texture and nearest sampler for
+untextured menu effects. The ribbon shader does not sample them, but libps5vk
+currently validates all stage-visible descriptor layout entries rather than just
+statically used shader bindings. This uses the same descriptor-fill compatibility
+path as textured draws (including patch 0026's second sampler slot).
+
+Named patch 0065 keeps texture coordinates consistent with the physical image
+width required by the driver's row alignment. RGBA8 rows need 64-texel alignment;
+R8 font rows need 256-texel alignment. Display UVs are scaled to the logical image
+region and font atlas offsets are normalized by the physical width. Padding only
+the image width changes what a normalized coordinate samples.
+
+Named patch 0066 keeps static/menu textures at one mip level. XMB's full mipmapped
+icons rendered as repeated/cropped fragments in the tested libps5vk path; the
+single-level images render correctly. This is a compatibility limit, not proof
+that the driver's general mip-chain storage/sampling is correct. RGUI and the
+CPU video driver remain compiled and selectable. The retired screenshot recipe
+is `parked/xmb-readback/README.md`; screenshots are not taken by normal builds.
