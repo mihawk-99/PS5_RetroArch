@@ -251,6 +251,63 @@ def frontend_defines() -> list[str]:
     return [flag for flag in done.stdout.split() if flag.startswith("-D")]
 
 
+class PortPatches(unittest.TestCase):
+    """This port's changes to RetroArch are exactly the intended set.
+
+    The fault this exists for: the working copy of tools/apply-port-patches.py
+    grew to fourteen blocks against the committed ten, because one guard was
+    pasted in twice. Every build from that tree patched runloop.c twice and died
+    with `rip: 0`, and the resulting crash was misread as progress on an unrelated
+    bug for most of a round.
+
+    A duplicate is invisible by reading - the block looks correct and the script
+    reports "applied" for both - so it is checked mechanically: the count, and the
+    fact that no two blocks target the same file at the same anchor, which is what
+    makes an edit apply twice.
+    """
+
+    script = ROOT / "tools" / "apply-port-patches.py"
+
+    def blocks(self) -> list:
+        import ast
+        source = self.script.read_text(encoding="utf-8")
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "EDITS":
+                return ast.literal_eval(node.value)
+        raise AssertionError(f"{self.script} no longer defines EDITS")
+
+    def test_no_patch_is_defined_twice(self) -> None:
+        edits = self.blocks()
+        pairs = [(edit[0], edit[1]) for edit in edits]
+        duplicates = {pair for pair in pairs if pairs.count(pair) > 1}
+        self.assertEqual(
+            duplicates, set(),
+            f"{len(pairs)} blocks but {len(set(pairs))} distinct (file, anchor) pairs: "
+            f"{sorted(duplicates)}. A block defined twice applies twice, and a file "
+            f"patched twice produces crashes that look like unrelated bugs")
+
+    def test_the_patch_set_is_the_size_it_should_be(self) -> None:
+        """Pinned so an accidental addition or deletion is a visible diff.
+
+        The number is not sacred - it changes when the port changes - but it must
+        change deliberately, in a commit that says why.
+        """
+        self.assertEqual(
+            len(self.blocks()), 10,
+            "the patch count changed: if a block was added or removed on purpose, "
+            "update this number in the same commit and say why in its message")
+
+    def test_each_file_is_patched_only_at_distinct_anchors(self) -> None:
+        edits = self.blocks()
+        per_file: dict[str, int] = {}
+        for edit in edits:
+            per_file[edit[0]] = per_file.get(edit[0], 0) + 1
+        self.assertEqual(
+            per_file.get("input/input_driver.c"), 3,
+            f"input_driver.c should carry three distinct edits (the driver in the "
+            f"table, the init fix, and the analog-axis guard); counts are {per_file}")
+
+
 class DriverTable(unittest.TestCase):
     """video_ps5 is really in RetroArch's driver table, in the object that ships."""
 

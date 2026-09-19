@@ -927,3 +927,31 @@ around it.
 **Verification.** `bash tools/verify.sh` → PASS (format unit build integration
 evidence). `bash tools/run-title.sh --watch 20` → pad working, menu redrawing, no
 fatal signal.
+
+## 2026-09-18: A duplicate patch block cannot reach a build again
+
+**The fault this closes.** The working copy of `tools/apply-port-patches.py` had grown
+to fourteen blocks against the committed ten: the controller-port guard was pasted in
+twice, so `runloop.c` was patched twice, and every build from that tree died with
+`rip: 0`. The block read correctly and the script reported "applied" for both, so
+nothing about reading it revealed the duplicate - and the crash it produced was chased
+as an unrelated bug for most of a round.
+
+**The check is mechanical now.** `tests/test_frontend.py` gains a `PortPatches` class
+that parses `EDITS` and asserts: no two blocks share a `(file, anchor)` pair - which
+is precisely what makes an edit apply twice; the patch count is the pinned ten, so an
+addition or removal is a deliberate diff; and `input/input_driver.c` carries its three
+distinct edits. A duplicate was planted to prove the test fails on it (11 != 10, two
+failures) and removed again to prove it passes.
+
+**On purging the patch set: no, and the enumeration is the argument.** Of the ten
+blocks, eight are load-bearing - video driver registration (2), the `main` rename,
+input driver registration (2), the input-init fix, the compiled input default, and the
+null-joypad guard. Purging them would remove the display and the pad. Only the
+`HAVE_XKBCOMMON` declaration and the controller-port guard are dead weight, and both
+are cheap. The set was instead verified from a pristine extraction: ten blocks, no
+duplicate pairs, three legitimate edits to `input_driver.c` at different anchors.
+
+**State.** `bash tools/build-title.sh` from a wiped tree, then
+`bash tools/run-title.sh --watch 12` -> title runs, no fatal signal;
+`bash tools/verify.sh` -> PASS; 16 host tests.
