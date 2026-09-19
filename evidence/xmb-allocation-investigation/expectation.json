@@ -1,0 +1,12 @@
+{
+  "step": "xmb-allocation-investigation",
+  "note": "Offline lifecycle evidence only; runtime remains unresolved. Replay host-probe.json with the command in capture.json.",
+  "must_contain": [
+    "10000 synthetic replacements",
+    "cleanup live bytes 0",
+    "no caller breakdown at first failure",
+    "no crash fix claimed"
+  ],
+  "must_not_contain": [],
+  "human_check": "User identifies left/right between XMB tabs. No new console acceptance."
+}

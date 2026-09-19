@@ -24,9 +24,14 @@ run and reports crash reproduced. Final logs are preserved; capture is stopped.
   this crash may be suppressed. Their absence is not proof of successful calls.
 - This reproduces the original failure without the first diagnostic's log flood.
   It does not establish heap limit, fragmentation, leak or corruption as cause.
-- Owner clarifies reproduction: holding a button to make the menu scroll fast.
-  Next investigation is navigation-driven list allocations and native heap behavior.
-  Do not silently disable XMB or switch away from Vulkan.
+- Owner clarifies reproduction: holding left/right between XMB tabs.
+- Local investigation: `docs/XMB_ALLOCATION_INVESTIGATION.md`, evidence in
+  `evidence/xmb-allocation-investigation/`. 10,000 synthetic list replacements
+  show no ordinary-node accumulation; 15,360 of each 15,488-byte node are path
+  arrays. Missing wallpaper updates can recreate the white texture every time.
+  The 6,991,272-byte console rise is not yet attributed; next diagnostic needs
+  first-failure caller totals and bounded tab/list/node counts. No new launch,
+  application build or driver edit. Do not switch away from XMB/Vulkan.
 - First diagnostic `000adf3edc25` froze; owner manually closed it. Raw:
   `klog/xmb-memory-run-20260919-183305/`. It emitted 12,793 failure records plus
   summaries / 5,404,264 bytes. Bounded logging corrected that diagnostic defect.

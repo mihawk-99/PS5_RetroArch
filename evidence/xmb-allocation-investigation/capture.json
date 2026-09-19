@@ -1,0 +1,17 @@
+{
+  "step": "xmb-allocation-investigation",
+  "recorded": "2026-09-19",
+  "revision": "a87f57a",
+  "command": "python3 tools/probe-xmb-allocations.py --expect evidence/xmb-allocation-investigation/host-probe.json",
+  "raw_capture": "klog/xmb-allocation-investigation/host-probe.json",
+  "lines": [
+    "Owner clarification: held left/right between XMB tabs.",
+    "Host source-extracted probe: 10000 synthetic replacements, 4566034 allocation calls; no ordinary-node accumulation.",
+    "Node 15488 bytes; embedded path arrays 15360 bytes; callback 648 bytes.",
+    "Peak requested bytes 8236400; warm cycle live bytes 259288; cleanup live bytes 0.",
+    "Separate named-node ownership check: 4-byte console_name allocation remains unfreed by xmb_free_node.",
+    "ASan and UBSan passed; LeakSanitizer disabled because sandbox ptrace prevents it; explicit live-allocation accounting passed.",
+    "Console increase 6991272 bytes is not yet attributed: no caller breakdown at first failure.",
+    "No console launch or application/driver change; no crash fix claimed."
+  ]
+}

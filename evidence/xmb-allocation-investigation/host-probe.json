@@ -1,0 +1,29 @@
+{
+  "node_bytes": 15488,
+  "path_data_bytes": 15400,
+  "path_chars_bytes": 15360,
+  "callback_bytes": 648,
+  "switches": 10000,
+  "largest_live_bytes": 8123364,
+  "peak_requested_bytes": 8236400,
+  "warm_cycle_live_bytes": 259288,
+  "after_cleanup_bytes": 0,
+  "allocation_calls": 4566034,
+  "console_name_unfreed_bytes": 4,
+  "kind": "host source-extracted list-lifetime experiment; not console acceptance",
+  "synthetic_list_lengths": [
+    12,
+    20,
+    1,
+    500,
+    6
+  ],
+  "synthetic_visible_slice_max": 8,
+  "source_sha256": {
+    "menu/drivers/xmb.c": "0223d4338690000d04a5bd7c75098a6846b43025ace0973f1744c50f8d00500f",
+    "libretro-common/lists/file_list.c": "2340543dbeab41bc5cb6ba9ae52faf8d4aaae80a3e93c45518a5edb603046cb0",
+    "gfx/gfx_thumbnail_path.h": "a853b9bb126883126bdc7bca0415fb81929d90352548e882dca1b5471d8b1f4f",
+    "gfx/gfx_thumbnail.h": "c2fafd468c5e1339f4de6589b41525239010ff36bffcb7b7c6869d1b90cea9c3",
+    "menu/menu_cbs.h": "e0317784c7ec714e2aa3a15d26897d474bdf33cdcd6986073e331d2b015e3e0f"
+  }
+}

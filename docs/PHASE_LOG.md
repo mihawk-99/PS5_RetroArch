@@ -2418,3 +2418,32 @@ record and match its expected failing outcome. No PS5_Vulkan writes occurred.
 Owner clarification: “It was just holding a button and making the menu scroll
 fast.” Reproduction does not require an explicit folder-open step in the owner's
 account. Exact navigation direction/list was not specified; do not infer either.
+
+
+## 2026-09-19 — XMB tab-switch allocation investigation
+
+Owner clarified that the trigger is holding left/right between XMB tabs.
+The configured source shows per-entry 15,488-byte nodes (15,360 bytes of inline
+path arrays), 648-byte callbacks, one copied visible outgoing list, and normal
+list clearing before tab rebuilds. Missing wallpaper candidates can repeatedly
+recreate the white texture, leading to the queue-wait path seen in the crash.
+The captured 6,991,272-byte rise remains unattributed: the only live-caller
+breakdown predates it. No claim of a node leak, heap limit or GPU-memory leak.
+
+`python3 tools/probe-xmb-allocations.py --expect evidence/xmb-allocation-investigation/host-probe.json`
+passes 10,000 synthetic replacements using extracted upstream lifetime functions:
+4,566,034 allocations, stable 259,288-byte end-of-cycle usage, 8,236,400-byte
+peak, zero after cleanup. A separate check demonstrates the small console_name
+ownership leak. The initial LeakSanitizer run failed because sandbox ptrace
+prevents scanning; explicit accounting plus ASan/UBSan pass with leak scanning
+disabled. The host harness is not a complete frontend/native heap/GPU replay.
+
+Evidence and limits: `evidence/xmb-allocation-investigation/` and
+`docs/XMB_ALLOCATION_INVESTIGATION.md`. No title launch, deployment, application
+rebuild, allocator-policy change or PS5_Vulkan edit. The next discriminating
+measurement is first-failure live callers plus bounded numeric tab/list counts;
+it requires another owner-authorized launch.
+
+Verification: `bash tools/verify.sh format evidence` passes format and all 27
+evidence replays; `git diff --check` passes. Product build/integration gates
+were not rerun because this step changes only offline tooling and documentation.
