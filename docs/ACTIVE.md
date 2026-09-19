@@ -39,21 +39,33 @@ declarations the link needs would have been lost with the next checkout. They ar
 tracked under `tooling/ps5-stubs/` now, which is also where `tools/build.sh` reads
 them.
 
-**Not yet run on the console.** What is proven here is that the title links with the
-driver embedded and that every gate passes. Whether the driver initialises on the
-console is the next run, and `--log-file=/app0/retroarch.log` is already in argv for
-it.
+**Not yet working on the console.** `bash tools/run-title.sh --watch 20` on this build:
+the title launches, the console reports it running, and every one of its eight attempts
+ends in `rarch_main returned = 1` with nothing in between - no `ps5_init`, no frame, no
+menu. `ps5_init` is expected to be absent, because the compiled video default is now
+`vulkan` and the config that names `ps5` is the one content loading discards (0006), but
+*something* returns 1, and the frontend's own log (`/app0/retroarch.log`, fetched over
+FTP) stops after the audio fallback with no fatal-error line: the setjmp handler in
+`rarch_main` logs `Fatal error received in: "<what>"`, and that line is not there, so
+the return is one of the silent paths after `drivers_init` - the leading candidate is
+`task_push_load_content_from_cli` returning false (`retroarch.c:6036`).
+
+**Read the log, not the trace, for this one.** `/app0/retroarch.log` is fetched with
+`RETR /data/homebrew/<title>/retroarch.log`; `/app0/...` is not an FTP path. It proves
+the frontend's own startup ran: input driver `ps5` found, audio fell back to null,
+display server `null`, core geometry 320x240.
 
 ## Next
 
-1. **Run it.** `bash tools/run-title.sh --watch 20`, then read `/app0/retroarch.log`
-   and `/app0/trace.txt`. The three answers to look for: does `video_vulkan` come up,
-   does it find a device, and does the picture reach the screen.
-2. **The config file is still not read.** Content loading discards the title's `-c`,
-   and the fix (0006) is parked in `parked/config-path.patch.py` because reading the
-   config crashes the launch inside `command_event`. The file logger above is inert
-   until this is fixed, so on the Vulkan run the title's own trace is still the only
-   instrument.
+1. **Find what returns 1 in the Vulkan build.** Probes at statement level inside
+   `drivers_init` after the audio block and inside `rarch_main`'s content-load push,
+   through `tools/apply-runtime-probes.py` so they stay revertible. The answer decides
+   whether this is a Vulkan-init problem or the content-load path the parked 0006
+   already covers.
+2. **Then the config file.** Content loading discards the title's `-c`, and the fix
+   (0006) is parked in `parked/config-path.patch.py` because reading the config crashes
+   the launch inside `command_event`. Until it lands, `video_driver` comes from the
+   compiled default and nothing in `config/retroarch.cfg` applies.
 3. **Then the menu's size.** RGUI renders 320x240 into a 1920x1080 frame.
 
 ## Working notes
@@ -88,11 +100,11 @@ it.
 
 | Check | Result |
 | --- | --- |
+| `bash tools/run-title.sh --watch 20` on this build | **FAILS**: the title launches, then `rarch_main returned = 1` eight times with no video init, no frame, no signal; `klog/console-retroarch.log` stops after the audio fallback |
 | `bash tools/build-title.sh` | PASS: clean link with the driver embedded; `eboot.bin` 29,859,722 bytes (was 8,225,706); 0 undefined symbols |
 | `bash tools/build-mesa-util.sh` | PASS: `u_thread.o`, `anon_file.o`, `os_file.o`, each checked to define the symbols it is for |
 | `bash tools/verify.sh` (all gates) | PASS (format unit build integration evidence) |
 | `python3 -m unittest discover -s tests` | PASS: 18 tests, including the AGC import surface and the unwind boundaries in the linked image |
-| `bash tools/run-title.sh` on this build | **NOT RUN**: the driver is linked but has not been on the console yet |
 | Config path (0006) | **PARKED**: reading the config still crashes in `command_event`; see `parked/config-path.patch.py` |
 
 ## Open findings

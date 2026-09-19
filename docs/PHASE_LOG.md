@@ -1014,3 +1014,55 @@ so regenerating the script from the boilerplate fails the test instead of the li
 **Not proven.** The driver has not been on the console since it was linked. The next
 run is `bash tools/run-title.sh --watch 20` and the answers are in
 `/app0/retroarch.log`.
+
+## 2026-09-18: First console run of the linked build: it returns 1 before video init
+
+**What was run.** `bash tools/run-title.sh --watch 20` against the build of `17c44d8`
+(the driver linked, `eboot.bin` 29,859,722 bytes). The console reports the title
+running, and it is gone before the twenty-second watch ends.
+
+**What the console says.** Eight attempts, each exactly this and nothing else:
+
+    main() entered; static constructors have already run
+    argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file
+    rarch_main returned = 1
+
+No `ps5_init entered`, no frame, no menu, and no fatal signal - `main` returned by
+itself, which is the one failure the title's own trace can show but not explain.
+
+**What the frontend's own log says.** Fetched over FTP; `/app0/...` is not an FTP
+path, the file is `/data/homebrew/PPSA99169/retroarch.log`, which is worth writing
+down because two `RETR /app0/retroarch.log` attempts answered `550` first. It stops
+after the audio fallback:
+
+    [INFO] [Input] Found input driver: "ps5".
+    [INFO] [Video] Set video size to: fullscreen.
+    [INFO] [Video] Graphics driver did not initialize an input driver. Attempting to pick a suitable driver.
+    [INFO] [Video] Found display server: "null".
+    [ERROR] Failed to initialize audio driver. Will continue without audio.
+
+Two facts follow, and both narrow it. The log reaches `drivers_init` and gets past the
+video block, so the video driver was found and its own init did not fail loudly; and
+`rarch_main`'s setjmp handler, which logs `Fatal error received in: "<error_string>"`,
+never ran - so no `retroarch_fail` fired and the return is one of the silent `return 1`
+paths later in `rarch_main`. The first of those is
+`task_push_load_content_from_cli` (`retroarch.c:6036`), reached after `drivers_init`
+returns, which is also where the parked 0006 lives: content loading is the code that
+discards the title's `-c`.
+
+**Why `ps5_init` is absent, and it is not a regression.** The compiled video default is
+`vulkan` since `6f4bd10`, and the config that names `ps5` is the config content loading
+discards, so the ps5 driver is never selected. The last run that reached the menu
+(`ps5_frame 600: menu commits=22 changes=2 presented=yes` in the trace at block 1714)
+is the build before that default changed, which is why it looks like a step backwards
+and is not one.
+
+**Recorded captures.** `klog/console-trace.txt` (the whole append-only trace, 1762
+lines, the eight attempts at 1741-1762) and `klog/console-retroarch.log` (24 lines,
+stderr and stdout of the frontend's logger). Both stay in the ignored `klog/` tree;
+what they said is transcribed here.
+
+**Next.** Statement-level probes, through `tools/apply-runtime-probes.py` so they stay
+revertible: inside `drivers_init` after the audio block, and around `rarch_main`'s
+content-load push. Which one fires decides whether this is a Vulkan-init problem or the
+content-load path 0006 already describes.
