@@ -1848,3 +1848,57 @@ with `rip: 0` and an 8-line trace, and I misread it as progress on the config fa
 and the title immediately ran again. Twice now this session a patch-script edit made
 by slicing text has cost a round; the lesson is to count the blocks
 (`grep -c '^    ($'`) after every edit to that file.
+
+## With the config read, everything works up to the joypad step - which is where it dies
+
+**Measured, in order, on one run with the config-path fix applied.** Probes at each
+landmark give a complete sequence with no gap until the very end:
+
+    probe CFG: load-file-enter
+    probe CFG: load-file-body-start
+    probe CFG: before-read
+    probe CFG: after-read
+    input: pad opened, user=515310723 handle=51578624
+    probe X: wrap-before-init
+    probe X: before-joypads
+    -> dead
+
+Read it as the phases it names. The config file **is opened and parsed** -
+`after-read` prints, so `config_file_new_from_path_to_string` returns a real
+`conf`, and nothing about the config file's contents or the reading of it is at
+fault. The input driver **is** initialised, and this time its own init runs to
+completion: `pad opened` is printed by `ps5_input_init` itself, and
+`wrap-before-init` immediately precedes the call to it. Then `before-joypads` prints,
+which is the first statement after that init returns, and nothing after it.
+
+**So the remaining fault is in `input_driver_init_joypads()` or the moment after
+it** - the last step of `input_driver_init_wrap`:
+
+    if ((ret = input->init(name)))      /* returns: pad opened */
+    {
+       input_driver_init_joypads();      /* before-joypads prints, then nothing */
+       return ret;
+    }
+
+That function calls `input_joypad_init_driver(settings->arrays.input_joypad_driver,
+input_driver_st.current_data)`. This build compiles exactly one joypad driver,
+`null_joypad`, and its `init` is a real function, so this is not the empty-table case
+the earlier entries suspected. What is left is the `null_joypad` init itself or the
+syscall behind it - and that is where SIGSYS (signal 12, `rax: 0`) points, not at the
+config.
+
+**This is a much better position than "the config crashes".** The config mechanism
+is proven to work on this console: the file opens, parses, and its settings are
+applied far enough to change driver behaviour (`input_driver = "ps5"` reaches the
+frontend and the pad opens, which is only true when the config is read). The fault
+is one call in the input subsystem, on a path that only exists because the config now
+names this project's driver. It is also specific to reading the config: with the
+config path parked, the input driver still initialises through the compiled default
+and the pad works, because that route does not reach this call with the same
+`current_data`.
+
+**A note on the earlier SIGSYS attribution.** The previous entry said reading the
+config "walks the title into a blocked syscall" and implied the file path was at
+fault. The probes above show the file path completing; the refused syscall is downstream,
+in the joypad step. The correction matters because it changes the fix: nothing about
+`retroarch.cfg`, `fopen`, `stat` or the working directory needs to change.
