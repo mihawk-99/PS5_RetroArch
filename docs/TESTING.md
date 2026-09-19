@@ -146,3 +146,13 @@ This test fails against the former mkdir-only implementation. After console
 startup, `python3 tools/check-ftp-write.py` requires both mode `0777` and successful
 FTP upload/readback/cleanup in all seven managed directories. Mode listings alone
 are insufficient evidence that the FTP process can write.
+
+The native input fixture compiles `src/input_ps5.cpp` against mocked pad services
+and the actual upstream `input_state_wrap` and analog helpers. It checks raw button
+capture, all stick directions, trigger scaling, invalid ports/axes/buttons,
+user binding priority without the old direct mapping, menu deadzone behavior,
+zero-sample repeat polling, interception/disconnect and driver teardown/reinit.
+ELF relocations verify joypad registration and the built-in profile in the shipped
+frontend. On console, confirm left-stick menu navigation, button/axis capture in
+Settings > Input > RetroPad Binds > Port 1 Controls, and saved bindings after a
+restart. Preserve the owner's live configuration when deploying.

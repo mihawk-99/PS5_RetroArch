@@ -1,0 +1,63 @@
+{
+  "step": "native-joypad",
+  "recorded": "2026-09-19T17:34:57.651249+00:00",
+  "revision": "132274e + native joypad binding fix",
+  "commands": [
+    "tools/verify.sh",
+    "tools/run-title.sh --no-build --watch 120",
+    "tools/run-title.sh --no-build --no-deploy --watch 30"
+  ],
+  "raw_capture": "klog/input-joypad-followup.log",
+  "build_identity": "e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9",
+  "lines": [
+    "input: ps5 joypad registered (16 buttons, 6 axes)",
+    "[Input] Found joypad driver: \"ps5\".",
+    "[Autoconf] PS5 Controller configured in port 1.",
+    "Owner confirmed left-stick menu navigation and button/stick binding capture: \"Everything works flawlessly!\"",
+    "Interactive run early exit: owner confirmed manual close; not a crash acceptance.",
+    "Follow-up: 30 seconds alive; script closed title; Vulkan refusals=0; API failures=0; presentation observed.",
+    "Host: upstream input_state_wrap honors button/axis remaps without raw fallback; upstream menu analog helper honors deadzone.",
+    "Host: raw buttons/axes, triggers, repeated polls, interception/disconnect, teardown/reinit PASS.",
+    "ELF: ps5_joypad before null_joypad; built-in ps5_controller_profile referenced.",
+    "Fresh patch replay: 107 applied + one existing marker; second pass 108 present, unchanged.",
+    "PS5_Vulkan unchanged at 6f0ce0d."
+  ],
+  "runs": [
+    {
+      "name": "interactive",
+      "raw_capture": "klog/input-joypad-run.log",
+      "raw_sha256": "b1aa67e132a05fe5c7f3465af7c18ed9a40270741fa062fa60b3a8ec086d9d1f",
+      "build_identity": "e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9",
+      "frontend_capture": "klog/retroarch-133020.log",
+      "frontend_sha256": "eac4ea8cc5c1bd0ccd0ca6bbc73fc73af3f61f59e0dc758b703cef6a0710aead",
+      "frontend_lines": [
+        "[INFO] [Input] Found joypad driver: \"ps5\".",
+        "[INFO] [Audio] Started synchronous audio driver.",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [Autoconf] PS5 Controller configured in port 1."
+      ],
+      "refusal_lines": [],
+      "api_failure_lines": [],
+      "presentation_observed": true,
+      "termination": "Owner confirmed manual close after successful interactive testing."
+    },
+    {
+      "name": "followup",
+      "raw_capture": "klog/input-joypad-followup.log",
+      "raw_sha256": "ef739554ebade612c38c84a86672aeaa058b4a69938f629dbd90673efd436535",
+      "build_identity": "e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9",
+      "frontend_capture": "klog/retroarch-133319.log",
+      "frontend_sha256": "eac4ea8cc5c1bd0ccd0ca6bbc73fc73af3f61f59e0dc758b703cef6a0710aead",
+      "frontend_lines": [
+        "[INFO] [Input] Found joypad driver: \"ps5\".",
+        "[INFO] [Audio] Started synchronous audio driver.",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes",
+        "[INFO] [Autoconf] PS5 Controller configured in port 1."
+      ],
+      "refusal_lines": [],
+      "api_failure_lines": [],
+      "presentation_observed": true,
+      "termination": "30 seconds alive; script closed title."
+    }
+  ]
+}

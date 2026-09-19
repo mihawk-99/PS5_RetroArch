@@ -74,3 +74,6 @@
 # Supply the native executable path and enumerate through kernel getdents.
 0069-native-executable-path
 0070-native-directory-enumeration
+
+# 0071  expose PS5 pad through the binding/menu joypad interface and auto profile
+0071-register-native-ps5-joypad

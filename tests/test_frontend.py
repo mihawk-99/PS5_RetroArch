@@ -300,7 +300,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 105,
+            len(self.blocks()), 108,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 
@@ -314,9 +314,9 @@ class PortPatches(unittest.TestCase):
             f"configuration.c should carry four distinct edits (audio, asset path, input default and "
             f"the video default); counts are {per_file}")
         self.assertEqual(
-            per_file.get("input/input_driver.c"), 3,
-            f"input_driver.c should carry three distinct edits (the driver in the "
-            f"table, the init fix, and the analog-axis guard); counts are {per_file}")
+            per_file.get("input/input_driver.c"), 4,
+            f"input_driver.c should carry four distinct edits (the driver in the "
+            f"table, joypad table, the init fix, and the analog-axis guard); counts are {per_file}")
 
 
 class DriverTable(unittest.TestCase):
@@ -435,6 +435,21 @@ class InputDriver(unittest.TestCase):
             "input_drivers[] must name input_ps5 before input_null: the null driver "
             "reports no input and terminates the array, so a pad driver listed after "
             "it is a pad driver the frontend never reaches")
+
+    def test_native_joypad_and_profile_are_linked(self) -> None:
+        done = subprocess.run(["readelf", "-rW", str(self.frontend_obj)],
+                              capture_output=True, text=True, check=True)
+        section = re.search(
+            r"Relocation section '\.rela\.data\.joypad_drivers' at.*?\n(.*?)\n\n",
+            done.stdout, re.S)
+        self.assertIsNotNone(section)
+        targets = re.findall(r"R_X86_64_64\s+\S+\s+(\S+)", section.group(1))
+        self.assertEqual([target.rsplit(".", 1)[-1] for target in targets],
+                         ["ps5_joypad", "null_joypad"])
+        profile_obj = self.frontend_obj.parent / "input_input_autodetect_builtin.c.o"
+        done = subprocess.run(["readelf", "-rW", str(profile_obj)],
+                              capture_output=True, text=True, check=True)
+        self.assertIn("ps5_controller_profile", done.stdout)
 
     def test_the_button_map_is_the_console_s_own_words(self) -> None:
         """The pairing table, read out of the object the title links.

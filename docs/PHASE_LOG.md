@@ -1930,3 +1930,40 @@ showed `0755`. No sibling project changes or core implementation were assigned.
 Only the seven managed directory modes are repaired; user file modes are not
 changed recursively. Error logging remains enabled. PS5_Vulkan is unchanged at
 `6f0ce0d`. Actual core/content execution remains a separate, unverified step.
+
+## 2026-09-19 — Native joypad fixes stick navigation and binding capture
+
+The owner reported working menu buttons but no left-stick navigation and binding
+capture timeouts. The input-only backend bypassed the joypad callbacks used by
+both paths. Added `ps5_joypad`, its built-in default profile and registration;
+`input_ps5` supplies no duplicate hardcoded gamepad state. The pad is polled only
+through the joypad interface. Zero new samples preserve held input for the extra
+binding-screen poll; errors/interception/disconnect clear input. Existing saved
+configuration is preserved, and an empty joypad selection finds the new backend.
+
+- Initial unit gate flagged the pinned patch counts (105 to 108, and three to
+  four input_driver.c edits). Updated them for the new joypad declaration,
+  registry entry and built-in profile. No additional dependency or SDK flag.
+- Host fixture compiles the actual backend and upstream input mapping/analog
+  helpers. Explicit button and axis bindings suppress old mappings; raw capture,
+  left/right axes, triggers, deadzone, second polls and teardown/reinit pass.
+  ELF relocation checks verify both registration and the profile in the build.
+- Fresh patch replay: 107 applied plus one existing upstream marker. Second
+  pass: 108 present, all bytes unchanged (`/tmp/input-patch-replay.log`).
+- Interactive console command: `tools/run-title.sh --no-build --watch 120`.
+  Build `e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9`.
+  Owner confirmed left-stick navigation and button/stick binding capture:
+  "Everything works flawlessly!" The title was gone at the 120-second check;
+  the runner's generic early-exit verdict was resolved by the owner's explicit
+  confirmation "I closed it manually". No crash was inferred from that verdict.
+  Raw capture `klog/input-joypad-run.log`, frontend `klog/retroarch-133020.log`.
+
+Rumble, multiple controllers, saved remapping after restart and actual core
+execution are not claimed. PS5_Vulkan remains unchanged at `6f0ce0d`.
+
+Follow-up: `tools/run-title.sh --no-build --no-deploy --watch 30`, same build,
+full window alive and script-closed (`klog/input-joypad-followup.log`, frontend
+`klog/retroarch-133319.log`). Both runs selected/configured the PS5 joypad and
+presented XMB with native audio initialization, zero GPU refusals/API errors and
+no frontend ERROR lines. All five `tools/verify.sh` gates PASS: 37 unit tests,
+17 evidence records. Sanitized capture/expectations: `evidence/native-joypad/`.

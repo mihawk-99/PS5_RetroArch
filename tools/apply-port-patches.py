@@ -30,6 +30,11 @@ from pathlib import Path
 
 # (file, anchor, inserted-before-anchor, already-present-marker)
 EDITS = [
+    # 0071: native joypad discovery, binding capture and built-in defaults.
+    ('input/input_driver.h', 'extern input_device_driver_t ps4_joypad;', 'extern input_device_driver_t ps4_joypad;\nextern input_device_driver_t ps5_joypad;', 'extern input_device_driver_t ps5_joypad;'),
+    ('input/input_driver.c', '   &null_joypad,\n   NULL,\n};', '   &ps5_joypad,\n   &null_joypad,\n   NULL,\n};', '   &ps5_joypad,'),
+    ('input/input_autodetect_builtin.c', 'const char* const input_builtin_autoconfs[] =\n{', 'extern const char ps5_controller_profile[];\nconst char* const input_builtin_autoconfs[] =\n{\n   ps5_controller_profile,', '   ps5_controller_profile,'),
+
     (
         "gfx/video_driver.h",
         "extern video_driver_t video_null;",
@@ -243,12 +248,9 @@ EDITS = [
         # video_ps5 is: the console's pad calls and the driver's shape are this
         # project's, and upstream stays upstream.
         #
-        # It is an *input* driver and not a joypad driver because every joypad
-        # driver upstream ships needs a library this SDK does not carry, so
-        # primary_joypad is NULL here - see the guard below. input_state_wrap
-        # consults the joypad only when there is one and calls the input driver's
-        # own input_state unconditionally, so a pad read directly still reaches
-        # the menu.
+        # The initial implementation reported pad state directly here. Patch
+        # 0071 now adds the paired native joypad backend, which supplies raw
+        # binding capture and mapped input; this input interface stays registered.
         "input/input_driver.h",
         "extern input_driver_t input_ps4;",
         "extern input_driver_t input_ps4;\n"

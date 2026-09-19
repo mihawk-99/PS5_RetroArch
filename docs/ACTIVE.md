@@ -4,36 +4,40 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**FTP uploads work in all seven RetroArch-managed directories.** The user's
-permission request takes precedence over the earlier filesystem follow-up scope.
-Startup creates and repairs `config`, `cores`, `content`, `system`, `savefiles`,
-`savestates` and `playlists` to `0777`, including existing folders and restrictive
-umasks. This changes directory modes only; user file modes are not recursive.
+**Left-stick menu navigation and input binding capture work on the PS5.** The
+owner tested both on the native joypad build and replied: "Everything works
+flawlessly!" This follows the new input issue rather than continuing the previous
+permission step. No driver work or core implementation was needed.
 
-`0775` applied successfully but real FTP uploads still returned `550 Permission
-denied` in every managed folder. The user-authorized `0777` fallback passed
-upload, byte-for-byte readback and cleanup in all seven. No probe files remain.
+The old input-only backend bypassed RetroArch's joypad interface. Menu sticks and
+the binding screen therefore had nothing to poll, although direct menu buttons
+worked. `ps5_joypad` now provides raw buttons/axes and a built-in controller
+profile; normal RetroArch binding/deadzone logic handles the resulting input.
+`input_ps5` no longer ORs hardcoded controls back into remapped input.
 
 ## Verified build and evidence
 
-- Identity: `347655429cf4a60f3d7608c3ba4e46ec1c1972f81704cbea9f9e654c9942cfed`.
-- Commands: `tools/run-title.sh --no-build --watch 30`, then
-  `python3 tools/check-ftp-write.py`. Full 30 seconds alive; script-closed.
-  No mkdir/chmod errors, Vulkan refusals or GPU API failures. Presentation,
-  native audio startup and XMB assets/fonts ready are recorded.
-- Evidence: `evidence/ftp-directory-permissions/` retains both the failed `0775`
-  FTP test and successful `0777` test. Raw captures stay in ignored `klog/`:
-  `permissions-{run,open-run}.log`, `retroarch-131931.log`, `ftp-write-*.json`.
-- Host fixture covers old `0755`/`0775` directories, `umask(0077)`, and config
-  preservation. Former mkdir-only code fails the permission regression.
-- All five `tools/verify.sh` gates PASS; 35 unit tests; 16 evidence records.
+- Identity: `e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9`.
+- Command: `tools/run-title.sh --no-build --watch 120`; the owner confirmed
+  left-stick navigation and button/stick binding capture on this build.
+- Follow-up: `tools/run-title.sh --no-build --no-deploy --watch 30` stayed alive
+  for the full window and was script-closed. Both runs selected/configured the PS5
+  joypad; Vulkan presentation, XMB and audio startup passed with zero GPU errors.
+  The owner manually closed the interactive run, explaining its early-exit verdict.
+- All five gates PASS; 37 unit tests; 17 evidence records.
+- Host tests use actual upstream input mapping and analog helpers with mocked
+  native samples. They cover button/axis bindings, deadzones, trigger scaling,
+  extra binding-screen polls, interception/disconnect and teardown/reinit.
+- Fresh patch replay: 107 applied + one upstream marker; second pass 108 present,
+  bytes unchanged. Three new edits register the joypad and built-in profile.
+- Evidence: `evidence/native-joypad/`; raw console capture stays in ignored
+  `klog/input-joypad-run.log`. Verification: `tools/verify.sh`.
 - PS5_Vulkan remains unchanged at **6f0ce0d**. No sibling project was modified.
 
-Configuration saving and directory browsing were verified in the previous step,
-`evidence/native-paths/`. The owner confirmed visible folders and the `.cfg`
-file. That step supplies native argv/defaults, preserves the live config across
-updates, avoids procfs during config saving and uses 64 KiB SDK directory reads.
-Its 90-second capture and failed intermediate attempts remain in that evidence.
+The previous step verified actual FTP upload/readback/cleanup in all seven managed
+folders at `0777`; `0775` was insufficient (`evidence/ftp-directory-permissions/`).
+Startup still repairs those directory modes. Configuration saving and browsing
+remain documented in `evidence/native-paths/`; deployments preserve live settings.
 
 ## User file locations
 
@@ -55,10 +59,10 @@ remain the tested compatibility path; general mip chains are unverified.
 parked recipe; GPU profiling stays opt-in. Useful startup/frontend/core/audio/error
 logs remain enabled without routine frame-success chatter.
 
-The first filesystem run crashed during config save; the second fixed saving
-but could not enumerate `/app0`. Both failures are documented, not acceptance.
-The final run resolves them. USB access and real core loading require separate
-verification on the available mounts and compatible core artifacts.
+Input currently supports the initial user’s single controller. Rumble, multiple
+controllers and saved remapping across a console restart remain unverified. USB
+access and real core loading require separate verification on available mounts
+and compatible core artifacts.
 
 ## Operating notes
 

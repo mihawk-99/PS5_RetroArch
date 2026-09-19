@@ -342,3 +342,21 @@ FTP write access and older `0755` directories are repaired. Mode `0775` was
 applied but still denied real FTP uploads on this console, despite matching
 groups in directory listings; the owner authorized `0777`. This policy
 changes only those directory modes; it does not recursively rewrite user files.
+
+### Native joypad and binding interface
+
+`input_ps5` pairs with `ps5_joypad`, registered before the null joypad. The joypad
+owns the single initial-user pad handle and exposes 16 raw buttons plus six axes
+(left X/Y, right X/Y, L2/R2). The built-in `PS5 Controller` profile maps them to
+RetroPad defaults through RetroArch's normal autoconfiguration. Existing saved
+configs with an empty joypad driver select it automatically; new seeds name
+`ps5`. Explicit user bindings override the profile.
+
+The input interface adds no raw gamepad state: OR-ing the old direct mapping into
+RetroArch's mapped state would make reassigned buttons remain active. Menu analog
+navigation and binding capture use the joypad callbacks. Sticks span -32767 to
+32767 centered on byte 128; triggers span 0 to 32767. RetroArch owns deadzone and
+axis-threshold handling. A zero-sample read preserves the previous sample (the
+binding screen may poll twice); errors/disconnects and shell interception suppress
+input. No per-frame or per-button logging is added. Rumble and multiple controllers
+remain unsupported in this backend.

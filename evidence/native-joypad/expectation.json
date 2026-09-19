@@ -1,0 +1,17 @@
+{
+  "step": "native-joypad",
+  "must_contain": [
+    "input: ps5 joypad registered (16 buttons, 6 axes)",
+    "[Input] Found joypad driver: \"ps5\".",
+    "[Autoconf] PS5 Controller configured in port 1.",
+    "Owner confirmed left-stick menu navigation and button/stick binding capture: \"Everything works flawlessly!\"",
+    "Follow-up: 30 seconds alive; script closed title; Vulkan refusals=0; API failures=0; presentation observed.",
+    "Host: upstream input_state_wrap honors button/axis remaps without raw fallback; upstream menu analog helper honors deadzone.",
+    "Host: raw buttons/axes, triggers, repeated polls, interception/disconnect, teardown/reinit PASS.",
+    "ELF: ps5_joypad before null_joypad; built-in ps5_controller_profile referenced.",
+    "Fresh patch replay: 107 applied + one existing marker; second pass 108 present, unchanged.",
+    "PS5_Vulkan unchanged at 6f0ce0d."
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirmed flawless left-stick navigation and button/stick binding capture; separately confirmed manually closing the interactive run. The follow-up was script-closed."
+}

@@ -2631,3 +2631,25 @@ folders and defeating creation-time umask restrictions. No recursive file-mode
 change is needed for this verified upload case. Evidence and both outcomes:
 `evidence/ftp-directory-permissions/`; reproduce using
 `tools/run-title.sh --no-build --watch 30` and `python3 tools/check-ftp-write.py`.
+
+## 2026-09-19 — Input-only pad reads bypass menu analog and binding capture
+
+The old `input_ps5.input_state` returned hardcoded RetroPad buttons directly.
+Upstream `input_state_wrap` calls that even without a joypad, explaining why menu
+buttons worked. In contrast, `input_driver_collect_system_input` reads sticks
+through `input_joypad_analog_axis(primary_joypad, ...)`, and the binding screen
+calls `primary_joypad->poll/button/axis`. No native joypad was registered, leaving
+those paths without input. This supersedes the earlier finding that a null
+joypad was this port's normal state; the defensive null guard remains useful.
+
+`ps5_joypad` plus a built-in autoconfiguration profile supplies those interfaces.
+The input interface must stop returning hardcoded buttons: its result is ORed
+with mapped joypad input, which would otherwise keep old bindings active after
+reassignment. Host tests call the upstream wrapper to prove this priority and
+upstream analog helpers to prove menu stick/deadzone behavior. A zero-sample
+`scePadRead` preserves the last state because binding capture can poll again
+within a frame. Errors, disconnect samples and interception suppress input.
+
+The owner tested left-stick navigation and button/stick binding capture on build
+`e6211dea9fd0bb512e83a9979a6a44c0c8c5fdf175564c753e3fd2a25067e0a9`
+and replied "Everything works flawlessly!" Evidence: `evidence/native-joypad/`.
