@@ -141,16 +141,50 @@ EDITS = [
         "Named by this port (patches/series, 0011)",
     ),
     (
-        # The other half of the same change: the pipeline index is derived from the
-        # primitive type, so a strip reported as a strip would still select the
-        # strip pipeline. Reporting it as a list selects the list pipeline, and the
-        # vertices already match because the expansion above produced a list.
+        # The creation site that actually refuses. There are four topology
+        # assignments in this file and only these two build a strip pipeline: the
+        # display pair loop below (i & 2 selects a strip for half of the four) and
+        # the HDR pair, which is a strip unconditionally. An earlier version of
+        # this patch changed the *draw* path instead - the expression that picks a
+        # pipeline index from the primitive type - which cannot help, because the
+        # refusal happens when the pipeline is created, before any draw.
+        #
+        # Both loops now build lists. The vertices are expanded into lists in
+        # gfx_display_vk_draw above, so a draw that names a strip still produces
+        # list geometry - which is what the driver decodes.
         "gfx/drivers/vulkan.c",
-        "                 ((draw->prim_type == GFX_DISPLAY_PRIM_TRIANGLESTRIP) << 1)\n",
-        "                 /* patches/series 0011: always the list pipeline, because the\n"
-        "                  * vertices were expanded into a list above. */\n"
-        "                 0u << 1\n",
-        "0u << 1",
+        "      input_assembly.topology = i & 2 ?\n"
+        "         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP :\n"
+        "         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n",
+        "      /* patches/series 0011: lists only; the decoder builds nothing else. */\n"
+        "      input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n",
+        "lists only; the decoder builds nothing else",
+    ),
+    (
+        # The HDR pair, a strip unconditionally.
+        "gfx/drivers/vulkan.c",
+        "   /* Build display hdr pipelines. */\n"
+        "   for (i = 4; i < 6; i++)\n"
+        "   {\n"
+        "      input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;\n",
+        "   /* Build display hdr pipelines. */\n"
+        "   for (i = 4; i < 6; i++)\n"
+        "   {\n"
+        "      /* patches/series 0011: lists only, as above. */\n"
+        "      input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n",
+        "lists only, as above",
+    ),
+    (
+        # The fourth and last topology site: the shader-menu pipelines at indices
+        # 6 and up, which to_menu_pipeline selects when a shader preset provides a
+        # menu. Half of them are strips for the same reason the display pair was.
+        "gfx/drivers/vulkan.c",
+        "      input_assembly.topology = i & 1 ?\n"
+        "         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP :\n"
+        "         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n",
+        "      /* patches/series 0011: the shader-menu pipelines are lists too. */\n"
+        "      input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n",
+        "the shader-menu pipelines are lists too",
     ),
     (
         # qb/config.params.sh declares the default state of every optional
@@ -402,8 +436,8 @@ EDITS = [
         "           * The config cannot make this choice: content loading rebuilds\n"
         "           * argv and drops the title's `-c`, so /app0/retroarch.cfg's\n"
         "           * video_driver is never parsed. */\n"
-        "          return \"ps5\";",
-        "return \"ps5\";",
+        "          return \"vulkan\";",
+        "return \"vulkan\";",
     ),
     (
         # The console's pad is this build's input driver, so it is also the
