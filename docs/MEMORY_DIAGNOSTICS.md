@@ -11,7 +11,7 @@ PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh
 ```
 
 The normal build (variable absent or `0`) compiles out the observer. The diagnostic
-adds `PS5_MEMORY_DIAGNOSTICS` to the title definitions and
+adds `PS5_MEMORY_DIAGNOSTICS` to the title and frontend definitions and
 `--wrap=posix_memalign` to the existing malloc/calloc/realloc/free wrappers because
 Mesa's default Vulkan host allocator uses aligned native allocations. Mode and
 archive contents participate in the runtime build identity.
@@ -38,7 +38,8 @@ These tests do not establish console stability or identify the memory consumer.
 
 ## Manual console test — only when the owner is ready
 
-Do not upload, launch, change live settings, or stop another title automatically.
+Uploads are authorized after checking the console is idle. A launch requires
+owner intervention; do not change live settings or stop another title automatically.
 Start a passive klog listener before the owner's reproduction and preserve the
 existing logs first. Deploy the diagnostic using the project's normal folder
 procedure, preserving live configuration and user content. The owner launches it.
@@ -90,6 +91,55 @@ and count; `site_records_omitted` reports overflow of the separate 2,048-site
 aggregation table. They are not full stack traces. No frame means no periodic
 sample; rate-limited allocation failures still write synchronously. Clean frontend return
 writes `final`; a crash need not.
+
+### First-failure allocation owners and XMB state
+
+The first observed allocation failure additionally emits, once per process:
+
+- `first-failure-caller`: up to 16 largest live caller groups **per route**,
+  with `route=0` native, `1` mapped and `2` aligned. These separate rankings keep
+  large mappings from hiding the native consumers. Counts/bytes are live requests,
+  not cumulative allocation traffic. Groups beyond the top 16 are not printed;
+  `site_records_omitted` separately indicates aggregation-table overflow.
+- `first-failure-xmb`: the last cached numeric context and insertion progress,
+  current node counters, and native requested bytes/count at failure.
+- `first-failure-xmb-history`: the last eight boundary events, oldest first,
+  including native requested bytes/count as observed at each event. Navigation
+  itself only updates a fixed in-memory ring: there is no per-entry file I/O.
+
+`tab` is the horizontal category index, `kind` the configured source's
+`XMB_SYSTEM_TAB_*` enum (UINT_MAX for a custom tab). Optional compiled features
+affect enum numbering; decode against the matching configured source. `current`,
+`old` and `horizontal` are the latest observed selection-list, animation-list and
+horizontal-list sizes. `list_size` refers to the list at the recorded operation.
+`index` is the insertion offset, copied-entry count for copy phases, or selection
+index for cache/populate phases. No strings, entry names or content paths are
+captured. A zero phase means no XMB context has been observed yet.
+
+Phases: 1 cache begin, 2 destination selected, 3 copy begin, 4 copy end,
+5 clear begin, 6 clear end, 7 before insert, 8 populated. Clear boundaries
+surround XMB node cleanup; callbacks/entry strings are freed subsequently by
+the menu layer. Sizes are observations, not pointers reread from an allocation
+failure callback. In particular, clear-end size can still be the old entry
+count, and current/old sizes remain cached until the next context hook.
+`ms` is the last stage observation's timestamp; the enclosing `failure` row
+gives the actual failure time. For failure on another thread this is the last
+observed frontend state, not an assertion that that thread was rebuilding XMB.
+
+`nodes` counts successful XMB node allocations/copies minus observed node frees;
+`created`, `copied` and `freed` are cumulative. `unmatched_frees` marks incomplete
+node accounting. This supplements allocator ownership; it does not replace it
+or classify GPU allocations. The failure path never calls frontend code or
+dereferences cached frontend pointers. Existing failure rate limits still apply;
+the expanded snapshot is not repeated during the failure storm.
+
+Host coverage wraps the eight-event ring, injects insertion context, separates
+same-address callers across all three routes, caps output at 48 owner rows, and
+checks that 10,006 failures emit only one expanded snapshot and five ordinary
+failure records (<20 KiB total in the test). It also verifies that navigation
+hooks write no bytes and normal-build C macros do not evaluate their arguments.
+The linked diagnostic inspection checks that the actual frontend XMB object
+references all three hooks. These checks are not console acceptance.
 
 The first console run showed why failure logging must be bounded: menu-entry
 allocation retries produced 12,793 failure records and summaries (5.4 MB) before

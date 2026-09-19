@@ -94,3 +94,6 @@
 0077-vulkan-menu-colour-and-cached-frame-ownership
 
 0078-crop-padded-core-source
+
+# Opt-in, bounded first-failure XMB context; no allocator or menu policy change.
+0079-observe-xmb-allocation-context

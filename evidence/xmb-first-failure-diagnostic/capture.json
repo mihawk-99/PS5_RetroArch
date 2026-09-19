@@ -1,0 +1,18 @@
+{
+  "step": "xmb-first-failure-diagnostic",
+  "recorded": "2026-09-19",
+  "revision": "7019dae plus this diagnostic step",
+  "command": "PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh; python3 tools/check-memory-diagnostics.py",
+  "raw_capture": "klog/xmb-first-failure-verify-final.log",
+  "lines": [
+    "Diagnostic identity: e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00.",
+    "All five host gates passed; 69 tests; 278 of 278 frontend sources compiled.",
+    "Host failure injection: 10006 failures, five ordinary failure records, one expanded first-failure snapshot; 9404 bytes total.",
+    "Expanded snapshot: last eight boundary events, 48 owner rows (16 per route), numeric XMB tab/list/progress/node counters.",
+    "Navigation hooks wrote zero bytes; normal-build C hooks did not evaluate arguments.",
+    "Actual configured XMB object references all three diagnostic hooks; exact ELF and driver archive hashes saved.",
+    "libps5vk hash differs from previous console capture; three other driver archive hashes match. PS5_Vulkan was not modified.",
+    "Console runtime verification pending; no launch attempted.",
+    "Console confirmed idle; upload and readback passed; previous logs preserved. No launch attempted."
+  ]
+}

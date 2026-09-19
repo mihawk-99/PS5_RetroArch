@@ -4,50 +4,45 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The bounded allocation diagnostic captured the original XMB crash.** Branch:
-`codex/xmb-allocation-diagnostics`. This is a diagnostic result, not a crash fix.
-Uploads are authorized; launch only with owner intervention. Owner authorized this
-run and reports crash reproduced. Final logs are preserved; capture is stopped.
+**The first-failure XMB diagnostic is built and host-verified.** Branch:
+`codex/xmb-allocation-diagnostics`. It is instrumentation, not a crash fix.
+Uploaded after confirming idle; readback passed and previous logs preserved.
+A launch requires owner intervention. No new launch.
 
-- Running identity: `a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be`.
-- Raw: `klog/xmb-memory-run-20260919-184732/`; evidence:
-  `evidence/xmb-memory-crash/`. Exact symbols: `klog/xmb-memory-a4a751e58339/`.
-- Kernel records one post-launch SIGSEGV: NULL write in Mesa `__vk_log_impl`.
-  Stack matches the original crash: XMB wallpaper/context update, texture unload,
-  `vkQueueWaitIdle`, allocation-error reporting, NULL dereference.
-- Allocation log is 3,217 bytes. First failure: 6,429 ms, 15,488-byte request in
-  `xmb_list_insert` (inlined `xmb_alloc_node`). Native requested bytes rise from
-  4,625,679 at 5 s to 11,616,951 at first failure; tracked mappings stay 5,498,938.
-  Image creations minus destructions stay 131. dropped=0; native coverage remains
-  incomplete because system-internal allocations are not intercepted.
-- Only first four failures are logged immediately, so subsequent failures before
-  this crash may be suppressed. Their absence is not proof of successful calls.
-- This reproduces the original failure without the first diagnostic's log flood.
-  It does not establish heap limit, fragmentation, leak or corruption as cause.
-- Owner clarifies reproduction: holding left/right between XMB tabs.
-- Local investigation: `docs/XMB_ALLOCATION_INVESTIGATION.md`, evidence in
-  `evidence/xmb-allocation-investigation/`. 10,000 synthetic list replacements
-  show no ordinary-node accumulation; 15,360 of each 15,488-byte node are path
-  arrays. Missing wallpaper updates can recreate the white texture every time.
-  The 6,991,272-byte console rise is not yet attributed; next diagnostic needs
-  first-failure caller totals and bounded tab/list/node counts. No new launch,
-  application build or driver edit. Do not switch away from XMB/Vulkan.
-- First diagnostic `000adf3edc25` froze; owner manually closed it. Raw:
-  `klog/xmb-memory-run-20260919-183305/`. It emitted 12,793 failure records plus
-  summaries / 5,404,264 bytes. Bounded logging corrected that diagnostic defect.
+- Ready identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
+- Evidence: `evidence/xmb-first-failure-diagnostic/`; symbols, map, manifest,
+  executable, host capture and inspection: `klog/xmb-first-failure/`.
+- First failure emits live caller owners, ranked separately for native/mapped/
+  aligned routes (up to 16 each), cached tab/list/progress/node counters and the
+  previous eight transition boundaries with native usage. No per-entry log I/O.
+- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh`: all five gates pass, 69 tests,
+  278/278 frontend sources. Log: `klog/xmb-first-failure-verify-final.log`.
+  Inspection proves the actual XMB object references all three hooks.
+- Injected 10,006 failures: five ordinary failure records, one expanded snapshot,
+  eight history rows, 48 owners, 9,404 bytes. Normal-build hooks are inert.
+- Linked libps5vk hash is now `8c2a1c46a38ea935edf496c807c100e26b8a32d5aec725179983f46b3f626906`;
+  the prior run used `900d496a9eb725857e4a70540d34ef262dcb1d5c85b7ed9325a28d16b460e246`.
+  Other three archive hashes match. Stable local copies linked; driver unmodified.
+- Initial gate attempt hit the deliberate patch-count check (139 -> 150 for 11
+  new anchors). Updated count, reran successfully; no unexplained gate failure.
+- Procedure, phase/counter meanings and stale-context limits:
+  `docs/MEMORY_DIAGNOSTICS.md`. Next run: capture klog before launching; owner
+  holds left/right between XMB tabs. Preserve logs before any relaunch.
 
-## Diagnostic readiness and limits
+## Prior failure and local attribution limits
 
-- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five host gates,
-  68 tests; `tools/check-memory-diagnostics.py` passed. Raw build log:
-  `klog/xmb-memory-bounded-verify.log`. Output remains `dist/PPSA99169/`.
-- First four failures are immediate; thereafter one detail/summary per five
-  seconds, every failure counted. Injected-clock test: 10,006 failures, five
-  records, 10,001 suppressed, <8 KiB. No allocator policy changes.
-- Four linked archive hashes match the first diagnostic (which already used a
-  newer libps5vk than the original baseline). PS5_Vulkan remains unmodified.
-- Procedure/coverage: `docs/MEMORY_DIAGNOSTICS.md`. The diagnostic itself now ran
-  and captured the crash; this does not accept application stability.
+- Bounded diagnostic `a4a751e58339` reproduced SIGSEGV / NULL write in Mesa
+  `__vk_log_impl`, through white-texture unload and queue-idle allocation error.
+  Raw: `klog/xmb-memory-run-20260919-184732/`; `evidence/xmb-memory-crash/`.
+- First failed request: 15,488 bytes in xmb_list_insert at 6,429 ms. Native live
+  requests rise 4,625,679 -> 11,616,951; tracked mappings remain 5,498,938 and net
+  frontend image count 131. The 6,991,272-byte increase remains unattributed.
+- `docs/XMB_ALLOCATION_INVESTIGATION.md`: 10,000 synthetic tab replacements show
+  no ordinary-node accumulation. Each node holds 15,360 bytes of path arrays;
+  missing wallpaper updates can recreate the white texture repeatedly.
+- First unbounded diagnostic froze; owner manually closed it. Its failure-log
+  flood was corrected. This does not prove a heap limit, fragmentation or leak.
+- Do not switch away from XMB/Vulkan. Console runtime verification remains pending.
 
 ## Previous console-verified baseline (Genesis Plus GX)
 

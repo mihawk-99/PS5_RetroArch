@@ -18,10 +18,16 @@ def inspect():
     symbols = subprocess.check_output(['llvm-nm', '-C', str(elf)], text=True)
     required = ('__wrap_malloc', '__wrap_calloc', '__wrap_realloc', '__wrap_free',
                 '__wrap_posix_memalign', 'ps5::memory::init(', 'ps5::memory::failure(',
-                'ps5::memory::tick(', 'memory_create(', 'memory_destroy(', 'memory_idle(')
+                'ps5::memory::tick(', 'memory_create(', 'memory_destroy(', 'memory_idle(',
+                'ps5_memory_xmb_context', 'ps5_memory_xmb_stage', 'ps5_memory_xmb_node')
     missing = [name for name in required if name not in symbols]
     if missing:
         raise SystemExit('Diagnostic symbol missing: ' + ', '.join(missing))
+    xmb_object = ROOT / 'build/ra/obj/menu_drivers_xmb.c.o'
+    xmb_symbols = subprocess.check_output(['llvm-nm', str(xmb_object)], text=True)
+    hooks = ('ps5_memory_xmb_context', 'ps5_memory_xmb_stage', 'ps5_memory_xmb_node')
+    if any(not re.search(r'\bU ' + hook + r'$', xmb_symbols, re.M) for hook in hooks):
+        raise SystemExit('Configured XMB object does not call every diagnostic hook')
     identity = re.search(r'build identity: ([a-f0-9]{64})',
                          (ROOT / 'build/title_build_identity.h').read_text()).group(1)
     hashes = {}
@@ -34,8 +40,9 @@ def inspect():
             raise SystemExit('Driver snapshot digest mismatch: ' + name)
     return {'kind': 'host-only-diagnostic-inspection', 'passed': True,
             'build_identity': identity, 'symbols_present': list(required),
+            'frontend_xmb_hook_references': list(hooks),
             'artifacts_sha256': hashes, 'driver_archives_sha256': archives,
-            'console_test': 'pending; owner requested no automatic upload or launch'}
+            'console_test': 'pending; uploads authorized, launch requires owner intervention'}
 
 
 if __name__ == '__main__':

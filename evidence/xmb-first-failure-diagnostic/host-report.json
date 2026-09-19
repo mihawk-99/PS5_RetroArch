@@ -1,0 +1,462 @@
+{
+  "kind": "host failure-injection test; not console acceptance",
+  "log_bytes": 9404,
+  "first_failure_snapshots": 1,
+  "context": [
+    {
+      "seq": "3",
+      "event": "20",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "7",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "500",
+      "index": "499",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "20313",
+      "native_count": "21"
+    }
+  ],
+  "history": [
+    {
+      "seq": "3",
+      "event": "13",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "12",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "14",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "13",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "15",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "14",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "16",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "15",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "17",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "16",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "18",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "17",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "19",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "18",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    },
+    {
+      "seq": "3",
+      "event": "20",
+      "ms": "5000",
+      "tab": "3",
+      "kind": "2",
+      "phase": "6",
+      "current": "500",
+      "old": "8",
+      "horizontal": "10",
+      "list_size": "19",
+      "index": "0",
+      "nodes": "1",
+      "created": "1",
+      "copied": "1",
+      "freed": "1",
+      "unmatched_frees": "0",
+      "native_bytes": "123",
+      "native_count": "1"
+    }
+  ],
+  "owners_by_route": {
+    "0": [
+      {
+        "bytes": "1019",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1018",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1017",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1016",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1015",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1014",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1013",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1012",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1011",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1010",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1009",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1008",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1007",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1006",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1005",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1004",
+        "count": "1",
+        "site_records_omitted": "0"
+      }
+    ],
+    "1": [
+      {
+        "bytes": "1019",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1018",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1017",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1016",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1015",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1014",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1013",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1012",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1011",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1010",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1009",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1008",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1007",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1006",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1005",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1004",
+        "count": "1",
+        "site_records_omitted": "0"
+      }
+    ],
+    "2": [
+      {
+        "bytes": "1019",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1018",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1017",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1016",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1015",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1014",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1013",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1012",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1011",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1010",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1009",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1008",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1007",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1006",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1005",
+        "count": "1",
+        "site_records_omitted": "0"
+      },
+      {
+        "bytes": "1004",
+        "count": "1",
+        "site_records_omitted": "0"
+      }
+    ]
+  },
+  "final": {
+    "seq": "8",
+    "ms": "10000",
+    "native_bytes": "0",
+    "native_count": "0",
+    "native_peak": "2097152",
+    "mapped_bytes": "0",
+    "mapped_count": "0",
+    "mapped_peak": "2097152",
+    "aligned_bytes": "0",
+    "aligned_count": "0",
+    "aligned_peak": "20190",
+    "failures": "10006",
+    "failure_records": "5",
+    "failure_suppressed": "10001",
+    "dropped": "1",
+    "foreign_frees": "2",
+    "foreign_reallocs": "1",
+    "image_create": "1",
+    "image_destroy": "1",
+    "image_failed": "0",
+    "idle_begin": "1",
+    "idle_end": "1",
+    "idle_failed": "1"
+  }
+}

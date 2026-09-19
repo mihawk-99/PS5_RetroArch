@@ -2447,3 +2447,42 @@ it requires another owner-authorized launch.
 Verification: `bash tools/verify.sh format evidence` passes format and all 27
 evidence replays; `git diff --check` passes. Product build/integration gates
 were not rerun because this step changes only offline tooling and documentation.
+
+
+## 2026-09-19 — Bounded first-failure owners and XMB context
+
+Added opt-in numeric context hooks before XMB allocation, list copy/clear,
+destination selection and populate. A fixed eight-entry history records
+boundary sizes and native requests; insertion updates one cached progress
+snapshot. Node constructor/copy/free counters supplement the allocator table.
+The first failure emits these plus up to 16 live caller groups per route, once.
+No frontend callbacks or cached pointers are dereferenced by the failure logger.
+Navigation writes no log bytes; ordinary failures retain their existing rate limit.
+
+Patch 0079 adds 11 anchors, intentionally changing the patch-count expectation
+from 139 to 150. The first gate attempt failed that check, then the corrected
+full run passed. PS5_MEMORY_DIAGNOSTICS now also enables the frontend hooks; this
+flag is in the existing build fingerprint so switching modes recompiles the
+frontend. No dependency, allocator policy, menu behavior or driver source changed.
+
+`PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five gates, 69 tests,
+278/278 frontend sources. Log: `klog/xmb-first-failure-verify-final.log`.
+`python3 tools/check-memory-diagnostics.py` verified title symbols, references
+from the actual XMB object and stable archive copies. The injected-clock test
+captures 10,006 failures, five ordinary records, one expanded snapshot, eight
+history entries, 48 owner rows and 9,404 bytes. Ring wrap, owner-route separation,
+rank caps, zero navigation I/O and inert normal-build C hooks are verified.
+`bash tools/verify.sh format evidence` and `git diff --check` also pass.
+
+Build: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
+Evidence: `evidence/xmb-first-failure-diagnostic/`; exact ELF/map/executable,
+inspection and raw captures: `klog/xmb-first-failure/`. The linked libps5vk
+archive changed from the previous run's 900d496a9eb7 prefix to 8c2a1c46a38e;
+three other archive hashes match. Full hashes are in inspection.json. The
+owner develops the driver concurrently; PS5_Vulkan was not modified here.
+
+Console was confirmed idle, previous logs/config preserved locally, and the
+verified build uploaded with readback through the normal deployment function.
+No title was launched or stopped. Runtime acceptance remains pending: the next
+owner-authorized run should capture klog, reproduce held left/right XMB tab
+switching, and preserve logs before relaunch. This is a diagnostic, not a crash fix.

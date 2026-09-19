@@ -1,4 +1,5 @@
 #include "src/memory_diagnostics.hpp"
+#include "src/memory_xmb.h"
 #include <cassert>
 #include <cerrno>
 #include <cstdlib>
@@ -6,6 +7,7 @@
 #include <thread>
 #include <vector>
 #include <time.h>
+#include <sys/stat.h>
 
 static uint64_t clock_ns = 1;
 extern "C" int __wrap_clock_gettime(clockid_t, timespec *t)
@@ -66,8 +68,30 @@ int main(int argc, char **argv)
     clock_ns += 5000000000ULL;
     tick();
     tick(); // Same instant must not emit a duplicate.
+    struct stat before_hooks{}, after_hooks{};
+    assert(!stat(argv[1], &before_hooks));
+    // Deliberately wrap the history ring before the first failure. No hook
+    // writes a row; the first failure must preserve only the latest eight.
+    ps5_memory_xmb_context(3, 2, 500, 8, 10);
+    ps5_memory_xmb_node(1);
+    ps5_memory_xmb_node(2);
+    ps5_memory_xmb_node(0);
+    for (unsigned i = 0; i < 20; ++i)
+        ps5_memory_xmb_stage(PS5_XMB_CLEAR_END, i, 0);
+    ps5_memory_xmb_stage(PS5_XMB_INSERT, 500, 499);
+    assert(!stat(argv[1], &after_hooks));
+    assert(before_hooks.st_size == after_hooks.st_size);
+    // Same caller can own allocations in different routes. Force each route
+    // over its output cap and verify that the first failure remains bounded.
+    for (unsigned r = 0; r < 3; ++r)
+        for (unsigned i = 0; i < 20; ++i)
+            add({reinterpret_cast<void *>(uintptr_t(0x10000 + r * 0x1000 + i * 16)), 1000 + i,
+                 0x8000 + i * 16, Route(r)});
     fail_realloc = true;
     assert(!__wrap_realloc(p, 456) && errno == ENOMEM);
+    for (unsigned r = 0; r < 3; ++r)
+        for (unsigned i = 0; i < 20; ++i)
+            take(reinterpret_cast<void *>(uintptr_t(0x10000 + r * 0x1000 + i * 16)));
     assert(p[122] == 37 && snapshot().bytes[0] == 123);
     fail_realloc = false;
     p = static_cast<char *>(__wrap_realloc(p, 2 * 1024 * 1024));
@@ -94,6 +118,7 @@ int main(int argc, char **argv)
     fail_malloc = false;
     assert(!__wrap_calloc(SIZE_MAX, 2));
     // Reproduce a menu allocation failure storm without flooding synchronous I/O.
+    ps5_memory_xmb_context(99, 99, 0, 0, 0); // Must not overwrite first-failure rows.
     for (int i = 0; i < 10000; ++i)
         failure("storm", 15488, 0, 0x2345, ENOMEM);
     assert(snapshot().failures == 10005 && snapshot().failure_records == 4);

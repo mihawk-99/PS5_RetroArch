@@ -1,0 +1,13 @@
+{
+  "step": "xmb-first-failure-diagnostic",
+  "note": "Host-verified opt-in instrumentation; not a crash fix or console acceptance.",
+  "must_contain": [
+    "All five host gates passed; 69 tests",
+    "one expanded first-failure snapshot; 9404 bytes total",
+    "Navigation hooks wrote zero bytes",
+    "all three diagnostic hooks",
+    "no launch attempted"
+  ],
+  "must_not_contain": [],
+  "human_check": "Pending; no console launch authorized for this step."
+}

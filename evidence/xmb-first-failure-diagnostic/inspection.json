@@ -1,0 +1,38 @@
+{
+  "kind": "host-only-diagnostic-inspection",
+  "passed": true,
+  "build_identity": "e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00",
+  "symbols_present": [
+    "__wrap_malloc",
+    "__wrap_calloc",
+    "__wrap_realloc",
+    "__wrap_free",
+    "__wrap_posix_memalign",
+    "ps5::memory::init(",
+    "ps5::memory::failure(",
+    "ps5::memory::tick(",
+    "memory_create(",
+    "memory_destroy(",
+    "memory_idle(",
+    "ps5_memory_xmb_context",
+    "ps5_memory_xmb_stage",
+    "ps5_memory_xmb_node"
+  ],
+  "frontend_xmb_hook_references": [
+    "ps5_memory_xmb_context",
+    "ps5_memory_xmb_stage",
+    "ps5_memory_xmb_node"
+  ],
+  "artifacts_sha256": {
+    "build/llvm-pie.elf": "d3db797eea533a5d6c7241d5643f9a7d3685b3aca3d06c0c138788c19251af0e",
+    "build/title.map": "0938410464906665c18f6777344de56d817786a38e0d334ef59d8b46b8f8b484",
+    "dist/PPSA99169/eboot.bin": "379e6f681079962711fb693c0994b1fbf8d5a35e9303ff217c1c507fdbabb96b"
+  },
+  "driver_archives_sha256": {
+    "libps5vk.ps5.a": "8c2a1c46a38ea935edf496c807c100e26b8a32d5aec725179983f46b3f626906",
+    "libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7",
+    "libpsbc_driver.ps5.a": "a7605370c28895a3b5a13d0718ebfea2abf1b9cf842633de07533775745b21b8",
+    "libpsbc_support.ps5.a": "e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8"
+  },
+  "console_test": "pending; uploads authorized, launch requires owner intervention"
+}

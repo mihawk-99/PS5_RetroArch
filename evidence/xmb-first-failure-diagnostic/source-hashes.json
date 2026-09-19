@@ -1,0 +1,8 @@
+{
+  "src/memory_diagnostics.cpp": "89c7bdbd68dfea77dbd0ef5d70137300c73f4a1f6fae6068e4d82d5ad9740de4",
+  "src/memory_xmb.h": "5be89fab9fb968dd4cecf5798f6a4b426577580955ca4a1eb0b6be5b748bf999",
+  "tools/apply-port-patches.py": "532ceb9a9899ac5b6829f574487e345ced80e0618c58799f82092e35b74318ca",
+  "tools/build-retroarch.sh": "509504781861f7fda6285bf00c3b33862e414a2028e50f48c6539be64ce5564e",
+  "tests/memory_diagnostics_test.cpp": "0dd6a034be547f75b48fba9b41a58452d19fbb373fdf63e1ce509925578363ba",
+  "tests/test_memory_diagnostics.py": "4dea84b067f8b4bfcd1028b83c75d15e8de5ff8989a186e2cae999914dbf7345"
+}

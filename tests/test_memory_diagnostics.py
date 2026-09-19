@@ -8,6 +8,23 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class MemoryDiagnostics(unittest.TestCase):
+    def test_normal_build_xmb_hooks_are_inert_c(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'inert.c'
+            source.write_text('''#include "src/memory_xmb.h"
+int main(void) {
+    unsigned calls = 0;
+    ps5_memory_xmb_context(++calls, ++calls, ++calls, ++calls, ++calls);
+    ps5_memory_xmb_stage(++calls, ++calls, ++calls);
+    ps5_memory_xmb_node(++calls);
+    return calls != 0;
+}
+''')
+            binary = Path(directory) / 'inert'
+            subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I.',
+                            str(source), '-o', str(binary)], cwd=ROOT, check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_counts_failure_logging_and_ownership(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / 'diagnostics-test'
@@ -34,7 +51,27 @@ class MemoryDiagnostics(unittest.TestCase):
             self.assertEqual(fields['failures'], '10006')
             self.assertEqual(fields['failure_records'], '5')
             self.assertEqual(fields['failure_suppressed'], '10001')
-            self.assertLess(capture.stat().st_size, 8000)
+            rows = text.splitlines()
+            context = [line for line in rows if line.startswith('first-failure-xmb ')]
+            self.assertEqual(len(context), 1)
+            for field in ('tab=3', 'kind=2', 'phase=7', 'current=500', 'old=8',
+                          'horizontal=10', 'list_size=500', 'index=499', 'nodes=1',
+                          'created=1', 'copied=1', 'freed=1', 'unmatched_frees=0'):
+                self.assertIn(' ' + field + ' ', context[0] + ' ')
+            history = [line for line in rows if line.startswith('first-failure-xmb-history ')]
+            self.assertEqual(len(history), 8)
+            for i, line in enumerate(history):
+                self.assertIn(f' event={i + 13} ', line)
+                self.assertIn(f' list_size={i + 12} ', line)
+            owners = [dict(field.split('=') for field in line.split()[1:])
+                      for line in rows if line.startswith('first-failure-caller ')]
+            self.assertEqual(len(owners), 48)
+            for route in range(3):
+                group = [o for o in owners if o['route'] == str(route)]
+                self.assertEqual(len(group), 16)
+                self.assertEqual([int(o['bytes']) for o in group], list(range(1019, 1003, -1)))
+                self.assertTrue(all(o['count'] == '1' for o in group))
+            self.assertLess(capture.stat().st_size, 20000)
             self.assertEqual(fields['image_create'], fields['image_destroy'])
             self.assertEqual(fields['idle_failed'], '1')
 

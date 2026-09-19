@@ -120,6 +120,14 @@ defines+=(
     -DCORE_INFO_DIR='"/app0/info"'
 )
 
+# XMB must cache its numeric context before allocation can fail. Keep these
+# hooks in the same opt-in mode as the title observer; the flag is fingerprinted.
+case "${PS5_MEMORY_DIAGNOSTICS:-0}" in
+    0) ;;
+    1) defines+=(-DPS5_MEMORY_DIAGNOSTICS) ;;
+    *) echo "PS5_MEMORY_DIAGNOSTICS must be 0 or 1" >&2; exit 2 ;;
+esac
+
 includes=(
     # The tree that is compiled comes first, both for its headers and for
     # config.h: every -I below names a directory inside it, so a quoted include

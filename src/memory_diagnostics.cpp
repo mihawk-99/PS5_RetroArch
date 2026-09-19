@@ -1,6 +1,7 @@
 /* Fixed-size metadata and stack-only formatting: diagnostics must survive OOM.
  * No native allocator calls, stdio, dynamic C++ containers or worker threads. */
 #include "memory_diagnostics.hpp"
+#include "memory_xmb.h"
 #ifdef PS5_MEMORY_DIAGNOSTICS
 #include <cerrno>
 #include <cstring>
@@ -23,6 +24,16 @@ int output = -1;
 uint64_t start_ns = 0, next_ns = 0, sequence = 0, failure_next_ns = 0;
 uint64_t image_create = 0, image_destroy = 0, image_failed = 0;
 uint64_t idle_begin = 0, idle_end = 0, idle_failed = 0;
+struct XmbState
+{
+    uint64_t tab = 0, kind = 0, current = 0, old = 0, horizontal = 0;
+    uint64_t phase = 0, list_size = 0, index = 0, ms = 0;
+    uint64_t nodes = 0, created = 0, copied = 0, freed = 0, unmatched_frees = 0;
+    uint64_t native_bytes = 0, native_count = 0;
+};
+XmbState xmb;
+XmbState xmb_history[8];
+uint64_t xmb_events = 0;
 
 uint64_t now()
 {
@@ -110,7 +121,7 @@ void summary(const char *kind)
 }
 // Fixed aggregation table: caller attribution may overflow independently of
 // the live-pointer table. Report that explicitly, never silently lose counts.
-void callers()
+void callers(const char *kind = "caller", int route = -1, unsigned limit = 8)
 {
     struct Site
     {
@@ -124,6 +135,8 @@ void callers()
         if (states[i] != 1)
             continue;
         const Record &r = records[i];
+        if (route >= 0 && unsigned(r.route) != unsigned(route))
+            continue;
         size_t j = (r.caller >> 4) & 2047, tries = 0;
         while (sites[j].count && sites[j].caller != r.caller && tries < 2048)
         {
@@ -139,7 +152,7 @@ void callers()
         sites[j].bytes += r.bytes;
         ++sites[j].count;
     }
-    for (unsigned rank = 0; rank < 8; ++rank)
+    for (unsigned rank = 0; rank < limit; ++rank)
     {
         size_t best = 0;
         for (size_t i = 1; i < 2048; ++i)
@@ -148,8 +161,10 @@ void callers()
         if (!sites[best].count)
             break;
         Line line;
-        line.text("caller");
+        line.text(kind);
         line.field("seq", sequence);
+        if (route >= 0)
+            line.field("route", unsigned(route));
         line.text(" pc=0x");
         line.number(sites[best].caller, 16);
         line.field("bytes", sites[best].bytes);
@@ -158,6 +173,30 @@ void callers()
         line.emit();
         sites[best] = {};
     }
+}
+void xmb_line(const char *kind, const XmbState &s, uint64_t event)
+{
+    Line line;
+    line.text(kind);
+    line.field("seq", sequence);
+    line.field("event", event);
+    line.field("ms", s.ms);
+    line.field("tab", s.tab);
+    line.field("kind", s.kind);
+    line.field("phase", s.phase);
+    line.field("current", s.current);
+    line.field("old", s.old);
+    line.field("horizontal", s.horizontal);
+    line.field("list_size", s.list_size);
+    line.field("index", s.index);
+    line.field("nodes", s.nodes);
+    line.field("created", s.created);
+    line.field("copied", s.copied);
+    line.field("freed", s.freed);
+    line.field("unmatched_frees", s.unmatched_frees);
+    line.field("native_bytes", s.native_bytes);
+    line.field("native_count", s.native_count);
+    line.emit();
 }
 } // namespace
 void add(Record record)
@@ -244,6 +283,20 @@ void failure(const char *operation, size_t bytes, size_t alignment, uintptr_t ca
         line.number(caller, 16);
         line.emit();
         summary("failure-summary");
+        if (stats.failures == 1)
+        {
+            // Cache numeric state before allocations; never call frontend code
+            // or dereference its lists from this allocator failure path.
+            XmbState first = xmb;
+            first.native_bytes = stats.bytes[0];
+            first.native_count = stats.count[0];
+            xmb_line("first-failure-xmb", first, xmb_events);
+            const uint64_t begin = xmb_events > 8 ? xmb_events - 8 : 0;
+            for (uint64_t i = begin; i < xmb_events; ++i)
+                xmb_line("first-failure-xmb-history", xmb_history[i % 8], i + 1);
+            for (int route = 0; route < 3; ++route)
+                callers("first-failure-caller", route, 16);
+        }
     }
     pthread_mutex_unlock(&mutex);
     errno = saved;
@@ -326,4 +379,61 @@ void finish()
     errno = saved;
 }
 } // namespace ps5::memory
+
+extern "C" void ps5_memory_xmb_context(unsigned tab, unsigned kind, size_t current, size_t old,
+                                       size_t horizontal)
+{
+    using namespace ps5::memory;
+    const int saved = errno;
+    pthread_mutex_lock(&mutex);
+    xmb.tab = tab;
+    xmb.kind = kind;
+    xmb.current = current;
+    xmb.old = old;
+    xmb.horizontal = horizontal;
+    pthread_mutex_unlock(&mutex);
+    errno = saved;
+}
+extern "C" void ps5_memory_xmb_stage(unsigned phase, size_t list_size, size_t index)
+{
+    using namespace ps5::memory;
+    const int saved = errno;
+    pthread_mutex_lock(&mutex);
+    xmb.phase = phase;
+    xmb.list_size = list_size;
+    xmb.index = index;
+    xmb.ms = (now() - start_ns) / 1000000;
+    xmb.native_bytes = stats.bytes[0];
+    xmb.native_count = stats.count[0];
+    // Per-entry progress replaces a single snapshot; only boundaries enter
+    // the fixed ring. Nothing is written on the navigation path.
+    if (phase != PS5_XMB_INSERT)
+        xmb_history[xmb_events++ % 8] = xmb;
+    pthread_mutex_unlock(&mutex);
+    errno = saved;
+}
+extern "C" void ps5_memory_xmb_node(unsigned operation)
+{
+    using namespace ps5::memory;
+    const int saved = errno;
+    pthread_mutex_lock(&mutex);
+    if (operation)
+    {
+        ++xmb.nodes;
+        if (operation == 2)
+            ++xmb.copied;
+        else
+            ++xmb.created;
+    }
+    else
+    {
+        ++xmb.freed;
+        if (xmb.nodes)
+            --xmb.nodes;
+        else
+            ++xmb.unmatched_frees;
+    }
+    pthread_mutex_unlock(&mutex);
+    errno = saved;
+}
 #endif

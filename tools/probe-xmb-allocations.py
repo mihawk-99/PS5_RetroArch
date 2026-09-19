@@ -57,6 +57,7 @@ def main():
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include "memory_xmb.h"
 #include "menu/menu_driver.h"
 #include "gfx/gfx_thumbnail.h"
 #include <string/stdstring.h>
@@ -156,6 +157,7 @@ int main(void) {
         source.write_text(preamble + xmb[types_start:types_end] + bodies + experiment)
         binary = Path(td) / 'probe'
         subprocess.run(['cc', '-std=gnu11', '-O1', '-g', '-fsanitize=address,undefined',
+                        '-I' + str(ROOT / 'src'),
                         '-I' + str(root), '-I' + str(root / 'libretro-common/include'),
                         str(source), '-o', str(binary)], check=True)
         # The desktop sandbox uses ptrace, which LeakSanitizer cannot inspect.
