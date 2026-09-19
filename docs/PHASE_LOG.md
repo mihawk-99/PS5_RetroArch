@@ -1412,3 +1412,23 @@ Next step, in order: print the viewport and the dump's result from the capture p
 more line in the trace, which separates "no viewport" from "writer refused"), and if the
 viewport is the zero one, call the driver's `read_viewport` directly and write a PPM from
 the port's own code - a PPM is a header and the bytes, so no frontend writer is involved.
+
+## 2026-09-19 - reading the frame back in the port's own code: first attempt does not compile
+
+The next step from the last entry was tried: patch 0031 rewritten to call the driver's
+`vulkan_read_viewport` directly from `vulkan_frame` and write a PPM (header plus bytes)
+from the port's own code, with a forward declaration of the driver's static
+`vulkan_read_viewport`. The intention was to take the frontend's screenshot writer out of
+the path entirely, since three runs showed it bails before the driver is asked.
+
+It does not compile; the frontend build reports one source missing and the link fails on
+`vulkan_raster_font` (the missing object's symbols):
+
+    /home/mihawk/Desktop/PS5_Homebrews/PS5_RetroArch/build/ra-conf/gfx/drivers/vulkan.c:4695:7: error: function declared in block scope cannot have 'static' storage class
+
+The rewrite was reverted rather than pushed further: `tools/apply-port-patches.py` is back
+to the committed 0031 (the verified `take_screenshot` trigger), the configured tree is
+rebuilt from that, and `make test-unit` is green. The lesson for the next attempt is in
+the error itself - the local declaration and the driver's own definition have to agree
+exactly, and a `static` forward declaration inside a function body is where that attempt
+went wrong.

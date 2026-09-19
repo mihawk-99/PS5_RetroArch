@@ -45,16 +45,17 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **The pixels: the frontend's writer fails before the driver is asked.** Patch 0031's
+1. **The pixels: read the frame back in the port's own code - carefully.** Patch 0031's
    trigger works every run (`capture: frame 90 of 90, take_screenshot -> failed`), and
-   three runs - `.png`, `.bmp`, and with `video_gpu_screenshot = "true"` published - all
-   failed with **no** new `vulkan:` message in the trace, which is where the driver's
-   messenger writes every refusal. So `take_screenshot_viewport` bails before
-   `read_viewport`: its silent paths are `video_driver_get_viewport_info` reporting a zero
-   width/height and `malloc` failing. Next: add one trace line to the capture patch
-   printing the viewport and the dump's result; if the viewport is zero, call the driver's
-   `read_viewport` from the port's own code and write a PPM (header plus bytes, no
-   frontend writer involved), then read it back over FTP and look at it.
+   three runs (`.png`, `.bmp`, and with `video_gpu_screenshot = "true"` published) failed
+   with **no** new `vulkan:` message in the trace, so the frontend's writer bails before
+   the driver is asked (`take_screenshot_viewport`'s silent paths: a zero viewport from
+   `video_driver_get_viewport_info`, or a failed `malloc`). The first attempt at the
+   replacement - call `vulkan_read_viewport` from `vulkan_frame` and write a PPM - did not
+   compile (a `static` forward declaration inside the function body; see
+   `docs/PHASE_LOG.md`, 2026-09-19) and was reverted. Retry it with the declaration at
+   file scope next to the driver's own prototype (`gfx/drivers/vulkan.c:1239` has the
+   pattern), then read the PPM back over FTP and look at it.
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).

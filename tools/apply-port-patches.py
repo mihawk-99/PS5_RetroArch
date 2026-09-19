@@ -970,26 +970,22 @@ EDITS = [
         "patches/series, 0028",
     ),
     (
-        # The capture, on the one path every frame takes. `vulkan_frame` is called 644
-        # times in an unattended run, and the frontend's own `--max-frames-ss` block is
-        # never reached by a content-less menu run (docs/PHASE_LOG.md, 2026-09-19), so the
-        # count and the screenshot live here. The budget and the path are the port's own
-        # options in /app0/args.txt - `--ps5-capture=N` and `--ps5-capture-path=FILE`, which
-        # src/main.cpp keeps away from RetroArch's own option parsing - so a run without
-        # them never takes a picture. The screenshot is the Vulkan driver's readback
-        # (vulkan_readback), and the trace line says whether it worked.
+        # The capture, on the one path every frame takes. `vulkan_frame` is called every
+        # frame, and the frontend's own screenshot path never reaches the driver on a
+        # content-less run (docs/PHASE_LOG.md, 2026-09-19). So the port asks the driver
+        # itself - `vulkan_read_viewport` is the driver's own readback - and writes the
+        # bytes out as a PPM: a header and the pixels, with no frontend writer in the way.
+        # The budget and the path are the port's own options in /app0/args.txt, which
+        # src/main.cpp keeps away from RetroArch's option parsing, so a run without them
+        # never takes a picture. The trace line names the viewport and whether it worked.
         "gfx/drivers/vulkan.c",
-        "   int i, j, k;\n"
-        "   VkSubmitInfo submit_info;\n"
-        "   VkClearValue clear_color;\n",
+        "   vulkan_filter_chain_t *filter_chain           = NULL;\n",
         "   /* Added by this port (patches/series, 0031): see the note above this edit. */\n"
         "   {\n"
         "      static int      ps5_capture_budget = -1;\n"
         "      static unsigned ps5_capture_frames;\n"
         "      static bool     ps5_capture_taken;\n"
-        "      static char     ps5_capture_file[512] = \"/app0/shot.png\";\n"
-        "      extern bool take_screenshot(const char *screenshot_dir, const char *path,\n"
-        "            bool silence, bool has_valid_framebuffer, bool fullpath, bool use_thread);\n"
+        "      static char     ps5_capture_file[512] = \"/app0/shot.ppm\";\n"
         "\n"
         "      if (ps5_capture_budget < 0)\n"
         "      {\n"
@@ -1022,19 +1018,61 @@ EDITS = [
         "\n"
         "         if (ps5_capture_frames >= (unsigned)ps5_capture_budget)\n"
         "         {\n"
-        "            bool  ps5_ok;\n"
-        "            FILE *ps5_trace;\n"
+        "            unsigned ps5_width  = vk->vp.width;\n"
+        "            unsigned ps5_height = vk->vp.height;\n"
+        "            uint8_t *ps5_pixels = NULL;\n"
+        "            bool     ps5_ok     = false;\n"
+        "            FILE    *ps5_trace;\n"
         "\n"
         "            ps5_capture_taken = true;\n"
-        "            ps5_ok            = take_screenshot(NULL, ps5_capture_file, false,\n"
-        "                  false, true, false);\n"
+        "\n"
+        "            if (ps5_width && ps5_height)\n"
+        "               ps5_pixels = (uint8_t*)malloc((size_t)ps5_width * ps5_height * 3);\n"
+        "\n"
+        "            if (ps5_pixels)\n"
+        "               ps5_ok = vulkan_read_viewport(vk, ps5_pixels, false);\n"
+        "\n"
+        "            if (ps5_ok)\n"
+        "            {\n"
+        "               FILE *ps5_out = fopen(ps5_capture_file, \"wb\");\n"
+        "\n"
+        "               if (ps5_out)\n"
+        "               {\n"
+        "                  unsigned ps5_y;\n"
+        "\n"
+        "                  /* The driver reads bottom-up BGR, which is a BMP's order; a PPM\n"
+        "                   * is top-down RGB. */\n"
+        "                  fprintf(ps5_out, \"P6\\n%u %u\\n255\\n\", ps5_width, ps5_height);\n"
+        "                  for (ps5_y = 0; ps5_y < ps5_height; ps5_y++)\n"
+        "                  {\n"
+        "                     const uint8_t *ps5_row =\n"
+        "                           ps5_pixels + (size_t)(ps5_height - 1 - ps5_y) * ps5_width * 3;\n"
+        "                     unsigned ps5_x;\n"
+        "\n"
+        "                     for (ps5_x = 0; ps5_x < ps5_width; ps5_x++)\n"
+        "                     {\n"
+        "                        uint8_t ps5_rgb[3];\n"
+        "\n"
+        "                        ps5_rgb[0] = ps5_row[ps5_x * 3 + 2];\n"
+        "                        ps5_rgb[1] = ps5_row[ps5_x * 3 + 1];\n"
+        "                        ps5_rgb[2] = ps5_row[ps5_x * 3 + 0];\n"
+        "                        fwrite(ps5_rgb, 1, 3, ps5_out);\n"
+        "                     }\n"
+        "                  }\n"
+        "                  fclose(ps5_out);\n"
+        "               }\n"
+        "               else\n"
+        "                  ps5_ok = false;\n"
+        "            }\n"
+        "\n"
+        "            free(ps5_pixels);\n"
         "\n"
         "            ps5_trace = fopen(\"/app0/trace.txt\", \"a\");\n"
         "            if (ps5_trace)\n"
         "            {\n"
         "               fprintf(ps5_trace,\n"
-        "                     \"capture: frame %u of %d, take_screenshot -> %s (%s)\\n\",\n"
-        "                     ps5_capture_frames, ps5_capture_budget,\n"
+        "                     \"capture: frame %u of %d, viewport %ux%u, read_viewport -> %s (%s)\\n\",\n"
+        "                     ps5_capture_frames, ps5_capture_budget, ps5_width, ps5_height,\n"
         "                     ps5_ok ? \"ok\" : \"failed\", ps5_capture_file);\n"
         "               fclose(ps5_trace);\n"
         "            }\n"
@@ -1042,10 +1080,20 @@ EDITS = [
         "      }\n"
         "   }\n"
         "\n"
-        "   int i, j, k;\n"
-        "   VkSubmitInfo submit_info;\n"
-        "   VkClearValue clear_color;\n",
+        "   vulkan_filter_chain_t *filter_chain           = NULL;\n",
         "patches/series, 0031",
+    ),
+    (
+        # The driver's own readback is defined below `vulkan_frame`, so the capture calls it
+        # through a prototype at file scope - where the driver declares its other forward
+        # functions (`vulkan_viewport_info`, line 1239) - because C does not allow that
+        # declaration inside a function body.
+        "gfx/drivers/vulkan.c",
+        "static void vulkan_viewport_info(void *data, struct video_viewport *vp);\n",
+        "static void vulkan_viewport_info(void *data, struct video_viewport *vp);\n"
+        "/* Added by this port (patches/series, 0032): the capture's readback entry point. */\n"
+        "static bool vulkan_read_viewport(void *data, uint8_t *buffer, bool is_idle);\n",
+        "patches/series, 0032",
     ),
 ]
 
