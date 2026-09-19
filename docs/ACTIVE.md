@@ -9,6 +9,10 @@ _Updated: 2026-09-19_
 next game are clean.” Build and console evidence: `evidence/genesis-plus-gx-native/`.
 No next core is selected.
 
+The public README now describes this verified baseline, with a table of contents,
+scoped core coverage, roadmap, native build/install guidance and upstream credits.
+This documentation update does not change the accepted binaries.
+
 ## Verified build and evidence
 
 - Frontend identity: `ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445`.

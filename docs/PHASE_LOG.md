@@ -2284,3 +2284,32 @@ requested colour and transition check, not every Sega system, BIOS/disc/CHD,
 filter/interlace option, save mechanism or long-run A/V/performance behaviour.
 Replay with `python3 tools/evidence.py compare evidence/`; the new capture and
 expectation are in `evidence/genesis-plus-gx-native/`.
+
+## 2026-09-19 — Public README reflects the verified native port
+
+Replaced the initial project-definition README with the current frontend and
+five-core status, a linked table of contents, scoped console verification,
+software-rendering versus Vulkan-presentation explanation, and a roadmap using
+✅/❌ with an explicit pending-acceptance legend. Removed obsolete claims that
+nothing runs and that Vulkan/XMB must wait for driver rung 1.0. Linked Mihawk's
+public PS5_Vulkan repository and explained static linkage/rebuild requirements.
+
+Build instructions now name the repository-local SDK, frontend fetch, required
+sibling driver artifacts and initial title build before artifact-dependent tests.
+Installation explains FTP versus /app0, metadata, live configuration and preserved
+user folders. Credits name Mihawk, RetroArch/libretro, BlackBearReloaded's
+ProsperoLight and native foundation, John Törnblom/ps5-payload-dev, core authors,
+Mesa/Khronos, assets and toolchain projects, with repository links. Core author
+names and license summaries were checked against pinned metadata/source notices.
+The README separates executable-memory evidence from unintegrated PPSSPP JIT,
+and keeps future targets distinct from console-verified features.
+
+Documentation-only validation:
+- `python3 /tmp/check-readme-links.py > /tmp/readme-links.json`: 30 local links
+  and fragments resolve, including all ten TOC entries; code fences balanced.
+- `bash tools/verify.sh format > /tmp/readme-format.log 2>&1`: PASS.
+- `bash tools/verify.sh evidence > /tmp/readme-evidence.log 2>&1`: PASS,
+  23 captures replayed, zero failures. README gameplay claims refer to those
+  existing committed artifacts, especially evidence/genesis-plus-gx-native/.
+- `git diff --check`: PASS. No source, dependency, binary or console changes;
+  the accepted gameplay build remains 93a1332's recorded build identity.
