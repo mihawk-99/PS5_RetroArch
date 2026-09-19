@@ -4,45 +4,47 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The first-failure XMB diagnostic is built and host-verified.** Branch:
-`codex/xmb-allocation-diagnostics`. It is instrumentation, not a crash fix.
-Uploaded after confirming idle; readback passed and previous logs preserved.
-A launch requires owner intervention. No new launch.
+**The first-failure run identifies a large-playlist allocation burst.** Branch:
+`codex/xmb-allocation-diagnostics`. No crash fix is implemented yet.
+Owner authorized launch, then reports the crash happened while scrolling naturally
+and that older builds seemed stable. Rapid input is not required for this failure.
 
-- Ready identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
-- Evidence: `evidence/xmb-first-failure-diagnostic/`; symbols, map, manifest,
-  executable, host capture and inspection: `klog/xmb-first-failure/`.
-- First failure emits live caller owners, ranked separately for native/mapped/
-  aligned routes (up to 16 each), cached tab/list/progress/node counters and the
-  previous eight transition boundaries with native usage. No per-entry log I/O.
-- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh`: all five gates pass, 69 tests,
-  278/278 frontend sources. Log: `klog/xmb-first-failure-verify-final.log`.
-  Inspection proves the actual XMB object references all three hooks.
-- Injected 10,006 failures: five ordinary failure records, one expanded snapshot,
-  eight history rows, 48 owners, 9,404 bytes. Normal-build hooks are inert.
-- Linked libps5vk hash is now `8c2a1c46a38ea935edf496c807c100e26b8a32d5aec725179983f46b3f626906`;
-  the prior run used `900d496a9eb725857e4a70540d34ef262dcb1d5c85b7ed9325a28d16b460e246`.
-  Other three archive hashes match. Stable local copies linked; driver unmodified.
-- Initial gate attempt hit the deliberate patch-count check (139 -> 150 for 11
-  new anchors). Updated count, reran successfully; no unexplained gate failure.
-- Procedure, phase/counter meanings and stale-context limits:
-  `docs/MEMORY_DIAGNOSTICS.md`. Next run: capture klog before launching; owner
-  holds left/right between XMB tabs. Preserve logs before any relaunch.
+- Runtime identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
+- Raw: `klog/xmb-first-failure-run-20260919-192044/`. Evidence:
+  `evidence/xmb-playlist-allocation-crash/`; exact symbols in `klog/xmb-first-failure/`.
+- First failure: xmb_list_insert requests 15,488 bytes at 6,509 ms. Custom tab 7,
+  insertion index 339, list size 340. Previous-tab cleanup reduces node count
+  4 -> 3; new tab creates 339 nodes in 23 ms. No accumulation of old tabs here.
+- Native live requests rise 4,497,239 -> 11,616,951 after old-node cleanup.
+  XMB insert owns 5,265,920 bytes / 340 allocations; JSON playlist array owns
+  1,179,664; file-list arrays 473,152; entry callbacks 220,968.
+- Read-only console inspection finds one custom playlist with 7,384 entries.
+  Complete nodes alone would request 114,363,392 bytes, plus 4,784,832 callback
+  bytes. Native allocation failures precede the driver logger's NULL write.
+- One post-launch SIGSEGV in __vk_log_impl via texture unload/queue-idle error
+  reporting. Console reports no running title. Crash snapshots are saved and
+  the local passive collector is stopped. No second launch or title kill.
+- XMB's non-diagnostic source edits match its initial e080d81 commit. This does
+  not rule out regressions elsewhere or establish an exact native heap limit.
+  Asked whether older builds opened the same full playlist; answer pending.
+- Next design should make large-list allocations safe on the native platform;
+  merely reducing scroll speed or guarding the logger does not finish that job.
+  Do not switch away from XMB/Vulkan or reduce the owner's playlist as a fix.
 
-## Prior failure and local attribution limits
+## Diagnostic readiness and limits
 
-- Bounded diagnostic `a4a751e58339` reproduced SIGSEGV / NULL write in Mesa
-  `__vk_log_impl`, through white-texture unload and queue-idle allocation error.
-  Raw: `klog/xmb-memory-run-20260919-184732/`; `evidence/xmb-memory-crash/`.
-- First failed request: 15,488 bytes in xmb_list_insert at 6,429 ms. Native live
-  requests rise 4,625,679 -> 11,616,951; tracked mappings remain 5,498,938 and net
-  frontend image count 131. The 6,991,272-byte increase remains unattributed.
-- `docs/XMB_ALLOCATION_INVESTIGATION.md`: 10,000 synthetic tab replacements show
-  no ordinary-node accumulation. Each node holds 15,360 bytes of path arrays;
-  missing wallpaper updates can recreate the white texture repeatedly.
-- First unbounded diagnostic froze; owner manually closed it. Its failure-log
-  flood was corrected. This does not prove a heap limit, fragmentation or leak.
-- Do not switch away from XMB/Vulkan. Console runtime verification remains pending.
+- Diagnostic d7ad1b3 passed all five host gates, 69 tests, 278/278 frontend sources;
+  `evidence/xmb-first-failure-diagnostic/`. Log: `klog/xmb-first-failure-verify-final.log`.
+- First failure captures per-route top owners, cached numeric XMB context/node
+  counts, and eight transition boundaries without per-entry I/O. Injected 10,006
+  failures produced one expanded snapshot / 9,404 bytes. Normal hooks are inert.
+- Linked libps5vk is 8c2a1c46a38e, versus 900d496a9eb7 in the earlier bounded run;
+  three other archives match. Full hashes preserved. PS5_Vulkan was not modified.
+- Earlier a4a751e58339 run already reproduced the same NULL logger crash;
+  evidence/xmb-memory-crash/. The first diagnostic's unbounded log flood was
+  fixed before both later captures. This step did not build or deploy new code.
+- Procedures and context limitations: `docs/MEMORY_DIAGNOSTICS.md`.
+  Local lifecycle experiment: `docs/XMB_ALLOCATION_INVESTIGATION.md`.
 
 ## Previous console-verified baseline (Genesis Plus GX)
 

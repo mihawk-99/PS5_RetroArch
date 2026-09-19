@@ -1,0 +1,13 @@
+{
+  "step": "xmb-playlist-allocation-crash",
+  "note": "Identifies large-list allocation burst in this run; not a crash fix or historical regression verdict.",
+  "must_contain": [
+    "natural scrolling",
+    "339 nodes in 23 ms",
+    "7384 entries",
+    "__vk_log_impl",
+    "no historical regression commit identified"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner: crash while scrolling naturally; older commits had seemed stable. Whether the same full playlist worked on those builds remains unconfirmed."
+}

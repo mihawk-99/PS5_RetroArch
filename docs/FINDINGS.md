@@ -2836,3 +2836,24 @@ core received content. The owner identified those selections as Sega System
 for those boards. No archive parser change is warranted by this evidence, and
 no claim is made that the archive structures themselves were inspected. A later
 same-build frontend snapshot has no ERROR lines. See ACTIVE for current scope.
+
+
+## 2026-09-19 — XMB list allocation size, rather than scroll speed, triggers this capture
+
+The first-failure diagnostic now attributes a 7,119,712-byte native-request rise
+to construction of a destination playlist, with 339 new 15,488-byte XMB nodes
+accounting for 5,250,432 bytes in 23 ms. Old-node cleanup completed first; the
+observed node count dropped from four to three before growth. The owner reports
+natural navigation, so rapid input is not required. The console's one custom
+playlist contains 7,384 entries: all nodes would request 114,363,392 bytes before
+callbacks (4,784,832), strings and playlist structures. These sub-1-MiB individual
+requests stay on the native allocator path.
+
+The later NULL write in the driver's Mesa allocation-error logger remains a
+separate failure-handling defect; guarding it alone would not allocate the missing
+menu nodes. XMB's non-diagnostic patch set is unchanged from its initial port,
+but an older binary has not been retested with the same full playlist/config.
+No historical regression verdict or exact heap-capacity claim is established.
+See `evidence/xmb-playlist-allocation-crash/` for sanitized first-failure owners,
+context history, source comparison and playlist counts. Raw user data remains
+in ignored capture storage.

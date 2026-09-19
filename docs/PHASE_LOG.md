@@ -2486,3 +2486,47 @@ verified build uploaded with readback through the normal deployment function.
 No title was launched or stopped. Runtime acceptance remains pending: the next
 owner-authorized run should capture klog, reproduce held left/right XMB tab
 switching, and preserve logs before relaunch. This is a diagnostic, not a crash fix.
+
+
+## 2026-09-19 — First-failure capture attributes the XMB burst to a large playlist
+
+Owner authorized d7ad1b3's diagnostic launch. Existing logs were preserved, the
+uploaded identity verified, klog started before launch, and the running
+e60deca9412f session confirmed. Owner reports a crash during natural scrolling;
+rapid input is not a necessary condition. The read-only title-status query
+returned zero afterward. Passive collection was stopped locally after capture;
+no automatic title kill or second launch occurred.
+
+At 6,486 ms, XMB selected custom tab 7 and freed the old list's node: live
+observed node count fell 4 -> 3. It then successfully created 339 nodes in 23 ms
+before xmb_list_insert failed a 15,488-byte allocation at index 339, list size
+340. Native live requested bytes rose 4,497,239 -> 11,616,951. The first-failure
+owner table attributes 5,265,920 bytes / 340 live requests to xmb_list_insert,
+1,179,664 to playlist JSON array growth, 473,152 to file-list arrays, and 220,968
+to menu callbacks. The new nodes explain 5,250,432 bytes of that interval's
+7,119,712-byte increase. This is a destination-list construction burst, not
+evidence of retaining successive old tab lists.
+
+Read-only FTP inspection found one custom playlist with 7,384 entries. Its full
+XMB node demand is 114,363,392 bytes plus 4,784,832 bytes for callback objects,
+before strings and other metadata. Raw playlist content stays only in ignored
+klog; committed evidence records counts, not names or game paths. The first
+listing attempt used unsupported NLST and returned 502; the existing FTP helper
+then enumerated successfully. No console files were modified during inspection.
+
+One post-launch SIGSEGV is a NULL write in __vk_log_impl, reached through the
+same queue-idle allocation-error/white-texture-unload path as the prior crash.
+Symbolization used the exact archived ELF and recorded load base (no return-PC
+adjustment for fault RIP; minus one for caller PCs). Native accounting excludes
+system-internal allocations; no exact heap-limit or fragmentation claim follows.
+
+XMB's non-diagnostic patch entries are identical to initial XMB commit e080d81.
+The node allocator policy dates to mGBA's large-buffer mapping change; diagnostic
+hooks did not change it. This does not exclude other regressions. Whether an
+older binary opened this same full playlist/configuration remains unverified;
+the owner was asked. No fix, policy change, new build or driver edit in this step.
+
+Artifacts: `evidence/xmb-playlist-allocation-crash/`; raw capture and private
+playlist snapshot: `klog/xmb-first-failure-run-20260919-192044/`. Acceptance is
+attribution of the observed burst, not menu stability. `bash tools/verify.sh
+format evidence` replays the record; no product build was changed.

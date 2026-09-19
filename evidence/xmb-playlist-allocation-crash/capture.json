@@ -1,0 +1,22 @@
+{
+  "step": "xmb-playlist-allocation-crash",
+  "recorded": "2026-09-19",
+  "revision": "d7ad1b3",
+  "command": "Owner-authorized launch with prior-log preservation, uploaded identity verification, pre-launch klog, periodic FTP snapshots; symbolization against klog/xmb-first-failure/llvm-pie.elf using the recorded image base. Read-only FTP count of playlist JSON items.",
+  "raw_capture": "klog/xmb-first-failure-run-20260919-192044/crash-memory-diagnostics.log",
+  "raw_bytes": 6829,
+  "lines": [
+    "Owner-authorized diagnostic launch; matching runtime identity confirmed.",
+    "Owner reports crash during natural scrolling, not only rapid input.",
+    "First failed request: 15488 bytes at 6509 ms in xmb_list_insert.",
+    "Destination: custom tab 7; insertion index 339; list size 340; node count 342.",
+    "Old tab cleanup reduced node count from 4 to 3. New tab then allocated 339 nodes in 23 ms before failure.",
+    "Native requests rose 4497239 -> 11616951 after clearing old nodes; XMB insert owns 5265920 bytes across 340 live allocations.",
+    "One custom playlist on console: 7384 entries. Full node request would be 114363392 bytes plus 4784832 callback bytes.",
+    "Other owners include playlist JSON array 1179664 bytes, file-list arrays 473152 bytes, entry callbacks 220968 bytes.",
+    "One post-launch SIGSEGV NULL write in __vk_log_impl through allocation-error reporting in queue-idle/texture unload.",
+    "Console reports zero running titles; passive collector stopped; crash logs and exact symbols preserved.",
+    "XMB non-diagnostic source edits match the original XMB commit; no historical regression commit identified.",
+    "No allocator/frontend/driver fix or another launch performed."
+  ]
+}
