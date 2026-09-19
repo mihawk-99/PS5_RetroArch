@@ -33,6 +33,20 @@ frontend. Previously only the CPU video driver's open method called it.
   ps5vk_CmdDraw and ps5vk_QueuePresentKHR; title.map sources the driver from the
   static archive. Sibling source/archive remain unchanged from the diagnostic.
 
+## Current diagnosis
+
+The RGBA conversion is corrected and exhaustively tested over all 65,536 inputs,
+but the owner still reports wrong colours. The 30-second colour run completed
+and the script closed it, with zero refusals/errors in the retrieved trace.
+A subsequent identity build proves the console runs the intended input set:
+`df3a593a85388d58bc9fcc847dbd1deac6d9f1de8e4170493e84a84f87e362e3`.
+`evidence/vulkan-build-identity/` records local/remote/trace agreement. All five
+gates and 25 tests pass. Generic startup markers alone cannot prove a build.
+
+The next diagnostic is to read the uploaded texture and rendered image through
+the released driver's test-only image-storage API, without hardware writes or
+sibling changes, to separate upload pixels from rendered pixels.
+
 ## Next smallest step
 
 Correct the colour conversion using the RGUI producer's actual RGBA4444 nibble
@@ -60,7 +74,7 @@ to remove the accumulated duplicates. No colour or rendering code was changed.
 - A2 remains the matching 32-bit RGBA upload and plain copy path; do not reopen
   the settled choice. The traced menu dynamic/staging formats are both 37.
 - CPU fallback sources and registration have not been changed.
-- Patch count is 67 (three diagnostic edits added). `vendor/` is untouched.
+- Patch count is 68 with the pending RGBA conversion correction. `vendor/` is untouched.
 - Fresh replay of all port patches succeeds. The configured shader file contains
   only the intended 0023 sampler fallback block after regeneration. Its marker
   now appears in its replacement, so repeated builds cannot accumulate it.

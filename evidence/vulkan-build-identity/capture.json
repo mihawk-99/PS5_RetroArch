@@ -1,0 +1,16 @@
+{
+  "step": "vulkan-build-identity",
+  "command": "bash tools/verify.sh; bash tools/run-title.sh --no-build --watch 30",
+  "revision": "38564b8 + identity changes and pending RGBA upload correction",
+  "raw_capture": "klog/gpu-identity-latest-trace.txt",
+  "raw_lines": 365,
+  "eboot_sha256": "71363a0f57b4779c8590520bdb1b1afd018af45a0aeac864de0c27abf46f4fff",
+  "lines": [
+    "expected build identity: df3a593a85388d58bc9fcc847dbd1deac6d9f1de8e4170493e84a84f87e362e3",
+    "build identity: df3a593a85388d58bc9fcc847dbd1deac6d9f1de8e4170493e84a84f87e362e3",
+    "deploy: all 4 required markers, including the unique identity, present after console readback",
+    "tests: both identity regressions failed before the fix; all 25 tests and five gates pass after the fix",
+    "audit: fresh startup refusals=0",
+    "runner: title closed before the 30-second final query; no complete-window claim"
+  ]
+}

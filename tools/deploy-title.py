@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 from pathlib import Path
 from posixpath import join
@@ -144,23 +145,17 @@ def do_check(settings: dict, tid: str) -> int:
 
 
 def program_markers(signed: Path) -> list[bytes]:
-    """Strings that must survive into whatever the console stores for this build.
+    """Require the input-derived identity embedded by tools/build-title.sh.
 
-    eboot.bin cannot be verified by digest here, and that is a property of this
-    console rather than of the upload: it converts the signed fake self into a raw
-    ELF as it stores it, so the file it serves is a different container from the
-    file sent. Measured on 2026-09-18, the stored file is 8,117,072 bytes against a
-    signed 8,029,263, and only 12.8% of the bytes agree - yet the build's own probe
-    strings are in there, which is how the previous few rounds were read.
-
-    So the check is what the transform preserves: strings that exist only in this
-    build. Each one is taken from the signed image, so this cannot pass on a stale
-    file unless that file came from a build carrying the same markers. The build's
-    own trace tags are the markers, which means the verification and the debugging
-    instrument are the same evidence.
+    The console transforms the SELF container, so compare an identity that
+    survives that transform. Generic startup strings alone also match old builds.
     """
     blob = signed.read_bytes()
-    markers = []
+    identities = set(re.findall(rb"build identity: [0-9a-f]{64}(?=\x00)", blob))
+    if len(identities) != 1:
+        raise ValueError("eboot.bin must contain exactly one build identity; rebuild the title")
+    markers = list(identities)
+
     for name in (b"main() entered", b"rarch_main returned", b"ps5_init entered",
                  b"ps5_frame first call", b"probe iterate entered",
                  b"probe check_state ENTERED"):

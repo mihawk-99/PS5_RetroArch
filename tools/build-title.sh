@@ -144,6 +144,26 @@ if ! vulkan_object_list=$(PS5_VULKAN_DIR="$vulkan_dir" PS5_PAYLOAD_SDK="$sdk" \
 fi
 mapfile -t vulkan_objects <<< "$vulkan_object_list"
 
+# Bind the running trace and FTP readback to these exact source/archive inputs.
+# The console transforms the SELF container, so its whole-file digest differs.
+python3 - "$root" "${vulkan_archives[@]}" "${vulkan_objects[@]}" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
+inputs += [root / name for name in (
+    "build/ra/libretroarch.a", "build/ra-conf/config.h", "tools/build-title.sh",
+    "tools/build.sh", "tools/retroarch-flags.sh")]
+inputs += [pathlib.Path(name) for name in sys.argv[2:]]
+digest = hashlib.sha256()
+for path in inputs:
+    digest.update(path.name.encode() + b"\0")
+    digest.update(hashlib.sha256(path.read_bytes()).digest())
+identity = digest.hexdigest()
+(root / "build/title_build_identity.h").write_text(
+    '#define PS5_RETROARCH_BUILD_ID "build identity: ' + identity + '"\n')
+print("==> [title] build identity: " + identity)
+PY
+
 echo "==> [title] step 2/3: the title"
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \

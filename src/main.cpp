@@ -39,6 +39,7 @@
 #include <cxxabi.h>
 
 #include "trace.hpp"
+#include "../build/title_build_identity.h"
 
 /* RetroArch's entry, in C. */
 extern "C" int rarch_main(int argc, char *argv[], void *data);
@@ -132,6 +133,7 @@ int main()
     }
 
     std::set_terminate(on_terminate);
+    ps5::debug::mark(PS5_RETROARCH_BUILD_ID);
 
     /* The shell's splash covers the title until it explicitly dismisses it.
      * video_ps5 does this while opening its display, but video_vulkan never

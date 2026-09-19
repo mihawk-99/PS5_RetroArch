@@ -1,0 +1,10 @@
+{
+  "step": "vulkan-build-identity",
+  "note": "Verifies build identity only. Visual correctness is a separate pending check.",
+  "must_contain": [
+    "build identity: df3a593a85388d58bc9fcc847dbd1deac6d9f1de8e4170493e84a84f87e362e3",
+    "including the unique identity",
+    "refusals=0"
+  ],
+  "must_not_contain": []
+}

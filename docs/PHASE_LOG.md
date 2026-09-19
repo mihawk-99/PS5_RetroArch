@@ -1587,3 +1587,17 @@ upstream plus named edits to remove the repeated blocks. `bash tools/verify.sh`
 passed all five gates. Reapplying the full patch list leaves all 12 patched files'
 SHA256 values unchanged: `evidence/frontend-patch-idempotence/` records them.
 This is a host build-tool fix and makes no new claim about console rendering.
+
+## 2026-09-19 — Bind deployment and trace to one build identity
+
+Generic startup markers could accept an older transformed executable. Two host
+regressions failed before the correction. `tools/build-title.sh` now embeds a
+SHA256 identity of its source/archive inputs in a generated ignored header;
+main logs it and deployment requires it in the executable readback.
+`bash tools/verify.sh` passes all five gates with 25 tests, including the pending
+colour converter's exhaustive test. The subsequent 30-second scripted launch
+reported exactly the staged identity in its trace; see
+`evidence/vulkan-build-identity/`. This rules out an older input set for that run
+but does not prove correct pixels. The identity run closed before its final query.
+No driver project files were modified and no new dependency or compiler flag was
+introduced. The generated header is not committed.
