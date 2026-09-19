@@ -1553,3 +1553,26 @@ the splash scene until manual closure. The next step is a title-side splash fix.
 No sibling file was changed. A fresh port-patch replay also exposed repeated 0023
 sampler blocks in the configured shader source; record separately from the
 display diagnosis.
+
+## 2026-09-19 — Dismiss the shell splash for Vulkan
+
+`src/main.cpp` now performs the public splash-dismissal call before rarch_main.
+`bash tools/verify.sh` passed all five gates (21 tests). The staged image digest
+and target results are in `evidence/vulkan-splash-dismissal/`.
+`bash tools/run-title.sh --no-build --watch 90` recorded splash return 0 and
+successful initial Vulkan API results, with zero refusals in the 471-line new
+startup. The owner confirmed RGUI is visible, but with buggy colours and flicker.
+The final process query found no title; klog shows shell closure without a fatal
+signal, so the full watch window is not claimed. Visual defects remain open.
+
+Correction to the previous reproducibility description: 0023's marker is never
+present in its replacement at all; no later edit is needed to invalidate it. A
+new regression test failed on that exact condition. Its separate marker-only fix
+passes all 22 host tests and makes a second patch replay byte-identical.
+
+The user explicitly authorized future uploads and runs without their intervention;
+this supersedes the older per-run confirmation rule, while the shared-console
+busy check still applies.
+
+The owner subsequently confirmed the second closure was manual too, and clarified
+the visual defect as blue colours and black triangles appearing/disappearing.

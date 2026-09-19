@@ -42,6 +42,7 @@
 
 /* RetroArch's entry, in C. */
 extern "C" int rarch_main(int argc, char *argv[], void *data);
+extern "C" int sceSystemServiceHideSplashScreen();
 
 namespace
 {
@@ -131,6 +132,12 @@ int main()
     }
 
     std::set_terminate(on_terminate);
+
+    /* The shell's splash covers the title until it explicitly dismisses it.
+     * video_ps5 does this while opening its display, but video_vulkan never
+     * enters that code. This is title startup work for either video driver. */
+    ps5::debug::mark_value("startup: sceSystemServiceHideSplashScreen",
+                           sceSystemServiceHideSplashScreen());
 
     /* argv must be writable and NULL-terminated: RetroArch's option parsing
      * walks it the way the C runtime would have. */

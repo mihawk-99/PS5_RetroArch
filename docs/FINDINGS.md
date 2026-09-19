@@ -2466,3 +2466,18 @@ The raw trace appends across launches, including after a truncated prior line.
 The newest startup must therefore be selected by the last `bss check=` substring
 rather than a line-anchored match. The run script's "exited on its own" message
 means only that its final process query found no running title.
+
+## 2026-09-19 — Splash removal reveals the GPU menu and colour faults
+
+The title-level splash call returned 0 in the new run, and the owner confirmed
+that the menu was visible with buggy colours and flicker. The first four
+end/submit/present/per-image results remained VK_SUCCESS; no refusal was in the
+retrieved 471-line startup. See `evidence/vulkan-splash-dismissal/`. No complete
+90-second acceptance is inferred because the title was closed before the final
+query. The CPU driver and sibling Vulkan project were not changed.
+
+The RGUI producer `argb32_to_rgba4444` returns `(r << 12) | (g << 8) | (b << 4) | a`.
+Patch 0028 instead writes the blue nibble into the R8G8B8A8 texture's red byte and
+red into blue, and shifts four-bit channels into only the high nibble of each
+byte (15 becomes 240). This is a frontend conversion defect, independently of
+the still-unexplained flicker; fixing it preserves matching 32-bit upload formats.

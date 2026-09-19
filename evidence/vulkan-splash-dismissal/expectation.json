@@ -1,0 +1,15 @@
+{
+  "step": "vulkan-splash-dismissal",
+  "note": "Splash dismissal and menu visibility only. Colour corruption/flicker and the incomplete observation window prevent final GPU acceptance.",
+  "must_contain": [
+    "startup: sceSystemServiceHideSplashScreen = 0",
+    "video driver: video_vulkan init entered",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "refusals=0",
+    "owner: menu visible"
+  ],
+  "must_not_contain": [
+    "vulkan: "
+  ],
+  "human_check": "Owner saw the menu with blue colours and flickering black triangles, then manually closed the app. Final visual acceptance remains open."
+}
