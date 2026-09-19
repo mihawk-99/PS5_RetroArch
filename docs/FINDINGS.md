@@ -2163,3 +2163,35 @@ driver-side change in a tree this project does not modify. Until it is lifted - 
 until the frontend is shown how to avoid it - the menu's draws never reach the GPU,
 because a refusal ends recording with an error at `vkEndCommandBuffer` and
 RetroArch discards that result.
+
+## The compiled default now names this project's own driver
+
+**Changed.** `tools/apply-port-patches.py`'s `configuration.c` patch returns `"ps5"`
+instead of `"vulkan"`. That switch is the whole of the video-driver choice, because
+its own comment records that the config cannot make it: content loading rebuilds
+argv and drops the title's `-c`, so `/app0/retroarch.cfg`'s `video_driver` is never
+read. Naming this project's driver there makes `video_ps5` the driver that runs, and
+`video_ps5`'s display path is the one proven as far as the buffer.
+
+**Two traps hit while making it, both worth remembering.**
+
+1. **A build artifact lied about which source it came from.** After patching, the
+   object still behaved like the old one. The cause was that the port's build
+   applies the patch and then compiles, so the *order* of `build-retroarch.sh`'s
+   steps decides whether a patch reaches the object - and an object whose mtime is
+   newer than the already-patched source is kept. Deleting
+   `build/ra/obj/configuration.c.o` and rebuilding was the only way to be sure. The
+   lesson is the same one this project learned with `retroarch.c`: after changing a
+   patch, remove the object it belongs to rather than trusting the build to notice.
+2. **A `strings` check on the driver name was meaningless.** Counting `^ps5$` in an
+   object cannot distinguish the two builds, because the linker merges string
+   suffixes and a short name may not survive as its own entry. It reported `ps5=0
+   vulkan=1` for a binary that did contain the change. The driver name is the wrong
+   thing to grep for.
+
+**Not yet measured: whether this switch actually selects `video_ps5` on the
+console.** The runs made with it in place still produced libps5vk's refusals, which
+is why it is recorded as unverified rather than as working. The next run with the
+console free should be judged on the trace alone: `video_ps5`'s marks
+(`ps5_init entered`, `ps5_frame ...`) appear if it was selected, and the `vulkan:`
+refusals appear if it was not.
