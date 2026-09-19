@@ -9,122 +9,118 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The RetroArch menu is on the console's screen.** `PPSA99169` runs this project's
-own `video_ps5` driver, receives RGUI's 320x240 framebuffer, presents it, and the
-console owner confirms the menu is visible on the television. That is the objective
-the project was built for; `docs/FINDINGS.md` carries the trace and the captures.
+**Two paths run; the CPU one is on screen and the GPU one is not yet.**
 
-One unattended `bash tools/run-title.sh --watch 20` run is the evidence: one EXEC,
-zero fatal-signal lines, the script launching, watching and closing it itself.
-`/app0/trace.txt` from that run:
+`video_ps5` still puts the RGUI menu on the television and is untouched by all of
+this work. `video_vulkan` now initialises, presents ~45 frames a second, records
+the menu texture, uploads it and draws the menu quad every frame - and the screen
+is black. The owner has confirmed the black screen, and there is no refusal, no
+failed call and no error line to explain it.
 
-    ps5_init: told the frontend the display is 1920x1080
-    input: pad opened, user=515310723 handle=51447552
-    display: flip 1 of buffer 0, status=0 marker=1
-    ps5_set_texture_frame: rgb32=0 320x240 frame=present have=1 (was 0)
-    menu: framebuffer commit 1 is a new picture (1 of 1 changed so far)
-    ps5_frame 1: menu 320x240 pitch=640 present=1
-    ps5_frame 600: menu commits=3 changes=2 presented=yes
+## The GPU path, as measured
 
-The framebuffer changed twice, once immediately after a pad press, so the pad
-reaches the menu and the menu redraws.
+`docs/GPU_PATH_CRITERIA.md` holds the acceptance criteria. A4 and B1 are met:
 
-**What unblocked it was one anchoring mistake, twice.** The video driver is chosen
-by `config_get_default_video()`, whose switch is over `VIDEO_DEFAULT_DRIVER`; this
-build has `HAVE_VULKAN`, so it returns at `case VIDEO_VULKAN:` and never reaches the
-`case VIDEO_NULL:` arm patch 0010 was editing. And the driver-table edit inserted
-`&video_ps5` *after* the `#ifdef HAVE_VULKAN` block, leaving `&video_vulkan` at
-index 0 - which is RetroArch's fallback when a name is empty or unfindable. Both are
-fixed: the patch anchors on `case VIDEO_VULKAN:` and returns `"ps5"`, and
-`&video_ps5` is inserted before the block.
+- **A4 - zero refusals.** The trace carries no `vulkan: ` line at all. Three
+  named causes were cleared: every pipeline is created with a triangle list, every
+  sampler asks clamp-to-edge, and no compute pipeline is compiled (libps5vk
+  refuses any set-0 binding with stride 0, and this frontend's shared set declares
+  a compute-only storage image at binding 3, so the unused upload shader was
+  refused once per pipeline initialisation).
+- **B1 - the driver is the Vulkan one.** The trace carries
+  `video driver: video_vulkan init entered` and no `ps5_init entered`.
 
-**Left open, and recorded.** The flip status marker reads 1 at flips 1, 300, 600,
-900 and 1200 - never advancing - while the buffers rotate correctly and the frames
-are on screen. The marker is not a usable instrument on this console.
+B2, B3 and B4 are **not** met. The screen is black.
+
+## Seven faults, all silent, all fixed
+
+Each one produced a clean trace and a black screen. In the order they were found:
+
+1. **Widgets claimed the driver.** `vulkan_gfx_widgets_enabled` answered true, so
+   the frontend took the widgets branch of its mutually exclusive `if/else` and
+   never called `gfx_display_init_first_driver` - the only thing that sets
+   `p_disp->dispctx`, without which `gfx_display_draw` returns immediately.
+   (0042)
+2. **Nothing enabled the menu texture.** The driver draws the menu only behind
+   `VK_FLAG_MENU_ENABLE`, and the frontend's only `true` is in
+   `display_menu_libretro` - a libretro concept, set when a core runs. This title
+   launches straight into the menu with no content, so it was never set. (0046)
+3. **The menu texture was never filled.** In `vulkan_set_texture_frame`, when the
+   optimal texture already existed, the staging texture was flushed to the GPU and
+   never copied into the image the draw samples; the copy lives only in
+   `vulkan_frame`'s upload block and is the sole writer of that image. (0051)
+4. **A stale `/app0/args.txt` ended every run.** A leftover capture file from an
+   earlier probe made the run take a picture and then quit itself 90 frames in,
+   which the console books as an application crash with a coredump and which looks
+   from the sofa like a title that never appeared. The capture block no longer
+   calls `CMD_EVENT_QUIT`, and `tools/run-title.sh` clears the file before every
+   run. (0043)
+5-7. `docs/FINDINGS.md` carries these with their traces.
+
+## What is true at the moment of the draw
+
+From the instrumented trace, once per frame:
+
+    vulkan set_texture_frame: rgb32=0 320x240 frame=yes
+    vulkan copy_staging_to_dynamic: dynamic 320x240 fmt=37 type=2, staging fmt=37 type=1, compute=0
+    vulkan menu state: flag=1 idx=0 staging(img=0 buf=1) optimal(img=1 buf=0)
+    vulkan draw_quad 0: texture=yes image=yes layout=5 320x240 pipe=yes
+
+So: the menu hands its framebuffer over, the formats match, the copy to the
+sampled image runs, and the quad is drawn with a valid pipeline, a valid image and
+`VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`. The pixels are black anyway.
 
 ## Next
 
-1. **Run the capture - it is built, waiting, and now ends by itself.** The port now reads the frame with the
-   driver's own `vulkan_read_viewport` and writes a PPM itself (patches 0031/0032,
-   committed as `949fdb9`; the frontend builds 276 of 276 and the path is in the image).
-   It has **not** been run: the console stopped answering ("No route to host") before the
-   run, and the run that was attempted failed at its deploy step for that reason. Arm
-   `/app0/args.txt` with `--ps5-capture=90` and `--ps5-capture-path=/app0/shot.ppm`, run
-   `tools/run-title.sh --no-build --watch 18`, fetch `/app0/shot.ppm` and look at it. The
-   trace line says `viewport WxH, read_viewport -> ok|failed`; patch 0033 then asks
-   the frontend to quit, which should finally write `/app0/retroarch.log` (still the
-   same 1200 bytes, because the title has always been killed rather than exiting).
-2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
-   the chain's quad) and the blank texture's compute upload (its staging texture could
-   match its destination, as 0027 does for the menu texture).
-3. **`/app0/retroarch.log` is still the stale 1200 bytes** from an earlier round: the
-   frontend's file logger is set up (`--log-file=/app0/retroarch.log`) but never flushes,
-   and a run that exits by itself would flush it - which is the same exit the screenshot
-   step needs.
-4. **Config loading is still parked** (`parked/config-path.patch.py`, step 0006): the
-   command line passes `-c /app0/retroarch.cfg` and the port does not yet prove the file
-   is read.
-3. **Then the first frame**, and with it the objective: frames in the trace, the menu
-   on screen, and `tools/verify.sh` green.
-4. **Then the config file.** Content loading still discards the title's `-c`; the fix
-   (0006) is parked in `parked/config-path.patch.py`.
+1. **The driver's own draw, in `../PS5_Vulkan`.** Everything on this side is now
+   instrumented and correct, so the next question is what `ps5vk_CmdDraw` does
+   with the menu quad: the AGC stream it writes, the viewport it programs, and
+   whether the draw reaches the tiled framebuffer the swapchain image lives in.
+   `ps5vk_draw.c` is the file. Read it, then instrument it the same way - probes
+   on this side have been wrong three times about where the picture stops.
+2. **Then B4**: ask the owner to look. That confirmation is the only witness for
+   "on the screen" that this project accepts, and it has said "black" three times.
+3. **Then C**: measure. C2 compares frame rate against the CPU path's number for
+   the same window; C3 needs a core and is recorded as not measured without one.
+4. **Then retire the probes.** Fifteen diagnostic marks are now permanent in the
+   patch set (0046-0053). They are the reason this was findable and they are not
+   shippable: gate the useful ones behind a flag and delete the rest.
 
 ## Working notes
 
 - **`bash tools/run-title.sh` is the only way to run the title.** It owns the whole
   sequence and prints the title's own trace. Do not hand-deploy.
-- **`python3 tools/symbolize-crash.py <capture>` reads a console backtrace**, but only
-  approximately: the addresses are the *converted* image's and `build/title.map` is the
-  linked one, so a frame can land one function off. The trace's `assertion failed:`
-  line is exact - prefer it.
-- **Assertions only speak because stderr is unbuffered.** If that line vanishes from
-  the trace, check `src/main.cpp`'s `setvbuf` before anything else.
-- **A probe is not gone until the objects are.** Reverting the probe set leaves the
-  strings in `build/ra/obj`; `strings build/llvm-pie.elf | grep 'probe '` is the check
-  and `rm -rf build/ra/obj` is the fix. Two stale probe strings survived a revert this
-  round and needed a clean rebuild.
-- **An insert must not repeat its anchor.** The probe tool writes `insert + anchor`, so
-  an insert ending with its anchor duplicates that line - which broke the build three
-  times in one round. `tests/test_frontend.py`'s `ProbeSet` now checks every probe for
-  that, for a marker in its own text, for a note and for a trailing newline.
-- **Do not hand-edit the configured tree.** Slicing a probe out of `build/ra-conf` by
-  text removed a declaration line and a brace's partner this round, and the file only
-  went back together by diffing it against `vendor/retroarch`. Revert probes with the
-  tool; if the tree is damaged, diff it against its vendor copy (it carries no port
-  patches beyond the ones the patcher names).
-- **`vendor/` is not in the diff.** Anything a build needs from it must be regenerable
-  or live in a tracked directory.
+- **The probes have been wrong about where the picture stops, three times.** Each
+  time the trace was clean and the conclusion drawn from it was false. Instrument
+  the next step in the chain and read it, before concluding.
+- **`gfx_display_vk_draw` is not the menu's draw.** It is the display-list path.
+  This driver composites the menu itself in `vulkan_frame` through
+  `vulkan_draw_quad`. A probe there reports nothing and proves nothing.
 - **`/app0/...` is not an FTP path.** The title's files are at
   `/data/homebrew/PPSA99169/`.
-- **`src/` is linked before the archives**, so a definition there wins over the same
-  symbol in `libretroarch.a` or the driver's archives - that is how
-  `src/locale_shims.c` supplies the `_l` locale functions, and why a libc symbol cannot
-  be overridden (the native converter refuses to publish an application export).
-- The console's address and credentials come from the ignored `.env`; console captures
-  stay in the ignored `klog/` tree.
-
-## Last verified
-
-| Check | Result |
-| --- | --- |
-| `bash tools/run-title.sh` (probed build) | **Partial**: `selected="vulkan"`, `khr_display`, 4 textures, `vkCreateGraphicsPipelines -> 0`, `vulkan_init` live, pad opened, `vulkan_frame` -> `vkQueueSubmit`, then `assertion failed: cmd_buffer->render_pass == NULL` |
-| `bash tools/verify.sh` (all gates) | PASS (format unit build integration evidence) |
-| `python3 -m unittest discover -s tests` | PASS: 20 tests, including the probe-set checks and the patch count |
-| `strings build/llvm-pie.elf \| grep 'probe '` | Only the driver's own messages; no probe text (after a clean rebuild) |
-| Config path (0006) | **PARKED**: reading the config still crashes in `command_event`; see `parked/config-path.patch.py` |
-
-## Open findings
-
-- **The first frame leaves a render pass open** before the backbuffer pass; the marks
-  narrow it to the offscreen-passes call and the menu upload, and the next measurement
-  splits those two.
-- **The frontend's own log never reaches disk.** `--log-file=/app0/retroarch.log` is in
-  argv and the file exists, but it is a stale 1200 bytes: RetroArch never closes the
-  logger on this path, so its buffer is lost. The trace is the instrument that works.
-- `src/locale_shims.c` exists because glslang and SPIRV-Cross are written against
-  FreeBSD's xlocale interface and the console SDK exports only the unsuffixed
-  functions. If the SDK ever ships the `_l` set, that file goes.
-- The console's FTP will not replace `sce_module/libc.prx`; the title runs against the
-  console's copy. A release has to solve this.
-- Pad input cannot be verified unattended yet: nothing in the pipeline presses a
-  button.
+- **The console's `/app0/args.txt` is read by the driver too**, and deploy never
+  deletes anything, so a file left there changes later runs. `run-title.sh` clears
+  it on every run; if a run behaves oddly, check it first.
+- **`/app0/retroarch.log` does not exist to be read** (FTP answers "no such
+  file"), so the trace is the only record a run leaves.
+- **Assertions only speak because stderr is unbuffered.** If that line vanishes
+  from the trace, check `src/main.cpp`'s `setvbuf` before anything else.
+- **A probe is not gone until the objects are.** Reverting the probe set leaves the
+  strings in `build/ra/obj`; `rm -rf build/ra/obj` is the fix.
+- **An insert must not repeat its anchor.** `tests/test_frontend.py`'s `ProbeSet`
+  checks every probe for that, for a marker in its own text, for a note and for a
+  trailing newline.
+- **Do not hand-edit the configured tree for real changes.** Diff it against
+  `vendor/retroarch` if it is damaged; every port change belongs in
+  `tools/apply-port-patches.py`.
+- **The patch count is pinned** in `tests/test_frontend.py`. It is 64.
+- **`vendor/` is not in the diff.** Anything a build needs from it must be
+  regenerable or live in a tracked directory.
+- **`src/` is linked before the archives**, so a definition there wins over the
+  same symbol in the frontend.
+- **Console capture landmines.** `retroarch.log` may be from any run; the cfg's
+  `video_driver` is never parsed on a content-less run.
+- **The flip-status marker reads 1 forever** on this console while the buffers
+  rotate correctly, so it is not a usable instrument.
+- **`../PS5_Vulkan` is never modified.** Its maintainer answers questions and has
+  been accurate and decisive.

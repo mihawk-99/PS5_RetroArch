@@ -129,3 +129,37 @@ established what happens when an unverified assumption is treated as a result.
 
 If A4 cannot be reached, the work stops there, the CPU path stays, and what was
 learned is recorded. The menu on the screen is not put at risk for an optimisation.
+
+## Where this stands now
+
+A4 and B1 are met. A1, A2 and A3 were each fixed and the refusals are gone: the
+trace carries no `vulkan: ` line at all.
+
+**The A2 decision recorded above was right for the wrong reason, and the criterion
+it names was wrong about the mechanism.** The storage-image refusal did not come
+from an upload taking its compute branch. It came from `vkCreateComputePipelines`:
+libps5vk's `ps5vk_descriptor_options` walks every set-0 binding whose stage flags
+match the stage being compiled and refuses any whose stride is zero, a storage
+image's stride is zero by design, and this frontend's shared set declares a
+compute-only storage image at binding 3. So the fix is not a format decision at
+all - patch 0027's name-the-one-format change had already made the formats match
+and the compute branch was already unreachable. The fix is to stop compiling the
+upload shader (0036): the branch it serves would fail its own `retro_assert`.
+
+The lesson is in the criteria's own terms: "request RGB8888" and "match the menu's
+format" were both answers about a path that was not being taken. The refusal named
+the binding, not the upload, and reading it as an upload fault cost two rounds.
+
+**What B actually needed was five more faults, none of them about formats.** They
+are listed in `docs/ACTIVE.md` and each has a patch: widgets claiming the driver
+before the display context is resolved (0042); nothing ever enabling the menu
+texture, because the frontend's only `true` is a libretro concept this content-less
+title never reaches (0046); the optimal menu image never being copied into after
+the first handover (0051); a stale `/app0/args.txt` ending every run by itself
+(0043); and the driver's own menu draw living in `vulkan_draw_quad` rather than in
+the display-list `gfx_display_vk_draw` that was instrumented first.
+
+**B2, B3 and B4 remain unmet.** The screen is black with the menu texture filled,
+the quad drawn, and no error anywhere. That is where the work stops for now, and
+the next step is the driver's own draw path in `../PS5_Vulkan`, not another
+frontend gate.

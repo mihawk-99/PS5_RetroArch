@@ -2363,3 +2363,85 @@ objective's "CPU path stays selectable" is satisfied by `video_ps5` remaining
 registered, not by it being the default. A check of the deployed image for the
 `patches/series, 0027` marker returned 0 and proved nothing: the marker is inside a
 comment, and comments do not survive compilation.
+
+## Why the GPU path was black: seven faults that all failed silently (2026-09-19)
+
+Every fault below produced the same three symptoms - a clean trace with no refusal,
+a driver presenting ~45 frames a second, and a black screen - which is why five
+successive readings of the source produced five wrong answers and the faults were
+finally found by instrumenting the console and reading one frame in order.
+
+The measurements, from the run that has all seven fixed, in trace order:
+
+    menu iterate 0: state=17 ret=0
+    rgui render 0: blit-state reached
+    rgui set_texture: rgui=yes dirty=1 data=yes
+    vulkan set_texture_frame: rgb32=0 320x240 frame=yes
+    vulkan create_texture: asked=1 type=1 320x240 fmt=37 image=no buffer=yes
+    vulkan create_texture: asked=2 type=2 320x240 fmt=37 image=yes buffer=no
+    vulkan menu state: flag=1 idx=0 staging(img=0 buf=1) optimal(img=1 buf=0)
+    vulkan copy_staging_to_dynamic: dynamic 320x240 fmt=37 type=2, staging fmt=37 type=1, compute=0
+    vulkan draw_quad 0: texture=yes image=yes layout=5 320x240 pipe=yes
+
+1. **The last refusal was a compute pipeline, not an upload.** libps5vk's
+   `ps5vk_descriptor_options` walks every set-0 binding whose stage flags match the
+   stage being compiled and refuses any with stride 0; a storage image's stride is
+   zero by design (`ps5vk_descriptor_stride`), and this frontend's shared set
+   declares a compute-only storage image at binding 3. Exactly one pipeline is
+   compiled with COMPUTE against that layout - `rgb565_to_rgba8888`, the upload
+   shader - so the refusal fired once per `vulkan_init_pipelines` call: at init and
+   again on every swapchain recreation, three times in the recorded run, every line
+   identical. The pipeline is unnecessary here; 0027's single-format change had
+   already made its branch unreachable, and the branch would fail its own
+   `retro_assert`. Not compiling it ends the refusals (0036).
+
+2. **Widgets answered true for a driver whose menu widgets do not draw.** RetroArch
+   chooses between two mutually exclusive branches: `gfx_widgets_init` when the
+   driver reports `gfx_widgets_enabled`, else `gfx_display_init_first_driver`. The
+   latter is the only thing that sets `p_disp->dispctx`, and `gfx_display_draw`
+   returns immediately without it (`gfx_display.c:643`). Answering true therefore
+   cost the menu its display context and every draw returned in silence (0042).
+
+3. **Nothing enabled the menu texture.** The driver draws the menu only inside
+   `if (vk->flags & VK_FLAG_MENU_ENABLE)`, and the only place in the whole frontend
+   that sets it true is `display_menu_libretro` - whose own comment says "Display
+   the libretro core's framebuffer onscreen". It is a libretro concept and it is set
+   when a core runs. This title launches into the menu with no content, so it was
+   never set. `video_ps5` never noticed because it ignores the flag and draws
+   whatever `set_texture_frame` handed it (0046).
+
+4. **The sampled image was created and never filled.** `vulkan_set_texture_frame`
+   fills `vk->menu.textures[]` (staging) and the draw samples
+   `vk->menu.textures_optimal[]`. The optimal image is written by exactly one thing,
+   `vulkan_copy_staging_to_dynamic`, called from `vulkan_frame`'s upload block. That
+   block is gated on `vk->menu.dirty[]`, which this function sets at its end for
+   both cases - but the function itself fills the optimal image only when the
+   staging texture was just created. From the second handover on it took the `else`
+   branch, which flushed the staging texture to the GPU and never copied it, so the
+   menu was drawn every frame from an untouched allocation: a valid image, a valid
+   pipeline, a valid draw, black pixels (0051).
+
+5. **A leftover file on the console ended every run.** `/app0/args.txt` is read by
+   the driver as well as by `src/main.cpp`, deploy never deletes anything, and a
+   capture file left by an earlier probe made each run capture a frame at 90, write
+   it, and then call `command_event(CMD_EVENT_QUIT, NULL)`. The title therefore
+   disappeared about 1.5 seconds after it appeared, and the console booked it as an
+   application crash with a coredump - a symptom that reads as "it crashes and there
+   is no picture". The quit is gone (0039) and `tools/run-title.sh` clears the file
+   before every run (0043).
+
+6. **The draw was instrumented in the wrong place.** `gfx_display_vk_draw` is the
+   display-list path used by GL-style drivers. This driver composites the menu
+   itself, inside `vulkan_frame`, through `vulkan_draw_quad`. A probe there reported
+   "no draws" for three rounds, which was true of the path being watched and false
+   about the driver (0053).
+
+7. **A probe ended the run it was measuring.** The capture block's
+   `CMD_EVENT_QUIT` is the mechanism in fault 5; recorded separately because the
+   general rule is the one worth keeping: a probe must not change the run.
+
+Left open, precisely: with the menu texture filled, the quad drawn every frame with
+`texture=yes image=yes layout=5 320x240 pipe=yes`, and no refusal anywhere, the
+screen is still black. The next question is what the driver does with that draw -
+`../PS5_Vulkan`'s `ps5vk_draw.c`, the AGC stream it writes for the quad and the
+viewport it programs - not any further gate on this side.

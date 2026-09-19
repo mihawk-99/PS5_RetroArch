@@ -1483,3 +1483,48 @@ The run that proves it is the one the previous entry left waiting, unchanged: ar
 `tools/run-title.sh --no-build --watch 20`, then read `/app0/shot.ppm` and
 `/app0/retroarch.log` back. With the quit in place the verdict should read "it exited on
 its own" instead of "this script closed it", and the log should finally have content.
+
+## 2026-09-19 - the GPU path: seven silent faults, and the black screen that is left
+
+Ran the acceptance criteria in `docs/GPU_PATH_CRITERIA.md` against the console with
+`bash tools/run-title.sh`, reading `/app0/trace.txt` after each run. Fifteen
+diagnostic marks were added to the patch set (0046-0053) because inference failed
+five times in a row: every fault below produced a clean trace, a presenting driver
+and a black screen.
+
+A4 and B1 are met. `grep -c 'vulkan: '` over a full run's trace is 0, and the trace
+carries `video driver: video_vulkan init entered` with no `ps5_init entered`.
+
+The seven faults, each with the patch that fixed it:
+
+| # | Fault | Patch |
+| --- | --- | --- |
+| 1 | The last refusal was `vkCreateComputePipelines`, not an upload: libps5vk refuses any set-0 binding with stride 0, and this frontend's shared set declares a compute-only storage image at binding 3 | 0036 |
+| 2 | `vulkan_gfx_widgets_enabled` answered true, so the frontend skipped `gfx_display_init_first_driver` and `p_disp->dispctx` was never set - `gfx_display_draw` returns immediately without it | 0042 |
+| 3 | Nothing enabled `VK_FLAG_MENU_ENABLE`; the frontend's only `true` is in `display_menu_libretro`, which is a libretro concept this content-less title never reaches | 0046 |
+| 4 | The optimal menu image was never copied into after the first handover, so the draw sampled an untouched allocation | 0051 |
+| 5 | A stale `/app0/args.txt` made every run capture a frame and then quit itself 90 frames in, which the console books as an application crash with a coredump | 0043 |
+| 6 | `gfx_display_vk_draw` was instrumented as "the menu's draw"; it is the display-list path, and the driver composites the menu itself in `vulkan_draw_quad` | 0053 |
+| 7 | A capture probe that ended its own run: `command_event(CMD_EVENT_QUIT, NULL)` in the driver's capture block | 0039 |
+
+Measured at the moment of the draw, once per frame:
+
+    vulkan set_texture_frame: rgb32=0 320x240 frame=yes
+    vulkan copy_staging_to_dynamic: dynamic 320x240 fmt=37 type=2, staging fmt=37 type=1, compute=0
+    vulkan menu state: flag=1 idx=0 staging(img=0 buf=1) optimal(img=1 buf=0)
+    vulkan draw_quad 0: texture=yes image=yes layout=5 320x240 pipe=yes
+
+Nothing refuses, the copy runs, and the quad is drawn with a valid pipeline and
+image in `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`. The screen is black, and the
+owner has confirmed it three times.
+
+Not met: B2, B3, B4. Not claimed: C1-C4. The next step is the driver's own draw
+path in `../PS5_Vulkan` (`ps5vk_draw.c`), because everything on this side is now
+instrumented and reads correct.
+
+Two process notes worth keeping. The first is that the A2 mechanism recorded in the
+criteria was wrong for two rounds: both "request RGB8888" and "match the menu's
+format" were answers about a path that was not being taken, and the refusal named a
+binding rather than an upload. The second is that a leftover file on the console
+(`/app0/args.txt`, which deploy never deletes) silently changed what the title did;
+`tools/run-title.sh` now clears it before every run.
