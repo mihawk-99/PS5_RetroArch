@@ -31,7 +31,8 @@ subsequent build. Caller addresses must be decoded against the exact matching EL
 Host tests exercise allocation/free accounting, mapped/native realloc migration,
 failed realloc retention, foreign pointers, aligned allocation semantics,
 concurrency, metadata saturation, five-second sampling with an injected clock,
-and logging while the wrapped allocator fails. Vulkan mocks check that image and
+logging while the wrapped allocator fails, and 10,006 repeated failures producing
+only five failure records with the clock controlled by the test. Vulkan mocks check that image and
 queue-idle observers preserve arguments, return values and repeat registration.
 These tests do not establish console stability or identify the memory consumer.
 
@@ -65,9 +66,13 @@ previous run. No runner or deployment behavior is changed by this diagnostic.
   memory, not a separate heap. Native pressure includes both native and aligned.
 - `mapped_bytes/count/peak`: requests routed through the existing large-buffer
   mappings. These exclude mapping headers, page rounding and allocator overhead.
-- `failures`: cumulative failures; `failure` rows immediately record operation,
-  requested bytes, alignment (or element count for calloc overflow), error and
-  caller return address (`pc`). `calloc-overflow` is an arithmetic rejection,
+- `failures`: cumulative failures; the first four `failure` rows immediately
+  record operation, requested bytes, alignment (or element count for calloc
+  overflow), error and caller return address (`pc`). Further details and failure
+  summaries are limited to one per five seconds, even when presentation stops.
+  `failure_records` and `failure_suppressed` expose that limit. The `error` field
+  is a native error return or observed errno; a failed allocator may leave stale
+  errno, so a NULL result alone does not establish a particular error code. `calloc-overflow` is an arithmetic rejection,
   not measured heap exhaustion.
 - `dropped`: allocation records omitted because the fixed table was full. Any
   nonzero value makes live totals incomplete for the rest of that session.
@@ -83,8 +88,13 @@ Every five seconds while Vulkan presents, a summary and up to eight largest live
 allocation caller groups are emitted. Groups contain `pc`, requested live bytes
 and count; `site_records_omitted` reports overflow of the separate 2,048-site
 aggregation table. They are not full stack traces. No frame means no periodic
-sample; allocation failures still write synchronously. Clean frontend return
+sample; rate-limited allocation failures still write synchronously. Clean frontend return
 writes `final`; a crash need not.
+
+The first console run showed why failure logging must be bounded: menu-entry
+allocation retries produced 12,793 failure records and summaries (5.4 MB) before
+the owner closed a frozen title. That run is not a valid performance measurement,
+and rate limiting alone does not resolve the underlying allocation failures.
 
 Logging uses stack formatting, a preopened descriptor and `write`, without stdio
 or heap allocation. A fixed 131,072-entry pointer table plus state bytes uses

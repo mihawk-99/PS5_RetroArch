@@ -93,6 +93,13 @@ int main(int argc, char **argv)
     failure("forced", 77, 0, 0x1234, ENOMEM);
     fail_malloc = false;
     assert(!__wrap_calloc(SIZE_MAX, 2));
+    // Reproduce a menu allocation failure storm without flooding synchronous I/O.
+    for (int i = 0; i < 10000; ++i)
+        failure("storm", 15488, 0, 0x2345, ENOMEM);
+    assert(snapshot().failures == 10005 && snapshot().failure_records == 4);
+    clock_ns += 5000000000ULL;
+    failure("storm", 15488, 0, 0x2345, ENOMEM);
+    assert(snapshot().failure_records == 5);
     void *foreign = std::malloc(5);
     foreign = __wrap_realloc(foreign, 9);
     __wrap_free(foreign);
@@ -126,6 +133,6 @@ int main(int argc, char **argv)
     const auto stats = snapshot();
     assert(!stats.count[0] && !stats.count[1] && !stats.count[2]);
     assert(!stats.bytes[0] && !stats.bytes[1] && !stats.bytes[2]);
-    assert(stats.failures == 5 && stats.foreign_reallocs == 1 && stats.foreign_frees == 2);
+    assert(stats.failures == 10006 && stats.foreign_reallocs == 1 && stats.foreign_frees == 2);
     finish();
 }

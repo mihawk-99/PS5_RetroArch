@@ -21,7 +21,8 @@ struct Record
 struct Stats
 {
     uint64_t bytes[3]{}, count[3]{}, peak[3]{};
-    uint64_t failures = 0, dropped = 0, foreign_frees = 0, foreign_reallocs = 0;
+    uint64_t failures = 0, failure_records = 0, dropped = 0, foreign_frees = 0,
+             foreign_reallocs = 0;
 };
 #ifdef PS5_MEMORY_DIAGNOSTICS
 void init(const char *path, const char *identity);

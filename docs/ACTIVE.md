@@ -4,36 +4,46 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**XMB allocation diagnostic is built on `codex/xmb-allocation-diagnostics`.**
-This is instrumentation, not a crash fix. Owner explicitly requests no automatic
-upload or launch while working on another project. Wait for their intervention.
-The baseline's next-core work is not the assignment; this crash investigation is.
+**Bounded XMB allocation diagnostic is built on `codex/xmb-allocation-diagnostics`.**
+Uploads are always authorized; console launches require the owner's intervention.
+They authorized the first diagnostic run, which froze and was manually closed.
+Do not launch the revised build automatically. No next core is assigned.
 
-- Build identity: `000adf3edc2538bc563f833f0ccd2e91a01053aa6dac19dd568a580cdbbbb3cb`.
-- Output: `dist/PPSA99169/`; preserved executable/symbols/map/inspection under
-  `klog/xmb-memory-000adf3edc25/`. Evidence: `evidence/xmb-memory-diagnostic/`.
-- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five host gates.
-  Final format/unit check passed; 68 tests. Raw: `klog/xmb-memory-verify.log`,
-  `klog/xmb-memory-final-checks.log`. `tools/check-memory-diagnostics.py` passes.
-- No upload, launch, console settings change or PS5_Vulkan modification.
-  Current libps5vk differs from the crashing build; local archive snapshots and
-  their hashes identify the diagnostic's inputs. Other three archives match.
-- Log: `/app0/memory-diagnostics.log`; periodic requested live bytes/counts/peaks,
-  caller groups, image/queue-idle counters; immediate allocation failure records.
-  Metadata saturation/coverage gaps are explicit. No allocator policy change.
-- Reproduction and interpretation: `docs/MEMORY_DIAGNOSTICS.md`. Console validation
-  remains pending, including whether the crash reproduces with the newer driver.
+- Revised build identity: `a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be`.
+- Uploaded and verified; not launched. Raw: `klog/xmb-memory-bounded-upload.log`.
+- Output: `dist/PPSA99169/`; matching executable/symbols/map/inspection under
+  `klog/xmb-memory-a4a751e58339/`. Evidence: `evidence/xmb-memory-bounded-logging/`.
+- `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` passed all five host gates,
+  68 tests; `tools/check-memory-diagnostics.py` passed. Raw build log:
+  `klog/xmb-memory-bounded-verify.log`.
+- First four failure records are immediate; subsequent details and summaries are
+  limited to one per five seconds. Every failure still increments the counters.
+  Injected-clock test: 10,006 failures, five records, 10,001 suppressed, <8 KiB.
+- `/app0/memory-diagnostics.log` contains periodic requested live bytes/counts/
+  peaks, caller groups and image/queue-idle counters. Allocator policy unchanged.
+- Four archive hashes match the first diagnostic. PS5_Vulkan was not modified.
+  No revised console launch. Procedure/coverage: `docs/MEMORY_DIAGNOSTICS.md`.
 
-## Crash evidence
+## Console findings and limits
 
-Owner reproduced rapid XMB navigation crash. Raw capture:
-`klog/xmb-crash-20260919-181233/` (kernel, frontend, trace, config, diagnosis).
-Matching baseline symbols locate SIGSEGV at runtime `0x45b1ae` in
-`__vk_log_impl`, reached through `vk_sync_create` allocation failure inside
-`vkQueueWaitIdle`, called from XMB texture unload. Logger's second allocation
-returns NULL and is dereferenced. Why allocation failed is unresolved: heap
-exhaustion, fragmentation, retention/leak, unobserved usage or corruption remain
-possible. Do not call this a GPU hang or a resolved frontend/driver leak.
+- Original crash: `klog/xmb-crash-20260919-181233/`; SIGSEGV `0x45b1ae`
+  in Mesa `__vk_log_impl`, after `vk_sync_create` allocation failure during
+  XMB texture unload's `vkQueueWaitIdle`. Error logging dereferenced NULL.
+- First diagnostic `000adf3edc25` was uploaded/verified and launched with owner
+  authorization. Raw: `klog/xmb-memory-run-20260919-183305/`. Owner reports
+  complete freeze, then explicitly confirms manual close. No post-launch kernel
+  fatal signal. Preserve this outcome, not a passing crash reproduction.
+- First failure at 13,187 ms: 15,488-byte XMB node allocation; later 648-byte
+  menu callback allocation. Unbounded logging produced 12,793 failure records
+  plus summaries / 5,404,264 bytes. It distorted the run and may amplify a stall.
+- Observed native requested bytes rose from 4,559,423 (5 s sample) to 11,627,255;
+  tracked mappings stayed 5,498,938 bytes. Image creations minus destructions
+  stayed 131. Tracking dropped=0, but thousands of foreign frees expose incomplete
+  native-heap coverage. These observations do not prove a leak or heap limit.
+- Native malloc returned NULL with observed errno=22; errno may be stale. Do not
+  label that as a proven invalid request. Underlying failure/freeze is unresolved.
+- The bounded logger fixes diagnostic I/O flooding only. Console validation of
+  the revision is pending. Do not claim it fixes XMB or the driver's OOM logger.
 
 ## Previous console-verified baseline (Genesis Plus GX)
 
@@ -100,7 +110,7 @@ See `docs/DEPLOYMENT.md` for procedures and metadata-listed BIOS filenames.
 
 ## Operating notes
 
-Console testing is paused by the owner's explicit instruction for this step.
-When they are ready, start passive klog before reproduction and preserve current
-logs. Never interrupt another title. After a crash, capture logs before relaunch.
-No new core or unrelated driver work is authorized by the active-file context.
+Uploads are authorized; check console idle before deployment. No automatic launch
+of the revised diagnostic. When the owner authorizes a test, start klog first,
+preserve old logs and capture memory-diagnostics.log during the run. Never
+interrupt another title. Preserve crash/freeze logs before relaunch.

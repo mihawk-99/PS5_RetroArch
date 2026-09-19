@@ -2347,3 +2347,44 @@ opt-in build snapshots all four locally to avoid mutable archive inputs while
 the owner develops PS5_Vulkan. Mode and linked bytes participate in identity.
 No sibling writes, console access, upload, launch or settings change occurred.
 Manual protocol and limitations are in `docs/MEMORY_DIAGNOSTICS.md`.
+
+## 2026-09-19 — First allocation diagnostic froze; bound failure logging
+
+Owner authorized upload/launch of diagnostic `000adf3edc25`, then reported a
+complete freeze instead of a crash and explicitly confirmed manually closing it.
+Deployment was verified, klog started before launch and the allocation-log build
+identity matched. Raw: `klog/xmb-memory-run-20260919-183305/`, including prelaunch
+copies, deployment log, launch marker and post-freeze files. No post-launch
+kernel fatal signal was observed. Console later reported count=0 after manual close.
+
+First observed allocation failure: 13,187 ms, 15,488 bytes at `xmb_list_insert`;
+subsequent failures also include 648 bytes at `menu_entries_append` (decoded with
+the exact preserved ELF and image load base). The logger wrote 12,793 failure
+records and 12,793 summaries, totaling 5,404,264 bytes. This unbounded synchronous
+I/O distorted the diagnostic and could aggravate a freeze. The initial allocation
+failure precedes the flood; this does not prove logging caused the underlying
+failure or explains the complete freeze. Observed native live requests grew from
+4,559,423 bytes at the first sample to 11,627,255; mappings stayed 5,498,938. Net
+frontend Vulkan image count remained 131. Foreign frees leave native coverage
+incomplete; the observed errno=22 may be stale. No heap size/leak claim is made.
+
+Revised logging emits the first four failures immediately, then at most one
+detail and summary per five seconds even if presentation stops. All failures
+remain counted; failure_records and failure_suppressed expose rate limiting.
+Regression test uses a controlled clock: 10,006 failures, five records, 10,001
+suppressed and <8 KiB. A supplementary 10,000-failure comparison against 971534c
+produced 3,707,607 bytes before and 2,351 after. This fixes diagnostic flooding,
+not XMB's allocation failure or Mesa's unsafe OOM logging.
+
+`PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` — PASS format/unit/build/integration/
+evidence, 68 tests. `python3 tools/check-memory-diagnostics.py` — PASS.
+Evidence: `evidence/xmb-memory-bounded-logging/`; raw host log:
+`klog/xmb-memory-bounded-verify.log`. Revised identity:
+`a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be`.
+Matching ELF/map/executable are preserved under `klog/xmb-memory-a4a751e58339/`.
+All four driver archive hashes match the first diagnostic. No PS5_Vulkan edits.
+No revised console launch: further console validation awaits owner intervention.
+
+Revised diagnostic was uploaded under the owner's standing upload authorization
+and verified by `tools/deploy-title.py` after confirming console idle. Raw:
+`klog/xmb-memory-bounded-upload.log`. No launch command was sent.

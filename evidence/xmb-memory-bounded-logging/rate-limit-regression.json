@@ -1,0 +1,10 @@
+{
+  "before": {
+    "log_bytes": 3707607,
+    "failure_records": 10000
+  },
+  "after": {
+    "log_bytes": 2351,
+    "failure_records": 4
+  }
+}

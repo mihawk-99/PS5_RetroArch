@@ -20,7 +20,7 @@ unsigned char states[capacity];
 Stats stats;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int output = -1;
-uint64_t start_ns = 0, next_ns = 0, sequence = 0;
+uint64_t start_ns = 0, next_ns = 0, sequence = 0, failure_next_ns = 0;
 uint64_t image_create = 0, image_destroy = 0, image_failed = 0;
 uint64_t idle_begin = 0, idle_end = 0, idle_failed = 0;
 
@@ -95,6 +95,8 @@ void summary(const char *kind)
         line.field(peaks[i], stats.peak[i]);
     }
     line.field("failures", stats.failures);
+    line.field("failure_records", stats.failure_records);
+    line.field("failure_suppressed", stats.failures - stats.failure_records);
     line.field("dropped", stats.dropped);
     line.field("foreign_frees", stats.foreign_frees);
     line.field("foreign_reallocs", stats.foreign_reallocs);
@@ -223,17 +225,26 @@ void failure(const char *operation, size_t bytes, size_t alignment, uintptr_t ca
     const int saved = errno;
     pthread_mutex_lock(&mutex);
     ++stats.failures;
-    Line line;
-    line.text("failure op=");
-    line.text(operation);
-    line.field("ms", (now() - start_ns) / 1000000);
-    line.field("bytes", bytes);
-    line.field("alignment", alignment);
-    line.field("error", unsigned(error));
-    line.text(" pc=0x");
-    line.number(caller, 16);
-    line.emit();
-    summary("failure-summary");
+    // A failed allocation can be retried thousands of times by menu code.
+    // Preserve the first four, then at most one detail+summary per five seconds,
+    // even if presentation has stopped. Counters still include every failure.
+    const uint64_t time = now();
+    if (stats.failure_records < 4 || time >= failure_next_ns)
+    {
+        ++stats.failure_records;
+        failure_next_ns = time + 5000000000ULL;
+        Line line;
+        line.text("failure op=");
+        line.text(operation);
+        line.field("ms", (now() - start_ns) / 1000000);
+        line.field("bytes", bytes);
+        line.field("alignment", alignment);
+        line.field("error", unsigned(error));
+        line.text(" pc=0x");
+        line.number(caller, 16);
+        line.emit();
+        summary("failure-summary");
+    }
     pthread_mutex_unlock(&mutex);
     errno = saved;
 }

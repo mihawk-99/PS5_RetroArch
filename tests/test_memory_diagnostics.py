@@ -31,6 +31,10 @@ class MemoryDiagnostics(unittest.TestCase):
                           'native_count', 'mapped_count', 'aligned_count'):
                 self.assertEqual(fields[field], '0')
             self.assertEqual(fields['dropped'], '1')
+            self.assertEqual(fields['failures'], '10006')
+            self.assertEqual(fields['failure_records'], '5')
+            self.assertEqual(fields['failure_suppressed'], '10001')
+            self.assertLess(capture.stat().st_size, 8000)
             self.assertEqual(fields['image_create'], fields['image_destroy'])
             self.assertEqual(fields['idle_failed'], '1')
 

@@ -1,0 +1,25 @@
+{
+  "step": "xmb-memory-bounded-logging",
+  "recorded": "2026-09-19",
+  "revision": "971534c + bounded failure logging",
+  "command": "PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh; python3 tools/check-memory-diagnostics.py",
+  "console_run": null,
+  "raw_capture": "klog/xmb-memory-bounded-verify.log",
+  "raw_lines": 6269,
+  "raw_bytes": 3051974,
+  "lines": [
+    "First diagnostic owner observation: complete freeze; owner manually closed it.",
+    "First diagnostic: 12793 failure records and summaries; 5404264 log bytes; no post-launch kernel fatal signal.",
+    "Failures start at 13187 ms in XMB menu-node allocation, before the logging flood.",
+    "Revised logger: first four failures immediately, then at most one detail and summary per five seconds; all failures counted.",
+    "Host stress test: 10006 failures; 5 failure records; 10001 suppressed; output below 8192 bytes.",
+    "Host verification: PASS format unit build integration evidence; 68 tests.",
+    "Bounded diagnostic build identity: a4a751e58339deb55fd8b7b4cdae01c3e8479e79c22be53d717a696413ce34be",
+    "Four driver archive hashes match the first diagnostic; no sibling modifications.",
+    "Revised console run: NOT PERFORMED. Underlying allocation failure and freeze remain unresolved.",
+    "Revised diagnostic uploaded and verified on idle console; NOT launched."
+  ],
+  "additional_raw_captures": [
+    "klog/xmb-memory-bounded-upload.log"
+  ]
+}

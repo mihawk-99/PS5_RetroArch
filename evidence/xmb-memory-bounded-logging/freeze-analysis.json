@@ -1,0 +1,63 @@
+{
+  "kind": "console-diagnostic-freeze",
+  "build_identity": "000adf3edc2538bc563f833f0ccd2e91a01053aa6dac19dd568a580cdbbbb3cb",
+  "owner_observation": "complete freeze, followed by manual close",
+  "failure_record_count": 12793,
+  "first_failure_ms": 13187,
+  "first_sample": {
+    "seq": 2,
+    "ms": 5005,
+    "native_bytes": 4559423,
+    "native_count": 1336,
+    "native_peak": 4991899,
+    "mapped_bytes": 5498938,
+    "mapped_count": 3,
+    "mapped_peak": 5498938,
+    "aligned_bytes": 0,
+    "aligned_count": 0,
+    "aligned_peak": 0,
+    "failures": 0,
+    "dropped": 0,
+    "foreign_frees": 4404,
+    "foreign_reallocs": 0,
+    "image_create": 146,
+    "image_destroy": 15,
+    "image_failed": 0,
+    "idle_begin": 143,
+    "idle_end": 143,
+    "idle_failed": 0
+  },
+  "last_summary": {
+    "seq": 12796,
+    "ms": 43842,
+    "native_bytes": 11627255,
+    "native_count": 2059,
+    "native_peak": 11627255,
+    "mapped_bytes": 5498938,
+    "mapped_count": 3,
+    "mapped_peak": 5498938,
+    "aligned_bytes": 0,
+    "aligned_count": 0,
+    "aligned_peak": 0,
+    "failures": 12793,
+    "dropped": 0,
+    "foreign_frees": 7153,
+    "foreign_reallocs": 0,
+    "image_create": 162,
+    "image_destroy": 31,
+    "image_failed": 0,
+    "idle_begin": 175,
+    "idle_end": 175,
+    "idle_failed": 0
+  },
+  "failure_callers": [
+    "xmb_list_insert (15488-byte request)",
+    "menu_entries_append (648-byte request)"
+  ],
+  "kernel_fatal_signal_count_since_launch": 0,
+  "conclusions": [
+    "Unbounded synchronous failure logging distorted this diagnostic run.",
+    "Allocation failures precede the log flood; underlying cause remains unresolved."
+  ],
+  "raw_capture_directory": "klog/xmb-memory-run-20260919-183305"
+}
