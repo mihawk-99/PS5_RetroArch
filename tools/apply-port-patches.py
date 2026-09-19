@@ -969,6 +969,84 @@ EDITS = [
         "               | ((pix & 0x000f) << 28);\n",
         "patches/series, 0028",
     ),
+    (
+        # The capture, on the one path every frame takes. `vulkan_frame` is called 644
+        # times in an unattended run, and the frontend's own `--max-frames-ss` block is
+        # never reached by a content-less menu run (docs/PHASE_LOG.md, 2026-09-19), so the
+        # count and the screenshot live here. The budget and the path are the port's own
+        # options in /app0/args.txt - `--ps5-capture=N` and `--ps5-capture-path=FILE`, which
+        # src/main.cpp keeps away from RetroArch's own option parsing - so a run without
+        # them never takes a picture. The screenshot is the Vulkan driver's readback
+        # (vulkan_readback), and the trace line says whether it worked.
+        "gfx/drivers/vulkan.c",
+        "   int i, j, k;\n"
+        "   VkSubmitInfo submit_info;\n"
+        "   VkClearValue clear_color;\n",
+        "   /* Added by this port (patches/series, 0031): see the note above this edit. */\n"
+        "   {\n"
+        "      static int      ps5_capture_budget = -1;\n"
+        "      static unsigned ps5_capture_frames;\n"
+        "      static bool     ps5_capture_taken;\n"
+        "      static char     ps5_capture_file[512] = \"/app0/shot.png\";\n"
+        "      extern bool take_screenshot(const char *screenshot_dir, const char *path,\n"
+        "            bool silence, bool has_valid_framebuffer, bool fullpath, bool use_thread);\n"
+        "\n"
+        "      if (ps5_capture_budget < 0)\n"
+        "      {\n"
+        "         FILE *ps5_args = fopen(\"/app0/args.txt\", \"r\");\n"
+        "         char  ps5_line[256];\n"
+        "\n"
+        "         ps5_capture_budget = 0;\n"
+        "\n"
+        "         while (ps5_args && fgets(ps5_line, sizeof(ps5_line), ps5_args))\n"
+        "         {\n"
+        "            if (strncmp(ps5_line, \"--ps5-capture=\", 14) == 0)\n"
+        "               ps5_capture_budget = atoi(ps5_line + 14);\n"
+        "            else if (strncmp(ps5_line, \"--ps5-capture-path=\", 19) == 0)\n"
+        "            {\n"
+        "               char *ps5_end = strpbrk(ps5_line + 19, \"\\r\\n\");\n"
+        "\n"
+        "               if (ps5_end)\n"
+        "                  *ps5_end = '\\0';\n"
+        "               snprintf(ps5_capture_file, sizeof(ps5_capture_file), \"%s\", ps5_line + 19);\n"
+        "            }\n"
+        "         }\n"
+        "\n"
+        "         if (ps5_args)\n"
+        "            fclose(ps5_args);\n"
+        "      }\n"
+        "\n"
+        "      if (ps5_capture_budget > 0 && !ps5_capture_taken)\n"
+        "      {\n"
+        "         ps5_capture_frames++;\n"
+        "\n"
+        "         if (ps5_capture_frames >= (unsigned)ps5_capture_budget)\n"
+        "         {\n"
+        "            bool  ps5_ok;\n"
+        "            FILE *ps5_trace;\n"
+        "\n"
+        "            ps5_capture_taken = true;\n"
+        "            ps5_ok            = take_screenshot(NULL, ps5_capture_file, false,\n"
+        "                  false, true, false);\n"
+        "\n"
+        "            ps5_trace = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "            if (ps5_trace)\n"
+        "            {\n"
+        "               fprintf(ps5_trace,\n"
+        "                     \"capture: frame %u of %d, take_screenshot -> %s (%s)\\n\",\n"
+        "                     ps5_capture_frames, ps5_capture_budget,\n"
+        "                     ps5_ok ? \"ok\" : \"failed\", ps5_capture_file);\n"
+        "               fclose(ps5_trace);\n"
+        "            }\n"
+        "         }\n"
+        "      }\n"
+        "   }\n"
+        "\n"
+        "   int i, j, k;\n"
+        "   VkSubmitInfo submit_info;\n"
+        "   VkClearValue clear_color;\n",
+        "patches/series, 0031",
+    ),
 ]
 
 

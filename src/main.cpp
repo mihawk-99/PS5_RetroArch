@@ -182,6 +182,11 @@ int main()
                 line[--len] = '\0';
             if (len == 0 || line[0] == '#')
                 continue;
+            /* The port's own options are read from this file by the frontend code that
+             * uses them (patch 0031 reads `--ps5-capture=`), and RetroArch must not see
+             * them: an option it does not know is an option it complains about. */
+            if (std::strncmp(line, "--ps5-", 6) == 0)
+                continue;
             extra_count++;
         }
         std::fclose(extra);

@@ -1349,3 +1349,36 @@ counter there plus a call to it, with the quit the same way the max-frames path 
 Everything else this round is unchanged from the last: 644 frames and 643 menu draws in an
 unattended run, the probe-free image alive for its whole watch window, and
 `bash tools/verify.sh` PASS (format unit build integration evidence).
+
+## 2026-09-19 - the capture fires; the driver's readback is what fails
+
+Two hooks were tried for the frame budget the screenshot needs, and the difference
+between them is the finding:
+
+- `video_driver_cached_frame` (gfx/video_driver.c) - the natural place, and **not called**
+  in a content-less run: the hook never ran on the console, so that patch was removed
+  rather than committed.
+- `vulkan_frame` (gfx/drivers/vulkan.c, patch 0031) - the one path every frame takes, and
+  the trace now says so on every capture run:
+
+      capture: frame 90 of 90, take_screenshot -> failed (/app0/shot.png)
+
+So the port's own options work end to end: `/app0/args.txt` carrying
+`--ps5-capture=90` and `--ps5-capture-path=/app0/shot.png` is read by the patched
+`vulkan_frame`, the count reaches the budget, `take_screenshot` is called with the path,
+and the result is written to the trace either way. `src/main.cpp` keeps `--ps5-*` lines
+away from RetroArch's option parser. Run: `klog/run-shot-r6b.log`,
+`klog/run-PPSA99169-031642.log`.
+
+What fails is the readback behind `take_screenshot` - the frontend's screenshot writer
+asks the video driver for the frame, and `vulkan_readback`'s synchronous path (blit the
+backbuffer into a staging texture, `vkQueueWaitIdle`, map it) returns false. That is the
+next step: its refusal is logged to `/app0/retroarch.log`, which is the file that never
+flushes, so the first move is to get that message out - the driver's debug messenger is
+already installed, so a readback refused by `../PS5_Vulkan` would name its reason in the
+trace once the readback runs inside a trace-visible path.
+
+The options this needs are the frontend's own and stay that way: a run without
+/app0/args.txt takes no picture and behaves exactly as before (verified by the same
+round's runs), and `bash tools/verify.sh` is PASS (format unit build integration
+evidence) with the capture patch in place.

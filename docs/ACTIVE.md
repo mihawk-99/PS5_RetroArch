@@ -45,15 +45,16 @@ can be given those options without the launcher, verified by the mark
 
 ## Next
 
-1. **Hook the path the menu actually takes.** The `--max-frames-ss` block is not reached
-   on a content-less run: it compares `video_st->frame_count`, which only
-   `video_driver_frame` increments, and the menu is drawn through
-   `video_driver_cached_frame` (patch 0029 tried a runloop-side counter and had no effect
-   on the console, so it was removed). Put the counter and the `take_screenshot` call
-   (`tasks/task_screenshot.c`) in `video_driver_cached_frame`, take the shot, read it back
-   over FTP and look at it (`klog/shot-*.png`). The readback is the Vulkan driver's own
-   `vulkan_readback`/`VK_FLAG_READBACK_PENDING` path, so it tests one more driver entry
-   point too.
+1. **The capture fires; make the readback work.** Patch 0031 counts frames in
+   `vulkan_frame` and calls `take_screenshot` at the budget, and the trace says
+   `capture: frame 90 of 90, take_screenshot -> failed (/app0/shot.png)`: the trigger is
+   done, the pixels are not. `take_screenshot`'s writer asks the driver for the frame and
+   `vulkan_readback` (blit to a staging texture, `vkQueueWaitIdle`, map) returns false -
+   and its reason goes to `/app0/retroarch.log`, which never flushes. Get that message
+   out first (write it to the trace from the readback path, or make the frontend's log
+   unbuffered), then fix the refusal, then read `klog/shot-*.png` back over FTP and look
+   at it. The readback is `VK_FLAG_READBACK_PENDING`/`vulkan_readback`, so this also
+   exercises one more driver entry point.
 2. **Then the init refusals**: triangle strips at init (the topology patch 0016 applies to
    the chain's quad) and the blank texture's compute upload (its staging texture could
    match its destination, as 0027 does for the menu texture).
