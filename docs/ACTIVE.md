@@ -9,69 +9,59 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The Vulkan driver initialises on the console, builds the stock shader's pipeline,
-and runs the runloop - the first frame dies on a render pass left open.** A
-`tools/run-title.sh` run now shows: `selected="vulkan"`, the console's `khr_display`
-WSI resolved, a device and a swapchain at 3840x2160, four textures, a vertex buffer,
-the stock shader's SPIR-V reflected, **both shader modules compiled and
-`vkCreateGraphicsPipelines` returning 0**, `vulkan_init` handing back a live pointer,
-the input driver opening the pad, and `runloop_iterate` reaching
-`vulkan_frame` -> `vkQueueSubmit`. Nothing has reached the screen yet.
+**The Vulkan driver initialises, creates the stock shader's pipeline, and runs the
+runloop - the first frame's draw is refused by the driver.** `video_vulkan` is
+selected, the console's `khr_display` WSI resolves, a device and a swapchain at
+3840x2160 are created, four textures and a vertex buffer are built, both stock shaders
+compile through the driver's own compiler, `vkCreateGraphicsPipelines` returns 0,
+`vulkan_init` hands back a live pointer, the input driver opens the pad, and
+`runloop_iterate` reaches `vulkan_frame` -> the backbuffer pass -> the chain's draw ->
+`vkQueueSubmit`. Nothing is on screen.
 
-**The exact remaining failure**, read from the trace because assertions now say what
-they are:
+**The two rounds spent on "a render pass is already open" were this port's own probe.**
+A probe insert had duplicated the `vkCmdBeginRenderPass` call - the tool writes
+`insert + anchor`, the insert ended with the anchor, and the statement appeared twice,
+so the second call found the pass the first had begun. The duplicate detector (diff the
+configured tree against `vendor/retroarch` for lines that appear more often) found five
+such pairs; the file was restored from upstream and the port patches re-applied.
+`tests/test_frontend.py`'s `ProbeSet` now checks that an insert does not contain its
+anchor *at all*, which is the property that matters, and it caught one more while this
+was written up.
 
-    probe SPAN: offscreen passes
-    probe SPAN: menu upload
-    probe SPAN: about to begin the backbuffer pass
+**The real remaining failure**, from the trace (assert messages are readable because
+stderr is unbuffered):
+
     probe REC: begin render pass
-    assertion failed: cmd_buffer->render_pass == NULL
-      (.../vulkan-runtime/src/vulkan/runtime/vk_render_pass.c:2648,
-       vk_common_CmdBeginRenderPass2)
+    probe DRAW: binding for the second triangle
+    probe DRAW: the quad draw is recorded
+    assertion failed: cmd_buffer->state == MESA_VK_COMMAND_BUFFER_STATE_INITIAL ||
+      ... EXECUTABLE || ... PENDING  (vk_queue.c:362, vk_queue_submit_add_command_buffer)
 
-The frame's command buffer already has a render pass open when the backbuffer pass
-begins, and the marks bracket the span to the first-frame history/feedback clear
-(`vulkan_filter_chain_build_offscreen_passes`) and the menu texture upload.
+That state is what a **recording refusal** leaves, so the draw is refused. The driver
+refuses in three places, and two are silent here: `pipeline->draw_refusal` (a string
+computed at pipeline creation) and `ps5vk_pipeline_prepare_shaders` - its AGC
+`sceAgcCreateShader`/`sceAgcLinkShaders` step, which it runs at the **first draw**
+rather than at pipeline creation. The viewport/scissor check passes (one of each).
 
-**Five things were fixed to get here**, four of them in this repository:
-
-- **0016 - the topology.** That driver's pipeline check accepts only
-  `VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST`, and its draw path refuses a non-indexed draw
-  whose first vertex is not zero; RetroArch drew its quads as a four-vertex *strip*.
-  The quads are now six-vertex lists, the second triangle drawn through the binding's
-  own offset. This is what turned `VK_ERROR_UNKNOWN` into a created pipeline.
-- **0017 - the samplers.** The driver refuses any sampler that is not clamp-to-edge
-  and leaves the output handle untouched, and `CommonResources` destroys every handle
-  that is not `VK_NULL_HANDLE`: sixteen refused samplers were destroyed as if they were
-  real, and the driver asserted. The array is cleared before it is filled.
-- **0018 - the quit.** The display context reported `quit` from the frontend's signal
-  handler state, so the runloop ended on its first iteration and `rarch_main` returned
-  0 with no frame. A console title has no terminal and no SIGTERM sender, so this
-  context no longer treats that state as a quit request.
-- **The BSS is cleared by this port's CRT.** `_start` went from `_init_env` straight to
-  the static constructors, and the image's writable segment is 0x104b4 bytes in the
-  file against 0xc7040 in memory. `tooling/native/ps5-pie.ld` now marks
-  `__bss_start`/`__bss_end` and `_start` clears the range; every run prints
-  `bss check=0 (must be 0), data check=7 (must be 7)`. Whether the loader also zeroed
-  it was never measured - the invariant is what this asserts, and it is cheap.
-- **Assertions are readable.** The driver's `__assert` prints through stderr and then
-  aborts, and the console's libc buffers stderr, so every assertion used to arrive as a
-  bare `abort is called(system)`. `src/main.cpp` sends stderr to the trace **and makes
-  it unbuffered**, which is what produced the assert text above.
+**Its messages are compiled out**, which is why this cannot be read from here:
+`src/vulkan/runtime/vk_log.c` drops every message unless `MESA_DEBUG` was set at build
+time, or the instance has debug logging on, or a debug callback is installed - and
+`enable_debug_logging` is never assigned anywhere in that tree.
 
 ## Next
 
-1. **Mark the span between the offscreen-passes call and the backbuffer pass**: the
-   first-frame `clear_history_and_feedback` and the menu texture upload. Whichever one
-   opens a render pass is the bug; `vulkan_framebuffer_clear` and
-   `vulkan_copy_staging_to_dynamic` are the two candidates, and the driver's own
-   `ps5vk_CmdClearColorImage` is CPU work at a submission split point, so the copy path
-   is the likelier one.
-2. **Then the first frame**, and with it the objective: `probe FRAME` lines in
-   `/app0/trace.txt` every thirty frames, the menu on screen, and the driver's own
-   present path.
-3. **Then the config file.** Content loading still discards the title's `-c`, and the
-   fix (0006) is parked in `parked/config-path.patch.py`.
+1. **Make that driver speak, from this side**: patch the frontend's Vulkan instance
+   creation to enable `VK_EXT_debug_utils` and install a messenger whose callback
+   writes to stderr (which is the trace file). Then every refusal names its reason, and
+   the remaining work is ordinary. If the extension is refused, the failure is
+   immediate and visible.
+2. **Or take the answer from `../PS5_Vulkan`**: what `sceAgcCreateShader` /
+   `sceAgcLinkShaders` return for this pipeline, or a build whose `vk_log` is not
+   compiled out. One value settles it.
+3. **Then the first frame**, and with it the objective: frames in the trace, the menu
+   on screen, and `tools/verify.sh` green.
+4. **Then the config file.** Content loading still discards the title's `-c`; the fix
+   (0006) is parked in `parked/config-path.patch.py`.
 
 ## Working notes
 

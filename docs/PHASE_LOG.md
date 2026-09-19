@@ -1196,3 +1196,52 @@ own anchor duplicates the line it is inserted before, which broke the build thre
 in this round (a duplicated `vkCreateImage`, a duplicated `switch (`, a duplicated
 `vulkan_filter_chain_build_offscreen_passes(`); every probe must carry a marker, a
 note and a trailing newline. All of it is checked before a probe can reach a build.
+
+## 2026-09-19: Two rounds of "a render pass is already open" were this port's own probe
+
+**The correction.** The blocker chased through round 1 and the start of round 2 - the
+driver asserting `cmd_buffer->render_pass == NULL` in `vkCmdBeginRenderPass` - was not
+the driver's and not RetroArch's. A probe insert had **duplicated the
+`vkCmdBeginRenderPass` call**: the tool writes `insert + anchor`, the insert ended with
+the anchor line, and the tree ended up with the statement twice, so the *second* call
+found the pass the first had just begun. A duplicate-detector run against
+`vendor/retroarch` found five such pairs - `vkCmdBeginRenderPass`, `vkCmdEndRenderPass`,
+`vkEndCommandBuffer`, `vulkan_filter_chain_end_frame`, and the `if (quit)` pair from
+the ALIVE probe. Restoring the file from `vendor/retroarch` and re-applying the port
+patches removed all of them.
+
+**The guard is stronger now.** `tests/test_frontend.py`'s `ProbeSet` checked that an
+insert does not *end* with its anchor; it now checks that the insert does not *contain*
+the anchor at all, which is the property that matters. It caught one more of the same
+mistake in the SIGNAL probe while this was written up.
+
+**What the real blocker is.** With the duplication gone, a run reaches the frame's
+whole recording - the backbuffer pass begins, the chain binds and draws, the quad's
+second triangle is drawn through the binding offset - and then `vkQueueSubmit` asserts
+with `cmd_buffer->state` neither INITIAL, EXECUTABLE nor PENDING. That state is what a
+**recording refusal** leaves (Mesa's `vk_command_buffer_set_error`), so the draw itself
+is being refused. `../PS5_Vulkan`'s draw path refuses in three places, and two of them
+are silent in a build without its log:
+
+- `pipeline->draw_refusal` - a string computed when the pipeline is created;
+- `ps5vk_pipeline_prepare_shaders` - the AGC `sceAgcCreateShader`/`sceAgcLinkShaders`
+  step, which that driver runs at the **first draw**, not at pipeline creation;
+- the viewport/scissor count check, which this pipeline passes (one of each is set).
+
+**Why the message cannot be read from here.** `vk_log.c` drops every message unless
+`MESA_DEBUG` is set at compile time or the instance has debug logging on or a debug
+callback installed:
+
+    if (unlikely(!instance) ||
+        (likely(!instance->enable_debug_logging) &&
+         likely(list_is_empty(&instance->debug_utils.callbacks)) &&
+         likely(list_is_empty(&instance->debug_report.callbacks))))
+       return;
+
+and `enable_debug_logging` is never assigned anywhere in that tree. So the two ways
+forward are a debug-utils messenger created from this side, or that project's own
+result code.
+
+**Verified.** `bash tools/verify.sh` PASS (format unit build integration evidence);
+20 unit tests; `strings build/llvm-pie.elf | grep -c 'probe DRAW|probe REC|...'` = 0
+after deleting `build/ra/obj`, which a probe revert needs to take effect.

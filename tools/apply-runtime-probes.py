@@ -446,8 +446,7 @@ PROBES = [
         "#ifdef HAVE_MENU\n"
         "         /* Ensure that menu stack is flushed appropriately\n",
         "         { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
-        "           if (f) { fprintf(f, \"probe SHUTDOWN: a core asked to shut down\\n\"); fclose(f); } }\n"
-        "         runloop_st->flags |= RUNLOOP_FLAG_CORE_SHUTDOWN_INITIATED\n",
+        "           if (f) { fprintf(f, \"probe SHUTDOWN: a core asked to shut down\\n\"); fclose(f); } }\n",
         "probe SHUTDOWN:",
         "which trigger quit the runloop before the first frame",
     ),
@@ -457,12 +456,11 @@ PROBES = [
         # its first frame, and whether the console sends it or something in the
         # title does.
         "frontend/drivers/platform_unix.c",
-        "   (void)sig;\n",
-        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
-        "     if (f) { fprintf(f, \"probe SIGNAL: %d caught, count now %d\\n\",\n"
-        "                      sig, (int)(unix_sighandler_quit + 1)); fclose(f); } }\n"
         "   (void)sig;\n"
         "   unix_sighandler_quit++;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SIGNAL: %d caught, count now %d\\n\",\n"
+        "                      sig, (int)(unix_sighandler_quit + 1)); fclose(f); } }\n",
         "probe SIGNAL:",
         "which signal ends the runloop, and how early",
     ),
@@ -529,6 +527,64 @@ PROBES = [
         "        if (f) { fprintf(f, \"probe SPAN: about to begin the backbuffer pass\\n\"); fclose(f); } }\n",
         "probe SPAN: about to begin the backbuffer pass",
         "the last mark before the assert",
+    ),
+    (
+        # The frame's command buffer already has a render pass open when the
+        # backbuffer pass begins. The marks narrowed it to the first-frame
+        # history/feedback clear and the menu texture upload; the clear is inside
+        # build_offscreen_passes, and this and the mark after it split that call from
+        # the upload.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "      require_clear = false;\n",
+        "      { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "        if (f) { fprintf(f, \"probe SPAN: history clear done\\n\"); fclose(f); } }\n",
+        "probe SPAN: history clear done",
+        "the first-frame clear has run: a pass left open here is its doing",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "                  vk->menu.dirty[vk->menu.last_index] = false;\n",
+        "                  { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "                    if (f) { fprintf(f, \"probe SPAN: menu copy done\\n\"); fclose(f); } }\n",
+        "probe SPAN: menu copy done",
+        "the menu texture copy has run: a pass left open here is its doing",
+    ),
+
+    (
+        # The render pass is opened before the frame's own offscreen marks, so the
+        # span to split is the frame's first half: this marks its entry and the end of
+        # the software-frame upload, which is the one call in between that records
+        # commands into the frame's command buffer.
+        "gfx/drivers/vulkan.c",
+        "   int i, j, k;\n"
+        "   VkSubmitInfo submit_info;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe REC: frame entered\\n\"); fclose(f); } }\n",
+        "probe REC: frame entered",
+        "the frame's entry, before anything is recorded",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      vk->last_valid_index = frame_index;\n",
+        "      { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "        if (f) { fprintf(f, \"probe REC: frame upload done\\n\"); fclose(f); } }\n",
+        "probe REC: frame upload done",
+        "the software frame has been uploaded: a pass open here is that upload's doing",
+    ),
+
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        '   vkCmdDraw(cmd, 4, 1, 0, 0);\n',
+        '   { FILE *f = fopen("/app0/trace.txt", "a");\n     if (f) { fprintf(f, "probe DRAW: the quad draw is recorded\\n"); fclose(f); } }\n',
+        'probe DRAW: the quad draw is recorded',
+        "the chain's per-pass recording, step by step: the refusal is silent and the last mark is one command before it",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        '   vkCmdBindVertexBuffers(cmd, 0, 1, &buffer, &second);\n',
+        '   { FILE *f = fopen("/app0/trace.txt", "a");\n     if (f) { fprintf(f, "probe DRAW: binding for the second triangle\\n"); fclose(f); } }\n',
+        'probe DRAW: binding for the second triangle',
+        'the second triangle of the quad, drawn through the binding offset',
     ),
 ]
 

@@ -751,12 +751,20 @@ class ProbeSet(unittest.TestCase):
                 return ast.literal_eval(node.value)
         raise AssertionError(f"{self.script} no longer defines PROBES")
 
-    def test_no_insert_repeats_its_own_anchor(self) -> None:
+    def test_no_insert_contains_its_own_anchor(self) -> None:
+        """An insert that contains its anchor duplicates whatever the anchor is.
+
+        The tool writes `insert + anchor`, so any occurrence of the anchor inside
+        the insert ends up in the tree twice. Three probes did exactly that in one
+        session - including a duplicated `vkCmdBeginRenderPass`, whose second call
+        was chased for two rounds as a driver bug: it was this. Checking the whole
+        insert, not just its end, is what would have caught it.
+        """
         for name, anchor, insert, marker, _note in self.probes():
-            self.assertFalse(
-                insert.endswith(anchor),
-                f"{marker!r} in {name} ends with its own anchor, which would "
-                f"duplicate the line it is inserted before")
+            self.assertNotIn(
+                anchor, insert,
+                f"{marker!r} in {name} contains its own anchor, which would "
+                f"duplicate it in the tree")
 
     def test_every_probe_has_a_marker_and_a_note(self) -> None:
         for name, _anchor, insert, marker, note in self.probes():
