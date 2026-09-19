@@ -29,11 +29,23 @@ three sources and the frontend-side fix for each.
 | A3 | Every sampler the frontend creates uses clamp-to-edge on all three axes | `vendor/retroarch/gfx/drivers_shader/shader_vulkan.cpp:2034-2036` (hardcoded REPEAT) and `:2087-2108` (preset-driven, mapping to repeat / mirrored-repeat / clamp-to-border / mirror-clamp) | the trace has **zero** `sampler address modes` lines |
 | A4 | The refusal count is zero, not merely lower | all of the above | `grep -c '^vulkan: ' /app0/trace.txt` is **0** over a full run |
 
-A2 is a decision, not only a patch: the menu is uploaded as RGB565 and the dynamic
-texture is RGB8888, which is what makes the formats differ and select compute. The
-two candidate fixes are (a) request RGB8888 pixel format so the formats match and
-the copy branch runs, or (b) keep RGB565 and let the copy path handle it. Whichever
-is chosen, the criterion is the same and the choice is recorded here afterwards.
+A2 is a decision, not only a patch, and it is now settled: **request RGB8888**.
+
+The menu is sent as RGB565 (`rgb32 == false`), and `vulkan_set_texture_frame`
+answers that by remapping `fmt` to `VK_FORMAT_B4G4R4A4_UNORM_PACK16` while the
+staging texture is allocated in the 32-bit `fmt` it started as - so the two formats
+differ and `vulkan_copy_staging_to_dynamic` (`gfx/drivers/vulkan.c:1098`) takes the
+compute path, which writes the storage image at binding 3 that libps5vk refuses.
+
+The alternative - allocate the staging texture in the remapped format so the formats
+match - would also clear the refusal, but it stores the menu in **B4G4R4A4: four
+bits per channel**, and RGUI's palette and antialiased text would visibly degrade.
+Requesting RGB8888 makes the menu 32-bit end to end, so the formats match, the plain
+`vkCmdCopyBufferToImage` path runs, and the picture is full 8-bit colour.
+
+The risk to watch is that `SET_PIXEL_FORMAT: RGB8888` is a frontend-wide setting; if
+it has side effects, the remapped-staging fallback is the alternative and the
+quality tradeoff gets recorded here rather than hidden.
 
 ## B - the menu reaches the screen through the GPU
 
