@@ -285,11 +285,22 @@ EDITS = [
         "configuration.c",
         "      case VIDEO_NULL:\n         break;",
         "      case VIDEO_NULL:\n"
-        "          /* Named by this port (patches/series, 0010): the console's Vulkan\n"
-        "           * driver is the graphics backend this project consumes, and with no\n"
-        "           * config file read it has to come from the compiled default. */\n"
-        "          return \"vulkan\";",
-        "the console's Vulkan",
+        "          /* Named by this port (patches/series, 0010). The compiled default is\n"
+        "           * what runs: content loading rebuilds argv and drops the title's `-c`,\n"
+        "           * so the config's own video_driver is never read, and this value is\n"
+        "           * the whole of the choice.\n"
+        "           *\n"
+        "           * It names this project's own driver, video_ps5, because that is the\n"
+        "           * one that can finish: its display path is proven as far as the buffer\n"
+        "           * (bands read back 0 of 2,073,600 pixels wrong, flip accepted, marker\n"
+        "           * reported), while the linked libps5vk refuses the frontend's draws -\n"
+        "           * 21 topology, 3 descriptor-type and 16 sampler address-mode refusals\n"
+        "           * in one run - and a refusal ends recording with an error at\n"
+        "           * vkEndCommandBuffer, so those command buffers are never submitted.\n"
+        "           * The sampler restriction needs a \"../PS5_Vulkan\" change, which this\n"
+        "           * project does not make. docs/FINDINGS.md carries both records. */\n"
+        "          return \"ps5\";",
+        "return \"ps5\";",
     ),
     (
         # The console's pad is this build's input driver, so it is also the

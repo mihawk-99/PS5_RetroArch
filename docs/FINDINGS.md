@@ -2130,3 +2130,36 @@ a driver-side gap.
 stands on its own and is proven to the buffer, but it is a second, unused path
 while Vulkan is registered first. The live problem is the driver refusing the
 frontend's commands.
+
+## The video driver is chosen by a compiled default, and the config cannot override it
+
+**Measured.** `tools/apply-port-patches.py` patches `configuration.c` so that
+`case VIDEO_NULL:` returns a name instead of falling through - the compiled default
+video driver, used when no config file is read. Its own comment says why the config
+cannot help: *"There is no config file at runtime yet: content loading rebuilds argv
+and drops the title's `-c`, and the fix for that is parked because reading the
+config still crashes the launch."* So `/app0/retroarch.cfg`'s
+`video_driver = "ps5"` is inert, even though the file is present, correct, and read
+for its logging settings.
+
+**The ICD file is a red herring.** `/data/homebrew/PPSA99169/libvulkan.so.1`
+(16,706,040 bytes) is beside the title, and renaming it away changed nothing: the
+same refusals appeared. The Vulkan driver in use is the one linked statically from
+`libps5vk.ps5.a`, not something loaded by name at runtime.
+
+**Changing the compiled default to `"ps5"` did not take.** The patch was rewritten
+so `case VIDEO_NULL:` returns `"ps5"`, the configured tree was reset and the patches
+re-applied, the change was confirmed in `build/ra-conf/configuration.c`, and the
+title rebuilt (33,790,346 bytes). The run produced the same 21 topology, 3
+descriptor-type and 16 sampler address-mode refusals. Something other than that
+switch still selects Vulkan, and it has not been found. `video_ps5` remains
+registered in `video_drivers[]` at index 3 and unreachable in practice.
+
+**The blocker, stated once.** The frontend's draws are refused by the linked
+libps5vk. Of the three refusal sources the maintainer has classified all three as
+expected gaps, and the sampler address-mode restriction
+(`driver/ps5vk_image.c:800-806`, C4 scope) has no workaround from this side: it is a
+driver-side change in a tree this project does not modify. Until it is lifted - or
+until the frontend is shown how to avoid it - the menu's draws never reach the GPU,
+because a refusal ends recording with an error at `vkEndCommandBuffer` and
+RetroArch discards that result.
