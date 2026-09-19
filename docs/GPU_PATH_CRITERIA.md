@@ -1,0 +1,91 @@
+# The GPU path: acceptance criteria
+
+Scoped before any code is written, because the previous path taught this project
+what "done" has to mean before the work starts rather than after. Every criterion
+names how it is verified, and the verification is a command or an artifact - not an
+opinion.
+
+## What this replaces, and what it must not break
+
+The title renders today through `video_ps5` (`src/video_ps5.cpp` +
+`src/display.cpp`): RGUI's 320x240 RGB565 framebuffer is converted and scaled on the
+CPU, one pixel at a time, into a tiled 1920x1080 framebuffer in direct memory, and
+handed to the display with `sceVideoOutSubmitFlip`. The menu is visible on the
+console. **That path stays working throughout.** Every criterion below is additive:
+if the GPU path is not yet better, `video_ps5` is still the driver that runs, and
+the menu is still on screen.
+
+## A - the 40 refusals, cleared
+
+The linked libps5vk refuses this frontend's commands, and a refusal ends recording
+with an error at `vkEndCommandBuffer`, so the command buffers never submit and the
+screen stays black while every call returns success. The maintainer identified all
+three sources and the frontend-side fix for each.
+
+| # | Criterion | Where | How it is verified |
+| --- | --- | --- | --- |
+| A1 | No pipeline is created with `VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP` | `vendor/retroarch/gfx/drivers/vulkan.c:2620`, `:2649`, `:2765` - the three sites that select a strip topology | `grep -c TRIANGLE_STRIP` over the configured `gfx/drivers/vulkan.c` is 0 in any `input_assembly.topology` assignment, and the trace has **zero** `only triangle lists without primitive restart` lines |
+| A2 | The RGUI upload does not use a storage image | `vulkan_copy_staging_to_dynamic` chooses compute when `dynamic->format != staging->format` (`:1099-1104`); the compute path writes a `VK_DESCRIPTOR_TYPE_STORAGE_IMAGE` at binding 3 (`:1150-1156`) | the trace has **zero** `descriptor type 3 has no proven table entry` lines |
+| A3 | Every sampler the frontend creates uses clamp-to-edge on all three axes | `vendor/retroarch/gfx/drivers_shader/shader_vulkan.cpp:2034-2036` (hardcoded REPEAT) and `:2087-2108` (preset-driven, mapping to repeat / mirrored-repeat / clamp-to-border / mirror-clamp) | the trace has **zero** `sampler address modes` lines |
+| A4 | The refusal count is zero, not merely lower | all of the above | `grep -c '^vulkan: ' /app0/trace.txt` is **0** over a full run |
+
+A2 is a decision, not only a patch: the menu is uploaded as RGB565 and the dynamic
+texture is RGB8888, which is what makes the formats differ and select compute. The
+two candidate fixes are (a) request RGB8888 pixel format so the formats match and
+the copy branch runs, or (b) keep RGB565 and let the copy path handle it. Whichever
+is chosen, the criterion is the same and the choice is recorded here afterwards.
+
+## B - the menu reaches the screen through the GPU
+
+| # | Criterion | How it is verified |
+| --- | --- | --- |
+| B1 | The title runs on `video_vulkan`, not `video_ps5` | `/app0/trace.txt` shows RetroArch's Vulkan driver initialising, and `ps5_init entered` (this project's own driver) is **absent**, because only one video driver runs |
+| B2 | The frame is presented through libps5vk's swapchain | `vkQueuePresentKHR` returns `VK_SUCCESS` and the driver's flip marker is reached; a presentation count appears in the trace |
+| B3 | No command buffer ends in error | the trace carries no refusal line (A4) **and** no `vkEndCommandBuffer` failure is reported; this is the specific fault that produced a black screen with successful presents before |
+| B4 | The console owner confirms RGUI is visible, rendered through the GPU | the owner's confirmation, which is the only witness for "on the screen" this project accepts |
+
+## C - it is actually better, measured
+
+The reason for doing this at all. A GPU path that renders the menu no faster than
+the CPU path is not worth the swap, so it has to be shown to be faster.
+
+| # | Criterion | How it is verified |
+| --- | --- | --- |
+| C1 | The per-frame CPU cost of presentation is gone | the per-pixel loop in `src/video_ps5.cpp`'s `ps5_frame` does not run under Vulkan; evidenced by the absence of the driver's frame marks and by the frontend's own frame timing |
+| C2 | Frame rate at the menu is at least as good as the CPU path | measured frame count over a fixed `--watch` window, compared against the CPU path's number for the same window |
+| C3 | A real core runs at its target rate | load a libretro core, run it for a fixed window, and record frames presented versus frames expected. This is the number the whole exercise is for |
+| C4 | The result is reversible | `video_ps5` remains registered and selectable, so a regression in the GPU path can be undone by one line in `tools/apply-port-patches.py` |
+
+C3 needs a core in the title folder. If no core is available when the rest is done,
+C3 is recorded as **not measured** rather than inferred - the previous rounds
+established what happens when an unverified assumption is treated as a result.
+
+## D - the invariants hold
+
+| # | Criterion |
+| --- | --- |
+| D1 | `../PS5_Vulkan` is not modified. Every change is in this tree. |
+| D2 | `tools/verify.sh` passes: format, unit, build, integration, evidence. |
+| D3 | The port's changes to upstream remain named edits in `patches/series`, applied by `tools/apply-port-patches.py` to `build/ra-conf` only; `vendor/retroarch` is never edited. |
+| D4 | Every step is verified by a command or an artifact, committed with its evidence, and written up in `docs/ACTIVE.md` and `docs/FINDINGS.md`. |
+
+## Out of scope
+
+- Audio. The frontend already reports `Failed to initialize audio driver. Will
+  continue without audio.` and that is unchanged by this work.
+- Shaders, filters, overlays and the XMB menu, beyond what comes free with the
+  Vulkan driver. A1-A4 gate on the menus this project actually renders.
+- Input. The pad driver already opens and delivers presses; nothing here changes it.
+- Asking the maintainer for the `V0-sampler` or `V0-topology` probes. Every
+  criterion above is reachable from this side. If A3 turns out to need repeat or
+  mirrored-repeat sampling rather than clamp-to-edge, that is a scope change and
+  comes back to the `docs/ACTIVE.md` open list rather than being assumed.
+
+## Order of work
+
+1. A1, A2, A3 as named patches, then one run. A4 is the gate: zero refusals.
+2. Only then B - switch the compiled default to `vulkan`, one run, owner confirms.
+3. Only then C - measure, because measuring before the path works measures nothing.
+
+If A4 cannot be reached, the work stops there, the CPU path stays, and what was
+learned is recorded. The menu on the screen is not put at risk for an optimisation.
