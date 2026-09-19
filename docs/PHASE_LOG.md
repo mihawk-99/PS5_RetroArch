@@ -1066,3 +1066,68 @@ what they said is transcribed here.
 revertible: inside `drivers_init` after the audio block, and around `rarch_main`'s
 content-load push. Which one fires decides whether this is a Vulkan-init problem or the
 content-load path 0006 already describes.
+
+## 2026-09-19: The Vulkan driver initialises on the console, and where it stops
+
+**The result, in one line.** A `tools/run-title.sh` run now shows RetroArch
+selecting `video_vulkan`, creating a device, a swapchain and its textures, compiling
+the stock shader's SPIR-V, and then having its pipeline refused by the driver's own
+console AGC call. Nothing renders yet. Everything before that refusal is new.
+
+**What the trace shows**, in order, from `/app0/trace.txt`:
+
+    probe VDRV: configured="vulkan" selected="vulkan"
+    probe VK: init entered 960x720 rgb32=0
+    probe VK: context driver=2003a58 ident="khr_display"
+    probe IMG: 4x4  type=1 fmt=37 tiling=0 usage=0x7 | optimal=0xdd81
+    probe IMG: 512x512 type=1 fmt=37 tiling=0 usage=0x7 | optimal=0xdd81
+    probe IMG: 512x512 type=1 fmt=37 tiling=0 usage=0x7 | optimal=0xdd81
+    probe IMG: 1x1  type=1 fmt=37 tiling=0 usage=0x7 | optimal=0xdd81
+    probe BUF: create size=128 usage=0x80
+    probe BUF: bound memory=880083980
+    probe REFL: entered, vertex=273 words fragment=196 words
+    probe CHAIN: creating vertex module, 1092 bytes of SPIR-V
+    probe CHAIN: both modules created; creating pipeline
+    probe PIPE: vkCreateGraphicsPipelines -> -13 (pipeline=0)
+
+**Five frontend faults stood between the link and this**, each one a request the
+driver's own checks refuse, and each fixed in `patches/series` rather than in that
+project (0013, 0014, 0015):
+
+- the swapchain asked for `TRANSFER_SRC|TRANSFER_DST|SAMPLED` beside
+  `COLOR_ATTACHMENT`, and the surface advertises the one bit - now masked with
+  `supportedUsageFlags`, which is the specification's rule anyway;
+- the 4x4 blank and 1x1 default textures are created as `B8G8R8A8_UNORM`, whose
+  entry in that driver's table is colour-attachment-only - the create-info is now
+  masked to the format's advertised features, and a format that cannot be sampled
+  is replaced by `R8G8B8A8_UNORM`, the same image for a uniform colour;
+- `vulkan_format_to_bpp()` did not know `R8G8B8A8_UNORM`, so the staging buffer
+  sized from it was zero bytes long.
+
+**One frontend file had to go.** `src/video_filters_stub.cpp` defined the whole
+Vulkan filter chain as NULL-returning stubs, from when this port had video filters
+off; `src/` is linked before the archive, so the stubs won and the driver read "no
+chain" - no pipeline was ever created, and nothing in the log or the trace said so.
+Removing it pulled in glslang and SPIRV-Cross, and with them FreeBSD's xlocale
+interface: `src/locale_shims.c` provides the thirty-four `_l` functions the console
+SDK does not export, each the C-locale answer its unsuffixed counterpart gives.
+
+**The remaining refusal is console-only.** Both stock shaders compile cleanly
+through the host build of that project's compiler, with the driver's own options -
+`build/host/opengnm-psbc-probe` on the extracted SPIR-V, UBO stride 16 and the
+sampler at binding 2 stride 48, vertex in both `--ngg` and `--raw` modes. What the
+host cannot reproduce is the next step in `ps5vk_graphics_pipeline_create`
+(driver/ps5vk_pipeline.c): `sceAgcCreateShader` and `sceAgcLinkShaders` on the
+console, whose failure is the `vk_errorf(..., "AGC shader creation or linking
+failed: 0x%08x", result)` that returns the VK_ERROR_UNKNOWN RetroArch sees. That
+driver's own log is compiled out - `src/vulkan/runtime/vk_log.c` guards it with
+`#if !MESA_DEBUG` - so the `result` code has to be read from their side.
+
+**Instruments added, and kept.** `tools/build.sh` now links with `--error-limit=0`
+and `--Map`; `tools/symbolize-crash.py` turns a console backtrace into names using
+that map (this is what identified every refusal above, since `--exclude-libs`
+leaves the driver, the compiler and the SDK runtime with no symbol table);
+`src/main.cpp` points stderr at the trace file and installs a terminate handler
+that names an uncaught exception's type. `tools/apply-runtime-probes.py` carries
+the probes that measured all of it - twenty-nine, applied with one command and
+reverted before the shipping build.

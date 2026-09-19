@@ -96,6 +96,22 @@ int main()
      * anything that could fail. */
     ps5::debug::mark("main() entered; static constructors have already run");
 
+    /* Everything the libraries say goes to stderr, and a title's stderr reaches
+     * nothing on this console: not the kernel log, not RetroArch's log file, not
+     * FTP. That is why the driver's own refusals - the ones ../PS5_Vulkan states
+     * by name before returning VK_ERROR_UNKNOWN - could not be read, and why a
+     * console round could only report the error code. Pointing the stream at the
+     * trace file makes those messages part of the same record as the marks, which
+     * is also how an assertion's message stops being lost: __assert prints the
+     * expression it failed and then aborts. */
+    if (!std::freopen("/app0/trace.txt", "a", stderr))
+        ps5::debug::mark("could not send stderr to the trace file");
+    else
+    {
+        std::fputs("stderr is the trace file\n", stderr);
+        std::fflush(stderr);
+    }
+
     std::set_terminate(on_terminate);
 
     /* argv must be writable and NULL-terminated: RetroArch's option parsing

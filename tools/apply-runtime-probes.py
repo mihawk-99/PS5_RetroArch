@@ -289,6 +289,186 @@ PROBES = [
         "the reflection threw rather than refusing - the message says which part of "
         "the SPIR-V it could not read",
     ),
+    (
+        # None of the marks inside the chain fired, so the failure is before
+        # init_alias(): the first thing that chain's constructor does is build its
+        # vertex buffer, and the driver's buffer path is the one part of it not yet
+        # exercised on this console.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   vkCreateBuffer(device, &info, nullptr, &buffer);\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe BUF: create size=%llu usage=0x%x\\n\",\n"
+        "                      (unsigned long long)info.size, (unsigned)info.usage); fclose(f); } }\n",
+        "probe BUF: create size=",
+        "the buffer the chain constructor asks for, which is the last thing before "
+        "the marks that did not fire",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   vkBindBufferMemory(device, buffer, memory, 0);\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe BUF: bound memory=%p\\n\", (void*)memory); fclose(f); } }\n",
+        "probe BUF: bound memory=",
+        "whether the driver handed back real memory for that buffer",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   if (!vulkan_init_filter_chain(vk))\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe VK: everything before the filter chain is done\\n\"); fclose(f); } }\n",
+        "probe VK: everything before the filter chain",
+        "separates a failure in the descriptor/buffer setup after the textures from "
+        "a failure inside the filter chain itself",
+    ),
+    (
+        # The driver refused the stock shader's pipeline, and a refusal should have
+        # printed ../PS5_Vulkan's own message - the shims write Mesa's log to
+        # stderr, which src/main.cpp now points at this file. This calls the same
+        # entry point with the same state again and prints the VkResult, so the
+        # answer does not depend on that message arriving.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   if (vkCreateGraphicsPipelines(device,\n"
+        "            cache, 1, &pipe, NULL, &pipeline) != VK_SUCCESS)\n",
+        "   { VkPipeline probe_pipeline = VK_NULL_HANDLE;\n"
+        "     VkResult probe_result = vkCreateGraphicsPipelines(device, cache, 1, &pipe, NULL,\n"
+        "                                                       &probe_pipeline);\n"
+        "     FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe PIPE: vkCreateGraphicsPipelines -> %d (pipeline=%p)\\n\",\n"
+        "                      (int)probe_result, (void*)probe_pipeline); fclose(f); } }\n",
+        "probe PIPE:",
+        "the exact VkResult the driver gives the stock shader's pipeline, which the "
+        "caller only compares against VK_SUCCESS",
+    ),
+    (
+        # The result is VK_ERROR_UNKNOWN and ../PS5_Vulkan's own message never
+        # arrives - its Mesa log is compiled out - so the state has to be read
+        # from this side and checked against that driver's own conditions by hand.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   if (vkCreateGraphicsPipelines(device,\n"
+        "            cache, 1, &pipe, NULL, &pipeline) != VK_SUCCESS)\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) {\n"
+        "        unsigned bi, ai;\n"
+        "        fprintf(f, \"probe PIPE2: renderPass=%p stages=%u verts=%u attrs=%u topo=%d \"\n"
+        "                   \"blendAtt=%u blendEnable=%d writeMask=0x%x depthTest=%d samples=0x%x\\n\",\n"
+        "                (void*)pipe.renderPass, (unsigned)pipe.stageCount,\n"
+        "                (unsigned)(pipe.pVertexInputState ? pipe.pVertexInputState->vertexBindingDescriptionCount : 0),\n"
+        "                (unsigned)(pipe.pVertexInputState ? pipe.pVertexInputState->vertexAttributeDescriptionCount : 0),\n"
+        "                (int)(pipe.pInputAssemblyState ? pipe.pInputAssemblyState->topology : -1),\n"
+        "                (unsigned)(pipe.pColorBlendState ? pipe.pColorBlendState->attachmentCount : 0),\n"
+        "                (int)(pipe.pColorBlendState && pipe.pColorBlendState->attachmentCount\n"
+        "                        ? pipe.pColorBlendState->pAttachments[0].blendEnable : 0),\n"
+        "                (unsigned)(pipe.pColorBlendState && pipe.pColorBlendState->attachmentCount\n"
+        "                        ? pipe.pColorBlendState->pAttachments[0].colorWriteMask : 0),\n"
+        "                (int)(pipe.pDepthStencilState ? pipe.pDepthStencilState->depthTestEnable : 0),\n"
+        "                (unsigned)(pipe.pMultisampleState ? pipe.pMultisampleState->rasterizationSamples : 0));\n"
+        "        for (bi = 0; pipe.pVertexInputState && bi < pipe.pVertexInputState->vertexBindingDescriptionCount; bi++)\n"
+        "           fprintf(f, \"probe PIPE2: binding %u = {%u, %u}\\n\", bi,\n"
+        "                   (unsigned)pipe.pVertexInputState->pVertexBindingDescriptions[bi].binding,\n"
+        "                   (unsigned)pipe.pVertexInputState->pVertexBindingDescriptions[bi].stride);\n"
+        "        for (ai = 0; pipe.pVertexInputState && ai < pipe.pVertexInputState->vertexAttributeDescriptionCount; ai++)\n"
+        "        { const VkVertexInputAttributeDescription *a =\n"
+        "             &pipe.pVertexInputState->pVertexAttributeDescriptions[ai];\n"
+        "          fprintf(f, \"probe PIPE2: attr %u = {loc %u, bind %u, fmt %d, off %u}\\n\",\n"
+        "                  ai, (unsigned)a->location, (unsigned)a->binding, (int)a->format, (unsigned)a->offset); }\n"
+        "        fclose(f);\n"
+        "     } }\n",
+        "probe PIPE3:",
+        "the whole pipeline state the driver refuses, printed so it can be compared "
+        "against that driver's conditions without its log",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   if (vkCreatePipelineLayout(device,\n"
+        "            &layout_info, NULL, &pipeline_layout) != VK_SUCCESS)\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) {\n"
+        "        unsigned s;\n"
+        "        fprintf(f, \"probe LAYOUT: bindings=%u pushRanges=%u pushSize=%u pushStages=0x%x\\n\",\n"
+        "                (unsigned)set_layout_info.bindingCount, (unsigned)layout_info.pushConstantRangeCount,\n"
+        "                (unsigned)push_range.size, (unsigned)push_range.stageFlags);\n"
+        "        for (s = 0; s < set_layout_info.bindingCount; s++)\n"
+        "           fprintf(f, \"probe LAYOUT: binding %u = {%u, type %d, count %u, stages 0x%x}\\n\", s,\n"
+        "                   (unsigned)set_layout_info.pBindings[s].binding,\n"
+        "                   (int)set_layout_info.pBindings[s].descriptorType,\n"
+        "                   (unsigned)set_layout_info.pBindings[s].descriptorCount,\n"
+        "                   (unsigned)set_layout_info.pBindings[s].stageFlags);\n"
+        "        fclose(f);\n"
+        "     } }\n",
+        "probe LAYOUT:",
+        "the descriptor bindings and push-constant range the driver's layout check "
+        "reads, which is the other refusal it can give before compiling anything",
+    ),
+    (
+        # The compiler's header, at file scope: it opens an extern "C" block, which
+        # cannot be included inside a function body.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "#include \"../include/vulkan/vk_sdk_platform.h\"\n",
+        "/* Added by this port (probes): the shader compiler's header, so the probe that\n"
+        " * asks it directly about the stock shader can name its types. It belongs to\n"
+        " * ../PS5_Vulkan and is only used by that probe. */\n"
+        "#include \"../../../PS5_Vulkan/.deps/native/psbc/include/psbc_compile.h\"\n"
+        "#include \"../include/vulkan/vk_sdk_platform.h\"\n",
+        "#include \"../../../PS5_Vulkan/.deps/native/psbc/include/psbc_compile.h\"",
+        "the compiler's own types, for the probe that calls it",
+    ),
+    (
+        # Both stock shaders compile with the host build of this compiler, using
+        # the driver's own options (UBO stride 16, sampler at binding 2, stride 48).
+        # The driver refuses the pipeline anyway, and its message is compiled out,
+        # so the compiler is asked here on the console with the same options - the
+        # one thing a host test cannot reproduce. psbc_init() is left alone: the
+        # driver has already initialised the library by the time a pipeline is
+        # built, and calling it again is what crashed the first version of this
+        # probe.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   { VkPipeline probe_pipeline = VK_NULL_HANDLE;\n",
+        "   {\n"
+        "     PsbcCompileOptions probe_options;\n"
+        "     PsbcShaderOutput probe_output;\n"
+        "     PsbcResult probe_result;\n"
+        "     FILE *f;\n"
+        "\n"
+        "     memset(&probe_options, 0, sizeof(probe_options));\n"
+        "     memset(&probe_output, 0, sizeof(probe_output));\n"
+        "     probe_options.target       = PSBC_TARGET_PS5;\n"
+        "     probe_options.optimise     = true;\n"
+        "     probe_options.entrypoint   = \"main\";\n"
+        "     probe_options.address32_hi = 2u;\n"
+        "     probe_options.vertex_attributes[0] = (PsbcVertexAttribute){\n"
+        "        .location = 0, .binding = 0, .format = PSBC_VERTEX_FORMAT_R32G32_FLOAT,\n"
+        "        .offset = 0, .stride = 16, .alignment = 4};\n"
+        "     probe_options.vertex_attributes[1] = (PsbcVertexAttribute){\n"
+        "        .location = 1, .binding = 0, .format = PSBC_VERTEX_FORMAT_R32G32_FLOAT,\n"
+        "        .offset = 8, .stride = 16, .alignment = 4};\n"
+        "     probe_options.vertex_attribute_count = 2;\n"
+        "     probe_options.descriptor_bindings[0] = (PsbcDescriptorBinding){\n"
+        "        .set = 0, .binding = 0, .type = PSBC_DESCRIPTOR_UNIFORM_BUFFER,\n"
+        "        .array_size = 1, .offset = 0, .stride = 16};\n"
+        "     probe_options.descriptor_bindings[1] = (PsbcDescriptorBinding){\n"
+        "        .set = 0, .binding = 2, .type = PSBC_DESCRIPTOR_COMBINED_IMAGE_SAMPLER,\n"
+        "        .array_size = 1, .offset = 16, .stride = 48};\n"
+        "     probe_options.descriptor_binding_count = 2;\n"
+        "\n"
+        "     probe_options.stage = PSBC_STAGE_VERTEX;\n"
+        "     probe_result = psbc_compile_shader(vertex_shader.data(), vertex_shader.size(),\n"
+        "                                        &probe_options, &probe_output);\n"
+        "     f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe PSBC: vertex -> %d (%s)\\n\", (int)probe_result,\n"
+        "                      psbc_result_string(probe_result)); fclose(f); }\n"
+        "     psbc_free_output(&probe_output);\n"
+        "     memset(&probe_output, 0, sizeof(probe_output));\n"
+        "     probe_options.stage = PSBC_STAGE_FRAGMENT;\n"
+        "     probe_result = psbc_compile_shader(fragment_shader.data(), fragment_shader.size(),\n"
+        "                                        &probe_options, &probe_output);\n"
+        "     f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe PSBC: fragment -> %d (%s)\\n\", (int)probe_result,\n"
+        "                      psbc_result_string(probe_result)); fclose(f); }\n"
+        "     psbc_free_output(&probe_output);\n"
+        "   }\n",
+        "probe PSBC:",
+        "the console's own answer for the stock shader, with the driver's options",
+    ),
 ]
 
 
