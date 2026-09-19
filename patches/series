@@ -67,3 +67,10 @@
 
 # 0067  register the native PS5 PCM backend and select it by default
 0067-native-ps5-audio
+
+# Native platform paths, startup argument preservation and browser roots.
+0068-native-ps5-frontend
+
+# Supply the native executable path and enumerate through kernel getdents.
+0069-native-executable-path
+0070-native-directory-enumeration

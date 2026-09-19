@@ -1,0 +1,108 @@
+{
+  "step": "native-paths",
+  "recorded": "2026-09-19T17:07:12.824804+00:00",
+  "revision": "0523743 + native platform/config/directory changes",
+  "command": "tools/run-title.sh --no-build --watch 90",
+  "raw_capture": "klog/paths-large-run.log",
+  "build_identity": "26139a294d687ccf21c8fa779e5ad3883273b873b71ce67e1df48f48589f8f76",
+  "lines": [
+    "frontend_ctx_ps5 registered: startup -c preserved; config/core/content directories and accessible browser roots supplied.",
+    "Config save crash resolved: native application path /app0/eboot.bin avoids procfs discovery.",
+    "Directory fix: public SDK open/getdents/close adapter; 4 KiB EINVAL on /app0, 64 KiB successful.",
+    "frontend ps5: directory /app0 opened=1 entries=96 errno=0",
+    "frontend ps5: directory /app0/cores opened=1 entries=2 errno=0",
+    "Owner: \"It works! And it saved config\" (config fixed, before mounted-directory fix).",
+    "Owner: \"Folders are visible, and when I select Load configuration file I could see the .cfg file\" (final build).",
+    "Live config: /app0/config/retroarch.cfg; 108188 bytes unchanged across upload and restart.",
+    "Final run: 90 seconds alive; script closed title; refusals=0; API failures=0; no frontend ERROR lines.",
+    "[Audio] Started synchronous audio driver.",
+    "[XMB] Assets missing: no; fonts ready: yes",
+    "All five gates PASS; 35 unit tests; 15 evidence records; fresh replay 104 applied + 1 upstream marker; second pass 105 present, unchanged.",
+    "Regression fixture: former 4 KiB adapter fails; 64 KiB adapter passes.",
+    "PS5_Vulkan unchanged at 6f0ce0d; no core or ROM execution claimed."
+  ],
+  "runs": [
+    {
+      "name": "first",
+      "raw_capture": "klog/paths-first-run.log",
+      "raw_sha256": "566b246925472cdad38620fd433dd6108c9972518abc6ad8135ca182b19e1dd1",
+      "build_identity": "c2d8df3799dc02af17d8f0694291f38f9cc30b1276ad8d992d6f86af5b18fa2a",
+      "directory_lines": [
+        "frontend ps5: directory / opened=0 entries=0 errno=1",
+        "frontend ps5: directory /app0 opened=0 entries=0 errno=1",
+        "frontend ps5: directory /app0/cores opened=0 entries=0 errno=1",
+        "frontend ps5: directory /data opened=0 entries=0 errno=2",
+        "frontend ps5: directory /mnt/usb0 opened=0 entries=0 errno=2"
+      ],
+      "refusal_lines": [],
+      "api_failure_lines": [],
+      "presentation_observed": false,
+      "result": "FAIL: libc opendir EPERM; SIGSEGV during config save in application-path discovery."
+    },
+    {
+      "name": "native",
+      "raw_capture": "klog/paths-native-run.log",
+      "raw_sha256": "53a9d108d04a4e637f16c03ce08189a89f6fa1b43d74fb71529915d7ff57277b",
+      "build_identity": "887759ce3cfbe4baf4e5d63b9f0abcc86c3c6e15deafe9a0e954e6de308386d4",
+      "directory_lines": [
+        "frontend ps5: directory / opened=1 entries=8 errno=0",
+        "frontend ps5: directory /app0 opened=1 entries=0 errno=22",
+        "frontend ps5: directory /app0/cores opened=1 entries=0 errno=22",
+        "frontend ps5: directory /data opened=0 entries=0 errno=2",
+        "frontend ps5: directory /mnt/usb0 opened=0 entries=0 errno=2"
+      ],
+      "refusal_lines": [],
+      "api_failure_lines": [],
+      "presentation_observed": true,
+      "result": "PARTIAL: config save works; root enumerates, /app0 reports EINVAL with 4 KiB reads. Runner closed title after 90 seconds, then log identity check falsely failed because a later local build changed its reference header."
+    },
+    {
+      "name": "large",
+      "raw_capture": "klog/paths-large-run.log",
+      "raw_sha256": "b940dffb98ec32b1239e85fdf401d823c54513bee4dadcfce2c76d4d60d805f5",
+      "build_identity": "26139a294d687ccf21c8fa779e5ad3883273b873b71ce67e1df48f48589f8f76",
+      "directory_lines": [
+        "frontend ps5: directory / opened=1 entries=8 errno=0",
+        "frontend ps5: directory /app0 opened=1 entries=96 errno=0",
+        "frontend ps5: directory /app0/cores opened=1 entries=2 errno=0",
+        "frontend ps5: directory /data opened=0 entries=0 errno=2",
+        "frontend ps5: directory /mnt/usb0 opened=0 entries=0 errno=2"
+      ],
+      "refusal_lines": [],
+      "api_failure_lines": [],
+      "presentation_observed": true,
+      "result": "PASS: /app0 enumerates with 64 KiB reads; saved config retained; 90 seconds alive and script-closed."
+    }
+  ],
+  "config_readback": {
+    "bytes": 108188,
+    "sha256": "f7f2b7ba3545c0dd375004576c80d78a11b42aa2c351eb1f81349695571f15c1",
+    "unchanged_across_upload_and_restart": true,
+    "selected_settings": {
+      "video_driver": "vulkan",
+      "audio_driver": "ps5",
+      "menu_driver": "xmb",
+      "libretro_directory": ":/cores",
+      "assets_directory": ":/assets",
+      "rgui_browser_directory": "/app0"
+    }
+  },
+  "crash_symbolization": [
+    "fill_pathname_abbreviate_special",
+    "config_set_path",
+    "config_save_file",
+    "command_event_save_config",
+    "command_event_save_current_config",
+    "command_event",
+    "menu_driver_init",
+    "drivers_init",
+    "retroarch_main_init",
+    "content_load",
+    "rarch_main"
+  ],
+  "final_frontend_lines": [
+    "[INFO] [PS5] build identity: 26139a294d687ccf21c8fa779e5ad3883273b873b71ce67e1df48f48589f8f76",
+    "[INFO] [Audio] Started synchronous audio driver.",
+    "[INFO] [XMB] Assets missing: no; fonts ready: yes"
+  ]
+}

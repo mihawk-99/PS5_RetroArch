@@ -2572,3 +2572,46 @@ The test's 6,656 zero-filled frames include idle output, partial grains and paus
 this is not a measurement of uninterrupted core streaming. It proves the backend
 queue and native playback path, not core A/V synchronization or long-run underrun
 freedom. `evidence/native-audio/` holds the structured report and acceptance.
+
+### 2026-09-19 — configuration and directory browsing require a native frontend
+
+The user's report was correct: configuration was not reliably loaded, and the
+browser offered only `/`. The null platform frontend supplied neither an
+environment callback nor a drive list. task_content substituted its menu
+callback at startup, reconstructed argv from uninitialized content state, and
+lost `-c`. Native `frontend_ctx_ps5` now preserves the initial arguments and
+supplies application-relative defaults and accessible roots (patch 0068).
+
+The first run restored config loading but reproduced the historical `rip=0`
+crash. Symbolizing its backtrace against that exact ELF revealed
+`fill_pathname_abbreviate_special -> config_set_path -> config_save_file ->
+command_event_save_config -> menu_driver_init`. The application-path helper used
+Unix procfs/getpid/readlink discovery; a title has a known executable path and no
+such procfs contract. Patch 0069 returns `/app0/eboot.bin`. The next run saved
+`/app0/config/retroarch.cfg` successfully, confirmed by both the log and owner.
+This replaces the earlier suspicion that config parsing or controller setup was
+the root cause: the captured fault was in path abbreviation during config saving.
+
+Browsing was a separate remaining failure. The shipped libc `opendir` returned
+EPERM for `/`, `/app0` and `/app0/cores`, despite ordinary file I/O and directory
+creation working. The public SDK's `open(O_DIRECTORY)` and `getdents` route opened
+those directories. A 4 KiB read enumerated `/` but failed with EINVAL on the
+mounted `/app0` filesystem. A 64 KiB read enumerated 96 entries in `/app0` and two
+in its empty `cores` directory, with zero errors. The minimum acceptable size was
+not measured. Patch 0070 routes RetroArch VFS directory operations through the
+owned adapter, which validates records and retains native permission failures.
+`/data` and `/mnt/usb0` were unavailable inside this title and are not advertised.
+
+The owner then confirmed: "Folders are visible, and when I select Load
+configuration file I could see the .cfg file". The final build survived the
+90-second window and was script-closed, with zero Vulkan refusals/API failures
+and working audio/XMB initialization. The 108,188-byte saved config was identical
+before and after another upload/restart. Packaged seeds and live settings now
+occupy different paths, so deployment cannot replace saved preferences.
+`docs/DEPLOYMENT.md` maps `/app0` to `/data/homebrew/PPSA99169/` for FTP.
+
+A capture-tool issue also surfaced: building the next diagnostic while an older
+run completed changed the local identity header and falsely rejected its log.
+The runner now snapshots the selected identity before deployment/launch. That
+intermediate run remains a partial result, not final acceptance. Sanitized
+captures and the failure sequence are in `evidence/native-paths/`.

@@ -146,3 +146,28 @@ left/right tones, captures and validates `audio-test.json`, then captures the
 normal frontend log after the test's port is closed and reopened by RetroArch.
 The owner must separately confirm audible playback. Omit `--audio-test` for
 ordinary launches; the runner clears any stale audio control file in either case.
+
+## Where to put configurations, cores and content
+
+`/app0` is the running title's mount path, not an FTP directory. For this title,
+FTP uses `/data/homebrew/PPSA99169/` as the corresponding base directory:
+
+| Use | FTP path | In RetroArch |
+| --- | --- | --- |
+| Cores | `/data/homebrew/PPSA99169/cores/` | `/app0/cores/` |
+| ROMs/content | `/data/homebrew/PPSA99169/content/` | `/app0/content/` |
+| BIOS/system files | `/data/homebrew/PPSA99169/system/` | `/app0/system/` |
+| Live settings | `/data/homebrew/PPSA99169/config/retroarch.cfg` | `/app0/config/retroarch.cfg` |
+| Save files/states | `savefiles/`, `savestates/` under the FTP base | `/app0/savefiles/`, `/app0/savestates/` |
+
+The native frontend creates these directories. It installs the packaged
+`retroarch.cfg` seed only when the live config does not exist. Ordinary updates
+replace packaged files but do not delete the user's live config, cores, content
+or saves. Full `--clean` deployment/removal is destructive to the entire title
+folder, including these user files: back them up before explicitly requesting it.
+
+“Load Content” starts at `/app0`, while “Load Core” starts at `/app0/cores`.
+A directory can correctly be empty: this filesystem step installs no emulator
+cores or ROMs. A core must be built for this PS5 port; copying a desktop `.so`
+does not make it loadable. USB/data roots appear only when the title can open
+them; FTP visibility alone does not prove title access to an external mount.

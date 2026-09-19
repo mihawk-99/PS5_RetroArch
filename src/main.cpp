@@ -56,7 +56,7 @@ namespace
 {
 /* The title's own folder, as the console mounts it: the application image is at
  * /app0 and this is where a title may keep its configuration. */
-constexpr const char *config_path = "/app0/retroarch.cfg";
+constexpr const char *config_path = "/app0/config/retroarch.cfg";
 
 /* Why a terminate handler exists.
  *
@@ -154,7 +154,7 @@ int main()
     char arg0[] = "retroarch";
     char arg_fullscreen[] = "-f";
     char arg_config[] = "-c";
-    char arg_config_path[] = "/app0/retroarch.cfg";
+    char arg_config_path[] = "/app0/config/retroarch.cfg";
     char arg_verbose[] = "--verbose";
     char arg_menu[] = "--menu";
     /* RetroArch's own log, on the console, from the first line of main.
@@ -170,7 +170,7 @@ int main()
     };
     (void)config_path;
 
-    ps5::debug::mark("argv built: retroarch -f -c /app0/retroarch.cfg --verbose --log-file");
+    ps5::debug::mark("argv built: retroarch -f -c /app0/config/retroarch.cfg --verbose --log-file");
 
     /* Extra arguments, one per line, from /app0/args.txt when that file is there.
      *

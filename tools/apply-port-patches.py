@@ -2322,6 +2322,38 @@ EDITS = [
         '   return "ps5";',
         'patches/series, 0067: PS5 audio default',
     ),
+    (
+        'frontend/frontend_driver.c',
+        'static frontend_ctx_driver_t *frontend_ctx_drivers[] = {',
+        '/* patches/series, 0068: native PS5 platform paths and browser roots. */\n'
+        'extern frontend_ctx_driver_t frontend_ctx_ps5;\n'
+        'static frontend_ctx_driver_t *frontend_ctx_drivers[] = {\n'
+        '   &frontend_ctx_ps5,',
+        'patches/series, 0068: native PS5 platform',
+    ),
+
+    (
+        'libretro-common/file/file_path.c',
+        'size_t fill_pathname_application_path(char *s, size_t len)\n{',
+        'size_t fill_pathname_application_path(char *s, size_t len)\n{\n'
+        '   /* patches/series, 0069: a title has no procfs executable symlink. */\n'
+        '   return len ? strlcpy(s, "/app0/eboot.bin", len) : 0;',
+        'patches/series, 0069: a title has no procfs',
+    ),
+    (
+        'libretro-common/vfs/vfs_implementation.c',
+        '#include <vfs/vfs_implementation.h>',
+        '#include <vfs/vfs_implementation.h>\n'
+        '/* patches/series, 0070: SDK getdents adapter for native title directories. */\n'
+        'extern DIR *ps5_opendir(const char *path);\n'
+        'extern struct dirent *ps5_readdir(DIR *directory);\n'
+        'extern int ps5_closedir(DIR *directory);\n'
+        '#define opendir ps5_opendir\n'
+        '#define readdir ps5_readdir\n'
+        '#define closedir ps5_closedir',
+        'patches/series, 0070: SDK getdents adapter',
+    ),
+
 ]
 
 

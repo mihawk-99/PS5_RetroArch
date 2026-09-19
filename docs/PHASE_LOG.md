@@ -1840,3 +1840,60 @@ ProsperoLight and PS5_Vulkan were not modified; PS5_Vulkan remains `6f0ce0d`.
 The known unset configuration-save directory remains outside this audio step.
 Core audio and sustained content-based A/V synchronization remain unverified;
 zero-filled idle/partial grains are not claimed to measure streaming underruns.
+
+### 2026-09-19 — fix configuration and native directory browsing
+
+User reported missing config loading and browsers containing only `/`. Inspection
+confirmed the null platform lacked the callbacks/defaults needed by this title.
+Implemented `frontend_ctx_ps5` (0068), preserved initial argv, supplied native paths
+and roots, and separated the live config from the packaged seed. Main now passes
+`-c /app0/config/retroarch.cfg`; the frontend creates only its own title directories
+and installs the seed only if no live configuration exists.
+
+Verification sequence, including failures:
+
+1. Initial build failed because the new menu interface reached libretro-common's
+   relative config include through the pristine vendor tree. The title now uses
+   the configured libretro-common include directory; added the missing C++
+   initializer-list include. No dependency/version was added.
+2. First console run, `tools/run-title.sh --no-build --watch 90`, identity
+   `c2d8df3799dc02af17d8f0694291f38f9cc30b1276ad8d992d6f86af5b18fa2a`,
+   `klog/paths-first-run.log`: seed installed; libc opendir returned EPERM for
+   known roots. Owner reported crash. Kernel SIGSEGV at zero, ELF-symbolized stack
+   reached application-path discovery during config saving, from menu init.
+3. Added native executable path (0069) and public SDK getdents adapter (0070).
+   Second run, same command, identity
+   `887759ce3cfbe4baf4e5d63b9f0abcc86c3c6e15deafe9a0e954e6de308386d4`,
+   `klog/paths-native-run.log`: config saved; owner "It works! And it saved config".
+   However, owner confirmed `/app0` remained empty. Root enumerated eight entries;
+   4 KiB reads on `/app0` and `cores` reported EINVAL. Runner found title alive at
+   90 seconds and closed it, then falsely rejected the frontend log because the
+   next local diagnostic build had changed its comparison identity. The trace's
+   identity and independently captured frontend log match this run. Fixed runner
+   to snapshot identity before deployment; this partial run is not acceptance.
+4. Increased the directory-read buffer to 64 KiB. Host regression explicitly
+   rejects small mounted-directory reads: the prior 4 KiB variant fails, current
+   adapter passes. Unit harness setup issues (stale linker-wrapper reference and
+   an incorrect hardcoded string-length assertion) were corrected before gates.
+5. Final run, same command, identity
+   `26139a294d687ccf21c8fa779e5ad3883273b873b71ce67e1df48f48589f8f76`,
+   `klog/paths-large-run.log`, frontend `klog/retroarch-130100.log`: 96 entries in
+   `/app0`, two in the empty `cores` directory, errno zero; no frontend ERROR
+   lines; native audio and XMB fonts/assets ready; zero Vulkan refusals/API
+   failures; 90 seconds alive and script-closed. Owner: "Folders are visible,
+   and when I select Load configuration file I could see the .cfg file".
+6. FTP readback of live config before/after the final upload/restart: 108,188 bytes,
+   unchanged SHA-256 `f7f2b7ba3545c0dd375004576c80d78a11b42aa2c351eb1f81349695571f15c1`.
+   Only selected known port settings/digest are distilled; raw files stay ignored.
+7. `tools/verify.sh`: all five gates PASS, 35 unit tests, 15 evidence records.
+   Fresh patch replay 104 applied plus one upstream marker; second pass 105 present,
+   unchanged bytes. Tests exercise config preservation, startup callback, roots,
+   SDK directory records/errors, and executable-path discovery without procfs.
+
+Artifacts: `evidence/native-paths/{capture,expectation}.json`;
+replay: `python3 tools/evidence.py compare evidence/`. Documentation maps `/app0`
+to the FTP title folder and explains live-config preservation and content locations.
+No core/ROM execution, USB availability or complete storage milestone is claimed.
+PS5_Vulkan and ProsperoLight are unchanged; Vulkan and CPU/RGUI fallback registration
+are preserved. Packaged seed changes after the run are comments only; the tested
+binary identity is unchanged and the saved live configuration is byte-identical.

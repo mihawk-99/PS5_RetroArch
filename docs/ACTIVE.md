@@ -4,64 +4,72 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Native `audio_ps5` output is registered, default and verified on the console.**
-The owner reported: "I heard left right left right, then retroarch started!"
-The diagnostic verified buffering and port lifecycle; a normal follow-up stayed
-alive for 45 seconds and was closed by the script. XMB still presents through
-RetroArch's Vulkan driver and statically linked libps5vk without refusals.
+**Configuration saving and directory browsing work on the PS5.** The owner
+confirmed saving configuration, then on the final build: "Folders are visible,
+and when I select Load configuration file I could see the .cfg file".
+The title stayed alive for 90 seconds and was closed by the script. XMB/Vulkan
+and native audio initialization remain working, with zero GPU refusals/errors.
 
-This follows the user's audio assignment; the previous active file's statement
-that audio was outside the XMB step does not restrict this new step. No core
-implementation or configuration-persistence work is assigned here.
+The new prompt assigned configuration/content browsing despite the previous
+active file's audio-only scope; this step follows that assignment. Actual core
+execution is not claimed or newly assigned by this filesystem fix.
 
 ## Verified build and evidence
 
-- Identity: `801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55`.
-- `tools/run-title.sh --no-build --audio-test --watch 45`: audible channel test,
-  193,536 accepted/played frames, zero discarded frames or output errors,
-  1,536-frame peak/capacity, 6,144-byte partial nonblocking write. Pause/resume,
-  native drain/close, and normal frontend port reopen succeeded. The owner closed
-  this first run manually; its early exit is explained.
-- `tools/run-title.sh --no-build --no-deploy --watch 45`: no test tones, native
-  frontend audio initialized, XMB assets/fonts ready, zero Vulkan refusals/API
-  failures, title alive for the full window and script-closed.
-- All five `tools/verify.sh` gates PASS; 32 unit tests. Fresh patch replay: 101
-  edits applied and one existing upstream Vulkan marker; second pass has 102
-  present markers with unchanged bytes. Evidence: 14 records PASS.
-- Sanitized evidence/report: `evidence/native-audio/`. Raw captures remain ignored:
-  `klog/audio-native-run.log`, `klog/audio-normal-run.log`,
-  `klog/audio-test-123431.json`, `klog/retroarch-{123431,123631}.log`.
-- PS5_Vulkan unchanged at **6f0ce0d**. ProsperoLight is a read-only reference.
-  `video_ps5` and RGUI remain registered/selectable fallbacks.
+- Identity: `26139a294d687ccf21c8fa779e5ad3883273b873b71ce67e1df48f48589f8f76`.
+- Final command: `tools/run-title.sh --no-build --watch 90`.
+  `/app0` enumerated 96 entries and `/app0/cores` two (empty directory), errno 0.
+  XMB assets/fonts ready, native audio initialized, zero Vulkan refusals/API
+  failures or frontend ERROR lines. Full 90 seconds alive; script-closed.
+- Live configuration was saved successfully and the same 108,188-byte file
+  survived the next upload/restart byte-for-byte. Its selected drivers and core,
+  browser and asset paths match the port. Raw configs remain ignored.
+- All five `tools/verify.sh` gates PASS; 35 unit tests; 15 evidence records.
+  Fresh patch replay: 104 applied + one upstream marker; second pass: 105 present,
+  bytes unchanged. Old 4 KiB adapter fails the mounted-directory regression;
+  current 64 KiB adapter passes.
+- Evidence: `evidence/native-paths/`. Raw captures:
+  `klog/paths-{first,native,large}-run.log`, final `klog/retroarch-130100.log`,
+  `klog/paths-config-readback.json` and before/after config readbacks.
+- PS5_Vulkan remains unchanged at **6f0ce0d**. No sibling project was modified.
 
-## Native audio scope
+## What changed
 
-The backend opens 48 kHz signed 16-bit stereo in 256-frame blocks. RetroArch
-resamples source PCM to the negotiated device rate. A bounded ring plus output
-worker supports blocking/nonblocking writes, byte-based capacity reporting,
-pause/resume, error wakeup and cleanup. No SDL or Opus dependency is introduced.
-Startup/failure/close diagnostics remain; there is no successful-block logging.
-See `docs/REFERENCE.md` for the buffer/lifecycle contract and `docs/TESTING.md`
-for the one-shot tone test. Normal launches clear leftover test controls.
+`frontend_ctx_ps5` preserves startup argv and sets native directory defaults and
+browser roots. Live config is `/app0/config/retroarch.cfg`; a packaged seed is
+copied only if it does not exist. The config-save crash came from Unix executable
+path discovery during path abbreviation; the port now supplies `/app0/eboot.bin`.
 
-**Real core audio, long-duration A/V synchronization and streaming underrun
-behavior remain unverified.** Idle/menu silence and partial-grain padding are
-not themselves underruns. Configuration saving still reports its known unset
-directory; persistence and core integration are separate steps.
+The libc directory wrapper returned EPERM. The SDK `open/getdents/close` adapter
+works, using 64 KiB directory reads: 4 KiB worked on `/` but failed on the mounted
+application filesystem. Unavailable external roots are omitted. No permission
+bypass is attempted. The runner snapshots the selected build identity so a later
+local build cannot falsely invalidate an earlier run's log.
 
-## Preserved XMB and logging state
+## User file locations
 
-XMB's owner-confirmed rendering and final ordinary build are recorded in
-`evidence/xmb-default/`. Patches 0060–0063 and 0065–0066 handle uniform padding,
-descriptors, strip geometry, asset paths and padded image coordinates. Static
-menu textures use a single mip level pending general mip-chain verification.
-Official monochrome assets/font are pinned in `assets/xmb/source.json`.
-The screenshot hook remains retired in `parked/xmb-readback/`.
+FTP base is `/data/homebrew/PPSA99169/`; `/app0` is its in-title mount name.
+Use `cores/` for PS5-compatible cores, `content/` for ROMs/content, `system/` for
+BIOS files, and `config/retroarch.cfg` for live settings. Save directories are
+`savefiles/` and `savestates/`. Ordinary updates preserve these user files.
+See `docs/DEPLOYMENT.md`; no cores or ROMs were installed by this step.
 
-Startup, frontend/core INFO/WARN/ERROR, driver refusals, `trace.txt`,
-`retroarch.log` and kernel capture remain. Routine frame-success/input chatter
-stays suppressed. GPU profiling is opt-in (`docs/GPU_TIMING.md`). No new XMB
-steady-state performance measurement is claimed by this audio step.
+## Preserved functionality and limits
+
+Native `audio_ps5` is default; audible left/right tones, bounded buffering and
+port lifecycle were verified in `evidence/native-audio/`. Real-core audio,
+long-run A/V sync and content-based underruns remain unverified.
+
+XMB stays default on the statically linked Vulkan path. Single-level menu textures
+remain the tested compatibility path; general mip chains are unverified.
+`video_ps5` and RGUI stay registered/selectable. Screenshots remain opt-in via the
+parked recipe; GPU profiling stays opt-in. Useful startup/frontend/core/audio/error
+logs remain enabled without routine frame-success chatter.
+
+The first filesystem run crashed during config save; the second fixed saving
+but could not enumerate `/app0`. Both failures are documented, not acceptance.
+The final run resolves them. USB access and real core loading require separate
+verification on the available mounts and compatible core artifacts.
 
 ## Operating notes
 

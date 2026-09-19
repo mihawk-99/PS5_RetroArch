@@ -114,6 +114,13 @@ if (( build )); then
 fi
 
 [[ -f dist/$title_id/eboot.bin ]] || die "nothing built at dist/$title_id/"
+# Bind validation to the artifact selected now, even if a later local build starts.
+expected_identity=$(python3 - <<'PYID'
+import re
+from pathlib import Path
+print(re.search(r"build identity: ([a-f0-9]{64})", Path("build/title_build_identity.h").read_text())[1])
+PYID
+)
 
 # --- the console must be free ------------------------------------------------
 held=$(ctl_cmd procs)
@@ -226,8 +233,8 @@ except Exception as error:
 PY
 
 # --- preserve development logs and optional buffered timing ------------------
-python3 - "$title_id" "$profile" "$stamp" "$audio_test" <<'PY'
-import importlib.util, json, re, sys
+python3 - "$title_id" "$profile" "$stamp" "$audio_test" "$expected_identity" <<'PY'
+import importlib.util, json, sys
 from pathlib import Path
 sys.path.insert(0, "tools")
 from ps5_ftp import connect, remove_if_present
@@ -246,7 +253,7 @@ with connect(**dt.load_settings()) as ftp:
         try:
             with target.open("wb") as out:
                 ftp.retrbinary(f"RETR /data/homebrew/{sys.argv[1]}/{name}", out.write)
-            expected = re.search(r"build identity: ([a-f0-9]{64})", Path("build/title_build_identity.h").read_text())[1]
+            expected = sys.argv[5]
             if name == "retroarch.log":
                 if f"build identity: {expected}" not in target.read_text(errors="replace"):
                     raise SystemExit("RetroArch log is stale or logging failed: current build identity absent")

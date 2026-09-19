@@ -303,3 +303,34 @@ so it is not by itself evidence of a streaming underrun.
 The opt-in backend test is documented in `docs/TESTING.md`. Core integration,
 long-duration A/V synchronization and streaming underrun behavior need their own
 content-based acceptance runs; native test tones do not prove those properties.
+
+## Native platform frontend and paths
+
+`frontend_ctx_ps5` supplies platform initialization, a startup environment callback
+and a drive-list callback (patch 0068). Its non-null environment callback keeps the
+initial command line intact. Without it, task_content substitutes
+`menu_content_environment_get`, reconstructs argv from empty startup state and
+loses `-c`. Subsequent menu-initiated content loads retain upstream's menu callback.
+
+The frontend seeds `g_defaults` with paths under `/app0`, creates the title's own
+config/core/content/system/save/playlist directories, and copies the packaged seed
+to `/app0/config/retroarch.cfg` only when that file is absent. A temporary file and
+rename avoid installing a partial copy. Existing configs are left intact, including
+when a newer packaged seed is uploaded. `docs/DEPLOYMENT.md` maps these internal
+paths to FTP. Platform defaults apply when an existing config leaves paths unset.
+
+Patch 0069 returns `/app0/eboot.bin` for application-path discovery. The generic
+Unix procfs/getpid/readlink path is inappropriate for a PS5 title; configuration
+saving invokes it while abbreviating paths. Patch 0070 routes RetroArch's VFS
+`opendir/readdir/closedir` calls through `src/ps5_directory.cpp`. The adapter uses
+public SDK `open(O_DIRECTORY)`, `getdents`, and `close`, validates variable-length
+FreeBSD records, skips deleted entries and returns directory types/names. Reads
+use a 64 KiB buffer: 4 KiB failed with EINVAL on the tested `/app0` mount even
+though it worked on `/`; 64 KiB succeeded. The minimum accepted size was not
+determined. It does
+not change file reads/writes or bypass the title's filesystem permissions.
+
+The title compiles against the configured libretro-common include tree. Its
+headers resolve relative `config.h` includes there; using the pristine vendor
+include tree fails as soon as the native frontend includes the menu interfaces.
+No new dependency, SDK version or graphics-driver change is involved.

@@ -1,0 +1,17 @@
+{
+  "step": "native-paths",
+  "note": "Config save and directory browsing verified separately; failed native directory attempts retained. Final title remains on Vulkan and uses the existing saved config.",
+  "must_contain": [
+    "startup -c preserved",
+    "/app0 opened=1 entries=96 errno=0",
+    "/app0/cores opened=1 entries=2 errno=0",
+    "Folders are visible",
+    "108188 bytes unchanged across upload and restart",
+    "90 seconds alive; script closed title; refusals=0; API failures=0",
+    "All five gates PASS; 35 unit tests",
+    "former 4 KiB adapter fails; 64 KiB adapter passes",
+    "PS5_Vulkan unchanged"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirmed configuration saving, then on the final build confirmed visible folders and the .cfg file in Load Configuration File. No installed core/content execution is claimed."
+}

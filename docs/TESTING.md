@@ -118,3 +118,24 @@ or queue-count mismatches. Expected: 48 kHz, 256-frame grains, four bytes/frame,
 accepted from the oversized nonblocking write. The report cannot establish
 speaker audibility; that confirmation is recorded separately in the evidence.
 Normal launches remove leftover control files and never generate test tones.
+
+## Platform paths and directory browsing
+
+`tests/test_platform_paths.py` runs the actual native platform setup against an
+isolated host filesystem, checking first-install config seeding, preservation
+across a changed seed, startup argument preservation and accessible browser roots.
+The real SDK directory adapter receives synthetic FreeBSD records to test multiple
+batches, directory/file names and types, deleted records, EOF, denied opens,
+valid fd zero, truncated/oversized records and missing string terminators. The
+mounted-directory fixture rejects small reads; the previous 4 KiB variant fails
+and the 64 KiB adapter passes.
+Application-path tests compile the patched upstream function with procfs-related
+calls replaced by aborts, checking the known executable path and small buffers.
+
+On the console, retain the current build identity, platform directory summaries,
+configuration load/save logs, GPU API results, and the owner's browser observation.
+Read back the live config over FTP and verify its selected paths/settings. Launch
+again without overwriting it to prove parsing/persistence across runs. No core or
+ROM execution is implied by seeing directory entries. Raw filenames, settings,
+crash dumps and console information stay in ignored captures; commit sanitized
+counts, known port paths, crash symbols and acceptance results only.
