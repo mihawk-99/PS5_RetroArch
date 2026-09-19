@@ -6,6 +6,8 @@ extern "C"
 #include <gfx/video_driver.h>
 #include <tasks/task_content.h>
     bool ps5_core_recovery_test_pending();
+    const char *ps5_core_loader_test_path();
+    const char *ps5_core_loader_test_name();
     void *ps5_core_dlopen(const char *, int);
     void *ps5_core_dlsym(void *, const char *);
     int ps5_core_dlclose(void *);
@@ -32,7 +34,7 @@ extern "C" void ps5_core_recovery_test_if_requested()
         for (unsigned i = 0; i < 3; ++i)
             std::snprintf(old_paths[i], sizeof(old_paths[i]), "%s", path_get(slots[i]));
         // Exercise allocation, I/O and execution with the full frontend resident.
-        if (void *core = ps5_core_dlopen("/app0/cores/fceumm_libretro.so", 0))
+        if (void *core = ps5_core_dlopen(ps5_core_loader_test_path(), 0))
         {
             auto api = reinterpret_cast<unsigned (*)()>(ps5_core_dlsym(core, "retro_api_version"));
             menu_core_load = api && api() == RETRO_API_VERSION;
@@ -57,10 +59,12 @@ extern "C" void ps5_core_recovery_test_if_requested()
     if (FILE *out = std::fopen("/app0/core-recovery-test.json", "w"))
     {
         std::fprintf(out,
-                     "{\"build_identity\":\"%s\",\"passed\":%s,\"selection_rejected\":%s,\"content_"
+                     "{\"build_identity\":\"%s\",\"core\":\"%s\",\"passed\":%s,\"selection_"
+                     "rejected\":%s,\"content_"
                      "rejected\":%s,\"menu_context_preserved\":%s,\"menu_core_load\":%s}\n",
-                     ps5_frontend_build_identity(), passed ? "true" : "false",
-                     selection ? "false" : "true", content ? "false" : "true",
+                     ps5_frontend_build_identity(), ps5_core_loader_test_name(),
+                     passed ? "true" : "false", selection ? "false" : "true",
+                     content ? "false" : "true",
                      context && context == video->data ? "true" : "false",
                      menu_core_load ? "true" : "false");
         std::fclose(out);

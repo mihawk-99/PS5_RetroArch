@@ -1,0 +1,19 @@
+{
+  "step": "mgba-native",
+  "note": "Native mGBA archive loading, corrected colours, clean menu/next-content transitions and native Quit; no saves/states/performance claim.",
+  "must_contain": [
+    "frontend build identity: 82024b89e74bbad4ad2ce2e2916d1a49baf26ac325fef20fc71a2c168b862337",
+    "mGBA SHA-256: feb1922c9fe9dd3424b42f538a80362d0574b4dfa0134980d3fd14c52593cff6",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=mGBA",
+    "core recovery test: passed=1 selection_rejected=1 content_rejected=1 menu_context_preserved=1 menu_core_load=1",
+    "core loader: ran 21 initializers",
+    "[INFO] [Core] Geometry: 240x160, Aspect: 1.500, FPS: 59.73, Sample rate: 65536.00 Hz.",
+    "[INFO] [Core] Geometry: 160x144, Aspect: 1.111, FPS: 59.73, Sample rate: 131072.00 Hz.",
+    "current-build launches: 1; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signal reports: 0",
+    "native quit: frontend status = 0",
+    "owner: Menu and next game are clean",
+    "Host verification: PASS format unit build integration evidence; 58 tests"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirmed GB/GBC/GBA archive loading and corrected colours/native Quit in earlier runs, then clean menu and next game in the final texture-cropping run. Final capture shows mGBA GBA and GB/GBC dimensions."
+}

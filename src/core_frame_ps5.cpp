@@ -17,3 +17,16 @@ extern "C" void ps5_core_frame_rgba(void *output, size_t stride, const void *inp
             dst[4 * x + 3] = 255;
         }
 }
+
+/* Two triangle-list quads, with UVs restricted to the logical source image.
+ * The caller uses a buffer belonging to the current, fence-retired sync slot. */
+void ps5_core_source_quad(float *vertices, unsigned width, unsigned physical_width)
+{
+    const float right = physical_width > width ? float(width) / physical_width : 1.0f;
+    const float quad[] = {
+        -1, -1, 0, 0, -1, 1, 0, 1, 1, -1, right, 0, 1, -1, right, 0, -1, 1, 0, 1, 1, 1, right, 1,
+        0,  0,  0, 0, 0,  1, 0, 1, 1, 0,  right, 0, 1, 0,  right, 0, 0,  1, 0, 1, 1, 1, right, 1,
+    };
+    for (unsigned i = 0; i < 48; ++i)
+        vertices[i] = quad[i];
+}

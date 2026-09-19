@@ -244,6 +244,8 @@ bool load(Module *m)
     if (!dt || dynamic->p_filesz % sizeof(Elf64_Dyn))
         return fail("invalid dynamic entries");
     bool terminated = false;
+    uint64_t init_array = 0, init_bytes = 0;
+    bool have_init_array = false, have_init_size = false;
     for (size_t i = 0; i < dynamic->p_filesz / sizeof(Elf64_Dyn); ++i)
     {
         auto tag = dt[i].d_tag;
@@ -261,15 +263,35 @@ bool load(Module *m)
                           std::strcmp(name, "libScePosixForWebKit.sprx")))
                 return fail("unsupported core dependency");
         }
-        // Constructors, TLS and C++ unwind registration need a later loader extension.
-        if (tag == DT_TEXTREL || ((tag == DT_INIT || tag == DT_FINI || tag == DT_INIT_ARRAYSZ ||
-                                   tag == DT_FINI_ARRAYSZ || tag == DT_PREINIT_ARRAYSZ ||
-                                   tag == DT_RELSZ || tag == 35 /* DT_RELRSZ */) &&
-                                  value))
+        if (tag == DT_INIT_ARRAY)
+        {
+            if (have_init_array)
+                return fail("duplicate initializer array");
+            have_init_array = true;
+            init_array = value;
+        }
+        if (tag == DT_INIT_ARRAYSZ)
+        {
+            if (have_init_size)
+                return fail("duplicate initializer array size");
+            have_init_size = true;
+            init_bytes = value;
+        }
+        // Legacy init functions, finalizers, TLS and C++ unwinding remain unsupported.
+        if (tag == DT_TEXTREL ||
+            ((tag == DT_INIT || tag == DT_FINI || tag == DT_FINI_ARRAYSZ ||
+              tag == DT_PREINIT_ARRAYSZ || tag == DT_RELSZ || tag == 35 /* DT_RELRSZ */) &&
+             value))
             return fail("unsupported core initialization/relocation feature");
     }
     if (!terminated)
         return fail("unterminated dynamic entries");
+    if (init_bytes &&
+        (!have_init_array || init_array % sizeof(uint64_t) || init_bytes % sizeof(uint64_t) ||
+         init_bytes > 1024 * sizeof(uint64_t) || !mapped(m, init_array, init_bytes, PF_R)))
+        return fail("invalid initializer array range/size");
+    if (have_init_array && !have_init_size)
+        return fail("initializer array has no size");
     // Reserve aligned memory without ever making a page writable and executable.
     void *allocation =
         mmap(nullptr, m->span + page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -338,6 +360,16 @@ bool load(Module *m)
             ++relocations;
         }
     }
+    // Validate every relocated callback before executing any initializer.
+    const auto *initializers =
+        init_bytes ? reinterpret_cast<const uintptr_t *>(m->base + init_array) : nullptr;
+    const size_t initializer_count = init_bytes / sizeof(uintptr_t);
+    for (size_t i = 0; i < initializer_count; ++i)
+    {
+        const uintptr_t base = reinterpret_cast<uintptr_t>(m->base);
+        if (initializers[i] < base || !mapped(m, initializers[i] - base, 1, PF_X))
+            return fail("initializer callback outside executable segment");
+    }
     if (mprotect(m->base, m->span, PROT_NONE))
         return fail("core protect reserve failed errno=%d", errno);
     for (size_t i = 0; i < m->ph_count; ++i)
@@ -352,6 +384,10 @@ bool load(Module *m)
         if (mprotect(m->base + p.p_vaddr, length, protection))
             return fail("core segment mprotect flags=%u failed errno=%d", p.p_flags, errno);
     }
+    for (size_t i = 0; i < initializer_count; ++i)
+        reinterpret_cast<void (*)()>(initializers[i])();
+    if (initializer_count)
+        std::fprintf(stderr, "core loader: ran %zu initializers\n", initializer_count);
     std::fprintf(stderr, "core loader: ready symbols=%zu relocations=%zu mapped_bytes=%zu\n",
                  m->symbol_count, relocations, m->span);
     return true;

@@ -414,16 +414,22 @@ File reads use bounded POSIX reads into a separate mapped buffer. Failed opens
 release allocations and report the failing operation; successful handles are
 reference counted and unmapped on the final close.
 
-`tools/core-imports.py` derives the required native bindings from the staged
-FCEUmm ELF; those bindings and the core bytes participate in the title build
-identity. Directory imports use this port's existing directory adapters. The
+`tools/core-imports.py` derives the union of required native bindings from the
+explicitly shipped FCEUmm and mGBA ELFs; those bindings and both cores participate in the title build
+identity. Directory imports use this port's directory adapters, including `rewinddir`.
+The `localtime_r` binding uses RetroArch's existing locked `rtime_localtime`
+helper, initialized before gameplay. The
 runtime dependencies are limited to the public kernel_web, libc and Posix stubs.
 This route does not depend on websrv's payload loader hooks or publish native
 module exports through the title converter.
 
 The initial supported contract is deliberately narrower than a general dynamic
-linker: no TLS, ELF interpreter, constructors/finalizers, C++ unwind registration,
-REL/RELR, or additional dependent shared libraries. Unsupported imports and
+linker: no TLS, ELF interpreter, legacy DT_INIT/DT_FINI, finalizers, C++ unwind
+registration, REL/RELR, or additional dependent shared libraries. Bounded
+DT_INIT_ARRAY callbacks are supported: every relocated pointer must target this
+module's executable segment, and all callbacks are checked before any run.
+Initializers run once per new mapping after protection, before exposing the
+handle; a reference-counted reopen does not rerun them. Unsupported imports and
 relocations fail explicitly. Adding another core requires reviewing this
 contract and extending both host tests and target diagnostics as needed.
 
@@ -441,3 +447,96 @@ upload rule to actual content, avoiding the RGB565-only compute branch. Frame
 scaling and presentation remain on the Vulkan GPU path; `video_ps5` stays
 registered as the selectable fallback. RGB565 core frames retain their existing
 path and require separate content acceptance.
+
+
+## mGBA core build
+
+`make mgba` runs `tools/build-mgba.sh` with the same SDK and ELF linker layout as
+FCEUmm. The pinned source is the [official libretro mGBA tree](https://github.com/libretro/mgba/tree/7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6).
+Source and `.info` inputs have verified SHA-256 digests; a fresh extraction goes
+to `build/cores/mgba/`. CMake is required by this source revision. The wrapper in
+`tooling/mgba/` selects only the shared libretro target, both GB and GBA engines,
+software XRGB8888 output, and native kernel_web/libc/Posix imports. External
+frontend/media dependencies are disabled: RetroArch supplies presentation,
+audio, archive extraction and content services. No SDL, Qt or OpenGL backend is
+added. This core uses Vulkan for frontend presentation, not hardware emulation.
+
+The toolchain restricts header/library/package searches to the SDK. Function
+probes link against the actual native stubs without a CRT and are never executed;
+static-library probes falsely reported unavailable locale functions. The SDK
+provides locale types/headers but lacks several locale runtime functions, so the
+small `patches/mgba/native-locale-type.patch` uses a private formatting type for
+upstream's string-locale fallback; `HAVE_XLOCALE` is removed from this target.
+The patch is applied with zero fuzz to the fresh source. `HAVE_LOCALTIME_R` names
+the frontend adapter, avoiding upstream's unimplemented fallback. `-z undefs`
+permits that frontend-provided import; the generated binding table must still
+resolve every core import when the title links.
+
+`--build-id=sha1` keeps output repeatable. `GIT_CEILING_DIRECTORIES` prevents
+upstream's version generator from discovering RetroArch's parent Git checkout;
+the archive reports its own 0.11.0 version, with the exact source revision in
+`build/cores/mgba/build.json`. That report also contains the SDK wrapper, source,
+metadata and port-input hashes. No source checkout or environment is modified.
+
+Outputs are `build/cores/stage/cores/mgba_libretro.so` and
+`build/cores/stage/info/mgba_libretro.info`. The title build stages both cores,
+with metadata in both `info/` and `cores/` for existing saved configurations.
+Changing the shipped core list requires rebuilding the frontend's native import
+bindings. Console loading and manual gameplay remain separate target checks.
+
+
+`MGBA_PS5` selects `/app0/config/mgba` for mGBA's optional standalone config
+and disables `portable.ini` working-directory discovery. The zero-fuzz
+`native-config-path.patch` avoids native `getcwd`/Unix home discovery; core
+options continue to come from RetroArch's libretro environment.
+
+## Large application allocations
+
+`src/memory_ps5.cpp` maps allocations of at least 1 MiB with the native kernel
+and keeps smaller requests on libc. The title linker wraps `malloc`, `calloc`,
+`realloc` and `free` together, including the generated core binding references.
+This flag is required because a 16 MiB 7z extraction allocation returned null
+through the native libc import. The donor also uses mappings for large buffers;
+this implementation tracks mappings in a mutex-protected list and never reads
+headers before unknown pointers. Buffers allocated inside native libraries
+remain libc-owned and are forwarded to native free/realloc. Resize of a mapped
+buffer preserves its contents and leaves the old allocation intact on failure.
+Resize of a libc-owned buffer remains a libc operation, including growth beyond
+the threshold. Do not pass a mapped pointer to an API that privately frees or
+reallocates it inside an unwrapped native library.
+
+Patch 0076 reports 7z allocation/header/extraction failures without filenames
+and checks allocation before copying extracted content. It logs errors only.
+
+
+The mGBA libretro callback converts native XBGR to its declared XRGB8888 format
+using `ps5-video.h` and a separate bounded video buffer. It leaves the renderer's
+pixels intact for duplicate/cached frames. Upstream's 16-bit-only colour
+correction/interframe-blending routines are not enabled by this 32-bit build.
+
+Patch 0077 sets RGBA menu image decoding on every Vulkan context initialization
+and requests RGBA textures for those decoded pixels. This is separate from core
+XRGB frames. The Vulkan software-framebuffer callback returns false: callers
+must retain their own original pixels, since exposing RGBA staging memory as
+writable XRGB would let upload conversion mutate cached frames while paused.
+FCEUmm uses its own buffer when that optional callback is unavailable.
+
+On normal frontend return, `catchReturnFromMain` requests
+`sceSystemServiceLoadExec("exit", nullptr)` and waits for asynchronous shell
+termination on success. RetroArch has already cleaned up drivers and saved its
+configuration. A failed request is logged and falls back to the existing CRT
+termination path; it must not be described as a successful clean exit.
+
+### Padded core presentation
+
+Patch 0078 extends the existing 256-byte texture-row workaround to software
+core presentation. The filter chain carries logical width separately from the
+sampled image width and crops both triangle UVs to that initialized region.
+Each pass owns one small vertex buffer per retired sync slot, so CPU updates do
+not overwrite another in-flight frame. Swapchain reconstruction releases these
+buffers. Hardware-provided images and intermediate pass outputs keep their own
+extents; sampled format substitution is applied before computing padded width.
+The host regression covers FCEUmm, the blank menu frame, GBA and GB widths across
+repeated transitions. Console flicker acceptance is recorded in `evidence/mgba-native/`. This is
+not validation of arbitrary Slang presets, history sampling or linear-filter
+edge behaviour; those remain separate milestones.

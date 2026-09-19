@@ -9,6 +9,7 @@ namespace
 std::vector<std::vector<char>> batches;
 size_t batch = 0;
 int closed = 0;
+bool seek_fails = false;
 std::vector<char> record(uint32_t inode, unsigned type, const std::string &name)
 {
     uint16_t length = uint16_t((8 + name.size() + 1 + 3) & ~3u);
@@ -35,6 +36,17 @@ extern "C" int __wrap_close(int fd)
 {
     assert(fd == 0);
     ++closed;
+    return 0;
+}
+extern "C" off_t lseek(int fd, off_t offset, int whence)
+{
+    assert(fd == 0 && offset == 0 && whence == SEEK_SET);
+    if (seek_fails)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    batch = 0;
     return 0;
 }
 extern "C" int getdents(int fd, char *buffer, int size)
@@ -69,6 +81,16 @@ int main()
     assert(entry && entry->d_type == DT_REG && std::string(entry->d_name) == "Example ROM.bin");
     errno = 0;
     assert(!ps5_readdir(dir) && errno == 0 && !ps5_readdir(dir));
+    seek_fails = true;
+    ps5_rewinddir(dir);
+    assert(errno == EINVAL && !ps5_readdir(dir));
+    seek_fails = false;
+    ps5_rewinddir(dir);
+    entry = ps5_readdir(dir);
+    assert(entry && std::string(entry->d_name) == "cores");
+    ps5_rewinddir(dir); // Reset a partially consumed batch too.
+    entry = ps5_readdir(dir);
+    assert(entry && std::string(entry->d_name) == "cores");
     assert(ps5_closedir(dir) == 0 && closed == 1);
     // Truncated headers, oversized/zero records and missing name terminators fail closed.
     auto oversized = record(1, DT_DIR, "x");

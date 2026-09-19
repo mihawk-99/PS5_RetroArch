@@ -1,0 +1,32 @@
+--- a/src/platform/libretro/libretro.c
++++ b/src/platform/libretro/libretro.c
+@@ -58,6 +58,10 @@
+ 
+ static retro_environment_t environCallback;
+ static retro_video_refresh_t videoCallback;
++#ifdef MGBA_PS5
++#include "ps5-video.h"
++static uint32_t ps5Video[VIDEO_WIDTH_MAX * VIDEO_HEIGHT_MAX];
++#endif
+ static retro_audio_sample_batch_t audioCallback;
+ static retro_input_poll_t inputPollCallback;
+ static retro_input_state_t inputCallback;
+@@ -1699,7 +1703,18 @@
+ 			videoCallback(ppOutputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(mColor));
+ 		} else
+ #endif
++#ifdef MGBA_PS5
++        {
++            /* Preserve the renderer's native buffer for repeated/cached frames. */
++            for (unsigned y = 0; y < height; ++y)
++                for (unsigned x = 0; x < width; ++x)
++                    ps5Video[y * VIDEO_WIDTH_MAX + x] =
++                        ps5_mgba_xrgb(outputBuffer[y * VIDEO_WIDTH_MAX + x]);
++            videoCallback(ps5Video, width, height, VIDEO_WIDTH_MAX * sizeof(uint32_t));
++        }
++#else
+ 			videoCallback(outputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(mColor));
++#endif
+ 	} else {
+ 		videoCallback(NULL, width, height, VIDEO_WIDTH_MAX * sizeof(mColor));
+ 	}

@@ -1,0 +1,78 @@
+--- a/include/mgba-util/formatting.h
++++ b/include/mgba-util/formatting.h
+@@ -14,14 +14,19 @@
+ 
+ #ifdef HAVE_XLOCALE
+ #include <xlocale.h>
+-#elif !defined(HAVE_LOCALE)
+-typedef const char* locale_t;
+ #endif
+ 
+-int ftostr_l(char* restrict str, size_t size, float f, locale_t locale);
++/* The SDK can declare locale_t without providing the locale runtime API. */
++#ifdef HAVE_LOCALE
++typedef locale_t mLocale;
++#else
++typedef const char* mLocale;
++#endif
++
++int ftostr_l(char* restrict str, size_t size, float f, mLocale locale);
+ 
+ #ifndef HAVE_STRTOF_L
+-float strtof_l(const char* restrict str, char** restrict end, locale_t locale);
++float strtof_l(const char* restrict str, char** restrict end, mLocale locale);
+ #endif
+ 
+ int ftostr_u(char* restrict str, size_t size, float f);
+--- a/src/util/formatting.c
++++ b/src/util/formatting.c
+@@ -7,11 +7,11 @@
+ 
+ #include <float.h>
+ 
+-int ftostr_l(char* restrict str, size_t size, float f, locale_t locale) {
++int ftostr_l(char* restrict str, size_t size, float f, mLocale locale) {
+ #ifdef HAVE_SNPRINTF_L
+ 	return snprintf_l(str, size, locale, "%.*g", FLT_DIG, f);
+ #elif defined(HAVE_USELOCALE)
+-	locale_t old = uselocale(locale);
++	mLocale old = uselocale(locale);
+ 	int res = snprintf(str, size, "%.*g", FLT_DIG, f);
+ 	uselocale(old);
+ 	return res;
+@@ -27,9 +27,9 @@
+ }
+ 
+ #ifndef HAVE_STRTOF_L
+-float strtof_l(const char* restrict str, char** restrict end, locale_t locale) {
++float strtof_l(const char* restrict str, char** restrict end, mLocale locale) {
+ #ifdef HAVE_USELOCALE
+-	locale_t old = uselocale(locale);
++	mLocale old = uselocale(locale);
+ 	float res = strtof(str, end);
+ 	uselocale(old);
+ 	return res;
+@@ -47,9 +47,9 @@
+ 
+ int ftostr_u(char* restrict str, size_t size, float f) {
+ #ifdef HAVE_LOCALE
+-	locale_t l = newlocale(LC_NUMERIC_MASK, "C", 0);
++	mLocale l = newlocale(LC_NUMERIC_MASK, "C", 0);
+ #else
+-	locale_t l = "C";
++	mLocale l = "C";
+ #endif
+ 	int res = ftostr_l(str, size, f, l);
+ #ifdef HAVE_LOCALE
+@@ -60,9 +60,9 @@
+ 
+ float strtof_u(const char* restrict str, char** restrict end) {
+ #ifdef HAVE_LOCALE
+-	locale_t l = newlocale(LC_NUMERIC_MASK, "C", 0);
++	mLocale l = newlocale(LC_NUMERIC_MASK, "C", 0);
+ #else
+-	locale_t l = "C";
++	mLocale l = "C";
+ #endif
+ 	float res = strtof_l(str, end, l);
+ #ifdef HAVE_LOCALE

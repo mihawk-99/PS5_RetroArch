@@ -51,8 +51,13 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
-bash "$root/tools/build-fceumm.sh"
-python3 "$root/tools/core-imports.py"
+core_names=(fceumm mgba)
+core_files=()
+for core_name in "${core_names[@]}"; do
+    bash "$root/tools/build-$core_name.sh"
+    core_files+=("$root/build/cores/stage/cores/${core_name}_libretro.so")
+done
+python3 "$root/tools/core-imports.py" "${core_files[@]}"
 
 # The title's own sources are compiled with the same feature defines as the
 # frontend, because the two share a header full of #ifdefs and a struct whose
@@ -155,6 +160,7 @@ inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
 inputs += [root / name for name in (
     "build/ra/libretroarch.a", "build/ra-conf/config.h", "tools/build-title.sh",
     "build/core_imports.inc", "build/cores/stage/cores/fceumm_libretro.so",
+    "build/cores/stage/cores/mgba_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += [pathlib.Path(name) for name in sys.argv[2:]]
 digest = hashlib.sha256()
@@ -168,6 +174,7 @@ print("==> [title] build identity: " + identity)
 PY
 
 echo "==> [title] step 2/3: the title"
+# Large frontend/core buffers use mapped memory; wrap all ownership operations.
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
 PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
@@ -176,7 +183,7 @@ APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-c
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
-APP_LINK_FLAGS="$vulkan_flags" \
+APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free" \
     make app
 
 title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \
@@ -192,10 +199,12 @@ dist="$root/dist/$title_id"
 # initialise and the title exit 1 saying nothing. See config/retroarch.cfg.
 cp -a -- "$root/config/retroarch.cfg" "$dist/retroarch.cfg"
 mkdir -p "$dist/cores" "$dist/info"
-cp -- "$root/build/cores/stage/cores/fceumm_libretro.so" "$dist/cores/"
-cp -- "$root/build/cores/stage/info/fceumm_libretro.info" "$dist/info/"
-# Older saved configs have an empty info path: upstream then searches cores/.
-cp -- "$root/build/cores/stage/info/fceumm_libretro.info" "$dist/cores/"
+for core_name in "${core_names[@]}"; do
+    cp -- "$root/build/cores/stage/cores/${core_name}_libretro.so" "$dist/cores/"
+    cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/info/"
+    # Older saved configs have an empty info path: upstream then searches cores/.
+    cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/cores/"
+done
 
 # The Vulkan driver, beside the title, when it exists.
 #

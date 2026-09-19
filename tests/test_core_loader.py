@@ -123,3 +123,56 @@ extern "C" void *ps5_core_import(const char *name) {
         data = bytearray(self.original)
         struct.pack_into('<I', data, offset + 8, 5)  # R_X86_64_COPY
         self.reject(data, 'unsupported x86-64 relocation')
+
+    def test_constructor_runs_once_per_mapping_and_rejects_bad_array(self):
+        source = self.folder / 'ctor.c'
+        source.write_text('''int ready;
+__attribute__((constructor)) static void init(void) { ++ready; }
+int state(void) { return ready; }
+''')
+        path = self.folder / 'ctor.so'
+        subprocess.run(['cc', '-shared', '-nostdlib', '-fPIC', str(source),
+                        '-Wl,-z,max-page-size=16384', '-Wl,-T,' + str(ROOT / 'tooling/native/ps5-core.ld'),
+                        '-o', str(path)], check=True, capture_output=True)
+        data = bytearray(path.read_bytes())
+        data[7] = 9
+        path.write_bytes(data)
+        for _ in range(3):
+            handle = self.open(path)
+            self.assertTrue(handle, self.lib.ps5_core_dlerror())
+            other = self.open(path)
+            self.assertEqual(handle, other)
+            state = ctypes.CFUNCTYPE(ctypes.c_int)(self.lib.ps5_core_dlsym(handle, b'state'))
+            self.assertEqual(state(), 1)
+            self.lib.ps5_core_dlclose(other)
+            self.lib.ps5_core_dlclose(handle)
+        phoff = struct.unpack_from('<Q', data, 32)[0]
+        phcount = struct.unpack_from('<H', data, 56)[0]
+        dynamic = next(struct.unpack_from('<Q', data, phoff + i * 56 + 8)[0]
+                       for i in range(phcount)
+                       if struct.unpack_from('<I', data, phoff + i * 56)[0] == 2)
+        at = dynamic
+        while struct.unpack_from('<q', data, at)[0] != 25:  # DT_INIT_ARRAY
+            self.assertNotEqual(struct.unpack_from('<q', data, at)[0], 0)
+            at += 16
+        original = bytearray(data)
+        init_address = struct.unpack_from('<Q', data, at + 8)[0]
+        struct.pack_into('<Q', data, at + 8, 2**64 - 8)
+        self.reject(data, 'initializer array')
+        data = original
+        writable = next(struct.unpack_from('<Q', data, phoff + i * 56 + 16)[0]
+                        for i in range(phcount)
+                        if struct.unpack_from('<II', data, phoff + i * 56) == (1, 6))
+        shoff = struct.unpack_from('<Q', data, 40)[0]
+        shcount = struct.unpack_from('<H', data, 60)[0]
+        changed = False
+        for i in range(shcount):
+            if struct.unpack_from('<I', data, shoff + i * 64 + 4)[0] != 4:
+                continue
+            offset, size = struct.unpack_from('<QQ', data, shoff + i * 64 + 24)
+            for reloc in range(offset, offset + size, 24):
+                if struct.unpack_from('<Q', data, reloc)[0] == init_address:
+                    struct.pack_into('<q', data, reloc + 16, writable)
+                    changed = True
+        self.assertTrue(changed)
+        self.reject(data, 'initializer callback outside executable segment')

@@ -102,6 +102,20 @@ extern "C" struct dirent *ps5_readdir(DIR *opaque)
     return nullptr;
 }
 
+extern "C" void ps5_rewinddir(DIR *opaque)
+{
+    auto *directory = reinterpret_cast<Directory *>(opaque);
+    if (!directory)
+    {
+        errno = EBADF;
+        return;
+    }
+    if (lseek(directory->fd, 0, SEEK_SET) < 0)
+        return;
+    directory->offset = directory->bytes = 0;
+    directory->finished = false;
+}
+
 extern "C" int ps5_closedir(DIR *opaque)
 {
     auto *directory = reinterpret_cast<Directory *>(opaque);

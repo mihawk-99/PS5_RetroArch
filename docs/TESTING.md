@@ -187,7 +187,8 @@ when no core is selected.
 
 `tests/test_core_loader.py` compiles and executes the real loader against a small
 host ELF fixture. It tests relocation/import execution, reference counts,
-reloads, missing imports, malformed header/table bounds, forbidden segment flags,
+reloads, once-per-mapping initializers, invalid initializer tables/callbacks,
+missing imports, malformed header/table bounds, forbidden segment flags,
 TLS, and invalid relocation targets/types. The fixture's OSABI byte is adjusted
 only for this host test; shipped cores must pass the actual cross-build checker.
 `tests/test_core_recovery.py` runs the upstream core-selection function before
@@ -212,3 +213,45 @@ red/green/blue and mixed colours, checks opaque alpha, distinct input/output row
 pitches, untouched padding and in-place conversion. Real-core acceptance also
 requires a trace with no Vulkan refusals or failed command buffers, rather than
 inferring correctness from the core's successful initialization.
+
+
+For mGBA use `tools/run-title.sh --no-build --core-test=mgba --watch 180`.
+`--core-test` without a value retains the FCEUmm diagnostic. Reports contain the
+selected core name, checked along with build identity and pass status. Only these
+two names are accepted. The owner selects content manually after startup.
+
+`tests/test_core_imports.py` checks union/deduplication across two cores, object
+and untyped imports, directory/time adapters, and conflicting or TLS import
+rejection. The directory adapter fixture also checks rewind after EOF, rewind of
+a partially consumed batch and failed seek without discarding state. The loader
+constructor test was observed failing before support was added, then passing;
+it also rejects callbacks into writable data without executing them.
+
+Record GB, GBC and GBA gameplay separately when tested. Core compilation and
+metadata support for a system do not substitute for console gameplay. RTC,
+optional BIOS files, saves/states, sensors, rumble and sustained performance
+require their own acceptance; do not infer them from one successful game.
+
+
+The native memory test covers 16/32 MiB allocation, zeroing, preserved data on
+resize, overflow/failure keeping the original buffer, mapped-to-small resize,
+foreign libc ownership and concurrent allocation/free. Target acceptance must
+also load a GBA archive larger than the native heap could previously allocate;
+a host allocation test alone does not prove native content loading.
+
+
+For core lifecycle acceptance, test coloured content, open Quick Menu with the
+core paused, close content to XMB, reload another game, and choose Quit. Inspect
+both the live frontend log and kernel capture. Native exit(0) followed by SIGSYS
+is a shutdown failure even when the user intentionally chose Quit. Check core
+XBGR-to-XRGB conversion and repeated immutable cached-frame uploads on the host;
+console colour/flicker confirmation remains required.
+
+For patch 0078, manually exercise game -> Quick Menu -> Close Content -> another
+core/game, repeating with FCEUmm and mGBA. Check menu and gameplay for flicker
+and stale image regions at each transition, including the RGUI configuration
+in the owner's reproduction. Owner observation is required: a recording at a
+matching refresh cadence may hide alternating corrupted frames. Preserve the
+live frontend log before a relaunch replaces it; do not accept a clean loader
+probe alone as visual acceptance. Record hashes of linked driver archives when
+the sibling Vulkan repository is being developed concurrently.

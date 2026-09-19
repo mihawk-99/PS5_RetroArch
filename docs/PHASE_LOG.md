@@ -2069,3 +2069,62 @@ identity includes the actual archive bytes read at build time; no driver source
 commit is inferred from the later checkout. Its archive changed after the
 accepted title linked, so the accepted dist/ artifact has not been rebuilt
 against that newer archive. Console acceptance remains tied to identity 9b287ca7.
+
+
+## 2026-09-19 — Native mGBA archives and content lifecycle
+
+Added `make mgba` and the normal title build/stage integration using pinned
+upstream CMake libretro source 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6.
+Both GB and GBA engines are enabled; official metadata is staged in info/ and
+cores/. The core has no SDL/Qt or payload CRT. CMake is used because it is this
+revision's maintained libretro target. Native directory/time adapters and 21
+validated init callbacks support its ABI. Pins and reasons for toolchain/link
+flags are recorded in REFERENCE.md and the generated evidence build manifest.
+
+Iterations, all run with manual archive selection:
+
+- `656d34aa…`, `klog/run-PPSA99169-150419.log`: loader/recovery passed, but GB/GBC
+  crashed in mCoreConfigPortablePath at native getcwd; GBA failed before core
+  entry. Explicit /app0/config/mgba removed getcwd/getenv dependencies.
+- `9c7baa14…`, `klog/run-PPSA99169-151335.log`: owner confirmed GB/GBC load.
+  Archive diagnostic isolated a null 16 MiB allocation, extraction result 2;
+  errno=2 was stale. Owner manually quit, exit(0) then SIGSYS.
+- `773678fa…`, `klog/run-PPSA99169-152050.log`: tracked mmap allocations >=1 MiB
+  enabled GBA archive loading. Owner reported swapped colours, menu flicker and
+  Quit crash. The raw lld invocation initially rejected -Wl wrapper syntax;
+  corrected --wrap flags passed all gates (56 tests). Native realloc ownership
+  remains native; this is not an interposer inside the native libc library.
+- `ef7004d3…`, `klog/run-PPSA99169-153046.log`: mGBA XBGR->XRGB callback copy,
+  consistent RGBA menu textures and immutable cached frames fixed colours.
+  Native LoadExec exit fixed Quit (zero fatal reports). Owner confirmed both;
+  Close Content still flickered for mGBA and FCEUmm. All gates, 57 tests.
+- `6a761ad7…`, `klog/mgba-transition-capture-run.log`: diagnostic screenshot
+  trigger built and passed gates, but console became busy during deployment;
+  launch refused. Trigger was removed; owner supplied an RGUI photo/video.
+- UV crop host development: format lint first required formatting; regression
+  initially compared double and float UVs exactly and was corrected to float32
+  expectations. First crop build passed 58 tests/all gates. A follow-up made
+  substituted sampled format determine the physical width consistently.
+- Final `82024b89e74bbad4ad2ce2e2916d1a49baf26ac325fef20fc71a2c168b862337`:
+  `bash tools/verify.sh` passed all five gates, 58 tests, log
+  `/tmp/mgba-uv-format-final-verify.log`. mGBA SHA-256:
+  feb1922c9fe9dd3424b42f538a80362d0574b4dfa0134980d3fd14c52593cff6.
+  `bash tools/run-title.sh --no-build --core-test=mgba --watch 180` first refused
+  a busy console. After owner confirmed idle, upload/readback matched and the
+  launch succeeded. `klog/mgba-uv-crop-run.log`, kernel
+  `klog/run-PPSA99169-155435.log`: one current-build launch, zero Vulkan refusals,
+  zero GPU API failure records and zero kernel fatal signal reports. Eight
+  loader cycles and actual failed-load recovery passed. Owner: “Menu and next
+  game are clean.” Live frontend log records GBA -> menu -> GB/GBC -> menu,
+  then frontend return 0/native exit before the window ended. Runner's wording
+  “exited on its own” is not evidence of a crash or uninterrupted gameplay.
+
+Patch 0078 crops core sampling to initialized logical pixels in padded images;
+it uses per-pass/per-sync VBOs and preserves logical size semantics. No switch
+away from Vulkan and no PS5_Vulkan edits. The sibling is independently developed;
+linked archive hashes, unchanged through this build, are in the evidence.
+
+Evidence: `evidence/mgba-native/`, replay `bash tools/verify.sh evidence`.
+Private ROM names, console credentials and raw captures are not committed.
+Save/state round trips, long-run A/V sync, measured performance, Slang presets,
+and a fresh FCEUmm/XMB transition matrix are not claimed.

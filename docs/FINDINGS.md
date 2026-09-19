@@ -2708,3 +2708,39 @@ confirmed flawless gameplay and reported manual close because no return-to-menu
 shortcut was set. The capture contains three current-build launches with zero
 Vulkan refusals, GPU failure records or fatal signals; it is not a continuous
 180-second gameplay measurement. Repeated game unload and saves remain untested.
+
+
+## 2026-09-19 — mGBA and content transition lifetime
+
+mGBA needs 21 C log-category initializers. The loader now validates the bounded,
+relocated callback table and every executable target before invoking any entry,
+once per mapped image. Eight real-core load/unload cycles and a load with the
+frontend resident passed. Native getcwd crashed in mCoreConfigPortablePath;
+explicit `/app0/config/mgba` avoids that import. GBA 7z extraction then failed a
+16 MiB allocation before the core received content. Routing large title/core
+allocations to tracked anonymous mappings resolved that observed failure.
+
+The core's 32-bit renderer produces XBGR while libretro declares XRGB. A separate
+callback conversion preserves the native image. Frontend menu decode/upload now
+uses RGBA consistently. Refusing a writable software framebuffer prevents the
+XRGB-to-RGBA upload from mutating cached source pixels during paused menu frames.
+Owner confirmed colours and native Quit fixed, but Close Content still flickered
+for both mGBA and FCEUmm and polluted later games. This was a distinct defect.
+
+The existing texture workaround widens images to 256-byte rows; uploads populate
+only logical pixels. Menu/font UVs compensated, but the filter-chain quad still
+sampled 0..1 across physical width. Tiny blank frames and unaligned GB/GBA widths
+therefore exposed unwritten padding. Patch 0078 supplies sampled width separately,
+crops both triangles, and isolates mutable VBOs by pass and retired sync slot.
+Substituted image formats now determine padded width consistently. Owner confirms
+“Menu and next game are clean.” The captured final transitions were GBA -> menu
+-> GB/GBC-sized content -> menu. This does not independently verify every shader
+or a fresh FCEUmm/XMB matrix. PS5_Vulkan was not edited; linked archive hashes are
+recorded because the sibling is concurrently developed.
+
+The old CRT return path called exit(0) then produced SIGSYS. Calling native
+sceSystemServiceLoadExec("exit", nullptr) after frontend cleanup produced shell
+LoadExec termination without fatal signal reports, also confirmed by the owner.
+Evidence and failed iterations: `evidence/mgba-native/`; replay with
+`bash tools/verify.sh evidence`. Saves, state restoration and long-run timing are
+not established by these loading/transition tests.

@@ -1,0 +1,32 @@
+[
+  {
+    "identity": "656d34aa57e6172c08bfe03106468a832013a5cca37af924553410e2d9889389",
+    "raw": "klog/run-PPSA99169-150419.log",
+    "result": "Loader/recovery pass; GB/GBC SIGSEGV at native getcwd in mCoreConfigPortablePath; GBA archive fails before core entry."
+  },
+  {
+    "identity": "9c7baa1430ba8b149a01ee6c25c2bd642e38ed257a5bd1243790629ea279434d",
+    "raw": "klog/run-PPSA99169-151335.log",
+    "result": "Explicit /app0/config/mgba removes getcwd/getenv; owner confirms GB/GBC load. 7z 16777216-byte allocation returns null, extract result 2. Owner manually quit; exit(0) then SIGSYS is a shutdown defect. errno=2 in allocator diagnostic was stale, not the cause."
+  },
+  {
+    "identity": "773678fae328d01c5ba38e2e999a1d3ed77e45cbe8a862e2620e1ba39c1ec724",
+    "raw": "klog/run-PPSA99169-152050.log",
+    "result": "Mapped large allocations allow GBA archives to load. Owner reports swapped core/menu colours, Quick Menu flicker and native Quit crash. 56 host tests pass."
+  },
+  {
+    "identity": "ef7004d32ed14ec1b4a288e8ec549fe67c068bf96722d135c131df725dc7d80a",
+    "raw": "klog/run-PPSA99169-153046.log",
+    "result": "Owner confirms colours and native Quit fixed. Zero kernel fatal signal reports, Kill for LoadExec. Close Content flicker remains on mGBA and FCEUmm. 57 host tests pass."
+  },
+  {
+    "identity": "6a761ad7738f99ba28d019bcee159c694342eab21b0cd4452c231c8052ed0445",
+    "raw": "klog/mgba-transition-capture-run.log",
+    "result": "Host checks pass; console became busy during deployment, so runner refused launch. Unexercised screenshot trigger removed; owner supplied image/video."
+  },
+  {
+    "identity": "82024b89e74bbad4ad2ce2e2916d1a49baf26ac325fef20fc71a2c168b862337",
+    "raw": "klog/mgba-uv-crop-run.log",
+    "result": "Initial attempt refused upload/launch because another title was running. Owner freed console; subsequent run uploaded and verified identical bytes. Cropped source UVs and sampled-format width fix; owner confirms menu and next game clean. Final capture follows."
+  }
+]

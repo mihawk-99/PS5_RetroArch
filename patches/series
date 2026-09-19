@@ -88,3 +88,9 @@
 0074-native-core-recovery-diagnostic
 
 0075-native-core-rgba-upload
+
+0076-archive-read-error-diagnostics
+
+0077-vulkan-menu-colour-and-cached-frame-ownership
+
+0078-crop-padded-core-source

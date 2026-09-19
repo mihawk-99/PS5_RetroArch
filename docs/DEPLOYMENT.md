@@ -202,3 +202,12 @@ For manual core/game testing, launch with `--no-build --watch 180` (also
 `--no-deploy` if the same build is already verified on the console). The owner
 selects the game; collect `retroarch.log`, `trace.txt` and the kernel capture.
 The loader's supported ELF/runtime contract is in `docs/REFERENCE.md`.
+
+
+`make mgba` builds and checks the mGBA shared core without uploading it. The title
+build includes `mgba_libretro.so` alongside FCEUmm and installs its `.info` in both
+metadata locations. Deploy the rebuilt title with the new core: its import table
+now covers both cores. Use `--core-test=mgba` for the optional loader diagnostic.
+Place user GB/GBC/GBA games in `content/` (or another browsable user folder), select
+mGBA manually, and capture the gameplay log before closing/reopening the title.
+No ROM or BIOS is included in the build.

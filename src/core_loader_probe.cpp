@@ -15,7 +15,19 @@ extern "C"
 namespace
 {
 bool recovery_pending = false;
+const char *test_core = "fceumm";
+const char *test_path = "/app0/cores/fceumm_libretro.so";
+const char *test_name = "FCEUmm";
+} // namespace
+extern "C" const char *ps5_core_loader_test_path()
+{
+    return test_path;
 }
+extern "C" const char *ps5_core_loader_test_name()
+{
+    return test_core;
+}
+
 extern "C" bool ps5_core_recovery_test_pending()
 {
     bool pending = recovery_pending;
@@ -28,8 +40,21 @@ extern "C" void ps5_core_loader_test_if_requested()
     FILE *control = std::fopen("/app0/core-loader-test.txt", "r");
     if (!control)
         return;
+    char selection[32] = {};
+    const int fields = std::fscanf(control, "%31s", selection);
     std::fclose(control);
     std::remove("/app0/core-loader-test.txt");
+    if (fields == 1 && !std::strcmp(selection, "mgba"))
+    {
+        test_core = "mgba";
+        test_path = "/app0/cores/mgba_libretro.so";
+        test_name = "mGBA";
+    }
+    else if (fields != 1 || std::strcmp(selection, "fceumm"))
+    {
+        std::fprintf(stderr, "core loader test: unsupported selection\n");
+        return;
+    }
     recovery_pending = true;
     const char *exports[] = {"retro_api_version",
                              "retro_init",
@@ -63,7 +88,7 @@ extern "C" void ps5_core_loader_test_if_requested()
     bool unknown_symbol = false;
     for (unsigned i = 0; i < 8; ++i)
     {
-        void *core = ps5_core_dlopen("/app0/cores/fceumm_libretro.so", 0);
+        void *core = ps5_core_dlopen(test_path, 0);
         if (!core)
         {
             std::snprintf(error, sizeof(error), "%s", ps5_core_dlerror());
@@ -86,7 +111,7 @@ extern "C" void ps5_core_loader_test_if_requested()
                              ps5_core_dlerror() != nullptr;
         }
         if (ps5_core_dlclose(core) || found != 25 || api != RETRO_API_VERSION ||
-            std::strcmp(name, "FCEUmm"))
+            std::strcmp(name, test_name))
             break;
         ++cycles;
     }
@@ -96,11 +121,12 @@ extern "C" void ps5_core_loader_test_if_requested()
                  passed, cycles, found, api, name, error);
     if (FILE *out = std::fopen("/app0/core-loader-test.json", "w"))
     {
-        std::fprintf(out,
-                     "{\"build_identity\":\"%s\",\"passed\":%s,\"cycles\":%u,\"exports\":%u,"
-                     "\"api\":%u,\"missing_rejected\":%s,\"unknown_symbol_rejected\":%s}\n",
-                     ps5_frontend_build_identity(), passed ? "true" : "false", cycles, found, api,
-                     missing ? "true" : "false", unknown_symbol ? "true" : "false");
+        std::fprintf(
+            out,
+            "{\"build_identity\":\"%s\",\"core\":\"%s\",\"passed\":%s,\"cycles\":%u,\"exports\":%u,"
+            "\"api\":%u,\"missing_rejected\":%s,\"unknown_symbol_rejected\":%s}\n",
+            ps5_frontend_build_identity(), test_core, passed ? "true" : "false", cycles, found, api,
+            missing ? "true" : "false", unknown_symbol ? "true" : "false");
         std::fclose(out);
     }
 }

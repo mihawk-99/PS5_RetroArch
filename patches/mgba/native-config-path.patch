@@ -1,0 +1,31 @@
+--- a/src/core/config.c
++++ b/src/core/config.c
+@@ -233,6 +233,11 @@
+ }
+ 
+ void mCoreConfigDirectory(char* out, size_t outLength) {
++#ifdef MGBA_PS5
++	/* Native titles have no Unix home/working-directory configuration. */
++	strlcpy(out, "/app0/config/mgba", outLength);
++	mkdir(out, 0777);
++#else
+ 	char portableDir[PATH_MAX];
+ 	mCoreConfigPortablePath(portableDir, sizeof(portableDir));
+ 	if (portableDir[0]) {
+@@ -282,6 +287,7 @@
+ 	snprintf(out, outLength, "%s/.config/%s", home, binaryName);
+ 	mkdir(out, 0755);
+ #endif
++#endif
+ }
+ 
+ void mCoreConfigPortableIniPath(char* out, size_t outLength) {
+@@ -297,7 +303,7 @@
+ 	}
+ 	WideCharToMultiByte(CP_UTF8, 0, wpath, -1, out, outLength, 0, 0);
+ 	StringCchCatA(out, outLength, PATH_SEP "portable.ini");
+-#elif defined(PSP2) || defined(GEKKO) || defined(__SWITCH__) || defined(__3DS__)
++#elif defined(PSP2) || defined(GEKKO) || defined(__SWITCH__) || defined(__3DS__) || defined(MGBA_PS5)
+ 	UNUSED(outLength);
+ 	out[0] = '\0';
+ #else

@@ -40,19 +40,21 @@ deploy=1
 watch=30
 profile=0
 audio_test=0
-core_test=0
+core_test=none
 while (( $# )); do
     case "$1" in
         --no-build)  build=0 ;;
         --no-deploy) deploy=0 ;;
         --watch)     shift; watch=${1:?--watch needs seconds} ;;
         --audio-test) audio_test=1 ;;
-        --core-test) core_test=1 ;;
+        --core-test) core_test=fceumm ;;
+        --core-test=*) core_test=${1#*=} ;;
         --gpu-profile) shift; profile=${1:?--gpu-profile needs seconds} ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test]" >&2; exit 2 ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test[=fceumm|mgba]]" >&2; exit 2 ;;
     esac
     shift
 done
+case "$core_test" in none|fceumm|mgba) ;; *) echo "unknown core diagnostic: $core_test" >&2; exit 2 ;; esac
 
 [[ $watch =~ ^[0-9]+$ && $profile =~ ^[0-9]+$ ]] || { echo "durations must be integers" >&2; exit 2; }
 (( profile <= 60 )) || { echo "GPU profile duration must be 1..60 seconds" >&2; exit 2; }
@@ -165,11 +167,11 @@ with connect(**dt.load_settings()) as ftp:
         pass
     control = f"/data/homebrew/{sys.argv[1]}/core-loader-test.txt"
     remove_if_present(ftp, control)
-    if int(sys.argv[4]):
+    if sys.argv[4] != "none":
         remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-loader-test.json")
         remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-recovery-test.json")
-        ftp.storbinary(f"STOR {control}", io.BytesIO(b"native core loader test\n"))
-        print("    armed native core loader test (no game)")
+        ftp.storbinary(f"STOR {control}", io.BytesIO((sys.argv[4] + "\n").encode()))
+        print(f"    armed native {sys.argv[4]} loader test (no game)")
     control = f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt"
     remove_if_present(ftp, control)
     if int(sys.argv[2]):
@@ -254,7 +256,7 @@ with connect(**dt.load_settings()) as ftp:
     remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/audio-test.txt")
     remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-loader-test.txt")
     names = ["retroarch.log"]
-    if int(sys.argv[6]):
+    if sys.argv[6] != "none":
         names.extend(["core-loader-test.json", "core-recovery-test.json"])
     if int(sys.argv[4]):
         names.append("audio-test.json")
@@ -271,7 +273,7 @@ with connect(**dt.load_settings()) as ftp:
                     raise SystemExit("RetroArch log is stale or logging failed: current build identity absent")
             if name in ("core-loader-test.json", "core-recovery-test.json"):
                 report = json.loads(target.read_text())
-                if report.get("build_identity") != f"build identity: {expected}" or not report.get("passed"):
+                if report.get("build_identity") != f"build identity: {expected}" or report.get("core") != sys.argv[6] or not report.get("passed"):
                     raise SystemExit("Native core loader test failed or has stale identity")
                 print("    native core loader test PASS")
             if name == "audio-test.json":

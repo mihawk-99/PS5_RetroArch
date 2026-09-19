@@ -1,0 +1,36 @@
+{
+  "build_identity": "82024b89e74bbad4ad2ce2e2916d1a49baf26ac325fef20fc71a2c168b862337",
+  "current_build_launches": 1,
+  "geometry": [
+    "[INFO] [Core] Geometry: 320x240, Aspect: 1.333, FPS: 60.00, Sample rate: 48000.00 Hz.",
+    "[INFO] [Core] Geometry: 240x160, Aspect: 1.500, FPS: 59.73, Sample rate: 65536.00 Hz.",
+    "[INFO] [Core] Geometry: 320x240, Aspect: 1.333, FPS: 60.00, Sample rate: 48000.00 Hz.",
+    "[INFO] [Core] Geometry: 160x144, Aspect: 1.111, FPS: 59.73, Sample rate: 131072.00 Hz.",
+    "[INFO] [Core] Geometry: 320x240, Aspect: 1.333, FPS: 60.00, Sample rate: 48000.00 Hz."
+  ],
+  "lines": [
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=mGBA error=",
+    "core loader: ran 21 initializers",
+    "core recovery test: passed=1 selection_accepted=0 content_accepted=0 menu_context_preserved=1 menu_core_load=1",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "core loader: ran 21 initializers",
+    "rarch_main returned = 0",
+    "native quit: frontend status = 0"
+  ]
+}

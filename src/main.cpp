@@ -35,6 +35,7 @@
 #include <cstring>
 #include <exception>
 #include <typeinfo>
+#include <unistd.h>
 
 #include <cxxabi.h>
 
@@ -228,4 +229,19 @@ int main()
     ps5::debug::mark_value("rarch_main returned", status);
 
     return status;
+}
+
+/* RetroArch has already closed its drivers and written configuration here.
+ * Native title shutdown goes through the shell; kernel exit(0) raises SIGSYS
+ * for this application instead of returning cleanly to the home screen. */
+extern "C" int sceSystemServiceLoadExec(const char *, const char *const *);
+extern "C" void catchReturnFromMain(int status)
+{
+    ps5::debug::mark_value("native quit: frontend status", status);
+    std::fflush(nullptr);
+    const int result = sceSystemServiceLoadExec("exit", nullptr);
+    ps5::debug::mark_value("native quit: system service result", result);
+    if (result >= 0)
+        for (;;)
+            usleep(100000); /* Shell termination is asynchronous. */
 }
