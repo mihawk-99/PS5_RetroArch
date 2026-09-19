@@ -40,14 +40,16 @@ deploy=1
 watch=30
 profile=0
 audio_test=0
+core_test=0
 while (( $# )); do
     case "$1" in
         --no-build)  build=0 ;;
         --no-deploy) deploy=0 ;;
         --watch)     shift; watch=${1:?--watch needs seconds} ;;
         --audio-test) audio_test=1 ;;
+        --core-test) core_test=1 ;;
         --gpu-profile) shift; profile=${1:?--gpu-profile needs seconds} ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test]" >&2; exit 2 ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test]" >&2; exit 2 ;;
     esac
     shift
 done
@@ -149,7 +151,7 @@ fi
 # appeared. A run that does not ask for extras must not inherit them, so the file
 # is removed on every run - before the launch, because deleting it afterwards
 # would leave it for the next one if this run dies.
-python3 - "$title_id" "$profile" "$audio_test" <<'PY'
+python3 - "$title_id" "$profile" "$audio_test" "$core_test" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
 dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
@@ -161,6 +163,13 @@ with connect(**dt.load_settings()) as ftp:
         print("    cleared a leftover args.txt from the console")
     except Exception:
         pass
+    control = f"/data/homebrew/{sys.argv[1]}/core-loader-test.txt"
+    remove_if_present(ftp, control)
+    if int(sys.argv[4]):
+        remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-loader-test.json")
+        remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-recovery-test.json")
+        ftp.storbinary(f"STOR {control}", io.BytesIO(b"native core loader test\n"))
+        print("    armed native core loader test (no game)")
     control = f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt"
     remove_if_present(ftp, control)
     if int(sys.argv[2]):
@@ -233,7 +242,7 @@ except Exception as error:
 PY
 
 # --- preserve development logs and optional buffered timing ------------------
-python3 - "$title_id" "$profile" "$stamp" "$audio_test" "$expected_identity" <<'PY'
+python3 - "$title_id" "$profile" "$stamp" "$audio_test" "$expected_identity" "$core_test" <<'PY'
 import importlib.util, json, sys
 from pathlib import Path
 sys.path.insert(0, "tools")
@@ -243,7 +252,10 @@ dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
 with connect(**dt.load_settings()) as ftp:
     remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt")
     remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/audio-test.txt")
+    remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/core-loader-test.txt")
     names = ["retroarch.log"]
+    if int(sys.argv[6]):
+        names.extend(["core-loader-test.json", "core-recovery-test.json"])
     if int(sys.argv[4]):
         names.append("audio-test.json")
     if int(sys.argv[2]):
@@ -257,6 +269,11 @@ with connect(**dt.load_settings()) as ftp:
             if name == "retroarch.log":
                 if f"build identity: {expected}" not in target.read_text(errors="replace"):
                     raise SystemExit("RetroArch log is stale or logging failed: current build identity absent")
+            if name in ("core-loader-test.json", "core-recovery-test.json"):
+                report = json.loads(target.read_text())
+                if report.get("build_identity") != f"build identity: {expected}" or not report.get("passed"):
+                    raise SystemExit("Native core loader test failed or has stale identity")
+                print("    native core loader test PASS")
             if name == "audio-test.json":
                 report = json.loads(target.read_text())
                 checks = (

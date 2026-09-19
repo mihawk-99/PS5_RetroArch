@@ -2673,3 +2673,38 @@ context at `vulkan_alive+0x26` (ELF 0x6b3066) reading address 0x80. The owner
 confirmed the crash. This is not evidence that FCEUmm reached emulation or that
 libps5vk refused GPU work. Keep loader and error-recovery acceptance open.
 Evidence: `evidence/fceumm-build/`; next work: `parked/native-core-loading/`.
+
+## 2026-09-19: native ELF core loading and the first software-core frame
+
+The native title's payload-oriented dlfcn route did not open the staged FCEUmm
+ELF. The local native converter also refuses application exports. A no-game
+probe using public anonymous mmap, RW-to-RX mprotect and a return-42 function
+succeeded (`klog/run-PPSA99169-141420.log`). This supported implementing a bounded
+application ELF loader without websrv hooks, a donor SDK or kernel changes.
+
+The core now uses `tooling/native/ps5-core.ld` to separate 16 KiB RX/R/RW pages;
+`-T` is required because the previous shared layout combined code and data.
+Runtime imports are explicit title addresses generated from the core's dynamic
+symbols, including this port's directory adapters. Bounds, relocations, imports
+and final protection are checked before publishing a reference-counted handle.
+TLS/constructors/unwind support is deliberately outside this first contract.
+
+Eight pre-frontend load/API/identity/unload cycles passed, but the first manual
+selection failed reading the same file after XMB started. That diagnostic did
+not cover the failing lifecycle stage. Replacing the single stdio/heap read with
+bounded POSIX reads into mapped memory resolved the observed failure. The exact
+libc/allocator cause remains unisolated; the new diagnostic loads with the full
+frontend resident and tests rejection through the actual menu task functions.
+
+The next manual game start reached FCEUmm's video callback and aborted inside
+`vulkan_copy_staging_to_dynamic`: a BGRA staging buffer differed from the sampled
+RGBA image, selecting the RGB565-only compute branch. The core-frame upload now
+requests RGBA8 for both textures and converts XRGB8888 channel order/alpha while
+respecting row pitches. This is the existing GPU presentation route, not a switch
+to CPU video. Tests exercise colours, padding and in-place writes.
+
+The accepted build is recorded in `evidence/native-core-loading/`. The owner
+confirmed flawless gameplay and reported manual close because no return-to-menu
+shortcut was set. The capture contains three current-build launches with zero
+Vulkan refusals, GPU failure records or fatal signals; it is not a continuous
+180-second gameplay measurement. Repeated game unload and saves remain untested.

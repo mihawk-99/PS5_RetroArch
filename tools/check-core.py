@@ -56,7 +56,7 @@ def inspect(path):
             '<IIQQQQQQ', data, phoff + i * phsize)
         if ptype != 1:
             continue
-        if (align < 0x4000 or offset % 0x4000 != address % 0x4000
+        if (align < 0x4000 or flags & 3 == 3 or offset % 0x4000 != address % 0x4000
                 or filesz > memsz or offset + filesz > len(data)):
             raise ValueError('invalid PS5 16 KiB load segment')
         loads.append({'flags': flags, 'alignment': align})

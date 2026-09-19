@@ -77,3 +77,14 @@
 
 # 0071  expose PS5 pad through the binding/menu joypad interface and auto profile
 0071-register-native-ps5-joypad
+
+# Refuse failed core selection before frontend teardown; stop a failed runloop.
+0072-native-core-failure-recovery
+
+# Route libretro dynamic loading through the native ELF core loader.
+0073-native-elf-core-loader
+
+# Opt-in native loader diagnostic verifies rejected loads preserve the live menu.
+0074-native-core-recovery-diagnostic
+
+0075-native-core-rgba-upload

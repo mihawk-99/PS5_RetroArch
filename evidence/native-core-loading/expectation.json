@@ -1,0 +1,15 @@
+{
+  "step": "native-core-loading",
+  "note": "Native FCEUmm loading and first owner-confirmed gameplay; failed selection preserves live frontend. No claim of game hotkey/unload or sustained-rate acceptance.",
+  "must_contain": [
+    "frontend build identity: 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5",
+    "core SHA-256: fec7dc4eb7ec6cae937ae778f0b59365d8bd7570927a73353424345e13589d9c",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=FCEUmm",
+    "core recovery test: passed=1 selection_rejected=1 content_rejected=1 menu_context_preserved=1 menu_core_load=1",
+    "[INFO] [Core] Geometry: 256x224, Aspect: 1.306, FPS: 60.10, Sample rate: 48000.00 Hz.",
+    "current-build launches captured: 3; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signals: 0",
+    "Host verification: PASS format unit build integration evidence; 52 tests"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner answered the video/audio/controls question with \u201cWorks flawlessly!\u201d and reported manually closing the app because no return-to-menu shortcut was set."
+}

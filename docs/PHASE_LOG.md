@@ -2017,3 +2017,55 @@ Host verification: `tools/verify.sh` passes all five gates, 45 tests. Artifact:
 failed target result. `parked/native-core-loading/README.md` records the remaining
 loader/recovery work and its acceptance. PS5_Vulkan unchanged at 6f0ce0d; no ROM
 or BIOS is distributed. This commit completes build tooling, not a playable port.
+
+## 2026-09-19: native FCEUmm loader, failure guards and first gameplay
+
+Implemented the requested native loading/recovery step. The loader maps checked
+ELF64 segments, binds 71 explicit native imports, applies 16,001 relocations and
+publishes handles only after protection succeeds. FCEUmm remains a dynamically
+loaded core built with this project's SDK; PS5_Vulkan remains unchanged at
+6f0ce0d. Core upload uses matching RGBA8 textures with an XRGB8888 conversion.
+
+Runs and failures:
+
+- `tools/run-title.sh --no-build --core-test --watch 30`, memory probe,
+  `klog/run-PPSA99169-141420.log`: anonymous RW -> RX code returned 42; full window.
+- Same command, `klog/run-PPSA99169-142423.log`: eight real-core load/export/API/
+  identity/unload cycles passed before frontend startup; full window.
+- `tools/run-title.sh --no-build --no-deploy --watch 180`,
+  `klog/run-PPSA99169-142526.log`: menu-time core file read failed; owner saw
+  No Core/archive failure and confirmed manual quit/close. Kernel exit(0) then
+  SIGSYS is retained, not classified as a core execution crash.
+- Mapped/chunked-read diagnostic, `klog/run-PPSA99169-143443.log`: startup and
+  live-menu loader/rejection reports passed. Manual game start then aborted in
+  `vulkan_copy_staging_to_dynamic` (ELF offset 0x6b87ff, ce7176a7 build).
+  Symbolization: `addr2line -Cfipe klog/native-core-ce7176a7.elf 0x6b87ff
+  0x6b3880 0x6b0129 0xae8f1b 0xada6fd 0x620a`. The format mismatch selected the
+  RGB565-only compute path; matching RGBA core textures resolve it.
+- `tools/verify.sh`: PASS, all five gates, 52 tests; log
+  `/tmp/core-frame-verify.log`. Loader tests execute relocations/imports and
+  malformed-file rejection; recovery test fails on upstream's unchecked return
+  and passes with the guard; frame test verifies channels/alpha/pitch/in-place.
+- `tools/run-title.sh --no-build --core-test --watch 180`,
+  `klog/native-core-game-rgba-run.log`, kernel `klog/run-PPSA99169-143921.log`:
+  identity 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5;
+  core SHA-256 fec7dc4eb7ec6cae937ae778f0b59365d8bd7570927a73353424345e13589d9c.
+  Both diagnostic JSON reports pass. Owner manually loaded the archive and
+  answered “Works flawlessly!” to video/audio/controls, then reported closing
+  manually because the menu shortcut was unset. Three launches occurred within
+  the capture; the runner closed a later menu instance. Zero GPU refusals/API
+  failure records and zero kernel fatal signals. Do not claim continuous runtime.
+
+Evidence: `evidence/native-core-loading/`, replay with `tools/verify.sh evidence`.
+Raw gameplay log was saved before a later menu launch replaced it. No ROM or
+private filename is committed. Return-to-menu shortcut, repeated game unload,
+saves/states and measured performance are not included in this acceptance.
+
+Provenance correction for the preceding entry: this task did not edit
+PS5_Vulkan, but its checkout advanced independently during the work to 8c2985a
+and then 085c632. “Remains unchanged at 6f0ce0d” is therefore not a valid claim
+about the sibling checkout or the linked driver revision. The accepted title
+identity includes the actual archive bytes read at build time; no driver source
+commit is inferred from the later checkout. Its archive changed after the
+accepted title linked, so the accepted dist/ artifact has not been rebuilt
+against that newer archive. Console acceptance remains tied to identity 9b287ca7.

@@ -374,6 +374,9 @@ host build. The linker is the compiler driver because upstream passes `-Wl`
 options; `-nostdlib -nodefaultlibs` excludes payload CRT/static libc defaults.
 The `--build-id=sha1` override replaces Clang's random PS5 UUID with a
 content-derived ELF ID so repeated builds have stable hashes.
+`-T tooling/native/ps5-core.ld` separates executable, read-only and writable
+segments on 16 KiB boundaries; the loader never maps writable executable pages.
+The core checker rejects a writable executable load segment.
 Math and libc imports come from the native runtime stubs, with `libkernel_web`
 rather than the payload `libkernel_sys`. No SDL or decoder is added.
 
@@ -399,3 +402,42 @@ After uploading each `.info`, deployment writes and reads back RetroArch's
 `core_info.refresh` marker in the same directory. RetroArch consumes it when
 rebuilding its metadata cache; it is not a shipped manifest file. This also
 refreshes entries previously cached as having no metadata.
+
+
+## Native in-process core loader
+
+`src/core_loader_ps5.cpp` supplies the dynamic-library operations used by the
+frontend. It loads this pipeline's ELF64 x86-64 FreeBSD-ABI shared cores into
+anonymous memory, resolves their imports against explicit title bindings,
+applies checked RELA relocations, then protects each segment as RX, R or RW.
+File reads use bounded POSIX reads into a separate mapped buffer. Failed opens
+release allocations and report the failing operation; successful handles are
+reference counted and unmapped on the final close.
+
+`tools/core-imports.py` derives the required native bindings from the staged
+FCEUmm ELF; those bindings and the core bytes participate in the title build
+identity. Directory imports use this port's existing directory adapters. The
+runtime dependencies are limited to the public kernel_web, libc and Posix stubs.
+This route does not depend on websrv's payload loader hooks or publish native
+module exports through the title converter.
+
+The initial supported contract is deliberately narrower than a general dynamic
+linker: no TLS, ELF interpreter, constructors/finalizers, C++ unwind registration,
+REL/RELR, or additional dependent shared libraries. Unsupported imports and
+relocations fail explicitly. Adding another core requires reviewing this
+contract and extending both host tests and target diagnostics as needed.
+
+Core selection checks load success before content startup tears down drivers.
+The main loop also refuses to poll drivers after frontend initialization fails.
+This protects against load failures; it cannot isolate a fault inside arbitrary
+core code running in the same process.
+
+
+Software core frames in libretro XRGB8888 are converted by
+`src/core_frame_ps5.cpp` to RGBA8 bytes with opaque alpha, respecting both row
+pitches and in-place framebuffers. The Vulkan frontend requests RGBA8 for both
+staging and sampled core textures. This extends the menu's matching-format
+upload rule to actual content, avoiding the RGB565-only compute branch. Frame
+scaling and presentation remain on the Vulkan GPU path; `video_ps5` stays
+registered as the selectable fallback. RGB565 core frames retain their existing
+path and require separate content acceptance.

@@ -52,6 +52,7 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
 bash "$root/tools/build-fceumm.sh"
+python3 "$root/tools/core-imports.py"
 
 # The title's own sources are compiled with the same feature defines as the
 # frontend, because the two share a header full of #ifdefs and a struct whose
@@ -153,6 +154,7 @@ root = pathlib.Path(sys.argv[1])
 inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
 inputs += [root / name for name in (
     "build/ra/libretroarch.a", "build/ra-conf/config.h", "tools/build-title.sh",
+    "build/core_imports.inc", "build/cores/stage/cores/fceumm_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += [pathlib.Path(name) for name in sys.argv[2:]]
 digest = hashlib.sha256()

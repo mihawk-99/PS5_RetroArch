@@ -1,0 +1,47 @@
+{
+  "step": "native-core-loading",
+  "recorded": "2026-09-19",
+  "revision": "7af1081 + native loader/recovery/core upload",
+  "command": "tools/verify.sh; tools/run-title.sh --no-build --core-test --watch 180 (owner selects FCEUmm and NES archive manually)",
+  "raw_capture": "klog/native-core-game-rgba-run.log",
+  "raw_lines": 8363,
+  "lines": [
+    "frontend build identity: 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5",
+    "core SHA-256: fec7dc4eb7ec6cae937ae778f0b59365d8bd7570927a73353424345e13589d9c",
+    "ELF64 x86-64 ET_DYN FreeBSD; 25 libretro exports; kernel_web; separate RX/R/RW segments",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=FCEUmm",
+    "core recovery test: passed=1 selection_rejected=1 content_rejected=1 menu_context_preserved=1 menu_core_load=1",
+    "[INFO] [Environ] SET_PIXEL_FORMAT: XRGB8888.",
+    "[INFO] [Core] Geometry: 256x224, Aspect: 1.306, FPS: 60.10, Sample rate: 48000.00 Hz.",
+    "[libretro INFO]  Player 1: Gamepad",
+    "[libretro INFO]  Player 2: Gamepad",
+    "current-build launches captured: 3; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signals: 0",
+    "owner: Works flawlessly! I manually closed as I didnt set the shortcut to close a game and return to menu",
+    "Runner used a 180-second window; owner closed/reopened the title, and runner closed a later menu instance. This is not 180 seconds of uninterrupted gameplay.",
+    "Gameplay acceptance: owner-confirmed; return-to-XMB hotkey and repeated game unload/reload: NOT VERIFIED",
+    "Host verification: PASS format unit build integration evidence; 52 tests",
+    "PS5_Vulkan not edited by this task; sibling advanced independently; title identity binds the linked archive bytes"
+  ],
+  "loader": {
+    "build_identity": "build identity: 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5",
+    "passed": true,
+    "cycles": 8,
+    "exports": 25,
+    "api": 1,
+    "missing_rejected": true,
+    "unknown_symbol_rejected": true
+  },
+  "recovery": {
+    "build_identity": "build identity: 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5",
+    "passed": true,
+    "selection_rejected": true,
+    "content_rejected": true,
+    "menu_context_preserved": true,
+    "menu_core_load": true
+  },
+  "gpu_refusals": 0,
+  "gpu_api_failure_records": 0,
+  "kernel_fatal_signals": 0,
+  "core_sha256": "fec7dc4eb7ec6cae937ae778f0b59365d8bd7570927a73353424345e13589d9c",
+  "return_to_menu_verified": false
+}

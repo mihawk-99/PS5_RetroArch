@@ -194,3 +194,11 @@ After uploading each `.info`, deployment writes and reads back RetroArch's
 `core_info.refresh` marker in the same directory. RetroArch consumes it when
 rebuilding its metadata cache; it is not a shipped manifest file. This also
 refreshes entries previously cached as having no metadata.
+
+
+For a no-game native loader/recovery diagnostic, use
+`tools/run-title.sh --no-build --core-test --watch 30` after the host gates pass.
+For manual core/game testing, launch with `--no-build --watch 180` (also
+`--no-deploy` if the same build is already verified on the console). The owner
+selects the game; collect `retroarch.log`, `trace.txt` and the kernel capture.
+The loader's supported ELF/runtime contract is in `docs/REFERENCE.md`.

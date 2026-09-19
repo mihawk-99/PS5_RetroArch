@@ -47,6 +47,7 @@ extern "C" int sceSystemServiceHideSplashScreen();
 
 extern "C" void ps5_vulkan_profile_init();
 extern "C" void ps5_audio_test_if_requested();
+extern "C" void ps5_core_loader_test_if_requested();
 extern "C" const char *ps5_frontend_build_identity()
 {
     return PS5_RETROARCH_BUILD_ID;
@@ -219,6 +220,7 @@ int main()
     argv_with_extras[base_count + extra_count] = nullptr;
 
     ps5_audio_test_if_requested();
+    ps5_core_loader_test_if_requested();
     const int status =
         rarch_main(static_cast<int>(base_count + extra_count), argv_with_extras, nullptr);
 

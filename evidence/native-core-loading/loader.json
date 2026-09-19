@@ -1,0 +1,9 @@
+{
+  "build_identity": "build identity: 9b287ca7e0d4a04721c68d30fb88b678a62cc568c1f2d44b75716b464c21b6d5",
+  "passed": true,
+  "cycles": 8,
+  "exports": 25,
+  "api": 1,
+  "missing_rejected": true,
+  "unknown_symbol_rejected": true
+}

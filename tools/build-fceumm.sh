@@ -50,7 +50,7 @@ make -C "$work" -f Makefile.libretro -j"${JOBS:-8}" platform=unix \
     CC="$CC" CXX="$CXX" AR="$AR" LD="$LD" \
     GIT_VERSION="\" ${revision:0:7}\"" LIBM= \
     LIBS='-lkernel_web -lSceLibcInternal -lScePosixForWebKit' \
-    LDFLAGS='-nostdlib -nodefaultlibs -Wl,--build-id=sha1'
+    LDFLAGS="-nostdlib -nodefaultlibs -Wl,--build-id=sha1 -Wl,-T,$root/tooling/native/ps5-core.ld"
 python3 tools/check-core.py "$work/fceumm_libretro.so" --report "$work/abi.json"
 cp -- "$work/fceumm_libretro.so" "$stage/cores/fceumm_libretro.so"
 cp -- "$info" "$stage/info/fceumm_libretro.info"

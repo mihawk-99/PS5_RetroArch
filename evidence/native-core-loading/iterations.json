@@ -1,0 +1,26 @@
+[
+  {
+    "raw_capture": "klog/run-PPSA99169-141420.log",
+    "stage": "executable mapping probe",
+    "build_identity": null,
+    "outcome": "RW anonymous memory -> RX; executed return value 42; title survived 30s"
+  },
+  {
+    "raw_capture": "klog/run-PPSA99169-142423.log",
+    "stage": "pre-frontend loader test",
+    "build_identity": "4dfefb6b14414a24c164fdbbe10d364897aa8b7e0058745ac53e8e8b2dcca513",
+    "outcome": "8 load/export/API/identity/unload cycles passed; title survived 30s"
+  },
+  {
+    "raw_capture": "klog/run-PPSA99169-142526.log",
+    "stage": "manual selection",
+    "build_identity": "4dfefb6b14414a24c164fdbbe10d364897aa8b7e0058745ac53e8e8b2dcca513",
+    "outcome": "core file read failed after frontend initialization; owner confirmed manual quit/close; exit(0) followed by SIGSYS"
+  },
+  {
+    "raw_capture": "klog/run-PPSA99169-143443.log",
+    "stage": "mapped file reads and live recovery",
+    "build_identity": "ce7176a7e6688563b2b59cfa52808f403d5021299308e6038ea4f64d67fd661d",
+    "outcome": "loader/recovery reports passed; manually loaded content reached video callback; aborted in vulkan_copy_staging_to_dynamic"
+  }
+]

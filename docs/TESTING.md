@@ -181,3 +181,34 @@ core load, content initialization and presented frames separately; a visible
 core entry or `.info` name is not proof of loaded executable code. Owner game
 paths remain in ignored logs. Keep normal XMB, Vulkan and audio startup working
 when no core is selected.
+
+
+## Native core loader diagnostics
+
+`tests/test_core_loader.py` compiles and executes the real loader against a small
+host ELF fixture. It tests relocation/import execution, reference counts,
+reloads, missing imports, malformed header/table bounds, forbidden segment flags,
+TLS, and invalid relocation targets/types. The fixture's OSABI byte is adjusted
+only for this host test; shipped cores must pass the actual cross-build checker.
+`tests/test_core_recovery.py` runs the upstream core-selection function before
+and after the patch and checks rejection without marking the core as selected.
+
+`tools/run-title.sh --no-build --core-test --watch 30` arms an opt-in no-game
+console diagnostic. It executes eight FCEUmm load/symbol/API/identity/unload
+cycles, rejects a missing core/export, and loads the core again with the frontend
+resident. It then attempts missing-core selection/content startup through the
+actual task functions and checks that the initialized menu context survives.
+The runner collects `core-loader-test.json` and `core-recovery-test.json`, checks
+their build identity and pass status, captures logs, and closes the title. Normal
+runs clear the control file; diagnostics never run without the flag.
+
+These diagnostics do not establish gameplay. The owner selects the core and
+content manually in a separate captured run and confirms video, audio, controls
+and return to XMB. Keep user content paths in ignored captures, not evidence.
+
+
+`tests/test_core_frame.py` executes the actual XRGB8888 upload conversion with
+red/green/blue and mixed colours, checks opaque alpha, distinct input/output row
+pitches, untouched padding and in-place conversion. Real-core acceptance also
+requires a trace with no Vulkan refusals or failed command buffers, rather than
+inferring correctness from the core's successful initialization.
