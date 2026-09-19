@@ -1942,3 +1942,50 @@ literally `"ext"` and the only one compiled is `null`, so audio is expected to f
 and the frontend continues - that is not a fault to chase. And the input driver is
 found as `"ps5"` and the display server is `"null"`, which is correct for a build with
 no graphics backend: the "display server" is a separate slot from the video driver.
+
+## Vulkan is on, the delivered driver is staged, and the EXEC-1 is now a named step
+
+**The blocker recorded for three sessions was not the ICD.** With `--enable-vulkan`
+on, the frontend compiled **266 of 276** sources and **archived a title anyway**.
+The ten that failed were all one cause:
+
+    deps/SPIRV-Cross/spirv_cfg.cpp: cannot use 'throw' with exceptions disabled
+    gfx/drivers_shader/shader_vulkan.cpp: cannot use 'throw' with exceptions disabled
+    gfx/drivers_shader/slang_process.cpp: cannot use 'throw' with exceptions disabled
+    ... seven more
+
+`tools/build-retroarch.sh` compiled the frontend's C++ with
+`-fno-exceptions -fno-rtti`, and SPIRV-Cross and RetroArch's Vulkan shader path need
+exceptions. The archive was then built from what did compile, so the Vulkan shader
+path was silently half-present - and because the build *succeeds*, nothing about the
+run said so. With `-fexceptions` (RTTI still off) the frontend compiles **276 of
+276**. The lesson generalises: `build-retroarch.sh` prints
+`==> [ra] N sources did not compile: ...` and that line must be read on every build,
+because a partial archive still links.
+
+**What is in place now.** `--enable-vulkan`; the video driver's compiled default is
+`"vulkan"` (`patches/series` 0010, the same mechanism 0009 uses for input, because
+the config path is parked and the frontend runs on compiled defaults); the driver
+`../PS5_Vulkan` delivers is staged beside the title by `tools/build-title.sh` from
+`$PS5_VULKAN_ICD` or the sibling's `build/driver/ps5/libvulkan.so.1`, into both the
+title root and `sce_module/`; and `patches/series` 0011 adds `/app0` and
+`/app0/sce_module` fallbacks to RetroArch's `dylib_load` chain plus a `RARCH_ERR` on
+total failure, because upstream's `dylib_load` logs nothing and that silence is what
+made this path undiagnosable.
+
+**The console re-signs a shared object on write.** Measured: the file staged here is
+16,695,760 bytes with sha256 `25b32922...`, and the console serves 16,706,040 bytes
+with sha256 `eb23125d...` - byte-for-byte the sibling's own `libvulkan.so.1.signed`.
+So `tools/deploy-title.py` now checks a shared object the way it checks `eboot.bin`:
+a byte string taken from the middle of the local library must appear in what the
+console serves. A digest comparison there answers the wrong question and was
+rejecting a correct upload.
+
+**Where it still stops, and what that rules out.** The title reaches
+`[Input] Found input driver: "ps5"`, then `rarch_main returned = 1`. The trace shows
+**no `ps5_init`** at all, so with `video_driver = "vulkan"` the frontend fails
+inside `video_driver_init_internal` before our driver is called - and the new
+`RARCH_ERR` never printed, which places the failure *before* the `dylib_load` chain.
+The candidates are therefore the graphics-context step and the `[Video] Found video
+driver` lookup, not the ICD, not the dlopen path, and not the delivered object. That
+is a much smaller space than "exits 1 with no message".

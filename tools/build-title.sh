@@ -115,6 +115,37 @@ dist="$root/dist/$title_id"
 # initialise and the title exit 1 saying nothing. See config/retroarch.cfg.
 cp -a -- "$root/config/retroarch.cfg" "$dist/retroarch.cfg"
 
+# The Vulkan driver, beside the title, when it exists.
+#
+# RetroArch does not link Vulkan: it dlopens "libvulkan.so.1" at run time
+# (gfx/common/vulkan_common.c), so the driver has to be a shared object in the
+# title's own folder. That object is ../PS5_Vulkan's released artifact - this
+# project consumes released drivers and never builds them (docs/PLAN.md, "What is
+# deliberately not planned") - and its own build puts it at
+# build/driver/ps5/libvulkan.so.1.
+#
+# It is copied only when it is there, and its absence is reported rather than
+# fatal: the driver is a separate project's release, and a title built without it
+# still runs (the video driver's compiled default is Vulkan, so it will report a
+# failed load in /app0/retroarch.log rather than exit silently). PS5_VULKAN_ICD
+# overrides the path for a release kept somewhere else.
+icd="${PS5_VULKAN_ICD:-$root/../PS5_Vulkan/build/driver/ps5/libvulkan.so.1}"
+if [[ -f $icd ]]; then
+    cp -a -- "$icd" "$dist/libvulkan.so.1"
+    # Beside libc.prx as well, which is the one module path the console's loader
+    # is known to look at: libc.prx is resolved from sce_module/ by every title
+    # here. A bare dlopen does not search the app directory, and whether it
+    # accepts an absolute /app0 path is not yet measured, so the driver goes
+    # where the loader provably looks.
+    mkdir -p "$dist/sce_module"
+    cp -a -- "$icd" "$dist/sce_module/libvulkan.so.1"
+    printf '==> [title] staged the Vulkan driver: %s (%s bytes)\n' \
+        "$(basename "$icd")" "$(stat -c %s "$dist/libvulkan.so.1")"
+else
+    printf '==> [title] no Vulkan driver at %s; the title will report a failed load\n' \
+        "$icd" >&2
+fi
+
 # The manifest is recorded here, as part of building, because a folder published
 # without one cannot be told apart from the folder published last week: this
 # project has already produced a title folder whose eboot.bin was a raw link-stage

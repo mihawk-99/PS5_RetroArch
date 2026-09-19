@@ -225,14 +225,23 @@ for source in "${sources[@]}"; do
         compiled=$((compiled + 1)); continue
     fi
     # The language follows the source, not a preference: RetroArch's object list
-    # holds C and C++, and glslang and slang are C++. -fno-exceptions -fno-rtti
-    # matches what the title's own build uses for C++, and the pipeline's C++ is
-    # built without unwinding support, so a C++ source that threw could not be
-    # caught here anyway.
+    # holds C and C++, and glslang and slang are C++.
+    #
+    # Exceptions are ON for the frontend's C++, and that is a measured requirement
+    # rather than a preference. With -fno-exceptions (which stays right for the
+    # title's own src/) ten sources of the Vulkan shader path do not compile at all:
+    # SPIRV-Cross's spirv_cross.cpp and its companions, and
+    # gfx/drivers_shader/{shader_vulkan,slang_process,slang_reflection}.cpp - every
+    # one reporting "cannot use 'throw' with exceptions disabled". The build then
+    # archived 266 of 276 objects and linked a title anyway, so the Vulkan shader
+    # path was silently half-present. That is precisely the partial build this loop
+    # prints a count for, and reading that count is what found it.
+    #
+    # RTTI stays off: nothing in this object list needs dynamic_cast or typeid.
     standard=-std=c11
     [[ $source == *.c ]] || standard=-std=c++20
     extra=()
-    [[ $source == *.c ]] || extra=(-fno-exceptions -fno-rtti)
+    [[ $source == *.c ]] || extra=(-fexceptions -fno-rtti)
     if PS5_CLANG=/usr/bin/clang PS5_PAYLOAD_SDK="$sdk" \
         sh "$root/tooling/prospero-clang18" "$standard" -O2 -w \
            "${extra[@]}" -ffunction-sections -fdata-sections \

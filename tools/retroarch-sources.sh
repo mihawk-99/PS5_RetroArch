@@ -34,22 +34,27 @@ configure_flags=(
     # The menu, and only the menu that needs no GPU display context.
     --enable-menu --enable-rgui
     --disable-materialui --disable-xmb --disable-ozone --disable-gfx_widgets
-    # No graphics API: the frame is presented by src/display.cpp.
+    # Vulkan is ON. ../PS5_Vulkan is the graphics backend this project consumes
+    # (docs/PLAN.md, M2 and the "no direct hardware access" invariant), and the
+    # path to it is now measured rather than assumed:
     #
-    # Vulkan is prepared but switched off, and the reason is measured. With
-    # --enable-vulkan the frontend builds and links (the driver, its loader and
-    # gfx_display_ctx_vulkan all present, plus the stubs in
-    # src/video_filters_stub.cpp that a Vulkan build needs), but the title then
-    # exits 1 within a second of EXEC with no signal and no message, whatever
-    # video_driver the config names - so a Vulkan build cannot even fall back to
-    # another driver. Turning it back on is the right move once ../PS5_Vulkan's
-    # libvulkan.so.1 is beside the title: switch this line to --enable-vulkan,
-    # keep the config's video_driver as "vulkan", and the other changes Vulkan
-    # needed are already in place (tools/build-retroarch.sh: the glslang and
-    # SPIRV-Cross include paths, and the C++ sources RetroArch's object list
-    # contains; tools/retroarch-sources.sh: the object list no longer renames
-    # .cpp to .c).
-    --disable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
+    #  - the frontend builds and links with it enabled (the driver, its loader,
+    #    gfx_display_ctx_vulkan, the glslang and SPIRV-Cross include paths, and
+    #    the stubs in src/video_filters_stub.cpp);
+    #  - RetroArch obtains the entry points by dlopen of "libvulkan.so.1", then
+    #    "libvulkan.so" (gfx/common/vulkan_common.c), and this build carries
+    #    --enable-dylib and the SDK's dlfcn.h, so a shared object beside the title
+    #    is what it looks for;
+    #  - RetroArch's Vulkan driver presents through VK_KHR_display - no window
+    #    system - which is exactly what ../PS5_Vulkan's driver/ps5vk_wsi.c
+    #    implements.
+    #
+    # What is *not* yet true: that object does not exist on our side, so the
+    # loader finds nothing. Previously that failure was silent - "exits 1 within a
+    # second of EXEC with no message" - which is why it could not be diagnosed.
+    # The title now passes --log-file, so the frontend's own words land in
+    # /app0/retroarch.log and the next run says which name it searched for.
+    --enable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
     --disable-sdl2 --disable-sdl --disable-cg
     # Libraries this SDK does not carry.
     --disable-ffmpeg --disable-freetype --disable-flac --disable-networking

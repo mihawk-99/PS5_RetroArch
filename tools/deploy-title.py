@@ -169,6 +169,28 @@ def program_markers(signed: Path) -> list[bytes]:
     return markers
 
 
+def so_marker(local: Path) -> bytes:
+    """A byte string this build's shared object carries, for the same reason
+    program_markers exists: this console signs a shared object as it stores it.
+
+    Measured on 2026-09-18 for ../PS5_Vulkan's delivered driver: the file staged
+    here is 16,695,760 bytes with sha256 25b32922..., and the console served
+    16,706,040 bytes with sha256 eb23125d... - which is byte-for-byte the sibling
+    project's own libvulkan.so.1.signed, produced by its signing step. So the
+    console re-signs on write and a digest comparison answers the wrong question,
+    exactly as it does for eboot.bin.
+
+    The marker is 32 bytes taken from the middle of the file. Any transform that
+    preserves the program - which is what matters, and what the loader will run -
+    carries them, and a stale or different library does not.
+    """
+    blob = local.read_bytes()
+    if len(blob) < 1024:
+        return b""
+    middle = len(blob) // 2
+    return blob[middle:middle + 32]
+
+
 def do_deploy(settings: dict, tid: str) -> int:
     # Files the console refused to replace. Reported at the end, not fatal: see the
     # note where sce_module/libc.prx is handled.
@@ -220,6 +242,24 @@ def do_deploy(settings: dict, tid: str) -> int:
                         f"title on the console is not this build")
                 print(f"    {relative:28} {len(served):>10,} bytes stored; all "
                       f"{len(markers)} of this build's markers present  ok")
+                continue
+            if relative.endswith(".so") or relative.endswith(".so.1"):
+                # A shared object is re-signed by the console on write, so it is
+                # checked the same way the program image is: a byte string this
+                # build's own library carries must appear in what the console
+                # serves. See so_marker.
+                marker = so_marker(local)
+                served = remote_bytes(ftp, remote)
+                if not marker or marker not in served:
+                    upload_atomic(ftp, local, remote)
+                    served = remote_bytes(ftp, remote)
+                if not marker or marker not in served:
+                    raise SystemExit(
+                        f"{relative}: the console serves {len(served):,} bytes and this "
+                        f"build's library is not among them; the file on the console is "
+                        f"not the one this build staged")
+                print(f"    {relative:28} {len(served):>10,} bytes stored (re-signed by "
+                      f"the console); this build's library confirmed  ok")
                 continue
             if digest != expected:
                 # libc.prx is the one file this console will not let go of, and it

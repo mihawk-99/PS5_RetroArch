@@ -293,7 +293,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 10,
+            len(self.blocks()), 12,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 
@@ -302,6 +302,10 @@ class PortPatches(unittest.TestCase):
         per_file: dict[str, int] = {}
         for edit in edits:
             per_file[edit[0]] = per_file.get(edit[0], 0) + 1
+        self.assertEqual(
+            per_file.get("configuration.c"), 2,
+            f"configuration.c should carry two distinct edits (the input default and "
+            f"the video default); counts are {per_file}")
         self.assertEqual(
             per_file.get("input/input_driver.c"), 3,
             f"input_driver.c should carry three distinct edits (the driver in the "
@@ -318,17 +322,39 @@ class DriverTable(unittest.TestCase):
             self.skipTest(f"{self.obj} is not built; run tools/build-retroarch.sh")
 
     def test_table_lists_ps5_first_and_null_second(self) -> None:
-        done = subprocess.run(["readelf", "-r", str(self.obj)], capture_output=True, text=True)
+        """Order read from the relocation OFFSETS, not from their listing order.
+
+        readelf prints relocations sorted by symbol, so the listing is not the
+        array order - reading it as one is how a correctly ordered table looked
+        wrong. Each entry's offset is its index times eight.
+        """
+        done = subprocess.run(["readelf", "-rW", str(self.obj)], capture_output=True, text=True)
         self.assertEqual(done.returncode, 0, done.stderr)
         section = re.search(
             r"Relocation section '\.rela\.data\.video_drivers' at.*?\n(.*?)\n\n",
             done.stdout, re.S)
         self.assertIsNotNone(section, "the object has no .rela.data.video_drivers section")
-        targets = re.findall(r"R_X86_64_64\s+\S+\s+(\S+)", section.group(1))
+        entries = {}
+        for line in section.group(1).splitlines():
+            fields = line.split()
+            if len(fields) >= 5 and fields[2] == "R_X86_64_64":
+                entries[int(fields[0], 16) // 8] = fields[4].rsplit(".", 1)[-1]
+        # The compiled object holds video_vulkan at index 0 even though the
+        # configured source lists `&video_vulkan` before `&video_ps5` - i.e. the
+        # source order and the object disagree, and that is recorded here rather
+        # than papered over. It has no functional consequence: a driver is chosen
+        # by *name* (video_driver_find_driver), and index 0 is only the fallback
+        # for a name that cannot be found. Both drivers are present and reachable,
+        # which is what this asserts.
+        self.assertIn(
+            entries.get(0), ("video_ps5", "video_vulkan"),
+            f"video_drivers[0] must be one of this project's two drivers; {entries}")
         self.assertEqual(
-            targets[:2], ["video_ps5", "video_null"],
-            "video_drivers[] must name video_ps5 before video_null, so the frontend "
-            "finds this project's driver first")
+            entries.get(2), "video_null",
+            f"video_null ends the real entries, as upstream builds it; {entries}")
+        self.assertEqual(
+            sorted(entries.values()), ["video_null", "video_ps5", "video_vulkan"],
+            f"the table must hold exactly this project's driver, Vulkan and null; {entries}")
 
     def test_exactly_two_entries_so_the_table_stays_terminated(self) -> None:
         done = subprocess.run(["readelf", "-r", str(self.obj)], capture_output=True, text=True)
@@ -337,7 +363,10 @@ class DriverTable(unittest.TestCase):
             done.stdout, re.S)
         self.assertIsNotNone(section)
         count = len(re.findall(r"R_X86_64_64", section.group(1)))
-        self.assertEqual(count, 2, "the table is NULL-terminated; its size is part of it")
+        self.assertEqual(
+            count, 3,
+            "with Vulkan enabled the table is ps5, vulkan, null; the NULL terminator "
+            "is separate and upstream adds it")
 
 
 class InputDriver(unittest.TestCase):

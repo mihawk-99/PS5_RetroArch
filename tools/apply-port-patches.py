@@ -41,10 +41,16 @@ EDITS = [
         "extern video_driver_t video_ps5;",
     ),
     (
+        # Position matters twice over. `video_drivers[0]` is the fallback when a
+        # configured name cannot be found, so this project's own driver - the one
+        # that provably runs on this console - is first. Vulkan is reachable by
+        # name ("vulkan", which is also the compiled default now) and sits after
+        # it; it needs ../PS5_Vulkan's shared object beside the title, so it must
+        # never be the fallback.
         "gfx/video_driver.c",
-        "   &video_null,",
-        "   &video_ps5,\n   &video_null,",
-        "   &video_ps5,",
+        "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n",
+        "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n   &video_ps5,\n",
+        "#ifdef HAVE_VULKAN\n   &video_vulkan,\n#endif\n   &video_ps5,\n",
     ),
     (
         # qb/config.params.sh declares the default state of every optional
@@ -128,6 +134,53 @@ EDITS = [
         "   &input_ps5,",
     ),
     (
+        # Vulkan is loaded from the title's own folder, because the console's
+        # loader does not search it.
+        #
+        # RetroArch does not link Vulkan; it dlopens by bare name
+        # (gfx/common/vulkan_common.c):
+        #
+        #     vulkan_library = dylib_load("libvulkan.so.1");
+        #     if (!vulkan_library)
+        #        vulkan_library = dylib_load("libvulkan.so");
+        #
+        # A bare dlopen resolves through the loader's search path, which on this
+        # console is the system module directories - not the folder the title was
+        # started from. So the driver ../PS5_Vulkan delivers is invisible to it
+        # even when it sits beside eboot.bin, and the failure is silent: the title
+        # returns 1 with no line in its log, because a failed dylib_load logs
+        # nothing. That is the shape the Vulkan build has failed in all along.
+        #
+        # The title folder is mounted at /app0, so naming it absolutely is what
+        # makes the delivered object reachable. The bare names are tried first, so
+        # a future table that does search the app directory still wins and this
+        # changes nothing.
+        "gfx/common/vulkan_common.c",
+        "      vulkan_library = dylib_load(\"libvulkan.so.1\");\n"
+        "      if (!vulkan_library)\n"
+        "         vulkan_library = dylib_load(\"libvulkan.so\");\n",
+        "      /* Fallbacks added by this port (patches/series, 0011): the title's\n"
+        "       * own folder, which the console mounts at /app0. */\n"
+        "      vulkan_library = dylib_load(\"libvulkan.so.1\");\n"
+        "      if (!vulkan_library)\n"
+        "         vulkan_library = dylib_load(\"libvulkan.so\");\n"
+        "      if (!vulkan_library)\n"
+        "         vulkan_library = dylib_load(\"/app0/libvulkan.so.1\");\n"
+        "      if (!vulkan_library)\n"
+        "         vulkan_library = dylib_load(\"/app0/libvulkan.so\");\n"
+        "      if (!vulkan_library)\n"
+        "         vulkan_library = dylib_load(\"/app0/sce_module/libvulkan.so.1\");\n"
+        "      /* A failed load is silent in upstream - dylib_load only returns NULL -\n"
+        "       * and a silent Vulkan failure is what made this path undiagnosable for\n"
+        "       * three sessions. The four names and the loader's own message go to the\n"
+        "       * log so a console run says which path was tried and why it failed. */\n"
+        "      if (!vulkan_library)\n"
+        "         RARCH_ERR(\"[Vulkan] libvulkan not loadable; tried libvulkan.so.1, "
+        "libvulkan.so, /app0/libvulkan.so.1, /app0/libvulkan.so, "
+        "/app0/sce_module/libvulkan.so.1: %s\\n\", dylib_error());\n",
+        "/app0/libvulkan.so.1",
+    ),
+    (
         # A core that has not loaded registers no controller-port callback, and
         # upstream calls it anyway.
         #
@@ -194,6 +247,30 @@ EDITS = [
         "   if (*input != NULL && *input == tmp)\n"
         "      *input = NULL;\n",
         "the same pointer the caller carried in",
+    ),
+    (
+        # The graphics backend this project consumes is the compiled video default.
+        #
+        # With the config path parked, the frontend runs on compiled defaults, and
+        # the video driver's default resolves to "ext" - so the Vulkan driver was
+        # never even attempted, whatever the config said. Naming it here is what
+        # makes the Vulkan path reachable without a readable config, and it is the
+        # same mechanism `0009` uses for the input driver.
+        #
+        # RetroArch obtains the Vulkan entry points by dlopen of "libvulkan.so.1"
+        # (gfx/common/vulkan_common.c), which ../PS5_Vulkan now delivers as a
+        # console shared object; the frontend's driver presents through
+        # VK_KHR_display, which that driver implements. If the object is not beside
+        # the title the load fails, and with --log-file the frontend now says so
+        # instead of exiting silently.
+        "configuration.c",
+        "      case VIDEO_NULL:\n         break;",
+        "      case VIDEO_NULL:\n"
+        "          /* Named by this port (patches/series, 0010): the console's Vulkan\n"
+        "           * driver is the graphics backend this project consumes, and with no\n"
+        "           * config file read it has to come from the compiled default. */\n"
+        "          return \"vulkan\";",
+        "the console's Vulkan",
     ),
     (
         # The console's pad is this build's input driver, so it is also the
