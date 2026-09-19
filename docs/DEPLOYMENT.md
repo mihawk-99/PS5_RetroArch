@@ -220,3 +220,12 @@ Use `tools/run-title.sh --no-build --core-test=snes9x --watch 180` for loader an
 recovery diagnostics followed by manual SNES archive loading. Preserve existing
 config/content; verify gameplay colours, audio/input, Quick Menu, Close Content
 and a subsequent game before accepting the run.
+
+`make fbneo` builds and ABI-checks the full native FBNeo core. Rebuild/deploy the
+frontend alongside it so the new native imports are available. Official metadata
+is staged in info/ and cores/; user-supplied `.info` files are references only.
+Use `tools/run-title.sh --no-build --core-test=fbneo --watch 240` for diagnostics
+and a manual gameplay/colour-transition run. Place matching user arcade archives
+in content/ and BIOS files in system/fbneo/ under the FTP base above. Keep each
+ZIP/7z archive intact: FBNeo loads it directly. Deployment preserves those user
+folders and the live configuration. No BIOS, ROM or sample data is bundled.

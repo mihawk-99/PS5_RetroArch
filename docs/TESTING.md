@@ -278,3 +278,35 @@ visual confirmation and matching build identity are required. Core-declared FPS
 and audio rate are metadata, not performance measurements. NTSC filters, special
 chips, subsystem BIOSes, interlace/hires modes, SRAM/state round trips and long-run
 A/V timing require separate coverage beyond an ordinary game acceptance run.
+
+### FBNeo
+
+`tests/test_fbneo_video.py` checks every RGB565 value through the actual native
+conversion and frontend upload helpers, immutable cached input, padded rows,
+bounds rejection and horizontal/vertical arcade dimensions. The pinned-source
+`test_fbneo_upstream.py` checks all 16,777,216 32-bit colours using upstream's
+actual HighCol32/HighCol16 functions and the frontend upload helper. It also
+compares the original MPEG decoder against the patched decoder at all 4,097
+bit limits of each synthetic layer 2 and AMM frame, with address/undefined-behaviour
+sanitizers. LeakSanitizer is disabled because the host sandbox cannot provide
+its process attachment; bounds and UB checks remain enabled. This source-based
+test requires the hash-verified archive downloaded by `make fbneo`; absence is
+reported as a skip and cannot establish FBNeo acceptance. The patched metadata
+function is also queried 10,000 times under these sanitizers, checking its
+name/version, full-path and no-extraction flags, and archive extensions.
+
+After all host gates pass, use `tools/run-title.sh --no-build --core-test=fbneo
+--watch 240` for eight load/unload cycles, failed-load/menu recovery and manual
+arcade archive loading. Capture frontend/trace/kernel logs and both diagnostic
+reports, verify identity, and obtain owner confirmation of gameplay colours,
+audio/input, Quick Menu, Close Content and the next loaded game's colours.
+Record whether the observed game exercised native 32-bit or converted 16-bit
+output. Do not infer both paths or all supported boards from one game. ROM-set
+errors, BIOS errors, CHD, samples, rotation, save states and long-run performance
+need their own evidence when exercised. Private game names stay in ignored logs.
+
+The FBNeo pinned-source test also exercises the patched catalogue with 30,000
+drivers under a simulated 1 MiB small-allocation budget: two bulk allocations,
+each allocation failing independently, repeated initialize/exit, double exit,
+original pointer restoration and oversized-name rejection. ASan/UBSan runs cover
+both narrow and Unicode variants. The shipped console build remains narrow.

@@ -2772,3 +2772,37 @@ exception/unwind support.
 
 Source and linked archive provenance are in `evidence/snes9x-native/`.
 PS5_Vulkan was not edited; FCEUmm/mGBA core binaries retain their accepted hashes.
+
+## 2026-09-19 — FBNeo formats, metadata ownership and catalogue allocation
+
+Pinned FBNeo `6bb3167a044e19e7106a5110d5531aa9c6afa96f` has native XRGB8888
+HighCol32 output and RGB565-only driver paths. Preserving those internal paths
+and converting only 16-bit video callbacks to XRGB8888 works with the existing
+frontend RGBA upload. Exhaustive host tests exercise every 32-bit RGB input and
+RGB565 value; the accepted console log exercises both native depths, including
+304x224 and 384x224 games and intervening menus. Owner: “Works flawlessly!”
+No frontend video or PS5_Vulkan change was required.
+
+Two console failures constrained the port. First, changing the metadata version
+buffer to static storage while retaining upstream free() aborted in native libc.
+The old free was removed, and 10,000 sanitizer-tested calls to the patched
+metadata function now check ownership and whole-archive flags. Second, the full
+28,910-driver catalogue allocates three small name buffers per driver. It exhausted
+the native heap during BurnLibInit, leading to NULL strcpy (return offset 0x10d82c
+in the second core). A bulk name store and pointer tables use the existing
+large-buffer mapping path. Validation is atomic with respect to driver pointers;
+cleanup restores originals. Failure and repeated initialization tests cover
+30,000 drivers. Actual maximum short/full-name lengths are 31/166 bytes.
+
+The native loader still does not register exception unwind tables. FBNeo's MPEG
+layer 2/AMM bit-limit exception is replaced locally with setjmp/longjmp across
+primitive-only frames. Differential sanitizer tests compare the pinned original
+and adapted decoders on complete/truncated synthetic input; this adds no general
+C++ exception support. Existing per-core destructor registration remains in use.
+
+The accepted logs have no GPU refusals/API failure records, kernel fatal signals
+or audio backend errors. Missing-core ERROR lines are deliberate recovery tests.
+Optional environment command 87 carries an endian-dependent serialization hint
+which this frontend does not recognize; gameplay succeeds, but cross-platform
+state compatibility is not established. See `evidence/fbneo-native/` for exact
+builds, failed iterations, reports, declared geometries/rates and linked hashes.

@@ -1,0 +1,6 @@
+{
+  "build/driver/ps5/libps5vk.ps5.a": "e691159519272da11856b024ffe56675ff3f289f69d3c8c44c09e933f83d8886",
+  ".deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7",
+  "build/driver/ps5/libpsbc_driver.ps5.a": "a7605370c28895a3b5a13d0718ebfea2abf1b9cf842633de07533775745b21b8",
+  ".deps/native/psbc/lib/libpsbc_support.ps5.a": "e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8"
+}

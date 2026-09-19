@@ -1,0 +1,9 @@
+{
+  "build_identity": "build identity: 41cb59a98907d3c382fa7c6c2282e64740a2d079364fd7f231dd0ddef7a2ca10",
+  "core": "fbneo",
+  "passed": true,
+  "selection_rejected": true,
+  "content_rejected": true,
+  "menu_context_preserved": true,
+  "menu_core_load": true
+}

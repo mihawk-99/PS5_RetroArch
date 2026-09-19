@@ -1,0 +1,67 @@
+--- a/src/burn/snd/mpeg_audio.h
++++ b/src/burn/snd/mpeg_audio.h
+@@ -10,6 +10,8 @@
+ #define FBNEO_SOUND_MPEG_AUDIO_H
+ 
+ #pragma once
++
++#include <setjmp.h>
+ 
+ class mpeg_audio {
+ public:
+@@ -60,7 +62,9 @@
+ 	void scan();
+ 
+ private:
+-	struct limit_hit {};
++	// Only primitive locals exist between decode_buffer and gb.
++	// Keep the bounded-read escape local; native modules have no unwind registration.
++	jmp_buf limit_escape;
+ 
+ 	struct band_info {
+ 		int modulo;
+@@ -125,7 +129,7 @@
+ 	inline int gb(int count)
+ 	{
+ 		if(current_pos + count > current_limit)
+-			throw limit_hit();
++			longjmp(limit_escape, 1);
+ 
+ 		return do_gb(base, current_pos, count);
+ 	}
+--- a/src/burn/snd/mpeg_audio.cpp
++++ b/src/burn/snd/mpeg_audio.cpp
+@@ -119,28 +119,27 @@
+ 		goto retry_sync;
+ 	}
+ 
++	if (setjmp(limit_escape))
++		return false;
++
+ 	switch(layer) {
+ 	case 1:
+ 		abort();
+ 	case 2:
+-		try {
++		{
+ 			read_header_mpeg2(variant == 2);
+ 			read_data_mpeg2();
+ 			decode_mpeg2(output, output_samples);
+-		} catch(limit_hit) {
+-			return false;
+ 		}
+ 		break;
+ 	case 3:
+ 		abort();
+ 	case 4:
+-		try {
++		{
+ 			read_header_amm(variant == 2);
+ 			read_data_mpeg2();
+ 			if(last_frame_number)
+ 				decode_mpeg2(output, output_samples);
+-		} catch(limit_hit) {
+-			return false;
+ 		}
+ 		break;
+ 	}

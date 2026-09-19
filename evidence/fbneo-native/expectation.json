@@ -1,0 +1,23 @@
+{
+  "step": "fbneo-native",
+  "note": "Native FBNeo archive gameplay and owner-verified colours/menu transitions.",
+  "must_contain": [
+    "frontend build identity: 41cb59a98907d3c382fa7c6c2282e64740a2d079364fd7f231dd0ddef7a2ca10",
+    "FBNeo SHA-256: 0e4231a238af2e5cc2630568abcaec2d3fe5356d647ec87ab9d9c13e8da66e44",
+    "current-build launches: 1; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signal reports: 0",
+    "owner: Works flawlessly!",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=FinalBurn Neo",
+    "[FBNeo PS5] Native depth ",
+    "SET_PIXEL_FORMAT: XRGB8888.",
+    "Host verification: PASS format unit build integration evidence; 63 tests",
+    "Native depth 32; callback XRGB8888.",
+    "Native depth 16; callback XRGB8888.",
+    "native quit: frontend status = 0",
+    "Runtime health: 5 expected missing-core recovery error lines; 0 unexpected error lines; 0 audio backend errors."
+  ],
+  "must_not_contain": [
+    "core loader test: passed=0",
+    "core recovery test: passed=0"
+  ],
+  "human_check": "Works flawlessly!; Owner confirmed colours, sound, controls and menu/next-game transitions. Both native 32-bit and converted 16-bit gameplay paths appear in logs. This does not establish every arcade board/ROM set, CHD, rotation, samples, save-state/SRAM round trips, cross-platform states or long-run A/V/performance coverage. Optional serialization-quirks environment command 87 is unsupported by this frontend; ordinary gameplay is unaffected."
+}

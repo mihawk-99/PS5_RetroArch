@@ -56,6 +56,12 @@ extern "C" void ps5_core_loader_test_if_requested()
         test_path = "/app0/cores/snes9x_libretro.so";
         test_name = "Snes9x";
     }
+    else if (fields == 1 && !std::strcmp(selection, "fbneo"))
+    {
+        test_core = "fbneo";
+        test_path = "/app0/cores/fbneo_libretro.so";
+        test_name = "FinalBurn Neo";
+    }
     else if (fields != 1 || std::strcmp(selection, "fceumm"))
     {
         std::fprintf(stderr, "core loader test: unsupported selection\n");

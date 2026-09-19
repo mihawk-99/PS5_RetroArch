@@ -2188,3 +2188,48 @@ interlace/hires/NTSC/HD Mode 7 console tests, saves/states and long-run timing a
 separate acceptance work. Build/ABI reports are static checks; their false
 console_loading_verified field is superseded only by the separate console
 capture, not rewritten into an unsupported claim.
+
+## 2026-09-19 — Native FBNeo with verified gameplay colours and transitions
+
+Task: add FBNeo through the existing native core pipeline, use supplied metadata
+only as a reference, and verify gameplay/menu/next-game colours before committing.
+Official source and core-info are pinned and hash-checked; no game/BIOS is shipped.
+The full core preserves native 32-bit rendering and converts 16-bit callbacks.
+The native wrapper selects SDK-compatible flags, core-local C++ cleanup and a
+bounded MPEG decoder escape. Catalogue names use two bulk allocations through
+the existing frontend allocator. PS5_Vulkan was not modified.
+
+Commands and outcomes:
+
+- Initial `tools/build-fbneo.sh`: MPEG throw/try failed with exceptions disabled.
+  Added a local non-unwinding bounds escape and differential decoder tests.
+- `bash tools/verify.sh` → `/tmp/fbneo-verify.log`: all gates/62 tests passed.
+  Console `--no-build --core-test=fbneo --watch 240` failed: metadata patch retained
+  free() after changing the buffer to static. Build `a69d4ad4...`; raw
+  `klog/fbneo-first-run.log`, `klog/run-PPSA99169-163509.log`. Owner reported crash.
+- Removed invalid free, added 10,000-query sanitizer regression. All gates passed
+  in `/tmp/fbneo-fixed-verify.log`; build `96ee4812...` passed eight loader cycles
+  and recovery. Game load failed with NULL strcpy in BurnLibInit after catalogue
+  small allocations exhausted libc heap. Raw `klog/fbneo-fixed-run.log` and
+  `klog/run-PPSA99169-164532.log`. Owner confirmed core loads but game crashes.
+- Bulk catalogue storage, rollback and pointer restoration fix the second failure.
+  `bash tools/verify.sh` → `/tmp/fbneo-catalogue-verify.log`: all five gates pass,
+  63 tests. Stress/failure/reload tests use 30,000 drivers; all 28,910 real names fit.
+- `bash tools/run-title.sh --no-build --core-test=fbneo --watch 240` →
+  `klog/fbneo-catalogue-run.log`: verified deployment and loader/recovery PASS.
+  Kernel `klog/run-PPSA99169-165611.log`; live trace/frontend captured under
+  `klog/fbneo-catalogue-live-*`. Owner manually loaded games and confirmed
+  “Works flawlessly!” for colours/audio/input and menu/next-game transitions.
+  Both native depth 32 and 16 negotiated XRGB8888. No GPU refusals/API failure
+  records, kernel fatal signals or audio backend errors. Five frontend ERROR
+  lines are intentional recovery tests. Optional serialization hint #87 remains
+  unsupported, without preventing gameplay. No cross-platform save-state claim.
+- Frontend returned 0 and native Quit status 0 before the watch window ended;
+  no claim of 240 seconds of continuous gameplay. Core rates are declared values.
+
+Final identity: `41cb59a98907d3c382fa7c6c2282e64740a2d079364fd7f231dd0ddef7a2ca10`.
+FBNeo SHA-256: `0e4231a238af2e5cc2630568abcaec2d3fe5356d647ec87ab9d9c13e8da66e44`.
+85,234,664 bytes; 25 callbacks; 7 initializers and 1 finalizer. Existing three core
+hashes stayed unchanged; four linked Vulkan archive hashes stayed unchanged.
+Symbol-bearing ELF: `klog/fbneo-41cb59a9-symbols.elf`. Committable evidence and
+expectations: `evidence/fbneo-native/`, replay with `bash tools/verify.sh evidence`.

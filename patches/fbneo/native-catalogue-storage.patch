@@ -1,0 +1,185 @@
+--- a/src/burn/burn.cpp
++++ b/src/burn/burn.cpp
+@@ -106,54 +106,77 @@
+ #endif
+ }
+ 
+-static void BurnGameListInit()
+-{	// Avoid broken references, RomData requires separate string storage
+-	if (0 == nBurnDrvCount) return;
+-	
+-		pszShortName = (char**   )malloc(nBurnDrvCount * sizeof(char*));
+-		pszFullNameA = (char**   )malloc(nBurnDrvCount * sizeof(char*));
+-		pszFullNameW = (wchar_t**)malloc(nBurnDrvCount * sizeof(wchar_t*));
+-
+-		if ((NULL != pszShortName) && (NULL != pszFullNameA) && (NULL != pszFullNameW)) {
+-			for (UINT32 i = 0; i < nBurnDrvCount; i++) {
+-				pszShortName[i] = (char*   )malloc(100      * sizeof(char));
+-				pszFullNameA[i] = (char*   )malloc(MAX_PATH * sizeof(char));
+-				pszFullNameW[i] = (wchar_t*)malloc(MAX_PATH * sizeof(wchar_t));
+-
+-				memset(pszShortName[i], '\0', 100      * sizeof(char));
+-				memset(pszFullNameA[i], '\0', MAX_PATH * sizeof(char));
+-				memset(pszFullNameW[i], '\0', MAX_PATH * sizeof(wchar_t));
+-
+-				if (NULL != pszShortName[i]) {
+-					strcpy(pszShortName[i], pDriver[i]->szShortName);
+-					pDriver[i]->szShortName = pszShortName[i];
+-				}
+-				if (NULL != pszFullNameA[i]) {
+-					strcpy(pszFullNameA[i], pDriver[i]->szFullNameA);
+-					pDriver[i]->szFullNameA = pszFullNameA[i];
+-				}
++// PS5 catalogue storage: large blocks use the frontend's mapped allocator.
++struct PS5DriverNames {
++    char short_name[100];
++    char full_name[MAX_PATH];
++    wchar_t full_name_w[MAX_PATH];
++    char *original_short, *original_full;
++    wchar_t *original_wide;
++};
++static PS5DriverNames *ps5_driver_names = NULL;
++
++static INT32 BurnGameListInit()
++{
++    if (!nBurnDrvCount) return 0;
++    // Validate before allocation or mutation; driver names must fit writable slots.
++    for (UINT32 i = 0; i < nBurnDrvCount; ++i) {
++        if (!pDriver[i]->szShortName || !pDriver[i]->szFullNameA ||
++            strlen(pDriver[i]->szShortName) >= 100 ||
++            strlen(pDriver[i]->szFullNameA) >= MAX_PATH)
++            return 1;
++    }
++    PS5DriverNames *storage = (PS5DriverNames*)calloc(nBurnDrvCount, sizeof(PS5DriverNames));
++    char **tables = (char**)calloc((size_t)nBurnDrvCount * 3, sizeof(char*));
++    if (!storage || !tables) {
++        free(storage);
++        free(tables);
++        return 1;
++    }
++    ps5_driver_names = storage;
++    pszShortName = tables;
++    pszFullNameA = tables + nBurnDrvCount;
++    pszFullNameW = (wchar_t**)(tables + (size_t)nBurnDrvCount * 2);
++    for (UINT32 i = 0; i < nBurnDrvCount; ++i) {
++        PS5DriverNames &entry = storage[i];
++        entry.original_short = pDriver[i]->szShortName;
++        entry.original_full = pDriver[i]->szFullNameA;
++        entry.original_wide = pDriver[i]->szFullNameW;
++        pszShortName[i] = entry.short_name;
++        pszFullNameA[i] = entry.full_name;
++        pszFullNameW[i] = entry.full_name_w;
++        strcpy(entry.short_name, entry.original_short);
++        strcpy(entry.full_name, entry.original_full);
++        pDriver[i]->szShortName = entry.short_name;
++        pDriver[i]->szFullNameA = entry.full_name;
+ #if defined (_UNICODE)
+-				if (NULL != pDriver[i]->szFullNameW) {
+-					wmemcpy(pszFullNameW[i], pDriver[i]->szFullNameW, MAX_PATH);	// Include '\0'
+-				}
+-				pDriver[i]->szFullNameW = pszFullNameW[i];
+-#endif
+-			}
+-		}
+-
++        if (entry.original_wide) {
++            size_t n = 0;
++            while (n + 1 < MAX_PATH && entry.original_wide[n]) {
++                entry.full_name_w[n] = entry.original_wide[n];
++                ++n;
++            }
++        }
++        pDriver[i]->szFullNameW = entry.full_name_w;
++#endif
++    }
++    return 0;
+ }
+ 
+ static void BurnGameListExit()
+ {
+-	// Release of storage space
+-	for (UINT32 i = 0; i < nBurnDrvCount; i++) {
+-		if ((NULL != pszShortName) && (NULL != pszShortName[i])) free(pszShortName[i]);
+-		if ((NULL != pszFullNameA) && (NULL != pszFullNameA[i])) free(pszFullNameA[i]);
+-		if ((NULL != pszFullNameW) && (NULL != pszFullNameW[i])) free(pszFullNameW[i]);
+-	}
+-	if (NULL != pszShortName) free(pszShortName);
+-	if (NULL != pszFullNameA) free(pszFullNameA);
+-	if (NULL != pszFullNameW) free(pszFullNameW);
++    if (ps5_driver_names) {
++        for (UINT32 i = 0; i < nBurnDrvCount; ++i) {
++            pDriver[i]->szShortName = ps5_driver_names[i].original_short;
++            pDriver[i]->szFullNameA = ps5_driver_names[i].original_full;
++            pDriver[i]->szFullNameW = ps5_driver_names[i].original_wide;
++        }
++    }
++    free(ps5_driver_names);
++    free(pszShortName); // All three pointer tables share this allocation.
++    ps5_driver_names = NULL;
++    pszShortName = pszFullNameA = NULL;
++    pszFullNameW = NULL;
+ }
+ 
+ extern "C" INT32 BurnLibInit()
+@@ -162,7 +185,10 @@
+ 
+ 	nBurnDrvCount = sizeof(pDriver) / sizeof(pDriver[0]);	// count available drivers
+ 
+-	BurnGameListInit();
++	if (BurnGameListInit()) {
++		nBurnDrvCount = 0;
++		return 1;
++	}
+ 
+ 	BurnSoundInit();
+ 
+--- a/src/burner/libretro/libretro.cpp
++++ b/src/burner/libretro/libretro.cpp
+@@ -81,6 +81,7 @@
+ static UINT8* pVidImage              = NULL;
+ // Kept separate from the renderer so paused/cached source pixels stay native.
+ static std::vector<uint32_t> ps5_xrgb_frame;
++static bool ps5_library_ready = false;
+ static void ps5_video_frame(const void *pixels, unsigned width, unsigned height, size_t pitch)
+ {
+     if (!pixels || nBurnBpp == 4)
+@@ -1280,7 +1281,11 @@
+ 	environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &libretro_msg_interface_version);
+ 
+ 	snprintf_nowarn(szAppBurnVer, sizeof(szAppBurnVer), "%x.%x.%x.%02x", nBurnVer >> 20, (nBurnVer >> 16) & 0x0F, (nBurnVer >> 8) & 0xFF, nBurnVer & 0xFF);
+-	BurnLibInit();
++	ps5_library_ready = BurnLibInit() == 0;
++	if (!ps5_library_ready) {
++		log_cb(RETRO_LOG_ERROR, "[FBNeo PS5] Driver catalogue initialization failed.\n");
++		return;
++	}
+ #ifdef AUTOGEN_DATS
+ 	CreateAllDatfiles("dats");
+ #endif
+@@ -1310,8 +1315,9 @@
+ 
+ void retro_deinit()
+ {
+-	DspExit();
++	if (ps5_library_ready) DspExit();
+ 	BurnLibExit();
++	ps5_library_ready = false;
+ }
+ 
+ void retro_reset()
+@@ -2359,6 +2365,7 @@
+ 
+ bool retro_load_game(const struct retro_game_info *info)
+ {
++	if (!ps5_library_ready) return false;
+ 	if (!info)
+ 		return false;
+ 
+@@ -2521,6 +2528,7 @@
+ 
+ bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t)
+ {
++	if (!ps5_library_ready) return false;
+ 	if (!info)
+ 		return false;
+ 

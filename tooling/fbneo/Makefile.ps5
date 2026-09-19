@@ -1,0 +1,7 @@
+# Preserve upstream source/feature selection and override only SDK compatibility.
+include Makefile
+.DEFAULT_GOAL := all
+# Clang rejects this obsolete GCC flag; the SDK libc++ requires C++11 or newer.
+CFLAGS := $(filter-out -fforce-addr,$(CFLAGS))
+CXXFLAGS := $(filter-out -fforce-addr -std=gnu++98,$(CXXFLAGS)) -std=gnu++11 -fno-exceptions -fno-rtti
+INCFLAGS += -I$(PS5_FBNEO_PORT_DIR)

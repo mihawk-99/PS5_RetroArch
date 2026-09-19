@@ -1,0 +1,28 @@
+[
+  {
+    "stage": "first cross build",
+    "log": "/tmp/fbneo-first-build.log",
+    "outcome": "Failed: MPEG decoder throw/try requires unwinding unsupported by native loader. Instance-local setjmp/longjmp replaces only the bounds escape; pinned original/patched decoder tests compare complete/truncated input."
+  },
+  {
+    "stage": "first full gates",
+    "log": "/tmp/fbneo-verify.log",
+    "identity": "a69d4ad46b809a2e9126c24abe4520b39762352bf33a39ee6bd991f905ffbf98",
+    "core_sha256": "0c0e7dc1acf7199acde353fddd0d1d39a9ce9ef21969149092945b3198dec370",
+    "outcome": "Host gates passed but console acceptance FAILED. Metadata static-buffer change retained old free(), compiler warned free-nonheap-object; both startup diagnostic and owner core load aborted in free. No gameplay colour acceptance. Raw klog/fbneo-first-run.log and klog/run-PPSA99169-163509.log preserved."
+  },
+  {
+    "stage": "metadata ownership correction",
+    "log": "/tmp/fbneo-fixed-verify.log",
+    "identity": "96ee48123a702a165d7aca49c492dbcb3f2f9c3b25c0a80fe2a0765b9c590cd1",
+    "core_sha256": "2cdb5f412772daa1f0bbdcd8c54ee30dcc0aea36240446fe1c601c705da38308",
+    "outcome": "Removed stale free; 10000-query sanitizer regression and all five gates pass (62 tests). Console loader eight cycles and recovery passed. Owner game load FAILED: SIGSEGV writing NULL in BurnLibInit catalogue copy after many small allocations. Kernel klog/run-PPSA99169-164532.log, frontend klog/fbneo-fixed-live-retroarch.log. No gameplay colour acceptance."
+  },
+  {
+    "stage": "bulk catalogue storage",
+    "log": "/tmp/fbneo-catalogue-verify.log",
+    "identity": "41cb59a98907d3c382fa7c6c2282e64740a2d079364fd7f231dd0ddef7a2ca10",
+    "core_sha256": "0e4231a238af2e5cc2630568abcaec2d3fe5356d647ec87ab9d9c13e8da66e44",
+    "outcome": "Two bulk allocations, validated lengths and failure rollback, pointer restoration on cleanup; content rejected if init fails. 30000-driver ASan/UBSan stress, allocation failures and reload pass. All 28910 actual catalogue entries fit. All five gates pass, 63 tests. Console result and owner confirmation are in capture.json."
+  }
+]

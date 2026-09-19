@@ -415,7 +415,7 @@ release allocations and report the failing operation; successful handles are
 reference counted and unmapped on the final close.
 
 `tools/core-imports.py` derives the union of required native bindings from the
-explicitly shipped FCEUmm, mGBA and Snes9x ELFs; bindings and all cores participate in the title build
+explicitly shipped FCEUmm, mGBA, Snes9x and FBNeo ELFs; bindings and all cores participate in the title build
 identity. Directory imports use this port's directory adapters, including `rewinddir`.
 The `localtime_r` binding uses RetroArch's existing locked `rtime_localtime`
 helper, initialized before gameplay. The
@@ -574,3 +574,50 @@ runs finalizers in reverse array order on the last close before unmapping.
 Reload gets a new registry; a rejected load executes no callbacks. This does not
 add TLS, legacy init/fini functions or exception-unwind registration support.
 As with initializers, lifecycle callbacks must not reenter this bounded loader.
+
+## FBNeo native core contract
+
+`make fbneo` uses pinned official libretro/FBNeo source
+`6bb3167a044e19e7106a5110d5531aa9c6afa96f` and the project's native SDK wrappers.
+The full upstream source selection remains, including ZIP/7z and CHD support;
+no ROM, BIOS, samples or user-provided metadata is shipped. Official core-info
+revision `5a74858ab2f7a50cebb5a6330895bc38899531c0` supplies the `.info` file.
+Archive digests are verified before fresh extraction. The local make wrapper
+removes obsolete GCC `-fforce-addr`, selects C++11 for SDK libc++, and disables
+exceptions/RTTI because the native module loader has no unwind registration.
+The shared core-local destructor registry handles C++ globals before unmapping.
+Native imports are included in the title's explicit union table, so the core
+and updated frontend must be deployed together.
+
+Native 32-bit FBNeo output is already XRGB8888 (0x00RRGGBB). Drivers flagged
+16-bit-only retain RGB565 internally; the video callback converts those frames
+into a separate XRGB8888 buffer with a 32-bit pitch. Source pixels are never
+mutated, and NULL duplicate-frame callbacks remain NULL. The existing frontend
+converts XRGB into RGBA for the Vulkan texture upload. This is CPU emulation and
+software rendering with Vulkan presentation, not Vulkan hardware emulation.
+
+The MPEG layer 2/AMM decoder uses an exception solely to escape an exhausted
+bit reader. The native patch substitutes an instance-local setjmp/longjmp
+escape and the same false return. The traversed decoder frames have only
+trivial local variables; no C++ destructor is bypassed. This is not general
+exception support. Differential host tests compare the original and adapted
+real decoder on complete and truncated synthetic layer 2 and AMM input. Core metadata
+queries also use a bounded static version string, avoiding upstream's
+unowned duplicate on each query.
+
+At runtime FBNeo sets need_fullpath=true and block_extract=true: RetroArch
+passes the whole archive to the core. Do not unpack arcade ZIP/7z collections
+as single-content archives. BIOS lookup includes the frontend's system/fbneo/
+and system/ directories and the content directory. User BIOS/ROM sets must
+match the pinned core's requirements; a successful build is not a compatibility
+claim for every supported board, disc format or subsystem.
+
+FBNeo's writable driver catalogue uses two allocations: a bulk name store and
+its pointer tables. Thousands of individual sub-1-MiB allocations otherwise
+exhaust SceLibcInternal's small heap during BurnLibInit. The name store crosses
+the frontend allocator's existing 1 MiB mapping threshold; that allocator and
+all other cores stay unchanged. Catalogue construction validates lengths and
+allocations before changing driver pointers, and exit restores the original
+pointers before freeing storage. Repeated exit/reinitialization is safe.
+Initialization failure is logged and causes regular/subsystem content loads to
+return false. No partially initialized catalogue is used for game execution.
