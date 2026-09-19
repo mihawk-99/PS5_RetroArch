@@ -2128,3 +2128,63 @@ Evidence: `evidence/mgba-native/`, replay `bash tools/verify.sh evidence`.
 Private ROM names, console credentials and raw captures are not committed.
 Save/state round trips, long-run A/V sync, measured performance, Slang presets,
 and a fresh FCEUmm/XMB transition matrix are not claimed.
+
+
+## 2026-09-19 — Snes9x with explicit colour and C++ lifetime contracts
+
+Implemented the requested Snes9x port using pinned official libretro revision
+fae2fea08f74180759ef540ee94259213f503480 (1.63), source archive SHA-256
+0d4b0c4181d66668ec0040eb17f90a559f7b7fa6cbd9198593c3bdbe79acd029.
+`make snes9x` invokes the upstream libretro Makefile with this project's SDK;
+no alternate SDK or payload CRT is introduced. Upstream LTO-off, no-strict-
+aliasing and no-exceptions/no-RTTI choices remain. Explicit native/C++ bindings
+require -z undefs for core link but are resolved by the title link. Metadata
+revision/digests and all port inputs are captured in the evidence build report.
+Upstream info display_version remains 1.61; the actual core reports 1.63 + pin.
+
+Colour handling leaves RGB565 renderer/filter arithmetic intact and converts
+only final frames into a separate bounded XRGB8888 buffer. Both libretro pixel
+format negotiation sites and every video callback path are patched. Host tests
+exhaust all 65,536 RGB565 colours through the actual frontend RGBA upload, with
+additional pitch, capacity, cached-source, hires/NTSC/4x dimension checks.
+
+Initial static build 81f07c1a… passed ABI but was not deployed: its imported
+__cxa_atexit would retain callbacks into unloaded code. The final core includes
+an export-hidden C++ destructor registry; a validated fini-array callback runs
+before last-close unmap. Loader tests exercise reverse destruction order,
+reference counting/reload and invalid finalizer rejection before constructors.
+The host C++ fixture initially hit GNU ld's overlapping EH FDE header error with
+the PS5 linker layout; --no-eh-frame-hdr fixes that host-only fixture. The target
+build linked normally. TLS/legacy init/fini/unwind registration remain unsupported.
+
+Verification and console acceptance:
+
+- `bash tools/verify.sh`: PASS format, unit, build, integration, evidence;
+  60 tests. Log `/tmp/snes9x-verify.log`. Final core SHA-256:
+  e8b66c5f6656afe927181e3fb4fb5d13152ae525fc64705b59af5d9a847a7cac,
+  3,392,576 bytes, 25 exports, 4 initializers, 1 finalizer.
+- Frontend identity:
+  64bef2e7826e5a63a6644a933e24ef5403d28c754230c0038eb8a76b4baa1c53.
+  Preserved ELF `klog/snes9x-64bef2e7.elf`.
+- `bash tools/run-title.sh --no-build --core-test=snes9x --watch 180`:
+  verified deployment, eight native loader cycles and resident-menu recovery
+  passed. Deliberate missing-core errors are part of that successful test.
+  Raw `klog/snes9x-first-run.log`, kernel `klog/run-PPSA99169-161400.log`.
+  One current-build launch, zero Vulkan refusals/API failure records and zero
+  kernel fatal signal reports. Title remained open through 180s and runner
+  closed it. No claim of 180s uninterrupted gameplay.
+- Owner-loaded archive negotiated XRGB8888, 256x224, declared 60.10 Hz and
+  32040 Hz audio, then returned to the dummy menu. Owner answered the combined
+  colours/sound/controls/Quick Menu/Close Content/next-content question with
+  “Works flawlessly.” The geometry log independently records menu -> Snes9x ->
+  menu; no exhaustive cross-core matrix or special-mode coverage is claimed.
+- FCEUmm/mGBA binaries retain their accepted hashes. PS5_Vulkan was read only;
+  its exact linked archive hashes stayed unchanged during verification and are
+  saved in the evidence. No driver source revision is inferred.
+
+Evidence: `evidence/snes9x-native/`; replay `bash tools/verify.sh evidence`.
+Raw logs/private filenames remain ignored. BIOS subsystems, special chips,
+interlace/hires/NTSC/HD Mode 7 console tests, saves/states and long-run timing are
+separate acceptance work. Build/ABI reports are static checks; their false
+console_loading_verified field is superseded only by the separate console
+capture, not rewritten into an unsupported claim.

@@ -1,0 +1,19 @@
+{
+  "step": "snes9x-native",
+  "note": "Native ordinary SNES archive loading, correct colour conversion and owner-confirmed menu transitions, with per-core C++ cleanup.",
+  "must_contain": [
+    "frontend build identity: 64bef2e7826e5a63a6644a933e24ef5403d28c754230c0038eb8a76b4baa1c53",
+    "Snes9x SHA-256: e8b66c5f6656afe927181e3fb4fb5d13152ae525fc64705b59af5d9a847a7cac",
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=Snes9x",
+    "core recovery test: passed=1 selection_rejected=1 content_rejected=1 menu_context_preserved=1 menu_core_load=1",
+    "core loader: ran 4 initializers",
+    "core loader: ran 1 finalizers",
+    "[INFO] [Environ] SET_PIXEL_FORMAT: XRGB8888.",
+    "[INFO] [Core] Geometry: 256x224, Aspect: 1.333, FPS: 60.10, Sample rate: 32040.00 Hz.",
+    "current-build launches: 1; Vulkan refusals: 0; GPU API failure records: 0; kernel fatal signal reports: 0",
+    "owner: Works flawlessly",
+    "Host verification: PASS format unit build integration evidence; 60 tests"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner replied \u201cWorks flawlessly\u201d to gameplay colours/audio/input and menu/content transition test. Special chips/modes and comprehensive cross-core coverage are not implied."
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "stage": "initial cross build",
+    "log": "/tmp/snes9x-first-build.log",
+    "core_sha256": "81f07c1ac7b148c9400d2ebf58861420ba0942a2c184db44483a4a7a4eabd461",
+    "outcome": "Built and passed static ABI. Not deployed: imported process-wide __cxa_atexit would retain callbacks into unloadable code."
+  },
+  {
+    "stage": "core-local C++ cleanup",
+    "log": "/tmp/snes9x-runtime-build.log",
+    "core_sha256": "e8b66c5f6656afe927181e3fb4fb5d13152ae525fc64705b59af5d9a847a7cac",
+    "outcome": "Private destructor registry, 4 initializers and 1 finalizer; no imported __cxa_atexit/__cxa_finalize. Host C++ fixture initially hit GNU ld overlapping EH FDE header error with PS5 layout; --no-eh-frame-hdr fixes host-only fixture. Actual PS5 build linked normally. Last-close cleanup/reload and malformed-finalizer rejection tests pass."
+  },
+  {
+    "stage": "full verification",
+    "log": "/tmp/snes9x-verify.log",
+    "frontend_identity": "64bef2e7826e5a63a6644a933e24ef5403d28c754230c0038eb8a76b4baa1c53",
+    "outcome": "All five gates pass; 60 tests, including every RGB565 input through XRGB callback and RGBA upload, pitches/cached source/bounds and high-resolution sizes."
+  }
+]

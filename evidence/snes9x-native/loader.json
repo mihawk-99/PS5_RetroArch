@@ -1,0 +1,10 @@
+{
+  "build_identity": "build identity: 64bef2e7826e5a63a6644a933e24ef5403d28c754230c0038eb8a76b4baa1c53",
+  "core": "snes9x",
+  "passed": true,
+  "cycles": 8,
+  "exports": 25,
+  "api": 1,
+  "missing_rejected": true,
+  "unknown_symbol_rejected": true
+}

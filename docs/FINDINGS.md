@@ -2744,3 +2744,31 @@ LoadExec termination without fatal signal reports, also confirmed by the owner.
 Evidence and failed iterations: `evidence/mgba-native/`; replay with
 `bash tools/verify.sh evidence`. Saves, state restoration and long-run timing are
 not established by these loading/transition tests.
+
+
+## 2026-09-19 — Snes9x pixel contract and C++ core unload
+
+Snes9x 1.63's libretro renderer outputs RGB565 and negotiates that format at
+normal and subsystem content load. The port leaves renderer arithmetic and
+filter output intact, then converts at the three final video callback sites to
+independent XRGB8888 storage. Both negotiation sites declare XRGB8888, matching
+the existing frontend's RGBA conversion and matching-format staging/image copy.
+All 65,536 RGB565 inputs pass through both actual helpers in the host test with
+correct expanded R/G/B channels and alpha 255. Additional tests cover non-tight
+pitch, repeated frames without source mutation, bounds, hires and NTSC widths.
+Owner's console result: “Works flawlessly” for gameplay and menu transitions;
+trace confirms XRGB8888 game output and return to the dummy menu.
+
+This core has four C++ initializers. A plain build imports __cxa_atexit, which
+would register callbacks into a mapping that the native loader later frees.
+The deployed core instead hides a module-local destructor registry behind the
+upstream export map. Its single fini-array callback drains that list before
+unmapping. Loader validates the entire bounded finalizer table, and all targets,
+before constructors run; last-reference close calls it in reverse array order.
+Host tests verify destruction order, reference counting, repeated reload and
+rejection without side effects. Eight actual Snes9x load/unload cycles and the
+resident-menu recovery test pass on the PS5. This is not TLS or general C++
+exception/unwind support.
+
+Source and linked archive provenance are in `evidence/snes9x-native/`.
+PS5_Vulkan was not edited; FCEUmm/mGBA core binaries retain their accepted hashes.

@@ -1,0 +1,9 @@
+{
+  "build_identity": "build identity: 64bef2e7826e5a63a6644a933e24ef5403d28c754230c0038eb8a76b4baa1c53",
+  "core": "snes9x",
+  "passed": true,
+  "selection_rejected": true,
+  "content_rejected": true,
+  "menu_context_preserved": true,
+  "menu_core_load": true
+}

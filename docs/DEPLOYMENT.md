@@ -207,7 +207,16 @@ The loader's supported ELF/runtime contract is in `docs/REFERENCE.md`.
 `make mgba` builds and checks the mGBA shared core without uploading it. The title
 build includes `mgba_libretro.so` alongside FCEUmm and installs its `.info` in both
 metadata locations. Deploy the rebuilt title with the new core: its import table
-now covers both cores. Use `--core-test=mgba` for the optional loader diagnostic.
+covers all shipped cores. Use `--core-test=mgba` for the optional loader diagnostic.
 Place user GB/GBC/GBA games in `content/` (or another browsable user folder), select
 mGBA manually, and capture the gameplay log before closing/reopening the title.
 No ROM or BIOS is included in the build.
+
+
+`make snes9x` builds and ABI-checks Snes9x without uploading. The title build
+stages snes9x_libretro.so and official metadata alongside the existing cores;
+rebuild the frontend too, since its import table includes C++ runtime bindings.
+Use `tools/run-title.sh --no-build --core-test=snes9x --watch 180` for loader and
+recovery diagnostics followed by manual SNES archive loading. Preserve existing
+config/content; verify gameplay colours, audio/input, Quick Menu, Close Content
+and a subsequent game before accepting the run.

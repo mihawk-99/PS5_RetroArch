@@ -42,6 +42,8 @@ struct Module
     size_t symbol_count;
     const char *strings;
     size_t string_size;
+    const uintptr_t *finalizers;
+    size_t finalizer_count;
 };
 Module *modules = nullptr;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -244,7 +246,8 @@ bool load(Module *m)
     if (!dt || dynamic->p_filesz % sizeof(Elf64_Dyn))
         return fail("invalid dynamic entries");
     bool terminated = false;
-    uint64_t init_array = 0, init_bytes = 0;
+    uint64_t init_array = 0, init_bytes = 0, fini_array = 0, fini_bytes = 0;
+    bool have_fini_array = false, have_fini_size = false;
     bool have_init_array = false, have_init_size = false;
     for (size_t i = 0; i < dynamic->p_filesz / sizeof(Elf64_Dyn); ++i)
     {
@@ -277,11 +280,24 @@ bool load(Module *m)
             have_init_size = true;
             init_bytes = value;
         }
-        // Legacy init functions, finalizers, TLS and C++ unwinding remain unsupported.
-        if (tag == DT_TEXTREL ||
-            ((tag == DT_INIT || tag == DT_FINI || tag == DT_FINI_ARRAYSZ ||
-              tag == DT_PREINIT_ARRAYSZ || tag == DT_RELSZ || tag == 35 /* DT_RELRSZ */) &&
-             value))
+        if (tag == DT_FINI_ARRAY)
+        {
+            if (have_fini_array)
+                return fail("duplicate finalizer array");
+            have_fini_array = true;
+            fini_array = value;
+        }
+        if (tag == DT_FINI_ARRAYSZ)
+        {
+            if (have_fini_size)
+                return fail("duplicate finalizer array size");
+            have_fini_size = true;
+            fini_bytes = value;
+        }
+        // Legacy init/fini functions, TLS and C++ unwinding remain unsupported.
+        if (tag == DT_TEXTREL || ((tag == DT_INIT || tag == DT_FINI || tag == DT_PREINIT_ARRAYSZ ||
+                                   tag == DT_RELSZ || tag == 35 /* DT_RELRSZ */) &&
+                                  value))
             return fail("unsupported core initialization/relocation feature");
     }
     if (!terminated)
@@ -292,6 +308,12 @@ bool load(Module *m)
         return fail("invalid initializer array range/size");
     if (have_init_array && !have_init_size)
         return fail("initializer array has no size");
+    if (fini_bytes &&
+        (!have_fini_array || fini_array % sizeof(uint64_t) || fini_bytes % sizeof(uint64_t) ||
+         fini_bytes > 1024 * sizeof(uint64_t) || !mapped(m, fini_array, fini_bytes, PF_R)))
+        return fail("invalid finalizer array range/size");
+    if (have_fini_array && !have_fini_size)
+        return fail("finalizer array has no size");
     // Reserve aligned memory without ever making a page writable and executable.
     void *allocation =
         mmap(nullptr, m->span + page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -370,6 +392,15 @@ bool load(Module *m)
         if (initializers[i] < base || !mapped(m, initializers[i] - base, 1, PF_X))
             return fail("initializer callback outside executable segment");
     }
+    const auto *finalizers =
+        fini_bytes ? reinterpret_cast<const uintptr_t *>(m->base + fini_array) : nullptr;
+    const size_t finalizer_count = fini_bytes / sizeof(uintptr_t);
+    for (size_t i = 0; i < finalizer_count; ++i)
+    {
+        const uintptr_t base = reinterpret_cast<uintptr_t>(m->base);
+        if (finalizers[i] < base || !mapped(m, finalizers[i] - base, 1, PF_X))
+            return fail("finalizer callback outside executable segment");
+    }
     if (mprotect(m->base, m->span, PROT_NONE))
         return fail("core protect reserve failed errno=%d", errno);
     for (size_t i = 0; i < m->ph_count; ++i)
@@ -386,6 +417,8 @@ bool load(Module *m)
     }
     for (size_t i = 0; i < initializer_count; ++i)
         reinterpret_cast<void (*)()>(initializers[i])();
+    m->finalizers = finalizers;
+    m->finalizer_count = finalizer_count;
     if (initializer_count)
         std::fprintf(stderr, "core loader: ran %zu initializers\n", initializer_count);
     std::fprintf(stderr, "core loader: ready symbols=%zu relocations=%zu mapped_bytes=%zu\n",
@@ -474,6 +507,10 @@ extern "C" int ps5_core_dlclose(void *handle)
             if (--m->references == 0)
             {
                 *at = m->next;
+                for (size_t i = m->finalizer_count; i; --i)
+                    reinterpret_cast<void (*)()>(m->finalizers[i - 1])();
+                if (m->finalizer_count)
+                    std::fprintf(stderr, "core loader: ran %zu finalizers\n", m->finalizer_count);
                 release(m);
             }
             pthread_mutex_unlock(&mutex);

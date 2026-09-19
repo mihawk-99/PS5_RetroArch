@@ -1,0 +1,78 @@
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -1,4 +1,5 @@
+ #include "libretro.h"
++#include "ps5-video.h"
+ #include <streams/file_stream.h>
+ #include <vfs/vfs_hybrid.h>
+ #include <file/file_path.h>
+@@ -74,6 +75,24 @@
+ 
+ retro_log_printf_t log_cb = NULL;
+ static retro_video_refresh_t video_cb = NULL;
++/* PS5: use the frontend's verified XRGB upload route, including NTSC output. */
++static void ps5_video_frame(const void *pixels, unsigned width, unsigned height, size_t pitch)
++{
++    static uint32_t output[MAX_SNES_WIDTH_4X * MAX_SNES_HEIGHT];
++    if (!pixels)
++    {
++        video_cb(NULL, width, height, (size_t)width * sizeof(uint32_t));
++        return;
++    }
++    if (!ps5_snes9x_frame(output, sizeof(output) / sizeof(output[0]),
++                         static_cast<const uint16_t *>(pixels), pitch, width, height))
++    {
++        if (log_cb)
++            log_cb(RETRO_LOG_ERROR, "PS5 frame exceeds conversion capacity or has invalid pitch.\n");
++        return;
++    }
++    video_cb(output, width, height, (size_t)width * sizeof(uint32_t));
++}
+ static retro_audio_sample_t audio_cb = NULL;
+ static retro_audio_sample_batch_t audio_batch_cb = NULL;
+ static retro_input_poll_t poll_cb = NULL;
+@@ -1522,10 +1541,10 @@
+ 
+     if (rom_loaded)
+     {
+-        /* If we're in RGB565 format, switch frontend to that */
++        /* Native pixels remain RGB565; callback converts to XRGB8888. */
+         if (RED_SHIFT_BITS == 11)
+         {
+-            enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
++            enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+             if (!environ_cb || !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+             {
+                 return false;
+@@ -1673,7 +1692,7 @@
+     {
+         if(RED_SHIFT_BITS == 11)
+         {
+-            enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
++            enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+             if (!environ_cb || !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+                 return false;
+         }
+@@ -2548,7 +2567,7 @@
+         else
+             snes_ntsc_blit(snes_ntsc, GFX.Screen, GFX.Pitch / 2, burst_phase, width, height, snes_ntsc_buffer, MAX_SNES_WIDTH_NTSC * 2);
+ 
+-        video_cb(snes_ntsc_buffer + ((int)(MAX_SNES_WIDTH_NTSC) * overscan_offset), SNES_NTSC_OUT_WIDTH(256), height, MAX_SNES_WIDTH_NTSC * 2);
++        ps5_video_frame(snes_ntsc_buffer + ((int)(MAX_SNES_WIDTH_NTSC) * overscan_offset), SNES_NTSC_OUT_WIDTH(256), height, MAX_SNES_WIDTH_NTSC * 2);
+     }
+     else if (width == MAX_SNES_WIDTH && hires_blend)
+     {
+@@ -2594,11 +2613,11 @@
+             width >>= 1;
+         }
+ 
+-        video_cb(GFX.Screen + ((int)(GFX.Pitch >> 1) * overscan_offset), width, height, GFX.Pitch);
++        ps5_video_frame(GFX.Screen + ((int)(GFX.Pitch >> 1) * overscan_offset), width, height, GFX.Pitch);
+     }
+     else
+     {
+-        video_cb(GFX.Screen + ((int)(GFX.Pitch >> 1) * overscan_offset), width, height, GFX.Pitch);
++        ps5_video_frame(GFX.Screen + ((int)(GFX.Pitch >> 1) * overscan_offset), width, height, GFX.Pitch);
+     }
+ 
+     return TRUE;

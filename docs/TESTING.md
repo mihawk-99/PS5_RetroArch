@@ -255,3 +255,26 @@ matching refresh cadence may hide alternating corrupted frames. Preserve the
 live frontend log before a relaunch replaces it; do not accept a clean loader
 probe alone as visual acceptance. Record hashes of linked driver archives when
 the sibling Vulkan repository is being developed concurrently.
+
+
+### Snes9x
+
+`tests/test_snes9x_video.py` exhaustively checks 65,536 RGB565 values through the
+actual core conversion and frontend GPU upload helpers. It also covers padded
+input rows, source immutability, repeated cached frames, common/hires/NTSC/4x
+sizes, and rejection without writing on bad dimensions/pitch/capacity.
+`test_core_loader.py` loads a C++ ELF with this core-local destructor registry:
+construct once, defer destruction while another handle exists, destroy in reverse
+order on the last close, reload repeatedly, and reject malformed finalizer tables
+or non-executable callbacks before any constructor. The host fixture disables
+GNU ld's EH frame header because this PS5 layout is not a host unwind layout;
+exceptions/unwind registration are outside the loader contract.
+
+Console acceptance uses `tools/run-title.sh --no-build --core-test=snes9x
+--watch 180`: eight loader cycles and live-menu recovery, then owner-loaded SNES
+archive with correct colours, sound and controls. Open Quick Menu, Close Content
+and load another game/core to check persistent colour/flicker regressions. Owner
+visual confirmation and matching build identity are required. Core-declared FPS
+and audio rate are metadata, not performance measurements. NTSC filters, special
+chips, subsystem BIOSes, interlace/hires modes, SRAM/state round trips and long-run
+A/V timing require separate coverage beyond an ordinary game acceptance run.

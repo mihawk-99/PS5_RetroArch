@@ -45,6 +45,10 @@ HOST_UNIT_TEST := build/tests/demo_renderer_tests
 all: app
 build: app
 
+.PHONY: snes9x
+snes9x:
+	@bash tools/build-snes9x.sh
+
 .PHONY: mgba
 mgba:
 	@bash tools/build-mgba.sh
@@ -169,6 +173,7 @@ help:
 	  'make test-unit       Run host-native GoogleTest application tests' \
 	  'make test-integration  Run host tooling integration tests' \
 	  'make deps            Fetch native dependencies into .deps/' \
+	  'make snes9x          Build and ABI-check the pinned PS5 Snes9x core' \
 	  'make mgba            Build and ABI-check the pinned PS5 mGBA core' \
 	  'make fceumm          Build and ABI-check the pinned PS5 FCEUmm core' \
 	  'make pacbrew         Fetch the pinned PacBrew ports sysroot' \

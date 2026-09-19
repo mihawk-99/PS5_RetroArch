@@ -32,11 +32,22 @@ int run(void) { return call_import(++*pointer); }
         cls.original = bytes(data)
         wrapper = cls.folder / 'runtime.cpp'
         wrapper.write_text('''#include <cstring>
+#include <cstdlib>
+#include <pthread.h>
 static bool allow = true;
+static int events = 0;
+static void native_record(int value) { events = events * 10 + value; }
+extern "C" void clear_events() { events = 0; }
+extern "C" int get_events() { return events; }
 extern "C" void allow_import(bool value) { allow = value; }
 static int native_add(int value) { return value + 40; }
 extern "C" void *ps5_core_import(const char *name) {
-    return allow && !std::strcmp(name, "native_add") ? reinterpret_cast<void *>(&native_add) : nullptr;
+    if (allow && !std::strcmp(name, "native_add")) return reinterpret_cast<void *>(&native_add);
+#define BIND(symbol) if (!std::strcmp(name, #symbol)) return reinterpret_cast<void *>(&symbol)
+    BIND(native_record); BIND(malloc); BIND(free);
+    BIND(pthread_mutex_lock); BIND(pthread_mutex_unlock); BIND(pthread_mutex_destroy);
+#undef BIND
+    return nullptr;
 }
 ''')
         harness = cls.folder / 'loader.so'
@@ -176,3 +187,69 @@ int state(void) { return ready; }
                     changed = True
         self.assertTrue(changed)
         self.reject(data, 'initializer callback outside executable segment')
+
+
+    def test_cpp_destructors_run_on_last_close_and_bad_finalizer_rejected(self):
+        source = self.folder / 'dtor.cpp'
+        source.write_text('''extern "C" void native_record(int);
+struct Object {
+    int marker;
+    Object(int value) : marker(value) { native_record(value); }
+    ~Object() { native_record(marker + 1); }
+};
+static Object a(1), b(3);
+''')
+        path = self.folder / 'dtor.so'
+        subprocess.run(['c++', '-shared', '-nostdlib', '-fPIC', '-fno-exceptions', '-fno-rtti',
+                        str(source), str(ROOT / 'tooling/native/core_cxx_runtime.cpp'),
+                        '-Wl,--no-eh-frame-hdr',
+                        '-Wl,-z,max-page-size=16384', '-Wl,-T,' + str(ROOT / 'tooling/native/ps5-core.ld'),
+                        '-o', str(path)], check=True, capture_output=True)
+        data = bytearray(path.read_bytes())
+        data[7] = 9
+        path.write_bytes(data)
+        for _ in range(4):
+            self.lib.clear_events()
+            handle = self.open(path)
+            self.assertTrue(handle, self.lib.ps5_core_dlerror())
+            other = self.open(path)
+            self.assertEqual(handle, other)
+            self.assertEqual(self.lib.get_events(), 13)
+            self.lib.ps5_core_dlclose(other)
+            self.assertEqual(self.lib.get_events(), 13)
+            self.lib.ps5_core_dlclose(handle)
+            self.assertEqual(self.lib.get_events(), 1342)
+        # Invalid finalizer is rejected BEFORE any constructor can run.
+        self.lib.clear_events()
+        phoff = struct.unpack_from('<Q', data, 32)[0]
+        phcount = struct.unpack_from('<H', data, 56)[0]
+        dynamic = next(struct.unpack_from('<Q', data, phoff + i * 56 + 8)[0]
+                       for i in range(phcount)
+                       if struct.unpack_from('<I', data, phoff + i * 56)[0] == 2)
+        at = dynamic
+        while struct.unpack_from('<q', data, at)[0] != 26:  # DT_FINI_ARRAY
+            self.assertNotEqual(struct.unpack_from('<q', data, at)[0], 0)
+            at += 16
+        fini_address = struct.unpack_from('<Q', data, at + 8)[0]
+        original = bytes(data)
+        struct.pack_into('<Q', data, at + 8, 2**64 - 8)
+        self.reject(data, 'finalizer array')
+        self.assertEqual(self.lib.get_events(), 0)
+        data = bytearray(original)
+        writable = next(struct.unpack_from('<Q', data, phoff + i * 56 + 16)[0]
+                        for i in range(phcount)
+                        if struct.unpack_from('<II', data, phoff + i * 56) == (1, 6))
+        shoff = struct.unpack_from('<Q', data, 40)[0]
+        shcount = struct.unpack_from('<H', data, 60)[0]
+        changed = False
+        for i in range(shcount):
+            if struct.unpack_from('<I', data, shoff + i * 64 + 4)[0] != 4:
+                continue
+            offset, size = struct.unpack_from('<QQ', data, shoff + i * 64 + 24)
+            for reloc in range(offset, offset + size, 24):
+                if struct.unpack_from('<Q', data, reloc)[0] == fini_address:
+                    struct.pack_into('<q', data, reloc + 16, writable)
+                    changed = True
+        self.assertTrue(changed)
+        self.reject(data, 'finalizer callback outside executable segment')
+        self.assertEqual(self.lib.get_events(), 0)

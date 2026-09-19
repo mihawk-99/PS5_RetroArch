@@ -415,7 +415,7 @@ release allocations and report the failing operation; successful handles are
 reference counted and unmapped on the final close.
 
 `tools/core-imports.py` derives the union of required native bindings from the
-explicitly shipped FCEUmm and mGBA ELFs; those bindings and both cores participate in the title build
+explicitly shipped FCEUmm, mGBA and Snes9x ELFs; bindings and all cores participate in the title build
 identity. Directory imports use this port's directory adapters, including `rewinddir`.
 The `localtime_r` binding uses RetroArch's existing locked `rtime_localtime`
 helper, initialized before gameplay. The
@@ -424,7 +424,7 @@ This route does not depend on websrv's payload loader hooks or publish native
 module exports through the title converter.
 
 The initial supported contract is deliberately narrower than a general dynamic
-linker: no TLS, ELF interpreter, legacy DT_INIT/DT_FINI, finalizers, C++ unwind
+linker: no TLS, ELF interpreter, legacy DT_INIT/DT_FINI, C++ unwind
 registration, REL/RELR, or additional dependent shared libraries. Bounded
 DT_INIT_ARRAY callbacks are supported: every relocated pointer must target this
 module's executable segment, and all callbacks are checked before any run.
@@ -479,7 +479,7 @@ the archive reports its own 0.11.0 version, with the exact source revision in
 metadata and port-input hashes. No source checkout or environment is modified.
 
 Outputs are `build/cores/stage/cores/mgba_libretro.so` and
-`build/cores/stage/info/mgba_libretro.info`. The title build stages both cores,
+`build/cores/stage/info/mgba_libretro.info`. The title build stages all shipped cores,
 with metadata in both `info/` and `cores/` for existing saved configurations.
 Changing the shipped core list requires rebuilding the frontend's native import
 bindings. Console loading and manual gameplay remain separate target checks.
@@ -540,3 +540,37 @@ The host regression covers FCEUmm, the blank menu frame, GBA and GB widths acros
 repeated transitions. Console flicker acceptance is recorded in `evidence/mgba-native/`. This is
 not validation of arbitrary Slang presets, history sampling or linear-filter
 edge behaviour; those remain separate milestones.
+
+
+## Snes9x core build and colour contract
+
+`make snes9x` runs `tools/build-snes9x.sh` against pinned official libretro source
+`fae2fea08f74180759ef540ee94259213f503480` (Snes9x 1.63). Its own libretro Makefile
+selects the sources; CC/CXX/AR/LD are explicitly the project's SDK wrappers.
+LTO remains off as upstream defaults, and upstream's no-strict-aliasing,
+no-exceptions/no-RTTI flags remain. No alternate SDK, CRT, SDL or host library
+is linked. The existing native linker script separates RX/R/RW pages. Native
+imports and C++ SDK runtime references are bound by the frontend's explicit
+union table; `-z undefs` permits these at core link, while the title link must
+resolve every entry. Metadata uses the same official core-info revision as the
+other cores; its upstream display_version says 1.61, while the core reports 1.63
+plus its source revision. The metadata otherwise stays upstream unchanged.
+
+The renderer retains RGB565 including its NTSC and hires paths. The callback
+patch converts to a separate bounded XRGB8888 buffer, reports XRGB8888 at both
+normal and subsystem load sites, and supplies the converted 32-bit pitch.
+The existing frontend XRGB-to-RGBA conversion then feeds matching staging and
+sampled textures. Cached native pixels remain unchanged. Tests cover every
+RGB565 value end to end, non-tight pitch and 256/512/602/1024-pixel widths through
+478 rows. These tests do not by themselves establish console acceptance of
+NTSC filtering, HD Mode 7 or interlaced games.
+
+Snes9x has C++ globals. `tooling/native/core_cxx_runtime.cpp` is linked locally
+inside this core, hidden by upstream's version script. Its own __cxa_atexit list
+runs in reverse registration order via a fini-array callback, so unloaded code
+is never retained in the process-wide exit registry. The loader accepts bounded
+DT_FINI_ARRAY/DT_FINI_ARRAYSZ, validates all targets before any initializer, and
+runs finalizers in reverse array order on the last close before unmapping.
+Reload gets a new registry; a rejected load executes no callbacks. This does not
+add TLS, legacy init/fini functions or exception-unwind registration support.
+As with initializers, lifecycle callbacks must not reenter this bounded loader.
