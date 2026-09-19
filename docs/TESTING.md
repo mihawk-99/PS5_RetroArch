@@ -93,3 +93,28 @@ addresses, and the console's own boot noise.
 - A known-benign console message (a service warning, a busy-device notice) is
   recorded once in `docs/TROUBLESHOOTING.md` with its exact text, and every later
   run may say "known benign" only if the text matches.
+
+## Native audio backend
+
+The unit gate compiles the real `src/audio_ps5.cpp` against an explicitly clocked
+AudioOut mock (`tests/audio_ps5_test.cpp`). It checks native arguments, 48 kHz rate
+negotiation, byte counts, FIFO order across wrap, full/partial nonblocking writes,
+blocking backpressure, zero-filled tails, pause/resume and output-error wakeup.
+Condition barriers coordinate the test; timeouts only bound a deadlock failure.
+
+`tools/run-title.sh --no-build --audio-test --watch 45` arms a consumed
+`/app0/audio-test.txt` file. Before the frontend starts, the same `audio_ps5`
+callbacks play four one-second PCM tones: left 440 Hz, right 660 Hz, repeated, at
+12.5% peak with 10 ms boundary ramps. Announce the tones before launch and obtain
+an audible/channel-order confirmation from the console owner. The test uses
+1/255/257/1000-frame writes, drains and pauses/resumes between phases, and then
+checks that an oversized nonblocking write accepts exactly one queue capacity.
+It closes its port before RetroArch opens its own normal audio driver.
+
+The runner retrieves `audio-test.json` into the ignored capture directory and
+rejects failure, stale build identity, wrong format, lost frames, native errors
+or queue-count mismatches. Expected: 48 kHz, 256-frame grains, four bytes/frame,
+1,536-frame queue, 193,536 accepted and played frames, zero errors, 6,144 bytes
+accepted from the oversized nonblocking write. The report cannot establish
+speaker audibility; that confirmation is recorded separately in the evidence.
+Normal launches remove leftover control files and never generate test tones.

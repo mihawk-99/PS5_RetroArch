@@ -1,0 +1,16 @@
+{
+  "step": "native-audio",
+  "note": "Owner-confirmed native audio through audio_driver_t; machine counts verify buffering and a normal follow-up run preserves XMB/Vulkan.",
+  "must_contain": [
+    "audio_ps5 registered and default",
+    "accepted=193536 played=193536 discarded=0 errors=0",
+    "nonblocking_bytes=6144",
+    "Native pause/resume, drain/close and frontend port reopen succeeded",
+    "I heard left right left right, then retroarch started!",
+    "Normal run: 45 seconds; script closed title; no test tones; refusals=0; API failures=0",
+    "All five gates PASS; 32 unit tests",
+    "PS5_Vulkan unchanged"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirmed left/right/left/right tones and RetroArch startup, then confirmed manually closing the first run. The normal follow-up was script-closed."
+}

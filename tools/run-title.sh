@@ -5,6 +5,7 @@
 #   tools/run-title.sh --no-build      use what is already in dist/
 #   tools/run-title.sh --no-deploy     run whatever the console already holds
 #   tools/run-title.sh --watch 90      how long to let it run (default 30)
+#   tools/run-title.sh --audio-test --watch 45  native PCM tones and queue checks
 #   tools/run-title.sh --gpu-profile 60 --watch 80  buffered timing, then collect logs
 #
 # Why this exists. Every earlier round of the console loop was four hand-driven
@@ -38,13 +39,15 @@ build=1
 deploy=1
 watch=30
 profile=0
+audio_test=0
 while (( $# )); do
     case "$1" in
         --no-build)  build=0 ;;
         --no-deploy) deploy=0 ;;
         --watch)     shift; watch=${1:?--watch needs seconds} ;;
+        --audio-test) audio_test=1 ;;
         --gpu-profile) shift; profile=${1:?--gpu-profile needs seconds} ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60]" >&2; exit 2 ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test]" >&2; exit 2 ;;
     esac
     shift
 done
@@ -53,6 +56,11 @@ done
 (( profile <= 60 )) || { echo "GPU profile duration must be 1..60 seconds" >&2; exit 2; }
 if (( profile > 0 && watch < profile + 15 )); then
     echo "--watch must allow the profile duration plus 15 seconds for startup/reporting" >&2
+    exit 2
+fi
+
+if (( audio_test && watch < 20 )); then
+    echo "--audio-test requires --watch of at least 20 seconds" >&2
     exit 2
 fi
 
@@ -134,7 +142,7 @@ fi
 # appeared. A run that does not ask for extras must not inherit them, so the file
 # is removed on every run - before the launch, because deleting it afterwards
 # would leave it for the next one if this run dies.
-python3 - "$title_id" "$profile" <<'PY'
+python3 - "$title_id" "$profile" "$audio_test" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
 dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
@@ -152,6 +160,12 @@ with connect(**dt.load_settings()) as ftp:
         remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/gpu-profile.tsv")
         ftp.storbinary(f"STOR {control}", io.BytesIO((sys.argv[2] + "\n").encode()))
         print(f"    armed buffered GPU profile for {sys.argv[2]} seconds")
+    control = f"/data/homebrew/{sys.argv[1]}/audio-test.txt"
+    remove_if_present(ftp, control)
+    if int(sys.argv[3]):
+        remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/audio-test.json")
+        ftp.storbinary(f"STOR {control}", io.BytesIO(b"native PCM test\n"))
+        print("    armed audio test: left 440 Hz / right 660 Hz, repeated, 12.5% peak")
 PY
 
 # --- listen first, then launch ----------------------------------------------
@@ -212,8 +226,8 @@ except Exception as error:
 PY
 
 # --- preserve development logs and optional buffered timing ------------------
-python3 - "$title_id" "$profile" "$stamp" <<'PY'
-import importlib.util, re, sys
+python3 - "$title_id" "$profile" "$stamp" "$audio_test" <<'PY'
+import importlib.util, json, re, sys
 from pathlib import Path
 sys.path.insert(0, "tools")
 from ps5_ftp import connect, remove_if_present
@@ -221,7 +235,10 @@ spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
 dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
 with connect(**dt.load_settings()) as ftp:
     remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt")
+    remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/audio-test.txt")
     names = ["retroarch.log"]
+    if int(sys.argv[4]):
+        names.append("audio-test.json")
     if int(sys.argv[2]):
         names.append("gpu-profile.tsv")
     for name in names:
@@ -229,10 +246,28 @@ with connect(**dt.load_settings()) as ftp:
         try:
             with target.open("wb") as out:
                 ftp.retrbinary(f"RETR /data/homebrew/{sys.argv[1]}/{name}", out.write)
+            expected = re.search(r"build identity: ([a-f0-9]{64})", Path("build/title_build_identity.h").read_text())[1]
             if name == "retroarch.log":
-                expected = re.search(r"build identity: ([a-f0-9]{64})", Path("build/title_build_identity.h").read_text())[1]
                 if f"build identity: {expected}" not in target.read_text(errors="replace"):
                     raise SystemExit("RetroArch log is stale or logging failed: current build identity absent")
+            if name == "audio-test.json":
+                report = json.loads(target.read_text())
+                checks = (
+                    report["build_identity"] == f"build identity: {expected}",
+                    report["passed"] is True,
+                    report["rate"] == 48000,
+                    report["grain_frames"] == 256,
+                    report["frame_bytes"] == 4,
+                    report["capacity_frames"] == 1536,
+                    report["accepted_frames"] == 193536,
+                    report["played_frames"] == report["accepted_frames"],
+                    report["errors"] == 0,
+                    report["peak_frames"] == report["capacity_frames"],
+                    report["nonblocking_bytes"] == 6144,
+                )
+                if not all(checks):
+                    raise SystemExit("Native audio test failed or belongs to another build")
+                print("    native audio playback/buffering report PASS; audible confirmation still required")
             print(f"    saved {name} to {target}")
         except Exception as error:
             print(f"    could not retrieve {name}: {type(error).__name__}")

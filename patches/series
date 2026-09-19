@@ -64,3 +64,6 @@
 
 # 0066  isolate XMB sampling from unverified mip-chain layout
 0066-single-level-menu-textures
+
+# 0067  register the native PS5 PCM backend and select it by default
+0067-native-ps5-audio

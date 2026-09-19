@@ -136,3 +136,13 @@ its kernel/trace capture. A normal run omits `--gpu-profile`. The runner checks
 console availability before upload and again before launch, and validates the
 frontend log's build identity to reject stale logs. See `docs/GPU_TIMING.md` for
 measurement definitions and `tools/analyze-gpu-profile.py` for replay.
+
+## Native audio test
+
+`tools/run-title.sh --no-build --audio-test --watch 45` uses the ordinary build
+with a one-shot console control file; no diagnostic binary is left installed.
+It requires at least a 20-second watch window, announces alternating low-level
+left/right tones, captures and validates `audio-test.json`, then captures the
+normal frontend log after the test's port is closed and reopened by RetroArch.
+The owner must separately confirm audible playback. Omit `--audio-test` for
+ordinary launches; the runner clears any stale audio control file in either case.

@@ -1,0 +1,112 @@
+{
+  "step": "native-audio",
+  "recorded": "2026-09-19T16:39:03.123799+00:00",
+  "revision": "e080d81 + native audio changes",
+  "command": "tools/run-title.sh --no-build --audio-test --watch 45; tools/run-title.sh --no-build --no-deploy --watch 45",
+  "raw_capture": "klog/audio-native-run.log",
+  "build_identity": "801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55",
+  "lines": [
+    "audio_ps5 registered and default; native S16 stereo at 48000 Hz, 256-frame output blocks.",
+    "Audio test PASS: accepted=193536 played=193536 discarded=0 errors=0 peak=1536 capacity=1536 nonblocking_bytes=6144.",
+    "Native pause/resume, drain/close and frontend port reopen succeeded.",
+    "Owner: \"I heard left right left right, then retroarch started!\"",
+    "First run ended by owner: \"I closed it manually\".",
+    "Normal run: 45 seconds; script closed title; no test tones; refusals=0; API failures=0.",
+    "[Audio] Started synchronous audio driver.",
+    "[XMB] Assets missing: no; fonts ready: yes",
+    "All five gates PASS; 32 unit tests; fresh replay: 101 applied + 1 upstream marker; second pass: 102 present, bytes unchanged.",
+    "PS5_Vulkan unchanged at 6f0ce0d; video_ps5 and RGUI retained.",
+    "Content-based core audio, long-duration A/V synchronization and streaming underrun freedom remain unverified."
+  ],
+  "audio_report": {
+    "build_identity": "build identity: 801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55",
+    "passed": true,
+    "rate": 48000,
+    "grain_frames": 256,
+    "frame_bytes": 4,
+    "accepted_frames": 193536,
+    "played_frames": 193536,
+    "errors": 0,
+    "peak_frames": 1536,
+    "capacity_frames": 1536,
+    "nonblocking_bytes": 6144
+  },
+  "runs": [
+    {
+      "name": "tones",
+      "raw_capture": "klog/audio-native-run.log",
+      "raw_sha256": "e6bbdf1c14e43b8c8c1e6bcf0defafe4fd86bff9a8f8a987c45e11e4986362fb",
+      "frontend_capture": "klog/retroarch-123431.log",
+      "build_identity": "801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55",
+      "audio_lines": [
+        "audio ps5 test: left 440 Hz, then right 660 Hz, repeated; 12.5% peak",
+        "audio ps5: ready requested_rate=44100 rate=48000 channels=2 s16 grain=256 buffer_bytes=6144",
+        "audio ps5: closed accepted=193536 played=193536 discarded=0 silence=6656 calls=782 errors=0 peak=1536 capacity=1536 drain=00000100 close=00000000",
+        "audio ps5 test: PASS accepted=193536 played=193536 errors=0",
+        "audio ps5: ready requested_rate=48000 rate=48000 channels=2 s16 grain=256 buffer_bytes=12288"
+      ],
+      "gpu_lines": [
+        "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+        "gpu result: swapchain image calls=1 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+        "gpu result: swapchain image calls=2 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+        "gpu result: swapchain image calls=3 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+        "gpu result: swapchain image calls=4 failures=0 result=0"
+      ],
+      "refusal_and_failure_lines": [],
+      "frontend_lines": [
+        "[INFO] [Audio] Set audio input rate to: 48000.00 Hz.",
+        "[INFO] [Audio] Started synchronous audio driver.",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes"
+      ],
+      "verdict": "==> [run] VERDICT: it exited on its own before 45s",
+      "owner_closed": true
+    },
+    {
+      "name": "normal",
+      "raw_capture": "klog/audio-normal-run.log",
+      "raw_sha256": "328784c88cb1fdcca1f512a372ee22d2c0da01d682eccafb1c527a66cf9913df",
+      "frontend_capture": "klog/retroarch-123631.log",
+      "build_identity": "801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55",
+      "audio_lines": [
+        "audio ps5: ready requested_rate=48000 rate=48000 channels=2 s16 grain=256 buffer_bytes=12288"
+      ],
+      "gpu_lines": [
+        "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+        "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+        "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+        "gpu result: swapchain image calls=1 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+        "gpu result: swapchain image calls=2 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+        "gpu result: swapchain image calls=3 failures=0 result=0",
+        "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+        "gpu result: swapchain image calls=4 failures=0 result=0"
+      ],
+      "refusal_and_failure_lines": [],
+      "frontend_lines": [
+        "[INFO] [Audio] Set audio input rate to: 48000.00 Hz.",
+        "[INFO] [Audio] Started synchronous audio driver.",
+        "[INFO] [XMB] Assets missing: no; fonts ready: yes"
+      ],
+      "verdict": "==> [run] VERDICT: it ran for 45s and this script closed it",
+      "owner_closed": false
+    }
+  ]
+}

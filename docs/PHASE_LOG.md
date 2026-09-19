@@ -1790,3 +1790,53 @@ Reproduce acceptance with tools/verify.sh, tools/run-title.sh --no-build --watch
 45 and python3 tools/evidence.py compare evidence/. Screenshot recipe:
 parked/xmb-readback/README.md. Known audio/config-save errors remain logged.
 No core, steady-state XMB FPS or general mip-chain correctness is claimed.
+
+### 2026-09-19 — native PCM audio driver, registration and audible acceptance
+
+User-assigned step: adapt ProsperoLight's native output to `audio_driver_t`,
+register `audio_ps5`, verify audible playback and buffering, then commit. No SDL,
+Opus, core implementation or sibling driver change is part of this step.
+
+Implemented `src/audio_ps5.cpp`: 48 kHz S16 stereo, 256-frame AudioOut grains,
+rate negotiation, bounded producer ring and paced worker, byte-based write and
+capacity callbacks, blocking/nonblocking backpressure, pause/resume, error wakeup
+and drain/close cleanup. Named patch 0067 adds registration/default (102 total
+patch edits). The staged config agrees. Added an opt-in native tone/buffering test
+and `tools/run-title.sh --audio-test` with current-build report validation.
+Normal launches do not generate tones; useful development logs remain enabled.
+
+Validation and artifacts:
+
+- `python3 -m unittest discover -s tests -p test_audio_ps5.py -v`: PASS. The real
+  backend runs against a paced native mock: exact native arguments, rate/byte
+  contract, FIFO/wrap, partial/full nonblocking writes, blocked producer wakeup,
+  zero-filled tails, pause/resume and injected output failure. Expected injected
+  errors were observed and handled; no unexplained host-test failure remains.
+- `tools/verify.sh`: all five gates PASS, 32 unit tests, signed PS5 title and
+  143-file staged-tree manifest. Identity
+  `801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55`.
+- Fresh patch replay/idempotence: PASS, 101 edits applied plus one marker already
+  in upstream (`return "vulkan";`), then 102 present and bytes unchanged. An
+  initial scratch assertion expected 102 newly applied edits; inspection showed
+  the pre-existing upstream marker, and the corrected accounting passed. No
+  vendor source was changed.
+- `tools/run-title.sh --no-build --audio-test --watch 45`: verified upload;
+  `klog/audio-native-run.log` and `klog/audio-test-123431.json`. The report passes:
+  193,536 accepted/played frames, zero discarded frames/output errors, 1,536-frame queue
+  and high water, 6,144-byte partial nonblocking write. Native drain returned
+  `0x100` (success), close zero. Normal frontend audio reopened at 48 kHz and
+  initialized successfully. Zero Vulkan refusals/API failures; XMB fonts/assets
+  ready. Owner: "I heard left right left right, then retroarch started!"
+  Runner found the title closed at 45 seconds; owner: "I closed it manually".
+  This is not treated as an unexplained crash or a full-window survival pass.
+- `tools/run-title.sh --no-build --no-deploy --watch 45`: normal follow-up,
+  `klog/audio-normal-run.log`, current `klog/retroarch-123631.log`. No test-tone
+  activation, audio initialized, XMB ready, zero refusals/API failures. Title
+  remained alive for the full window and the runner closed it.
+- Committed evidence: `evidence/native-audio/{capture,audio-test,expectation}.json`.
+  `python3 tools/evidence.py compare evidence/` replays 14 records.
+
+ProsperoLight and PS5_Vulkan were not modified; PS5_Vulkan remains `6f0ce0d`.
+The known unset configuration-save directory remains outside this audio step.
+Core audio and sustained content-based A/V synchronization remain unverified;
+zero-filled idle/partial grains are not claimed to measure streaming underruns.

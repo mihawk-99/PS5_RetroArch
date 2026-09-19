@@ -46,6 +46,7 @@ extern "C" int rarch_main(int argc, char *argv[], void *data);
 extern "C" int sceSystemServiceHideSplashScreen();
 
 extern "C" void ps5_vulkan_profile_init();
+extern "C" void ps5_audio_test_if_requested();
 extern "C" const char *ps5_frontend_build_identity()
 {
     return PS5_RETROARCH_BUILD_ID;
@@ -217,6 +218,7 @@ int main()
         argv_with_extras[base_count + i] = extra_storage[i];
     argv_with_extras[base_count + extra_count] = nullptr;
 
+    ps5_audio_test_if_requested();
     const int status =
         rarch_main(static_cast<int>(base_count + extra_count), argv_with_extras, nullptr);
 

@@ -2543,3 +2543,32 @@ this port keeps one mip level pending separate mip-chain investigation.
 Owner: "It's flawless!" after the rendering corrections. Final normal build:
 45 seconds, zero refusals/API errors, successful presentations, assets loaded,
 no screenshot writes. Evidence: `evidence/xmb-default/`. PS5_Vulkan was unchanged.
+
+### 2026-09-19 — native AudioOut behind RetroArch's PCM interface
+
+ProsperoLight's `src/moonlight_stream.cpp` supplies the native output ABI and
+sequence: system user `0xff`, main port `0`, 256-frame grains, 48 kHz, format `1`
+(signed 16-bit stereo), and already-initialized code `0x8026000e`. Its decoder
+and SDL are unnecessary because RetroArch already supplies PCM. The new backend
+uses those output calls directly and is registered by named patch 0067.
+
+RetroArch's audio header describes frame counts, but the actual producer and
+existing backends exchange **bytes**. `audio_ps5` therefore exposes byte counts
+and reports `use_float=false`; four bytes form one interleaved stereo frame.
+Returning 48 kHz through `new_rate` makes the frontend's resampler responsible
+for other rates. The worker releases its mutex around the paced native output
+call, keeping the producer's queue operations independent of that call.
+
+The opt-in console test requested 44.1 kHz and negotiated 48 kHz, submitted
+1/255/257/1000-frame chunks, exercised pause/resume and nonblocking backpressure,
+and recorded 193,536 accepted and played frames, zero discarded frames/errors,
+and peak queue occupancy equal to its 1,536-frame capacity. Native drain returned
+positive `0x100`, close returned zero: nonnegative output results are successful,
+not necessarily exactly zero. The port reopened for normal frontend audio.
+The owner heard the expected left/right/left/right sequence and saw RetroArch
+start. The first run was manually closed, not a spontaneous exit.
+
+The test's 6,656 zero-filled frames include idle output, partial grains and pauses;
+this is not a measurement of uninterrupted core streaming. It proves the backend
+queue and native playback path, not core A/V synchronization or long-run underrun
+freedom. `evidence/native-audio/` holds the structured report and acceptance.

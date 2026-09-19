@@ -2303,6 +2303,25 @@ EDITS = [
         '         info.mipLevels     = 1;',
         'patches/series, 0066: single-level menu images',
     ),
+    (
+        'audio/audio_driver.c',
+        'audio_driver_t *audio_drivers[] = {',
+        '/* patches/series, 0067: native PS5 PCM backend. */\n'
+        'extern audio_driver_t audio_ps5;\n'
+        'audio_driver_t *audio_drivers[] = {\n'
+        '   &audio_ps5,',
+        'patches/series, 0067: native PS5 PCM backend',
+    ),
+    (
+        'configuration.c',
+        'const char *config_get_default_audio(void)\n'
+        '{',
+        'const char *config_get_default_audio(void)\n'
+        '{\n'
+        '   /* patches/series, 0067: PS5 audio default. */\n'
+        '   return "ps5";',
+        'patches/series, 0067: PS5 audio default',
+    ),
 ]
 
 

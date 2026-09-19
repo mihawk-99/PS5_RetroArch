@@ -1,0 +1,13 @@
+{
+  "build_identity": "build identity: 801df0ac6a5754c3e6a6ea688f1e49e8ddd2041aeb131a637b8c8b59f4030d55",
+  "passed": true,
+  "rate": 48000,
+  "grain_frames": 256,
+  "frame_bytes": 4,
+  "accepted_frames": 193536,
+  "played_frames": 193536,
+  "errors": 0,
+  "peak_frames": 1536,
+  "capacity_frames": 1536,
+  "nonblocking_bytes": 6144
+}

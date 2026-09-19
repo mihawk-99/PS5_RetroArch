@@ -274,3 +274,32 @@ single-level images render correctly. This is a compatibility limit, not proof
 that the driver's general mip-chain storage/sampling is correct. RGUI and the
 CPU video driver remain compiled and selectable. The retired screenshot recipe
 is `parked/xmb-readback/README.md`; screenshots are not taken by normal builds.
+
+## Native PS5 audio
+
+`src/audio_ps5.cpp` adapts ProsperoLight's `sceAudioOutInit/Open/Output/Close`
+sequence to RetroArch's `audio_driver_t`. Patch 0067 registers `audio_ps5` and
+selects `ps5` by default; the staged config agrees. The backend opens the system
+user's main output at 48,000 Hz, signed 16-bit interleaved stereo, 256 frames per
+native output call. `new_rate` tells RetroArch to resample other source rates.
+Only the default device is supported. No SDL or Opus dependency is introduced.
+
+A dedicated worker feeds AudioOut, whose synchronous output call paces playback.
+The producer and consumer share a bounded ring guarded by a mutex/condition;
+no lock is held while calling AudioOut. Requested latency sizes the ring in
+256-frame multiples, with a 512-frame minimum and 8,192-frame maximum. A zero
+latency request uses 64 ms (3,072 frames). An additional native block can be in
+flight. `write`, `write_avail` and `buffer_size` use bytes, matching RetroArch's
+call sites. Blocking writes wait for space; nonblocking writes return the bytes
+accepted, including zero when full. Empty or partial blocks are zero-filled.
+
+Pause drops queued samples, waits for the in-flight block, then drains the native
+port. Resume uses the same worker. Free wakes and joins the worker before draining
+and closing the port. Output errors make the driver inactive and wake blocked
+writers. Startup, failures and close summaries are logged; successful blocks are
+not individually logged. Silence includes normal idle/menu output and padding,
+so it is not by itself evidence of a streaming underrun.
+
+The opt-in backend test is documented in `docs/TESTING.md`. Core integration,
+long-duration A/V synchronization and streaming underrun behavior need their own
+content-based acceptance runs; native test tones do not prove those properties.
