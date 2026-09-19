@@ -2317,3 +2317,49 @@ interleaved values after the fact.
 path, next to the shader pipeline ids (`VIDEO_SHADER_MENU` .. `_5`, which have their
 own `to_menu_pipeline` mapping at `:1453`). It wants a fresh round with the console
 free, and it is the first of the three refusals rather than the whole job.
+
+## A2's format match fails on one remap, and three refusals are all that remain
+
+**Measured on the console, Vulkan running.** After the corrected A1 (all four
+pipeline creation sites build triangle lists) the refusal count fell from 24 to
+**3**, and every `only triangle lists without primitive restart` line is gone. The
+three that remain are all one cause:
+
+    vulkan: set 0 binding 3: descriptor type 3 has no proven table entry (VK_ERROR_UNKNOWN)
+
+That is the storage-image descriptor written by `vulkan_copy_staging_to_dynamic`'s
+compute branch, which is taken when `dynamic->format != staging->format`.
+
+**Why they still differ, and it is one line.**
+`vulkan_create_texture` remaps a format for the *optimal* texture but not for the
+staging one:
+
+    #define VK_REMAP_TO_TEXFMT(fmt) ((fmt == VK_FORMAT_R5G6B6... ) ? R8G8B8A8 : fmt)
+    ...
+    if (remap_tex_fmt != format) {
+       if (type == VULKAN_TEXTURE_STREAMED) ...      /* keeps the original */
+       else if (type == VULKAN_TEXTURE_DYNAMIC) format = remap_tex_fmt;
+    }
+
+The macro only rewrites RGB565; every other format passes through unchanged. Patch
+0027 forces `fmt = VK_FORMAT_R8G8B8A8_UNORM`, which is *not* RGB565, so nothing is
+remapped: the dynamic texture is created as R8G8B8A8 and the staging texture - the
+same `fmt` argument - as R8G8B8A8 too. On that reading they should match, and the
+compute branch should not be taken. It is taken, so something in the chain still
+diverges, and where was not determined in this round.
+
+**The candidate worth checking first.** The comment in `vulkan_create_texture` shows
+a probe that *undoes* a remap when the device can sample the remapped format
+(`remap_probe.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT` sets
+`remap_tex_fmt = format`). If that probe behaves differently for the dynamic and
+staging textures - one created before the other, or with different `type` - the two
+end up with different formats from the same input. A one-line trace of
+`dynamic->format` and `staging->format` in `vulkan_copy_staging_to_dynamic` settles
+it in a single run, and that is the next step rather than another inference.
+
+**Also settled in this round.** An earlier round had already changed
+`configuration.c` to return "vulkan", so the compiled default is Vulkan and the
+objective's "CPU path stays selectable" is satisfied by `video_ps5` remaining
+registered, not by it being the default. A check of the deployed image for the
+`patches/series, 0027` marker returned 0 and proved nothing: the marker is inside a
+comment, and comments do not survive compilation.
