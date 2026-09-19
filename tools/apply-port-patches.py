@@ -1404,6 +1404,378 @@ EDITS = [
         "      return NULL;\n",
         "video_vulkan init entered",
     ),
+    (
+        # A capture must not end the run. It did: the block above called
+        # command_event(CMD_EVENT_QUIT, NULL) once the probe had fired, so a run
+        # that took a picture quit itself about 90 frames in - the frontend shuts
+        # down, the title disappears from the screen a second and a half after it
+        # appears, and the console's crash reporter books it as an application
+        # crash ("SCE_SHELL_UTIL_ERROR_APPLICATION_CRASH", with a coredump) even
+        # though the process exited 0. The probe was written to close a capture
+        # deterministically; what it actually closes is every run that has a
+        # capture requested, including one that is meant to stay on screen for
+        # somebody to look at.
+        #
+        # So the mark stays and the quit goes. The probe still runs, still reports
+        # through /app0/trace.txt and still writes its file; if a run needs to end
+        # by itself, the capture's budget is not the mechanism to use. That is the
+        # run script's job (`tools/run-title.sh` watches and closes the title), and
+        # it is the only place that knows how long a run should last.
+        "gfx/drivers/vulkan.c",
+        "            /* A capture run is over. The frontend's own shutdown is what\n"
+        "             * flushes /app0/retroarch.log, the log that never flushes while\n"
+        "             * the title is killed instead of exiting. */\n"
+        "            command_event(CMD_EVENT_QUIT, NULL);\n",
+        "            /* Added by this port (patches/series, 0039): the probe no longer\n"
+        "             * ends the run. See the note above the capture block. */\n",
+        "patches/series, 0039",
+    ),
+    (
+        # What the black screen needs to be told apart. A clean trace with no
+        # refusal means the driver accepted every command - and the screen is
+        # still black, so the question is now whether any draw is being recorded
+        # at all, and whether frames keep being presented. Those are two different
+        # faults and the trace cannot currently distinguish them: presenting with
+        # nothing drawn, and drawing into a buffer that is never shown, both look
+        # like "no refusal, no picture".
+        #
+        # So the driver marks both, the way src/video_ps5.cpp marks its own
+        # frames. `/app0/trace.txt` is stderr (src/main.cpp), so these lines land
+        # in the same record as the driver's refusals. The draw is marked in
+        # gfx_display_vk_draw, which is the one choke point every display list goes
+        # through, and it names the primitive type and the vertex count, because
+        # this port expands triangle strips into lists by index and a wrong index
+        # count draws nothing while looking like a successful draw.
+        "gfx/drivers/vulkan.c",
+        "   if (!vk || !draw)\n"
+        "      return;\n"
+        "\n"
+        "   texture                        = (struct vk_texture*)draw->texture;\n",
+        "   if (!vk || !draw)\n"
+        "      return;\n"
+        "\n"
+        "   /* Added by this port (patches/series, 0040): says whether anything is drawn. */\n"
+        "   {\n"
+        "      static unsigned ps5_draw_marks;\n"
+        "\n"
+        "      if (ps5_draw_marks < 6 || (ps5_draw_marks % 1200) == 0)\n"
+        "         fprintf(stderr, \"vulkan draw %u: type=%u vertices=%u texture=%s\\n\",\n"
+        "               ps5_draw_marks, (unsigned)draw->prim_type, (unsigned)draw->coords->vertices,\n"
+        "               draw->texture ? \"yes\" : \"no\");\n"
+        "      ps5_draw_marks++;\n"
+        "   }\n"
+        "\n"
+        "   texture                        = (struct vk_texture*)draw->texture;\n",
+        "patches/series, 0040",
+    ),
+    (
+        # The other half of the same question: is the frame loop still running, and
+        # is anything still being presented? A title that draws once and then stops
+        # being called, and a title that draws every frame into a swapchain image
+        # nobody flips, read the same way from the outside.
+        "gfx/drivers/vulkan.c",
+        "static bool vulkan_frame(void *data, const void *frame,\n",
+        "/* Added by this port (patches/series, 0041): counts the frames the frontend asks for. */\n"
+        "static void ps5_mark_vulkan_frame(void)\n"
+        "{\n"
+        "   static unsigned ps5_frames;\n"
+        "\n"
+        "   ps5_frames++;\n"
+        "   if (ps5_frames <= 3 || (ps5_frames % 300) == 0)\n"
+        "      fprintf(stderr, \"vulkan frame %u\\n\", ps5_frames);\n"
+        "}\n"
+        "\n"
+        "static bool vulkan_frame(void *data, const void *frame,\n",
+        "patches/series, 0041",
+    ),
+    (
+        # The call itself, at the top of vulkan_frame, before anything can fail.
+        "gfx/drivers/vulkan.c",
+        "   VkCommandBufferBeginInfo begin_info;\n"
+        "   VkSemaphore signal_semaphores[2];\n"
+        "   vk_t *vk                                      = (vk_t*)data;\n",
+        "   VkCommandBufferBeginInfo begin_info;\n"
+        "   VkSemaphore signal_semaphores[2];\n"
+        "   vk_t *vk                                      = (vk_t*)data;\n"
+        "   /* Added by this port (patches/series, 0041): see ps5_mark_vulkan_frame. */\n"
+        "   ps5_mark_vulkan_frame();\n",
+        "ps5_mark_vulkan_frame();",
+    ),
+    (
+        # Why the screen is black while every frame presents. RetroArch's widgets
+        # branch and its normal display-driver init are mutually exclusive:
+        #
+        #   retroarch.c: if (current_video->gfx_widgets_enabled(...))
+        #                   gfx_widgets_init(...);
+        #                else
+        #                   gfx_display_init_first_driver(...);
+        #
+        # gfx_display_init_first_driver is the only thing that sets
+        # p_disp->dispctx, and gfx_display_draw returns immediately without it
+        # (gfx_display.c:643, `if (!dispctx || !dispctx->draw) return;`). This
+        # driver answered gfx_widgets_enabled with true, so the frontend took the
+        # widgets branch, dispctx was never resolved, and every draw the menu
+        # issued - menu quads, font, all of it - returned in silence. Nothing was
+        # drawn, so the backbuffer stayed clear and the screen stayed black, while
+        # vulkan_frame went on presenting ~45 frames a second and the trace showed
+        # no error of any kind. That is the exact shape the previous rounds kept
+        # misreading as an upload or presentation fault.
+        #
+        # Answering false is what the upstream Vulkan-derived drivers do and what
+        # this port's own video_ps5 does (it has no gfx_widgets_enabled at all, so
+        # the frontend takes the else branch). Declining widgets costs nothing
+        # here: nothing in this driver draws widgets - gfx_widgets_frame is called
+        # from vulkan_frame and does its own rendering - and the widgets system is
+        # what left the menu without a display context. The menu is the thing this
+        # path exists to draw.
+        "gfx/drivers/vulkan.c",
+        "static bool vulkan_gfx_widgets_enabled(void *data) { return true; }\n",
+        "/* Added by this port (patches/series, 0042): false, because answering true\n"
+        " * makes the frontend skip gfx_display_init_first_driver, which is the only\n"
+        " * caller that sets the display context every menu draw needs. See the note\n"
+        " * above this edit. */\n"
+        "static bool vulkan_gfx_widgets_enabled(void *data) { return false; }\n",
+        "patches/series, 0042",
+    ),
+    (
+        # Which of the two mutually exclusive branches the frontend takes, and
+        # what the driver identifies itself as while it takes it. The black screen
+        # is one silent return deep - gfx_display_draw gives up when the display
+        # context was never resolved - and there are three different reasons that
+        # can happen (widgets claimed the driver, the frontend's ident does not
+        # match this port's, or the display driver list was not walked at all).
+        # The trace cannot currently tell them apart, so these two lines say which
+        # branch was entered and what the display driver matched.
+        "retroarch.c",
+        "      p_dispwidget->active= gfx_widgets_init(\n",
+        "      /* Added by this port (patches/series, 0044): which branch ran. */\n"
+        "      fprintf(stderr, \"frontend: widgets branch taken\\n\");\n"
+        "      p_dispwidget->active= gfx_widgets_init(\n",
+        "frontend: widgets branch taken",
+    ),
+    (
+        # The other branch, and the answer gfx_display_init_first_driver gets.
+        "retroarch.c",
+        "      gfx_display_init_first_driver(p_disp, video_is_threaded);\n",
+        "      /* Added by this port (patches/series, 0045): which branch ran, and\n"
+        "       * what the display driver was matched against. */\n"
+        "      fprintf(stderr, \"frontend: display-driver branch taken, video_driver=%s matched=%s\\n\",\n"
+        "            video_driver_get_ident() ? video_driver_get_ident() : \"(null)\",\n"
+        "            gfx_display_init_first_driver(p_disp, video_is_threaded) ? \"yes\" : \"no\");\n",
+        "frontend: display-driver branch taken",
+    ),
+    (
+        # Why the screen was black with a healthy driver, a resolved display
+        # context and 45 frames a second. RetroArch's Vulkan driver draws the menu
+        # only when the frontend tells it that the menu texture is the thing to
+        # show:
+        #
+        #   gfx/drivers/vulkan.c: if (vk->flags & VK_FLAG_MENU_ENABLE)
+        #                            menu_driver_frame(menu_is_alive, video_info);
+        #
+        # and VK_FLAG_MENU_ENABLE is set by exactly one call in the whole
+        # frontend, `video_st->poke->set_texture_enable(video_st->data, true,
+        # false)` in runloop.c's display_menu_libretro - the function whose own
+        # comment reads "Display the libretro core's framebuffer onscreen". So the
+        # flag means "a core's framebuffer is up": it is a libretro concept, and it
+        # is set when a core runs, not when the menu opens. menu_driver.c clears it
+        # when the menu closes and never sets it.
+        #
+        # That is fine upstream because the drivers whose menus are drawn this way
+        # are reached with a core running, and it is fine for this port's own
+        # video_ps5, which ignores the flag entirely and draws whatever
+        # set_texture_frame handed it. Under Vulkan it is fatal: this port launches
+        # straight into the menu with no content, the flag is never set, the menu
+        # branch is never entered, menu_driver_frame is never called, nothing is
+        # drawn, and the backbuffer is presented black - with no refusal from the
+        # driver, no error from the frontend, and a clean trace. The menu is on
+        # screen only if this flag says so.
+        #
+        # So the menu marks its own texture displayable while it is the thing on
+        # screen, and clears it when it closes. `on` is this function's own
+        # argument for exactly that state, and the two sites are the menu opening
+        # and the menu closing, so the flag now follows the menu instead of
+        # following a core that this title does not have loaded.
+        "menu/menu_driver.c",
+        "      menu_st->flags |= MENU_ST_FLAG_ALIVE;\n"
+        "      menu_driver_toggle(\n"
+        "            video_st->current_video,\n"
+        "            video_st->data,\n"
+        "            menu,\n"
+        "            menu_input,\n"
+        "            settings,\n"
+        "            (menu_st->flags & MENU_ST_FLAG_ALIVE) ? true : false,\n",
+        "      menu_st->flags |= MENU_ST_FLAG_ALIVE;\n"
+        "      /* Added by this port (patches/series, 0046): see the note above this\n"
+        "       * edit. The menu is the texture on screen, so say so - otherwise a\n"
+        "       * driver that draws the menu behind this flag (RetroArch's Vulkan\n"
+        "       * driver does) draws nothing at all. */\n"
+        "      if (video_st->poke && video_st->poke->set_texture_enable)\n"
+        "         video_st->poke->set_texture_enable(video_st->data, true, false);\n"
+        "      menu_driver_toggle(\n"
+        "            video_st->current_video,\n"
+        "            video_st->data,\n"
+        "            menu,\n"
+        "            menu_input,\n"
+        "            settings,\n"
+        "            (menu_st->flags & MENU_ST_FLAG_ALIVE) ? true : false,\n",
+        "patches/series, 0046",
+    ),
+    (
+        # Whether the frontend ever told the driver its menu texture is on screen,
+        # and whether the menu texture exists. The driver draws the menu only
+        # behind VK_FLAG_MENU_ENABLE, so a black screen with no draw can mean the
+        # flag was never set - or that it was set but set_texture_frame never
+        # handed over a texture, in which case the branch runs and skips its body.
+        # One line, in the same place the frame counter is, says which.
+        "gfx/drivers/vulkan.c",
+        "   /* Added by this port (patches/series, 0041): see ps5_mark_vulkan_frame. */\n"
+        "   ps5_mark_vulkan_frame();\n",
+        "   /* Added by this port (patches/series, 0041): see ps5_mark_vulkan_frame. */\n"
+        "   ps5_mark_vulkan_frame();\n"
+        "   /* Added by this port (patches/series, 0046): why the menu branch did or\n"
+        "    * did not draw. See the note above this edit. */\n"
+        "   {\n"
+        "      static unsigned ps5_flag_marks;\n"
+        "\n"
+        "      if (ps5_flag_marks < 4 || (ps5_flag_marks % 600) == 0)\n"
+        "         fprintf(stderr, \"vulkan menu state: flag=%u idx=%u staging(img=%u buf=%u) optimal(img=%u buf=%u)\\n\",\n"
+        "               (vk->flags & VK_FLAG_MENU_ENABLE) ? 1u : 0u,\n"
+        "               (unsigned)vk->menu.last_index,\n"
+        "               (vk->menu.textures[vk->menu.last_index].image != VK_NULL_HANDLE) ? 1u : 0u,\n"
+        "               (vk->menu.textures[vk->menu.last_index].buffer != VK_NULL_HANDLE) ? 1u : 0u,\n"
+        "               (vk->menu.textures_optimal[vk->menu.last_index].image != VK_NULL_HANDLE) ? 1u : 0u,\n"
+        "               (vk->menu.textures_optimal[vk->menu.last_index].buffer != VK_NULL_HANDLE) ? 1u : 0u);\n"
+        "      ps5_flag_marks++;\n"
+        "   }\n",
+        "patches/series, 0046): why the menu branch",
+    ),
+    (
+        # The handover, from both ends. The driver reports texture=0, which means
+        # vulkan_set_texture_frame ran and was handed nothing, or never ran at all -
+        # two different faults. RGUI only hands its framebuffer over when the
+        # frontend marks it dirty, and the frontend only calls the menu's
+        # set_texture in the runloop, so the mark goes in RGUI's set_texture and in
+        # the driver's own set_texture_frame, and it names the two facts that decide
+        # it: whether RGUI was asked, and whether it had a framebuffer to give.
+        "menu/drivers/rgui.c",
+        "   /* Framebuffer is dirty and needs to be updated? */\n"
+        "   if (!rgui || !(p_disp->flags & GFX_DISP_FLAG_FB_DIRTY))\n"
+        "      return;\n",
+        "   /* Added by this port (patches/series, 0047): whether the handover happens,\n"
+        "    * and why not when it does not. See the note above this edit. */\n"
+        "   fprintf(stderr, \"rgui set_texture: rgui=%s dirty=%u data=%s\\n\",\n"
+        "         rgui ? \"yes\" : \"no\",\n"
+        "         (p_disp->flags & GFX_DISP_FLAG_FB_DIRTY) ? 1u : 0u,\n"
+        "         (rgui && rgui->frame_buf.data) ? \"yes\" : \"no\");\n"
+        "\n"
+        "   /* Framebuffer is dirty and needs to be updated? */\n"
+        "   if (!rgui || !(p_disp->flags & GFX_DISP_FLAG_FB_DIRTY))\n"
+        "      return;\n",
+        "rgui set_texture: rgui=",
+    ),
+    (
+        # And the receiving end, so the trace shows the format and size actually
+        # handed over - the last thing that can differ between a texture that
+        # samples as the menu and one that samples as nothing.
+        "gfx/drivers/vulkan.c",
+        "   idx                 = vk->context->current_frame_index;\n"
+        "   texture             = &vk->menu.textures[idx];\n",
+        "   /* Added by this port (patches/series, 0047): what the menu handed over. */\n"
+        "   fprintf(stderr, \"vulkan set_texture_frame: rgb32=%u %ux%u frame=%s\\n\",\n"
+        "         rgb32 ? 1u : 0u, width, height, frame ? \"yes\" : \"no\");\n"
+        "\n"
+        "   idx                 = vk->context->current_frame_index;\n"
+        "   texture             = &vk->menu.textures[idx];\n",
+        "vulkan set_texture_frame: rgb32=",
+    ),
+    (
+        # Whether RGUI's renderer runs. rgui_set_texture is called every frame and
+        # always finds the frontend's framebuffer NOT dirty, and the only thing
+        # that makes it dirty for the menu is the end of rgui_render - so either
+        # rgui_render never runs, or something clears the flag between the end of
+        # the render and the frontend's set_texture call. This line settles which.
+        "menu/drivers/rgui.c",
+        "   unsigned x, y;\n"
+        "   unsigned fb_width, fb_height;\n"
+        "   gfx_animation_ctx_ticker_t ticker;\n",
+        "   /* Added by this port (patches/series, 0048): whether the menu renders. */\n"
+        "   {\n"
+        "      static unsigned ps5_render_marks;\n"
+        "\n"
+        "      if (ps5_render_marks < 3 || (ps5_render_marks % 600) == 0)\n"
+        "         fprintf(stderr, \"rgui render %u: blit-state reached\\n\", ps5_render_marks);\n"
+        "      ps5_render_marks++;\n"
+        "   }\n"
+        "\n"
+        "   unsigned x, y;\n"
+        "   unsigned fb_width, fb_height;\n"
+        "   gfx_animation_ctx_ticker_t ticker;\n",
+        "rgui render %u: blit-state reached",
+    ),
+    (
+        # The line that decides whether the menu redraws. generic_menu_iterate runs
+        # every frame and sets MENU_STATE_BLIT here; the runloop calls the menu's
+        # render callback only when that bit is set, and rgui_render is what marks
+        # the frontend's framebuffer dirty, which is what makes RGUI hand its
+        # texture to the driver. RGUI rendered three times and then stopped, and
+        # rgui_set_texture then ran hundreds of times with the framebuffer clean.
+        # This counts the iterations that actually reach the set, and reports the
+        # menu state alongside, so the two readings cannot be confused.
+        "menu/menu_driver.c",
+        "   BIT64_SET(menu->state, MENU_STATE_BLIT);\n",
+        "   /* Added by this port (patches/series, 0049): whether the render bit is set. */\n"
+        "   {\n"
+        "      static unsigned ps5_iter_marks;\n"
+        "\n"
+        "      if (ps5_iter_marks < 3 || (ps5_iter_marks % 600) == 0)\n"
+        "         fprintf(stderr, \"menu iterate %u: state=%llu ret=%d\\n\",\n"
+        "               ps5_iter_marks, (unsigned long long)menu->state, ret);\n"
+        "      ps5_iter_marks++;\n"
+        "   }\n"
+        "   BIT64_SET(menu->state, MENU_STATE_BLIT);\n",
+        "menu iterate %u: state=",
+    ),
+    (
+        # What the texture actually came out as. The driver reports no menu image
+        # even after the handover ran with a valid 320x240 frame, and
+        # vulkan_create_texture is allowed to change the type it was asked for: a
+        # STREAMED texture whose linear tiling cannot be sampled becomes STAGING,
+        # and STAGING has a buffer and NO image. The two call sites hand it
+        # VULKAN_TEXTURE_STREAMED first and VULKAN_TEXTURE_DYNAMIC second, so this
+        # line names the type each call settled on and whether an image exists -
+        # which is the difference between "the menu texture was created" and "a
+        # buffer was created and the menu has nothing to sample".
+        "gfx/drivers/vulkan.c",
+        "   tex.width  = width;\n"
+        "   tex.height = height;\n"
+        "   tex.format = format;\n"
+        "   tex.type   = type;\n",
+        "   tex.width  = width;\n"
+        "   tex.height = height;\n"
+        "   tex.format = format;\n"
+        "   tex.type   = type;\n"
+        "   /* Added by this port (patches/series, 0050): what was created. */\n"
+        "   fprintf(stderr, \"vulkan create_texture: asked=%d type=%d %ux%u fmt=%d image=%s buffer=%s\\n\",\n"
+        "         (int)type, (int)tex.type, width, height, (int)format,\n"
+        "         tex.image ? \"yes\" : \"no\", tex.buffer ? \"yes\" : \"no\");\n",
+        "vulkan create_texture: asked=",
+    ),
+    (
+        # The two types the handover asks for, so the ask and the result can be
+        # read together. Without this the "asked=" above is a number with no
+        # second reading to compare it against.
+        "gfx/drivers/vulkan.c",
+        "         ? VULKAN_TEXTURE_STAGING\n"
+        "         : VULKAN_TEXTURE_STREAMED);\n",
+        "         ? VULKAN_TEXTURE_STAGING\n"
+        "         : VULKAN_TEXTURE_STREAMED);\n"
+        "   /* Added by this port (patches/series, 0050): the staging texture's ask. */\n"
+        "   fprintf(stderr, \"vulkan menu staging ask: streamed=%d staging=%d dynamic=%d static=%d\\n\",\n"
+        "         (int)VULKAN_TEXTURE_STREAMED, (int)VULKAN_TEXTURE_STAGING,\n"
+        "         (int)VULKAN_TEXTURE_DYNAMIC, (int)VULKAN_TEXTURE_STATIC);\n",
+        "vulkan menu staging ask:",
+    ),
 ]
 
 

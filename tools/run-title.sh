@@ -115,6 +115,28 @@ if [[ -n $count && $count != 0 ]]; then
     die "the console is running $count process(es); this console runs one title at a time"
 fi
 
+# --- a run starts from a known console state ---------------------------------
+# /app0/args.txt is not in dist/ and deploy never deletes anything, so a copy
+# left on the console by an earlier probe survives every later upload and keeps
+# changing what the title does. It did: a capture file left behind made a run
+# take a picture and then quit itself 90 frames in, which reads on the console as
+# a crash with a coredump, and looks from the sofa like a title that never
+# appeared. A run that does not ask for extras must not inherit them, so the file
+# is removed on every run - before the launch, because deleting it afterwards
+# would leave it for the next one if this run dies.
+python3 - "$title_id" <<'PY' || say "note: could not clear /app0/args.txt; a stale one changes this run"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
+dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
+from ps5_ftp import connect
+with connect(**dt.load_settings()) as ftp:
+    try:
+        ftp.delete(f"/data/homebrew/{sys.argv[1]}/args.txt")
+        print("    cleared a leftover args.txt from the console")
+    except Exception:
+        pass
+PY
+
 # --- listen first, then launch ----------------------------------------------
 mkdir -p klog
 stamp=$(date +%H%M%S)
