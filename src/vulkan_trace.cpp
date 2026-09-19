@@ -50,69 +50,149 @@ struct Sample
             maximum = value;
     }
 };
+struct Frame
+{
+    uint64_t ns[MetricCount]{};
+    uint64_t present_interval = 0;
+    unsigned present_calls = 0;
+};
+struct Window
+{
+    unsigned frames = 0;
+    Sample samples[MetricCount]{};
+};
+unsigned gpu_failures = 0;
 struct Profile
 {
-    bool active = false;
-    unsigned warmup = 0, frames = 0;
+    static constexpr unsigned capacity = 8192;
+    bool enabled = false, active = false, finished = false;
+    unsigned warmup = 0, warmup_limit = 120, frames = 0;
+    unsigned record_count = 0, window_count = 0;
+    uint64_t duration = 0, elapsed = 0;
     uint64_t start = 0, previous_end = 0, texture_pending = 0;
+    uint64_t previous_present = 0, present_interval = 0;
+    unsigned present_calls = 0;
     uint64_t api[MetricCount]{};
     Sample samples[MetricCount]{};
+    Frame records[capacity]{};
+    Window windows[13]{};
 
+    void configure(unsigned seconds, unsigned skip = 120)
+    {
+        enabled = seconds >= 1 && seconds <= 60;
+        duration = uint64_t(seconds) * 1000000000ULL;
+        warmup_limit = skip;
+    }
     void begin(uint64_t now)
     {
-        // An early return has no matching end. Do not charge its gap to the next frame.
+        if (!enabled || finished)
+            return;
         if (active)
+        {
             previous_end = 0;
+            previous_present = 0;
+        }
         active = true;
         start = now;
+        present_calls = 0;
+        present_interval = 0;
         std::memset(api, 0, sizeof(api));
+    }
+    void presented(uint64_t now)
+    {
+        if (!active)
+            return;
+        ++present_calls;
+        if (previous_present)
+            present_interval = now - previous_present;
+        previous_present = now;
+    }
+    void save_window()
+    {
+        if (!frames)
+            return;
+        windows[window_count].frames = frames;
+        std::memcpy(windows[window_count++].samples, samples, sizeof(samples));
+        frames = 0;
+        for (auto &sample : samples)
+            sample = {};
     }
     void finish(uint64_t now)
     {
         if (!active)
             return;
         active = false;
-        if (warmup < 4 || !previous_end)
+        if (warmup < warmup_limit || !previous_end)
         {
             ++warmup;
             previous_end = now;
             texture_pending = 0;
             return;
         }
+        Frame &frame = records[record_count++];
         uint64_t measured = 0;
         for (unsigned i = End; i < MetricCount; ++i)
         {
-            samples[i].add(api[i]);
+            frame.ns[i] = api[i];
             measured += api[i];
         }
-        samples[Interval].add(now - previous_end);
+        frame.ns[Interval] = now - previous_end;
         const uint64_t outside = start - previous_end;
-        samples[Texture].add(texture_pending);
-        samples[Outside].add(outside >= texture_pending ? outside - texture_pending : 0);
+        frame.ns[Texture] = texture_pending;
+        frame.ns[Outside] = outside >= texture_pending ? outside - texture_pending : 0;
         texture_pending = 0;
         const uint64_t video = now - start;
-        samples[Prepare].add(video >= measured ? video - measured : 0);
+        frame.ns[Prepare] = video >= measured ? video - measured : 0;
+        frame.present_interval = present_interval;
+        frame.present_calls = present_calls;
         previous_end = now;
+        elapsed += frame.ns[Interval];
         ++frames;
-        if (samples[Interval].sum < 5000000000ULL)
-            return;
-        // One write per window; its cost belongs to the next Outside sample.
-        std::fprintf(stderr,
-                     "gpu timing: frames=%u seconds=%.3f fps=%.3f ms_avg/max "
-                     "interval=%.3f/%.3f outside=%.3f/%.3f texture=%.3f/%.3f prepare=%.3f/%.3f "
-                     "end=%.3f/%.3f submit=%.3f/%.3f present=%.3f/%.3f wait=%.3f/%.3f\n",
-                     frames, samples[Interval].sum / 1e9, frames * 1e9 / samples[Interval].sum,
-                     samples[Interval].sum / (1e6 * frames), samples[Interval].maximum / 1e6,
-                     samples[Outside].sum / (1e6 * frames), samples[Outside].maximum / 1e6,
-                     samples[Texture].sum / (1e6 * frames), samples[Texture].maximum / 1e6,
-                     samples[Prepare].sum / (1e6 * frames), samples[Prepare].maximum / 1e6,
-                     samples[End].sum / (1e6 * frames), samples[End].maximum / 1e6,
-                     samples[Submit].sum / (1e6 * frames), samples[Submit].maximum / 1e6,
-                     samples[Present].sum / (1e6 * frames), samples[Present].maximum / 1e6,
-                     samples[Wait].sum / (1e6 * frames), samples[Wait].maximum / 1e6);
-        frames = 0;
-        for (auto &sample : samples)
-            sample = {};
+        for (unsigned i = 0; i < MetricCount; ++i)
+            samples[i].add(frame.ns[i]);
+        if (samples[Interval].sum >= 5000000000ULL)
+            save_window();
+        if (elapsed >= duration || record_count == capacity)
+        {
+            save_window();
+            finished = true;
+        }
+    }
+    void dump(FILE *out) const
+    {
+        for (unsigned w = 0; w < window_count; ++w)
+        {
+            const auto &window = windows[w];
+            const auto *s = window.samples;
+            const double n = window.frames;
+            std::fprintf(out,
+                         "gpu timing: frames=%u seconds=%.3f fps=%.3f ms_avg/max "
+                         "interval=%.3f/%.3f outside=%.3f/%.3f texture=%.3f/%.3f prepare=%.3f/%.3f "
+                         "end=%.3f/%.3f submit=%.3f/%.3f present=%.3f/%.3f wait=%.3f/%.3f\n",
+                         window.frames, s[Interval].sum / 1e9, n * 1e9 / s[Interval].sum,
+                         s[Interval].sum / (1e6 * n), s[Interval].maximum / 1e6,
+                         s[Outside].sum / (1e6 * n), s[Outside].maximum / 1e6,
+                         s[Texture].sum / (1e6 * n), s[Texture].maximum / 1e6,
+                         s[Prepare].sum / (1e6 * n), s[Prepare].maximum / 1e6,
+                         s[End].sum / (1e6 * n), s[End].maximum / 1e6, s[Submit].sum / (1e6 * n),
+                         s[Submit].maximum / 1e6, s[Present].sum / (1e6 * n),
+                         s[Present].maximum / 1e6, s[Wait].sum / (1e6 * n), s[Wait].maximum / 1e6);
+        }
+        std::fprintf(out, "# frames=%u elapsed_ns=%llu capacity_reached=%u api_failures=%u\n",
+                     record_count, static_cast<unsigned long long>(elapsed),
+                     record_count == capacity ? 1u : 0u, gpu_failures);
+        std::fputs("frame\tinterval_ns\toutside_ns\ttexture_ns\tprepare_ns\tend_ns\tsubmit_ns"
+                   "\tpresent_ns\twait_ns\tpresent_interval_ns\tpresent_calls\n",
+                   out);
+        for (unsigned i = 0; i < record_count; ++i)
+        {
+            std::fprintf(out, "%u", i);
+            for (auto value : records[i].ns)
+                std::fprintf(out, "\t%llu", static_cast<unsigned long long>(value));
+            std::fprintf(out, "\t%llu\t%u\n",
+                         static_cast<unsigned long long>(records[i].present_interval),
+                         records[i].present_calls);
+        }
     }
 };
 Profile profile;
@@ -126,10 +206,13 @@ struct ApiTimer
         : metric(kind), enabled(profile.active), start(enabled ? PS5_VULKAN_PROFILE_NOW() : 0)
     {
     }
-    void finish()
+    uint64_t finish()
     {
-        if (enabled)
-            profile.api[metric] += PS5_VULKAN_PROFILE_NOW() - start;
+        if (!enabled)
+            return 0;
+        const uint64_t now = PS5_VULKAN_PROFILE_NOW();
+        profile.api[metric] += now - start;
+        return now;
     }
 };
 
@@ -142,8 +225,11 @@ struct Results
     {
         ++calls;
         if (result != VK_SUCCESS)
+        {
             ++failures;
-        if (calls <= 4 || calls % 600 == 0 || result != VK_SUCCESS)
+            ++gpu_failures;
+        }
+        if (calls <= 4 || result != VK_SUCCESS)
             std::fprintf(stderr, "gpu result: %s calls=%u failures=%u result=%d\n", name, calls,
                          failures, static_cast<int>(result));
     }
@@ -176,7 +262,9 @@ VKAPI_ATTR VkResult VKAPI_CALL traced_present(VkQueue queue, const VkPresentInfo
     static Results images;
     ApiTimer timer(Present);
     const VkResult result = queue_present(queue, present);
-    timer.finish();
+    const uint64_t completed = timer.finish();
+    if (result == VK_SUCCESS)
+        profile.presented(completed);
     results.record("vkQueuePresentKHR", result);
     if (present->pResults)
         for (uint32_t i = 0; i < present->swapchainCount; ++i)
@@ -204,22 +292,63 @@ VKAPI_ATTR VkResult VKAPI_CALL traced_acquire(VkDevice device, VkSwapchainKHR sw
 }
 } // namespace
 
+extern "C" void ps5_vulkan_profile_init()
+{
+    FILE *config = std::fopen("/app0/gpu-profile.txt", "r");
+    if (!config)
+        return;
+    unsigned seconds = 0;
+    const int parsed = std::fscanf(config, "%u", &seconds);
+    std::fclose(config);
+    // Consume the opt-in so a later manual launch cannot inherit the experiment.
+    std::remove("/app0/gpu-profile.txt");
+    if (parsed == 1 && seconds >= 1 && seconds <= 60)
+    {
+        profile.configure(seconds);
+        std::fprintf(stderr, "gpu profile: armed seconds=%u warmup=120 buffered=1\n", seconds);
+    }
+    else
+        std::fputs("gpu profile: invalid duration (expected 1..60 seconds)\n", stderr);
+}
+
 extern "C" uint64_t ps5_vulkan_profile_texture_begin()
 {
-    return PS5_VULKAN_PROFILE_NOW();
+    return profile.enabled && !profile.finished ? PS5_VULKAN_PROFILE_NOW() : 0;
 }
 extern "C" void ps5_vulkan_profile_texture_end(uint64_t start)
 {
-    profile.texture_pending += PS5_VULKAN_PROFILE_NOW() - start;
+    if (start)
+        profile.texture_pending += PS5_VULKAN_PROFILE_NOW() - start;
 }
 
 extern "C" void ps5_vulkan_profile_begin()
 {
-    profile.begin(PS5_VULKAN_PROFILE_NOW());
+    if (profile.enabled && !profile.finished)
+        profile.begin(PS5_VULKAN_PROFILE_NOW());
 }
 extern "C" void ps5_vulkan_profile_end()
 {
+    if (!profile.active)
+        return;
     profile.finish(PS5_VULKAN_PROFILE_NOW());
+    if (profile.finished)
+    {
+        FILE *out = std::fopen("/app0/gpu-profile.tsv", "w");
+        if (!out)
+        {
+            std::fputs("gpu profile: could not open result file\n", stderr);
+            return;
+        }
+        // Reporting happens only after the measured interval, never inside it.
+        char buffer[65536];
+        std::setvbuf(out, buffer, _IOFBF, sizeof(buffer));
+        profile.dump(out);
+        const bool failed = std::ferror(out) != 0;
+        const int closed = std::fclose(out);
+        std::fprintf(stderr, "gpu profile: completed frames=%u seconds=%.3f errors=%u write=%s\n",
+                     profile.record_count, profile.elapsed / 1e9, gpu_failures,
+                     failed || closed != 0 ? "failed" : "ok");
+    }
 }
 
 /* Called by both frontend symbol loaders. Keep the driver's real function,

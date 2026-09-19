@@ -1,51 +1,93 @@
-# Quiet Vulkan frame timing
+# Buffered Vulkan frame timing and development logs
 
-Build with `bash tools/verify.sh`, confirm the shared console is idle, then run
-`bash tools/run-title.sh --no-build --watch 45`. The runner clears stale capture
-arguments and closes the title at the end. No image readback hook is active.
-Extract only the last launch from the appended trace, starting at the last
-`bss check=` substring, and verify its input-derived build identity.
+Normal launches keep logging enabled but do not run the profiler. Keep
+`/app0/retroarch.log` for frontend/core/menu lifecycle, INFO/WARN/ERROR messages;
+`/app0/trace.txt` for build identity, startup milestones, assertions and driver
+refusals/API errors; and host `klog/` captures for kernel failures. Errors are
+not buffered away. Successful button transitions and periodic frame/render
+markers are routine chatter and no longer write files. Startup probes remain
+bounded to their initial calls.
 
-Patch 0056 limits the formerly unbounded RGUI texture-handover, Vulkan
-texture-update, texture-creation and staging-copy diagnostics to their first four calls. Existing
-startup, sparse progress and error/refusal reporting stays enabled. Timing adds
-no per-frame file writes or allocation: one summary appears after each window
-of at least five seconds. The first four completed video callbacks are warmup.
+Patch 0058 reasserts the frontend file logger after config/argument processing:
+this port's argument rebuilding previously lost the launcher's logging request.
+Each frontend startup/core reload records the title's input-derived build identity
+in `retroarch.log`. The run tool refuses to accept a log without the expected
+identity. This is distinct from the identity check on the uploaded executable.
 
-`src/vulkan_trace.cpp` uses `CLOCK_MONOTONIC` around the real Vulkan function
-pointers and around `vulkan_frame`, from its initial diagnostic marker through
-the return from the context's swap callback. Results and arguments are preserved.
-The current title's video loop is single-threaded; this instrumentation is for
-that configuration and the ordinary menu path, not threaded rendering or BFI.
+## Capture and reproduce
 
-Each `gpu timing:` line records completed frame count, measured seconds,
-`fps = frames / seconds`, and **average/maximum milliseconds per frame**:
+Build with `bash tools/verify.sh`, then:
+
+```sh
+bash tools/run-title.sh --no-build --gpu-profile 60 --watch 80
+python3 tools/analyze-gpu-profile.py klog/gpu-profile-<run-stamp>.tsv
+```
+
+The runner requires the shared console to be idle before uploading, checks again
+before launching, clears stale capture controls, and closes its title afterward.
+It saves `retroarch-<stamp>.log`, `gpu-profile-<stamp>.tsv` and the kernel capture
+in ignored `klog/`. Trace output stays in the run transcript. Extract only the
+last `bss check=` substring from appended traces and verify its build identity.
+
+`--gpu-profile` accepts 1..60 seconds. Allow at least 15 extra watch seconds for
+startup and reporting. The runner writes `/app0/gpu-profile.txt`; title startup
+consumes this one-shot opt-in. The runner also removes stale controls on later
+runs, including runs without profiling. Neither control nor results are deployed
+as part of the normal title. There is no image readback hook.
+
+The profiler skips 120 completed callbacks, then collects nanosecond records in
+a bounded 8,192-frame array and aggregates five-second windows **without file
+I/O**. When the requested interval finishes, it stops sampling and writes one
+buffered `gpu-profile.tsv` report. That reporting pause is outside the sample
+and occurs only in an opted-in diagnostic run. A killed/failed run may have no
+report; a full buffer is explicitly flagged and rejected by the analyzer rather
+than being presented as a complete measurement.
+
+## Meaning of the measurements
+
+`src/vulkan_trace.cpp` uses `CLOCK_MONOTONIC` around real Vulkan function pointers
+and around `vulkan_frame`, from its initial diagnostic marker through the return
+from the context's swap callback. Arguments and results remain unchanged.
+Measurements assume the title's single-threaded video loop and ordinary menu
+path, not threaded video or BFI/multiple presentations per callback.
+
+Each `gpu timing:` window in the result gives completed frames, measured seconds,
+FPS, and average/maximum milliseconds per frame. TSV records preserve every
+frame's phase times and presentation-completion interval in nanoseconds.
 
 | Field | Measurement |
 | --- | --- |
-| `interval` | Previous completed callback through this completed callback; includes frontend work between them. |
-| `outside` | Previous callback completion through this callback entry, excluding `texture`: frontend/menu/input/pacing work, previous callback tail, and summary I/O. |
-| `texture` | Menu `vulkan_set_texture_frame` callback between video frames, including resource creation/reuse, CPU conversion and memory mapping/flushes. |
-| `prepare` | Callback wall time minus the four explicitly timed API categories below; includes command recording, uploads and other frontend/driver calls. |
-| `end` | Sum of real `vkEndCommandBuffer` calls inside the callback. |
-| `submit` | Sum of real `vkQueueSubmit` calls inside the callback, including synchronous driver work/waits. |
-| `present` | Sum of real `vkQueuePresentKHR` calls inside the callback, including display waits. |
-| `wait` | Sum of real `vkWaitForFences` and `vkAcquireNextImageKHR` calls inside the callback. |
+| `interval` | Previous completed callback through this completed callback. |
+| `outside` | Time between callbacks excluding the menu texture-update callback: menu/input/pacing work and the previous callback's tail. |
+| `texture` | Menu `vulkan_set_texture_frame` between video callbacks, including resource creation/reuse, conversion and memory operations. |
+| `prepare` | Video callback wall time minus the four explicitly timed API categories below; includes command recording, uploads and other calls. |
+| `end` | Real `vkEndCommandBuffer` calls inside the callback. |
+| `submit` | Real `vkQueueSubmit` calls, including synchronous driver work/waits. |
+| `present` | Real `vkQueuePresentKHR` calls, including display waits. |
+| `wait` | Real `vkWaitForFences` and `vkAcquireNextImageKHR` calls. |
+| `present_interval` | Time between successful synchronous `vkQueuePresentKHR` returns. |
 
-Average `outside + texture + prepare + end + submit + present + wait` equals average
-`interval` apart from printed rounding. Maxima can belong to different frames;
-they must not be added. An early return without a completion hook invalidates
-that interval rather than charging its gap to the next completed frame.
+`outside + texture + prepare + end + submit + present + wait` equals `interval`
+for each recorded frame. Maxima can belong to different frames and cannot be
+added. An incomplete callback invalidates the next interval instead of charging
+an unmeasured gap to it.
 
-These are CPU-observed **elapsed times**, not CPU utilization or GPU execution
-timestamps. A long submission locates the stall inside the driver call but does
-not distinguish cache maintenance, CPU copies, kernel submission and waiting for
-the GPU. A long `prepare` likewise requires further separation before assigning
-blame to RetroArch rather than driver command-recording operations. Measurements
-at the driver's current 3840x2160 swapchain are not a like-for-like comparison
-with the CPU fallback's 1920x1080 output.
+These are CPU-observed elapsed times, not CPU utilization or GPU timestamps.
+This driver's present call returns after its flip marker reaches VideoOut, so
+return intervals provide useful presentation-completion cadence. They are not
+hardware scanout timestamps or exact missed-vblank counts. The analyzer reports
+intervals above 20/25 ms and rounded estimates of extra 60 Hz intervals, explicitly
+labelled as estimates. Small scheduling jitter around 16.67 ms is not proof of a
+missed refresh. A cadence near 16.683 ms corresponds to about 59.94 Hz.
 
-The fake-clock regression in `tests/test_vulkan_trace.py` checks partition sums,
-warmup exclusion, five-second windows, reset behavior and dispatch/result
-preservation, including timeout/suboptimal acquire results. Measured run records
-live under `evidence/`; current findings belong in `docs/ACTIVE.md`.
+The menu's "estimated screen refresh rate" averages observed frame intervals
+(`video_monitor_fps_statistics`); startup delays can initially depress it. It
+is separate from the driver's declared 60 Hz display mode. This measurement
+cannot guarantee other cores/workloads, nor compare 4K Vulkan with the 1080p CPU
+fallback as if they rendered the same number of pixels.
+
+Fake-clock tests cover phase partitions, presentation spacing, warmup, delayed
+output, capacity limits, stop behavior and dispatch/result preservation. Analyzer
+tests reject truncated/error captures and inconsistent timing partitions. Run
+`bash tools/verify.sh` for the complete gates. Current results and remaining
+limitations belong in `docs/ACTIVE.md` and the committed evidence.

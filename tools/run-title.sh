@@ -5,6 +5,7 @@
 #   tools/run-title.sh --no-build      use what is already in dist/
 #   tools/run-title.sh --no-deploy     run whatever the console already holds
 #   tools/run-title.sh --watch 90      how long to let it run (default 30)
+#   tools/run-title.sh --gpu-profile 60 --watch 80  buffered timing, then collect logs
 #
 # Why this exists. Every earlier round of the console loop was four hand-driven
 # steps that needed a person: build, upload, launch, read. Two things went wrong
@@ -36,15 +37,24 @@ cd "$root"
 build=1
 deploy=1
 watch=30
+profile=0
 while (( $# )); do
     case "$1" in
         --no-build)  build=0 ;;
         --no-deploy) deploy=0 ;;
         --watch)     shift; watch=${1:?--watch needs seconds} ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS]" >&2; exit 2 ;;
+        --gpu-profile) shift; profile=${1:?--gpu-profile needs seconds} ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60]" >&2; exit 2 ;;
     esac
     shift
 done
+
+[[ $watch =~ ^[0-9]+$ && $profile =~ ^[0-9]+$ ]] || { echo "durations must be integers" >&2; exit 2; }
+(( profile <= 60 )) || { echo "GPU profile duration must be 1..60 seconds" >&2; exit 2; }
+if (( profile > 0 && watch < profile + 15 )); then
+    echo "--watch must allow the profile duration plus 15 seconds for startup/reporting" >&2
+    exit 2
+fi
 
 [[ -f .env ]] || { echo "error: no .env; set PS5_HOST in it" >&2; exit 2; }
 set -a; . ./.env; set +a
@@ -97,6 +107,12 @@ fi
 
 [[ -f dist/$title_id/eboot.bin ]] || die "nothing built at dist/$title_id/"
 
+# --- the console must be free ------------------------------------------------
+held=$(ctl_cmd procs)
+count=$(running_count)
+say "console holds: ${held:-<no answer>}"
+[[ $count == 0 ]] || die "the shared console is not confirmed idle; no upload or launch"
+
 # --- deploy, then prove it ---------------------------------------------------
 if (( deploy )); then
     say "publishing to the console and reading it back"
@@ -107,13 +123,7 @@ if (( deploy )); then
     say "the console's copy is byte for byte this build"
 fi
 
-# --- the console must be free ------------------------------------------------
-held=$(ctl_cmd procs)
-count=$(running_count)
-say "console holds: ${held:-<no answer>}"
-if [[ -n $count && $count != 0 ]]; then
-    die "the console is running $count process(es); this console runs one title at a time"
-fi
+[[ $(running_count) == 0 ]] || die "the console became busy during deployment; not launching"
 
 # --- a run starts from a known console state ---------------------------------
 # /app0/args.txt is not in dist/ and deploy never deletes anything, so a copy
@@ -124,17 +134,24 @@ fi
 # appeared. A run that does not ask for extras must not inherit them, so the file
 # is removed on every run - before the launch, because deleting it afterwards
 # would leave it for the next one if this run dies.
-python3 - "$title_id" <<'PY' || say "note: could not clear /app0/args.txt; a stale one changes this run"
+python3 - "$title_id" "$profile" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
 dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
-from ps5_ftp import connect
+from ps5_ftp import connect, remove_if_present
+import io
 with connect(**dt.load_settings()) as ftp:
     try:
         ftp.delete(f"/data/homebrew/{sys.argv[1]}/args.txt")
         print("    cleared a leftover args.txt from the console")
     except Exception:
         pass
+    control = f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt"
+    remove_if_present(ftp, control)
+    if int(sys.argv[2]):
+        remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/gpu-profile.tsv")
+        ftp.storbinary(f"STOR {control}", io.BytesIO((sys.argv[2] + "\n").encode()))
+        print(f"    armed buffered GPU profile for {sys.argv[2]} seconds")
 PY
 
 # --- listen first, then launch ----------------------------------------------
@@ -192,6 +209,34 @@ try:
 except Exception as error:
     print(f"    unreadable: {error}")
     raise SystemExit(1)
+PY
+
+# --- preserve development logs and optional buffered timing ------------------
+python3 - "$title_id" "$profile" "$stamp" <<'PY'
+import importlib.util, re, sys
+from pathlib import Path
+sys.path.insert(0, "tools")
+from ps5_ftp import connect, remove_if_present
+spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
+dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
+with connect(**dt.load_settings()) as ftp:
+    remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/gpu-profile.txt")
+    names = ["retroarch.log"]
+    if int(sys.argv[2]):
+        names.append("gpu-profile.tsv")
+    for name in names:
+        target = Path("klog") / f"{name.rsplit('.', 1)[0]}-{sys.argv[3]}.{name.rsplit('.', 1)[1]}"
+        try:
+            with target.open("wb") as out:
+                ftp.retrbinary(f"RETR /data/homebrew/{sys.argv[1]}/{name}", out.write)
+            if name == "retroarch.log":
+                expected = re.search(r"build identity: ([a-f0-9]{64})", Path("build/title_build_identity.h").read_text())[1]
+                if f"build identity: {expected}" not in target.read_text(errors="replace"):
+                    raise SystemExit("RetroArch log is stale or logging failed: current build identity absent")
+            print(f"    saved {name} to {target}")
+        except Exception as error:
+            print(f"    could not retrieve {name}: {type(error).__name__}")
+            raise SystemExit(f"Required development log {name} was not captured")
 PY
 
 # --- say plainly what happened ----------------------------------------------

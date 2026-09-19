@@ -4,74 +4,66 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Quiet GPU profiling is verified.** The new performance request supersedes the
-previous note that performance was outside the completed menu-rendering task.
-The final 45-second run produced eight timing windows: **53.76–57.94 FPS**, or
-**55.92 FPS** over 2,239 measured frames / 40.039 seconds. There was no progressive
-collapse. This is not yet steady 60 FPS: isolated frame spikes remain.
+**The user ended further performance investigation and requested committing the
+logging work, then enabling XMB as the default menu and testing it on PS5.**
+That is the next task; do not continue optimizing RGUI frame timing.
 
-The owner reports "Noticeable improvement" and an estimated refresh-rate display
-that starts near 40 Hz and rises. That display averages observed frame intervals
-(`video_monitor_fps_statistics`), not the fixed 60 Hz output mode. Slower early
-frames can depress it while later faster frames raise it.
+## Logging step
 
-## What the measurements distinguish
+Routine periodic frame/render/API-success messages and successful input-button
+traces are removed; bounded startup diagnostics and all errors remain. Menu
+handover/staging-ask probes now log once. `retroarch.log` is explicitly enabled
+after argument/config processing and records this build's identity; the old file
+had been stale because this port rebuilds arguments. INFO/WARN/ERROR output,
+Vulkan refusals/assertions in `trace.txt`, and host kernel capture remain enabled.
 
-Final weighted averages, milliseconds per frame:
+Profiling is off by default. `tools/run-title.sh --gpu-profile 60 --watch 80`
+opts into 120 warmup frames followed by up to 60 seconds of in-memory timing.
+The report is written only after measurement and the one-shot control is consumed.
+The runner checks idle state before upload/launch, retrieves `retroarch.log` and
+optional timing, and rejects a frontend log without the expected build identity.
+Definitions/replay: `docs/GPU_TIMING.md`, `tools/analyze-gpu-profile.py`.
 
-| Work | Time |
-| --- | ---: |
-| Video callback preparation/other recording work | 5.344 |
-| Command-buffer finalization | 0.020 |
-| `vkQueueSubmit` | 3.525 |
-| `vkQueuePresentKHR` | 8.075 |
-| Fence/image acquisition waits | 0.041 |
-| Menu texture update outside the callback | 0.153 |
-| Other time between video callbacks | 0.724 |
-| Total frame interval | 17.882 |
+## Verified results and limits
 
-The preliminary run quieted three logs but left texture-creation/staging-ask
-logging active. Its rate fell from 35.91 to 1.63–1.98 FPS; the growing delay was
-outside the video callback (up to 958 ms), while submit stayed near 3.5 ms.
-Limiting the other two logs removed that collapse in the final run. This strongly
-implicates this port's unbuffered diagnostic I/O, rather than long submission or
-presentation stalls, in the severe slowdown. No driver code changed.
+- First buffered run: 3,597 frames / 60.0098 seconds, **59.940238 FPS**;
+  maximum frame interval **16.905813 ms**, no presentation-return gap above 20 ms.
+  Owner: "Very smooth", stable estimated refresh **59.941 Hz** after startup.
+- Restoring fresh frontend logging exposed three ~100 ms texture-update stalls
+  from remaining first-four-call diagnostics. They were reduced to one initial
+  message. The logger now contains this build's identity and Vulkan startup.
+- Final refined build launched with zero driver refusals, logged each menu
+  handover probe once, and returned from `rarch_main` with status 0 before the
+  profile completed. The runner rejected the missing report. **No final timing
+  result is claimed.** The user requested proceeding to XMB instead of more tests.
+- `evidence/vulkan-buffered-logging/` contains both completed timing analyses and
+  the final startup/logging evidence, including that incomplete final capture.
+- All five `tools/verify.sh` gates PASS; 28 tests. Fresh vendor patch replay and
+  second-pass idempotence PASS: 86 edits.
+- Installed identity:
+  `a6063c61145fb42ac409a1d78026f29865673e4575e9a6afc3500e4abccc4f66`.
+- Fresh frontend logs retain the existing audio-driver initialization errors and
+  missing configuration-save directory error. These are outside this logging/menu
+  step, not Vulkan failures; audio/config persistence are not claimed complete.
 
-These are CPU-observed elapsed times, not GPU timestamps or CPU utilization.
-The final trace still has occasional spikes (maximum interval 282 ms, including
-early work; later windows reach 167–184 ms). Sparse progress logs and the timing
-summary itself remain possible contributors, not measured root causes of every
-spike. Definitions and reproduction: `docs/GPU_TIMING.md`.
-
-## Evidence and validation
-
-- `evidence/vulkan-quiet-timing/`: both run windows, identities, sanitized API
-  counters, owner observations and timing audit. Final trace has zero refusals,
-  no recorded API errors and no CPU fallback initialization.
-- Final tested and installed identity:
-  `38ada4be3b74b8230ec13aae97b7d3618c4635760c30e90b29a54f0008e14450`.
-- All five `tools/verify.sh` gates PASS, 26 tests. Fake-clock regression verifies
-  phase partitions, warmup exclusion, window reset and unchanged API results.
-- Fresh vendor patch application and second-pass idempotence PASS: 77 edits.
-- Both 45-second runs completed and were closed by their scripts. All five
-  formerly unbounded texture diagnostics emit only their first four calls.
-- PS5_Vulkan remains at **6f0ce0d**, unmodified in this profiling step.
+Presentation measurements are CPU timestamps at this driver's synchronous
+present return, not hardware vblank counters. RGUI's refresh estimate averages
+frame intervals; startup frames depress it. No guarantee for other workloads.
 
 ## Preserved GPU acceptance and operating notes
 
-The owner-confirmed correct GPU menu remains recorded in
-`evidence/vulkan-fragment-inputs/`: RGBA conversion **947134d**, fragment compiler
-fix **6f0ce0d**, no flicker/triangles. `video_vulkan` uses statically linked libps5vk;
-`video_ps5` stays registered and selectable. No partial rendering-route switch.
-Temporary image/resource captures remain retired under `parked/gpu-readback/`;
-the failed blend experiment remains under `parked/explicit-stock-blend/`.
+Correct GPU RGUI is recorded in `evidence/vulkan-fragment-inputs/`: RGBA conversion
+**947134d**, driver compiler fix **6f0ce0d**, owner-confirmed correct colours and no
+flicker/triangles. PS5_Vulkan was not modified in this logging step. `video_vulkan`
+uses statically linked libps5vk; `video_ps5` stays registered/selectable.
 
-The user authorized necessary driver changes with documentation and a commit in
-PS5_Vulkan, and console uploads/runs without further confirmation. Check the shared
-console is idle **before uploading**; never interrupt an existing title to test.
-`tools/run-title.sh` owns deployment, identity readback, launch, watch and closure.
-Raw console data stays in ignored `klog/`. Extract the last `bss check=` substring
-from appended traces and check the build identity before interpreting results.
+The user authorized necessary driver fixes with documentation and a commit in
+PS5_Vulkan, and console uploads/runs without further permission. Never interrupt
+an existing title to test. Raw captures remain in ignored `klog/`. Extract the
+last `bss check=` substring and verify identity before reading appended traces.
+No partial switch to the CPU route if the GPU refusal gate cannot be satisfied.
 
-Further performance work should isolate remaining spikes and summary/progress
-I/O before changing driver synchronization. Core/audio work is a separate scope.
+XMB preparation: the current build disables HAVE_XMB, only RGUI fonts are staged.
+Official assets were fetched into ignored `vendor/retroarch-assets` at
+`73106363e14e34c08a5854b4cfbc29f184e3b783`; monochrome icons/font are available.
+No XMB implementation change has landed yet.

@@ -1694,3 +1694,39 @@ Evidence: `evidence/vulkan-quiet-timing/{capture,expectation}.json`, replay with
 `python3 tools/evidence.py compare evidence/`. Private raw captures:
 `klog/gpu-quiet-timing-run.log`, `klog/gpu-quiet-texture-timing-run.log` and their
 `*-latest-trace.txt` extracts. Timing definitions: `docs/GPU_TIMING.md`.
+
+## 2026-09-19 — Keep development logs, buffer profiling, then move to XMB
+
+User requested important logs remain available while removing frame-loop stalls.
+Patches 0057–0059 and the local profiler remove periodic successful-frame writes,
+stop button-transition chatter, and make the two menu-handover probes once-only.
+Startup diagnostics, driver errors/refusals and assertions remain. The frontend
+logger is explicitly re-enabled after argument/config processing and writes the
+build identity: the old 1,200-byte file had been stale. The run tool now captures
+and verifies this log, and checks idle state before uploading and launching.
+
+Profiling is opt-in (one-shot gpu-profile.txt), with 120 warmup frames and a bounded
+8,192-frame buffer. No summary/file writes occur during the measurement. It writes
+windows and per-frame TSV after capture; tools/analyze-gpu-profile.py validates
+phase sums/completeness and reports percentiles and presentation-return intervals.
+These intervals are not hardware scanout timestamps; missed-interval values are
+explicitly estimates. No driver or SDK code changed.
+
+Commands: bash tools/verify.sh; bash tools/run-title.sh --no-build --gpu-profile 60
+--watch 80; python3 tools/analyze-gpu-profile.py klog/gpu-profile-<stamp>.tsv.
+First buffered run (111457): 3,597 frames, 60.009771315 s, 59.940238 FPS, maximum
+interval 16.905813 ms, no presentation-completion gap above 20 ms. Owner: "Very
+smooth", estimate stabilizes at 59.941 Hz. With fresh frontend logging (112036):
+3,582 frames, 59.690273 FPS, three ~100 ms gaps localized to texture updates.
+The remaining first-four-call texture probes could occur late and were limited
+to one initial call. The final run (112603), identity
+a6063c61145fb42ac409a1d78026f29865673e4575e9a6afc3500e4abccc4f66, launched with
+zero refusals and a current frontend log, then rarch_main returned 0 before the
+profile completed. Required profile retrieval failed correctly. No final timing
+claim is made, and no further performance run was started: the user requested
+committing and proceeding to XMB. Existing audio/config-save errors remain visible
+and outside this step's acceptance.
+
+All five host gates PASS, 28 tests; fresh patch replay/idempotence PASS, 86 edits.
+Evidence: evidence/vulkan-buffered-logging/{capture,expectation}.json. Replay:
+python3 tools/evidence.py compare evidence/. Raw logs and TSV remain in klog/.

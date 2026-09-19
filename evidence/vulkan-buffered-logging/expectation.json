@@ -1,0 +1,13 @@
+{
+  "step": "vulkan-buffered-logging",
+  "note": "Logging and buffered capture verified; final once-only probe refinement has startup evidence but no completed performance sample.",
+  "must_contain": [
+    "refusals=0",
+    "menu handover and staging ask each logged once",
+    "final build identity present",
+    "59.940238 FPS",
+    "no final timing result claimed",
+    "all five gates PASS"
+  ],
+  "must_not_contain": []
+}

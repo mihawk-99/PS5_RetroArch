@@ -37,3 +37,12 @@
 
 # 0056  quiet steady-frame diagnostics and time Vulkan video preparation/submission/presentation
 0056-quiet-vulkan-frame-timing
+
+# 0057  retain startup/error logs without periodic successful-frame markers
+0057-startup-only-frame-diagnostics
+
+# 0058  reassert the title frontend logger after config parsing/rebuilt arguments
+0058-preserve-frontend-development-log
+
+# 0059  the first menu upload proves the handover; later updates must not write probes
+0059-log-menu-handover-once

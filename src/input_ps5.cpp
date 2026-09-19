@@ -124,7 +124,6 @@ struct PadState
     std::int32_t sample_count = 0;
     std::uint32_t buttons = 0;
     bool owns_user_service = false;
-    bool released_reported = false;
 };
 
 PadState *state_of(void *data) noexcept
@@ -271,27 +270,10 @@ void ps5_input_poll(void *data) noexcept
     }
     state->sample_count = count;
     const PadSample *newest = newest_sample(*state);
-    const std::uint32_t previous = state->buttons;
     state->buttons = newest != nullptr ? newest->buttons : 0;
 
-    /* The first press is written to the trace, and the first release after it, so
-     * a run's own file answers "did a controller reach the frontend" - the
-     * question this step exists for - without anyone watching a screen at the
-     * right moment. */
-    if (previous == 0 && state->buttons != 0)
-    {
-        char line[176];
-        std::snprintf(line, sizeof(line), "input: press, pad=0x%08x retropad=0x%08x",
-                      state->buttons, pad_buttons_to_retropad(state->buttons));
-        ps5_input_trace(line);
-    }
-    else if (previous != 0 && state->buttons == 0 && !state->released_reported)
-    {
-        state->released_reported = true;
-        char line[176];
-        std::snprintf(line, sizeof(line), "input: release, pad was 0x%08x", previous);
-        ps5_input_trace(line);
-    }
+    /* Successful button transitions are routine, not diagnostics. Keep pad-open
+     * failures and lifecycle logs, without a synchronous file write per press. */
 }
 
 std::int16_t ps5_input_state(void *data, const input_device_driver_t *joypad_data,

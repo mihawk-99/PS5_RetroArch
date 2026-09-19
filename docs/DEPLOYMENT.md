@@ -127,3 +127,12 @@ Two habits follow from that:
 - Treat a run as a claim about the revision it was launched from. The launch
   records the revision in `evidence/<step>/capture.json`, so a run that belongs
   to a different revision is visible rather than implied.
+
+## Buffered GPU timing with development logs
+
+`tools/run-title.sh --gpu-profile 60 --watch 80` opts into a bounded in-memory
+capture, then retrieves the profile and the current `retroarch.log` alongside
+its kernel/trace capture. A normal run omits `--gpu-profile`. The runner checks
+console availability before upload and again before launch, and validates the
+frontend log's build identity to reject stale logs. See `docs/GPU_TIMING.md` for
+measurement definitions and `tools/analyze-gpu-profile.py` for replay.

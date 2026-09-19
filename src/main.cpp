@@ -45,6 +45,12 @@
 extern "C" int rarch_main(int argc, char *argv[], void *data);
 extern "C" int sceSystemServiceHideSplashScreen();
 
+extern "C" void ps5_vulkan_profile_init();
+extern "C" const char *ps5_frontend_build_identity()
+{
+    return PS5_RETROARCH_BUILD_ID;
+}
+
 namespace
 {
 /* The title's own folder, as the console mounts it: the application image is at
@@ -134,6 +140,7 @@ int main()
 
     std::set_terminate(on_terminate);
     ps5::debug::mark(PS5_RETROARCH_BUILD_ID);
+    ps5_vulkan_profile_init();
 
     /* The shell's splash covers the title until it explicitly dismisses it.
      * video_ps5 does this while opening its display, but video_vulkan never

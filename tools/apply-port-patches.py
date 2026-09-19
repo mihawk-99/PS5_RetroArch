@@ -2073,6 +2073,83 @@ EDITS = [
         "}\n",
         "   ps5_vulkan_profile_texture_end(ps5_texture_start);",
     ),
+    (
+        "gfx/drivers/vulkan.c",
+        "if (ps5_draw_marks < 6 || (ps5_draw_marks % 1200) == 0)",
+        "if (ps5_draw_marks < 6) /* patches/series, 0057: startup-only ps5_draw_marks */",
+        "patches/series, 0057: startup-only ps5_draw_marks",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "if (ps5_frames <= 3 || (ps5_frames % 300) == 0)",
+        "if (ps5_frames <= 3) /* patches/series, 0057: startup-only ps5_frames */",
+        "patches/series, 0057: startup-only ps5_frames",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "if (ps5_flag_marks < 4 || (ps5_flag_marks % 600) == 0)",
+        "if (ps5_flag_marks < 4) /* patches/series, 0057: startup-only ps5_flag_marks */",
+        "patches/series, 0057: startup-only ps5_flag_marks",
+    ),
+    (
+        "menu/drivers/rgui.c",
+        "if (ps5_render_marks < 3 || (ps5_render_marks % 600) == 0)",
+        "if (ps5_render_marks < 3) /* patches/series, 0057: startup-only ps5_render_marks */",
+        "patches/series, 0057: startup-only ps5_render_marks",
+    ),
+    (
+        "menu/menu_driver.c",
+        "if (ps5_iter_marks < 3 || (ps5_iter_marks % 600) == 0)",
+        "if (ps5_iter_marks < 3) /* patches/series, 0057: startup-only ps5_iter_marks */",
+        "patches/series, 0057: startup-only ps5_iter_marks",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "if (ps5_quad_marks < 4 || (ps5_quad_marks % 600) == 0)",
+        "if (ps5_quad_marks < 4) /* patches/series, 0057: startup-only ps5_quad_marks */",
+        "patches/series, 0057: startup-only ps5_quad_marks",
+    ),
+    (
+        "retroarch.c",
+        "   /* Second pass: All other arguments override the config file */\n",
+        "   /* patches/series, 0058: the title's file logger must survive argv rebuilding.\n"
+        "    * Keep frontend/core INFO, WARN and ERROR output for ongoing development. */\n"
+        "   {\n"
+        "      extern const char *ps5_frontend_build_identity(void);\n"
+        "      verbosity_enable();\n"
+        "      verbosity_enabled = true;\n"
+        "      rarch_log_file_set_override(\"/app0/retroarch.log\");\n"
+        "      rarch_log_file_init(true, false, NULL);\n"
+        "      RARCH_LOG(\"[PS5] %s\\n\", ps5_frontend_build_identity());\n"
+        "   }\n"
+        "\n"
+        "   /* Second pass: All other arguments override the config file */\n",
+        "patches/series, 0058: the title's file logger",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   /* patches/series, 0056: quiet vulkan_set_texture_frame */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)",
+        "   /* patches/series, 0056: quiet vulkan_set_texture_frame */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 1) /* patches/series, 0059: once vulkan_set_texture_frame */",
+        "patches/series, 0059: once vulkan_set_texture_frame",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   /* patches/series, 0056: quiet vulkan_menu_staging_ask */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 4)",
+        "   /* patches/series, 0056: quiet vulkan_menu_staging_ask */\n"
+        "   {\n"
+        "      static unsigned ps5_marks;\n"
+        "      if (ps5_marks++ < 1) /* patches/series, 0059: once vulkan_menu_staging_ask */",
+        "patches/series, 0059: once vulkan_menu_staging_ask",
+    ),
 ]
 
 

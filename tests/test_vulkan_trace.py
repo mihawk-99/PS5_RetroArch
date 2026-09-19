@@ -128,6 +128,7 @@ static VkResult VKAPI_CALL fake_acquire(VkDevice, VkSwapchainKHR,
 }
 int main()
 {
+    profile.configure(60, 4);
     end_command_buffer = fake_end;
     queue_submit = fake_submit;
     queue_present = fake_present;
@@ -168,6 +169,26 @@ int main()
     tick += 1000000;
     ps5_vulkan_profile_end();
     assert(profile.frames == 2);
+    std::fputs("dump begins\n", stderr);
+    profile.dump(stderr);
+    assert(profile.record_count == 12);
+    assert(profile.records[0].present_calls == 1);
+    assert(profile.records[0].present_interval == 1000000000);
+    static Profile bounded;
+    bounded.configure(1, 0);
+    bounded.begin(1); bounded.finish(2);
+    bounded.begin(3); bounded.finish(1000000002);
+    assert(bounded.finished && bounded.record_count == 1 && bounded.window_count == 1);
+    bounded.begin(2000000000); bounded.finish(3000000000);
+    assert(bounded.record_count == 1);
+    static Profile capped;
+    capped.configure(60, 0);
+    capped.begin(1); capped.finish(2);
+    for (unsigned i = 0; i < Profile::capacity + 3; ++i)
+    {
+        capped.begin(3 + i*2); capped.finish(4 + i*2);
+    }
+    assert(capped.finished && capped.record_count == Profile::capacity);
 }
 '''
         with tempfile.TemporaryDirectory() as directory:
@@ -180,6 +201,7 @@ int main()
             run = subprocess.run([str(binary)], check=True, capture_output=True, text=True)
         lines = [line for line in run.stderr.splitlines() if line.startswith("gpu timing:")]
         self.assertEqual(len(lines), 2)
+        self.assertNotIn("gpu timing:", run.stderr.split("dump begins")[0])
         for line in lines:
             self.assertIn("frames=5 seconds=5.000 fps=1.000", line)
             self.assertIn("interval=1000.000/1000.000 outside=40.000/40.000 texture=50.000/50.000", line)

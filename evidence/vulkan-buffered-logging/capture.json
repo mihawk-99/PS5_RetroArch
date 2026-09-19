@@ -1,0 +1,423 @@
+{
+  "step": "vulkan-buffered-logging",
+  "command": "bash tools/verify.sh; bash tools/run-title.sh --no-build --gpu-profile 60 --watch 80; python3 tools/analyze-gpu-profile.py klog/gpu-profile-<stamp>.tsv",
+  "raw_capture": "klog/gpu-buffered-final-latest-trace.txt",
+  "raw_lines": 69,
+  "tested_build_identity": "a6063c61145fb42ac409a1d78026f29865673e4575e9a6afc3500e4abccc4f66",
+  "driver_modified": false,
+  "first_buffered_run": {
+    "frames": 3597,
+    "seconds": 60.009771315,
+    "fps": 59.94023841748746,
+    "phases": {
+      "interval": {
+        "mean_ms": 16.683283657214346,
+        "p99_ms": 16.72267,
+        "max_ms": 16.905813
+      },
+      "outside": {
+        "mean_ms": 0.12889975896580483,
+        "p99_ms": 0.188516,
+        "max_ms": 0.406701
+      },
+      "texture": {
+        "mean_ms": 0.035703493744787325,
+        "p99_ms": 0.049474,
+        "max_ms": 0.08219
+      },
+      "prepare": {
+        "mean_ms": 4.4030740150125105,
+        "p99_ms": 4.912078,
+        "max_ms": 6.101148
+      },
+      "end": {
+        "mean_ms": 0.018530612732832918,
+        "p99_ms": 0.023414,
+        "max_ms": 0.037767
+      },
+      "submit": {
+        "mean_ms": 3.592564045315541,
+        "p99_ms": 4.402821,
+        "max_ms": 4.690767
+      },
+      "present": {
+        "mean_ms": 8.46717335474006,
+        "p99_ms": 12.006885,
+        "max_ms": 13.024278
+      },
+      "wait": {
+        "mean_ms": 0.037338376702807895,
+        "p99_ms": 0.046908,
+        "max_ms": 0.062786
+      },
+      "present_interval": {
+        "mean_ms": 16.68331225827078,
+        "p99_ms": 16.719542,
+        "max_ms": 16.901242
+      }
+    },
+    "presentation": {
+      "completion_intervals_over_20ms": 0,
+      "completion_intervals_over_25ms": 0,
+      "estimated_extra_60hz_intervals": 0,
+      "limitation": "CPU times at successful synchronous vkQueuePresentKHR return; not hardware vblank counters or scanout timestamps. Extra 60 Hz intervals are rounded estimates, not exact missed-vblank counts."
+    },
+    "slowest_frames": [
+      {
+        "frame": 1945,
+        "interval_ns": 16905813,
+        "outside_ns": 137438,
+        "texture_ns": 41536,
+        "prepare_ns": 4832054,
+        "end_ns": 20528,
+        "submit_ns": 3537620,
+        "present_ns": 8292054,
+        "wait_ns": 44583,
+        "present_interval_ns": 16901242,
+        "present_calls": 1
+      },
+      {
+        "frame": 2750,
+        "interval_ns": 16869248,
+        "outside_ns": 138319,
+        "texture_ns": 41777,
+        "prepare_ns": 4836143,
+        "end_ns": 20447,
+        "submit_ns": 3521824,
+        "present_ns": 8270244,
+        "wait_ns": 40494,
+        "present_interval_ns": 16869408,
+        "present_calls": 1
+      },
+      {
+        "frame": 2025,
+        "interval_ns": 16832042,
+        "outside_ns": 142649,
+        "texture_ns": 42819,
+        "prepare_ns": 4788753,
+        "end_ns": 20207,
+        "submit_ns": 3542111,
+        "present_ns": 8254769,
+        "wait_ns": 40734,
+        "present_interval_ns": 16831883,
+        "present_calls": 1
+      },
+      {
+        "frame": 2630,
+        "interval_ns": 16825387,
+        "outside_ns": 140725,
+        "texture_ns": 42258,
+        "prepare_ns": 4798214,
+        "end_ns": 20127,
+        "submit_ns": 3529281,
+        "present_ns": 8250920,
+        "wait_ns": 43862,
+        "present_interval_ns": 16820897,
+        "present_calls": 1
+      },
+      {
+        "frame": 2321,
+        "interval_ns": 16813680,
+        "outside_ns": 141127,
+        "texture_ns": 43139,
+        "prepare_ns": 4827802,
+        "end_ns": 21810,
+        "submit_ns": 3451903,
+        "present_ns": 8287083,
+        "wait_ns": 40816,
+        "present_interval_ns": 16813199,
+        "present_calls": 1
+      },
+      {
+        "frame": 2324,
+        "interval_ns": 16810071,
+        "outside_ns": 138481,
+        "texture_ns": 43139,
+        "prepare_ns": 4851858,
+        "end_ns": 20207,
+        "submit_ns": 3547002,
+        "present_ns": 8168649,
+        "wait_ns": 40735,
+        "present_interval_ns": 16809831,
+        "present_calls": 1
+      },
+      {
+        "frame": 932,
+        "interval_ns": 16806623,
+        "outside_ns": 143852,
+        "texture_ns": 44904,
+        "prepare_ns": 4834540,
+        "end_ns": 20367,
+        "submit_ns": 3547964,
+        "present_ns": 8173861,
+        "wait_ns": 41135,
+        "present_interval_ns": 16806142,
+        "present_calls": 1
+      },
+      {
+        "frame": 35,
+        "interval_ns": 16794516,
+        "outside_ns": 406701,
+        "texture_ns": 0,
+        "prepare_ns": 4790597,
+        "end_ns": 20126,
+        "submit_ns": 3345817,
+        "present_ns": 8190300,
+        "wait_ns": 40975,
+        "present_interval_ns": 16797483,
+        "present_calls": 1
+      },
+      {
+        "frame": 975,
+        "interval_ns": 16759314,
+        "outside_ns": 88525,
+        "texture_ns": 0,
+        "prepare_ns": 4795649,
+        "end_ns": 20127,
+        "submit_ns": 3348383,
+        "present_ns": 8465977,
+        "wait_ns": 40653,
+        "present_interval_ns": 16757630,
+        "present_calls": 1
+      },
+      {
+        "frame": 2139,
+        "interval_ns": 16739989,
+        "outside_ns": 149145,
+        "texture_ns": 42979,
+        "prepare_ns": 4826280,
+        "end_ns": 20207,
+        "submit_ns": 3526955,
+        "present_ns": 8133769,
+        "wait_ns": 40654,
+        "present_interval_ns": 16741273,
+        "present_calls": 1
+      }
+    ]
+  },
+  "logger_restored_run": {
+    "frames": 3582,
+    "seconds": 60.009777249,
+    "fps": 59.6902732222638,
+    "phases": {
+      "interval": {
+        "mean_ms": 16.75314831072027,
+        "p99_ms": 16.721948,
+        "max_ms": 100.113583
+      },
+      "outside": {
+        "mean_ms": 0.13493418118369627,
+        "p99_ms": 0.19477,
+        "max_ms": 1.333243
+      },
+      "texture": {
+        "mean_ms": 0.10768433277498604,
+        "p99_ms": 0.050357,
+        "max_ms": 87.218083
+      },
+      "prepare": {
+        "mean_ms": 4.4205507816862095,
+        "p99_ms": 4.917371,
+        "max_ms": 5.951922
+      },
+      "end": {
+        "mean_ms": 0.01857901479620324,
+        "p99_ms": 0.023735,
+        "max_ms": 0.039772
+      },
+      "submit": {
+        "mean_ms": 3.591722783919598,
+        "p99_ms": 4.392236,
+        "max_ms": 4.691568
+      },
+      "present": {
+        "mean_ms": 8.442264174204356,
+        "p99_ms": 12.002956,
+        "max_ms": 12.123875
+      },
+      "wait": {
+        "mean_ms": 0.037413042155220545,
+        "p99_ms": 0.046507,
+        "max_ms": 0.058535
+      },
+      "present_interval": {
+        "mean_ms": 16.753175307928533,
+        "p99_ms": 16.719302,
+        "max_ms": 100.11246
+      }
+    },
+    "presentation": {
+      "completion_intervals_over_20ms": 3,
+      "completion_intervals_over_25ms": 3,
+      "estimated_extra_60hz_intervals": 15,
+      "limitation": "CPU times at successful synchronous vkQueuePresentKHR return; not hardware vblank counters or scanout timestamps. Extra 60 Hz intervals are rounded estimates, not exact missed-vblank counts."
+    },
+    "slowest_frames": [
+      {
+        "frame": 185,
+        "interval_ns": 100113583,
+        "outside_ns": 126852,
+        "texture_ns": 83809161,
+        "prepare_ns": 4854507,
+        "end_ns": 20287,
+        "submit_ns": 3531526,
+        "present_ns": 7730356,
+        "wait_ns": 40894,
+        "present_interval_ns": 100112460,
+        "present_calls": 1
+      },
+      {
+        "frame": 195,
+        "interval_ns": 100110776,
+        "outside_ns": 130862,
+        "texture_ns": 83570288,
+        "prepare_ns": 4828125,
+        "end_ns": 20126,
+        "submit_ns": 3523428,
+        "present_ns": 7997053,
+        "wait_ns": 40894,
+        "present_interval_ns": 100110456,
+        "present_calls": 1
+      },
+      {
+        "frame": 191,
+        "interval_ns": 100087763,
+        "outside_ns": 128057,
+        "texture_ns": 87218083,
+        "prepare_ns": 4892272,
+        "end_ns": 20207,
+        "submit_ns": 3535936,
+        "present_ns": 4252554,
+        "wait_ns": 40654,
+        "present_interval_ns": 100087362,
+        "present_calls": 1
+      },
+      {
+        "frame": 2664,
+        "interval_ns": 16949193,
+        "outside_ns": 147060,
+        "texture_ns": 41937,
+        "prepare_ns": 4801342,
+        "end_ns": 20046,
+        "submit_ns": 3499372,
+        "present_ns": 8398221,
+        "wait_ns": 41215,
+        "present_interval_ns": 16948151,
+        "present_calls": 1
+      },
+      {
+        "frame": 1509,
+        "interval_ns": 16915756,
+        "outside_ns": 149867,
+        "texture_ns": 42338,
+        "prepare_ns": 4815135,
+        "end_ns": 20126,
+        "submit_ns": 3529923,
+        "present_ns": 8317313,
+        "wait_ns": 41054,
+        "present_interval_ns": 16915355,
+        "present_calls": 1
+      },
+      {
+        "frame": 2661,
+        "interval_ns": 16820255,
+        "outside_ns": 140645,
+        "texture_ns": 43140,
+        "prepare_ns": 4797896,
+        "end_ns": 20126,
+        "submit_ns": 3534814,
+        "present_ns": 8242580,
+        "wait_ns": 41054,
+        "present_interval_ns": 16821298,
+        "present_calls": 1
+      },
+      {
+        "frame": 871,
+        "interval_ns": 16786578,
+        "outside_ns": 156121,
+        "texture_ns": 42178,
+        "prepare_ns": 4860279,
+        "end_ns": 20207,
+        "submit_ns": 3527276,
+        "present_ns": 8139782,
+        "wait_ns": 40735,
+        "present_interval_ns": 16786256,
+        "present_calls": 1
+      },
+      {
+        "frame": 150,
+        "interval_ns": 16750895,
+        "outside_ns": 93095,
+        "texture_ns": 0,
+        "prepare_ns": 4797414,
+        "end_ns": 20206,
+        "submit_ns": 3364901,
+        "present_ns": 8434464,
+        "wait_ns": 40815,
+        "present_interval_ns": 16750494,
+        "present_calls": 1
+      },
+      {
+        "frame": 1630,
+        "interval_ns": 16744721,
+        "outside_ns": 147301,
+        "texture_ns": 42739,
+        "prepare_ns": 4803749,
+        "end_ns": 20126,
+        "submit_ns": 3550209,
+        "present_ns": 8132405,
+        "wait_ns": 48192,
+        "present_interval_ns": 16727159,
+        "present_calls": 1
+      },
+      {
+        "frame": 1244,
+        "interval_ns": 16740150,
+        "outside_ns": 137920,
+        "texture_ns": 42257,
+        "prepare_ns": 4857150,
+        "end_ns": 20127,
+        "submit_ns": 3532087,
+        "present_ns": 8109633,
+        "wait_ns": 40976,
+        "present_interval_ns": 16739669,
+        "present_calls": 1
+      }
+    ]
+  },
+  "final_run": "Exited via rarch_main return 0 before the profile completed; retrieval correctly failed. No further performance run at user direction.",
+  "frontend_log": {
+    "sha256": "c64df8c97594642c48f0a1f2cdca3c483e19df966355e960f7af25c79d74911f",
+    "bytes": 2674,
+    "identity_matched": true
+  },
+  "lines": [
+    "build identity: a6063c61145fb42ac409a1d78026f29865673e4575e9a6afc3500e4abccc4f66",
+    "gpu profile: armed seconds=60 warmup=120 buffered=1",
+    "gpu result: vkEndCommandBuffer calls=1 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=1 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=2 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=2 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=3 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=3 failures=0 result=0",
+    "gpu result: vkEndCommandBuffer calls=4 failures=0 result=0",
+    "gpu result: vkQueueSubmit calls=4 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=1 failures=0 result=0",
+    "gpu result: swapchain image calls=1 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=2 failures=0 result=0",
+    "gpu result: swapchain image calls=2 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=3 failures=0 result=0",
+    "gpu result: swapchain image calls=3 failures=0 result=0",
+    "gpu result: vkQueuePresentKHR calls=4 failures=0 result=0",
+    "gpu result: swapchain image calls=4 failures=0 result=0",
+    "rarch_main returned = 0",
+    "audit: final startup trace refusals=0; menu handover and staging ask each logged once",
+    "frontend log: final build identity present; INFO/WARN/ERROR logging retained",
+    "owner (first buffered run): Very smooth; estimated refresh rate caps at 59.941 Hz stable",
+    "timing (first buffered run): 3597 frames; 59.940238 FPS; maximum interval 16.905813 ms; no completion gap over 20 ms",
+    "timing (logger restored): 3582 frames; three 100 ms texture-update stalls; remaining first-four-call probes identified",
+    "final run: frontend returned 0 before profile completion; no final timing result claimed",
+    "scope: user stopped further performance investigation and requested committing then enabling XMB",
+    "host: all five gates PASS; 28 tests; fresh patch application and idempotence PASS (86 edits)"
+  ]
+}
