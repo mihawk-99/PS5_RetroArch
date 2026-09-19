@@ -1,0 +1,27 @@
+{
+  "step": "frontend-patch-idempotence",
+  "command": "python3 tools/apply-port-patches.py build/ra-conf (repeat and compare SHA256 for every patched file)",
+  "revision": "fc65097 + 0023 marker fix",
+  "raw_capture": "",
+  "raw_lines": 18,
+  "lines": [
+    "patch files: 15",
+    "second application changes: 0",
+    "missing markers: 0",
+    "configuration.c 1c00b7a602a789de2b18437297b2272c93559d9d1f3a45db1338a33798b748b0",
+    "gfx/common/vulkan_common.c bec570c0d4eb818a5aa2a3004f4ec2368108d50d950466aaf155dc26ba4442dc",
+    "gfx/drivers/vulkan.c fdfc0425da1d92b090e72f74b14505c8466c5fbb31faf7f0a77fc6d7e5fa2bf5",
+    "gfx/drivers_context/khr_display_ctx.c 5a983bd5b6e089826ab79852353796960916de9ba1c131674a603a71e2ec2a95",
+    "gfx/drivers_shader/shader_vulkan.cpp 59be4305619433df2206df260a7b9008d85e1d9f99c7b8a3eed02f191b337779",
+    "gfx/video_driver.c d9f9847f87974d60b2c9e21bf53e9d9137698382948063f505c4eedb70bb525d",
+    "gfx/video_driver.h ca9953104bc129a543cbbab8476438d07e7e3e6ad13335914ac4151ab6d48b11",
+    "input/input_driver.c 441073f75f962257e7f55897d63a87ebd7dcf16646a1bc4e02d6d5dae4067ab9",
+    "input/input_driver.h f7f18137481854aa6ac9d4589b45236655ea4eb5b8eee2d6cf744879ed21f138",
+    "libretro-common/vulkan/vulkan_symbol_wrapper.c 873a1c054a8065c324a67af9e7d96799d0ef80bb839e69016086f23906735a4b",
+    "menu/drivers/rgui.c adc80127cbbede84b30507c9246ee0e6eca4c39b5d1893c685312bffd12e2834",
+    "menu/menu_driver.c dddfdeda8c6b8512155499d758e28dac1dbbdb165ff7c5c2ac4440d9d603307b",
+    "qb/config.params.sh e4394c0babcb4009e0772ec6771eeb9900919559adaeab4364801e9676964bd6",
+    "retroarch.c f54f262dc176b4b102a41b99b46c00f1dc2f5f423c30833807a636af8d6a590e",
+    "runloop.c 2ad081b52bf2345b0f2fca908cb8751059c10a79af943e850abe34cf1740018b"
+  ]
+}

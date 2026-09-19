@@ -970,7 +970,7 @@ EDITS = [
         "}\n"
         "\n"
         "CommonResources::~CommonResources()\n",
-        "a combined image sampler write names no sampler",
+        "patches/series, 0023",
     ),
     (
         # The display driver's own four samplers are created with an opaque-white

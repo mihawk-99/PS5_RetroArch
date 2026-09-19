@@ -287,6 +287,12 @@ class PortPatches(unittest.TestCase):
             f"{sorted(duplicates)}. A block defined twice applies twice, and a file "
             f"patched twice produces crashes that look like unrelated bugs")
 
+    def test_every_patch_inserts_its_own_marker(self) -> None:
+        """A missing marker makes each rebuild append the same edit again."""
+        for name, anchor, replacement, marker in self.blocks():
+            with self.subTest(file=name, marker=marker):
+                self.assertIn(marker, replacement)
+
     def test_the_patch_set_is_the_size_it_should_be(self) -> None:
         """Pinned so an accidental addition or deletion is a visible diff.
 

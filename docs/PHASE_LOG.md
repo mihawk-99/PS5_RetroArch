@@ -1576,3 +1576,14 @@ busy check still applies.
 
 The owner subsequently confirmed the second closure was manual too, and clarified
 the visual defect as blue colours and black triangles appearing/disappearing.
+
+## 2026-09-19 — Make the sampler fallback patch idempotent
+
+The 0023 marker was prose that existed only in the Python comment, never in its
+replacement C++. The new `test_every_patch_inserts_its_own_marker` failed on that
+block before its marker was corrected to `patches/series, 0023`. All 22 host
+tests then passed. The configured shader source was regenerated solely from
+upstream plus named edits to remove the repeated blocks. `bash tools/verify.sh`
+passed all five gates. Reapplying the full patch list leaves all 12 patched files'
+SHA256 values unchanged: `evidence/frontend-patch-idempotence/` records them.
+This is a host build-tool fix and makes no new claim about console rendering.

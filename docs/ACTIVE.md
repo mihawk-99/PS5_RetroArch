@@ -41,9 +41,10 @@ reverses red/blue and scales 15 to 240 instead of 255. Preserve A2's matching
 32-bit RGBA textures and plain-copy path. Diagnose flicker separately from colour.
 
 A host regression test also caught the existing 0023 patch marker missing from
-its own replacement. A marker-only fix is prepared separately and 22 host tests
-pass. A fresh upstream replay is byte-identical on its second application.
-This correction must not be confused with the colour or splash changes.
+its own replacement. The marker-only fix is verified separately: all five gates and 22 host tests
+pass. Evidence is in `evidence/frontend-patch-idempotence/`. A fresh upstream replay is byte-identical on its second application.
+The configured shader source was regenerated from upstream plus the named edits
+to remove the accumulated duplicates. No colour or rendering code was changed.
 
 ## Working notes
 
@@ -61,7 +62,6 @@ This correction must not be confused with the colour or splash changes.
 - CPU fallback sources and registration have not been changed.
 - Patch count is 67 (three diagnostic edits added). `vendor/` is untouched.
 - Fresh replay of all port patches succeeds. The configured shader file contains
-  repeated 0023 sampler fallback blocks: its marker is absent from its own
-  replacement, so rebuilding inserts the block again. This reproducibility defect needs
-  a separate idempotence fix; it is not evidence of the display fault.
+  only the intended 0023 sampler fallback block after regeneration. Its marker
+  now appears in its replacement, so repeated builds cannot accumulate it.
 - Audio remains outside this GPU task. C measurements wait until B4 passes.

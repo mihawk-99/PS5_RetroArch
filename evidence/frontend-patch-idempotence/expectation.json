@@ -1,0 +1,9 @@
+{
+  "step": "frontend-patch-idempotence",
+  "note": "Host-side patch application only; no console rendering claim.",
+  "must_contain": [
+    "second application changes: 0",
+    "missing markers: 0"
+  ],
+  "must_not_contain": []
+}
