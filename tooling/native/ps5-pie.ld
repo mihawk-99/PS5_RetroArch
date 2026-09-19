@@ -82,7 +82,12 @@ SECTIONS {
     .tdata : { *(.tdata .tdata.*) } : data
     .tbss : { *(.tbss .tbss.*) } : data
     .bss : {
+        /* The console's loader does not zero the tail of this segment - the file
+         * image is 0x104b4 bytes and the segment is 0xc7040 - so app_crt.cpp
+         * needs its boundaries and zeroes it before anything reads a static. */
+        PROVIDE_HIDDEN(__bss_start = .);
         *(.bss .bss.*)
         *(COMMON)
+        PROVIDE_HIDDEN(__bss_end = .);
     } : data
 }

@@ -94,6 +94,19 @@ int main()
 {
     /* First thing: prove that control reached this function at all, before
      * anything that could fail. */
+    {
+        /* A zero-initialised static: it lives in the BSS, which this port's own
+         * CRT now clears before main. Printed so a run says whether that happened -
+         * the alternative was to read it from the far side of the frontend, where
+         * the same question cost a round. */
+        static long ps5_bss_check;
+        static long ps5_data_check = 7;
+        char line[128];
+        std::snprintf(line, sizeof line, "bss check=%ld (must be 0), data check=%ld (must be 7)",
+                      ps5_bss_check, ps5_data_check);
+        ps5::debug::mark(line);
+    }
+
     ps5::debug::mark("main() entered; static constructors have already run");
 
     /* Everything the libraries say goes to stderr, and a title's stderr reaches
@@ -108,8 +121,12 @@ int main()
         ps5::debug::mark("could not send stderr to the trace file");
     else
     {
-        std::fputs("stderr is the trace file\n", stderr);
-        std::fflush(stderr);
+        /* Unbuffered, because everything that writes an error and then aborts -
+         * an assertion, a C++ terminate - would otherwise lose it: the console's
+         * libc buffers this stream and abort does not flush. The assert message is
+         * what a console run needs most and it was the one thing never printed. */
+        std::setvbuf(stderr, nullptr, _IONBF, 0);
+        std::fputs("stderr is the trace file (unbuffered)\n", stderr);
     }
 
     std::set_terminate(on_terminate);

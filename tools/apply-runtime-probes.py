@@ -349,7 +349,7 @@ PROBES = [
         "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
         "     if (f) {\n"
         "        unsigned bi, ai;\n"
-        "        fprintf(f, \"probe PIPE2: renderPass=%p stages=%u verts=%u attrs=%u topo=%d \"\n"
+        "        fprintf(f, \"probe PIPE3: renderPass=%p stages=%u verts=%u attrs=%u topo=%d \"\n"
         "                   \"blendAtt=%u blendEnable=%d writeMask=0x%x depthTest=%d samples=0x%x\\n\",\n"
         "                (void*)pipe.renderPass, (unsigned)pipe.stageCount,\n"
         "                (unsigned)(pipe.pVertexInputState ? pipe.pVertexInputState->vertexBindingDescriptionCount : 0),\n"
@@ -363,13 +363,13 @@ PROBES = [
         "                (int)(pipe.pDepthStencilState ? pipe.pDepthStencilState->depthTestEnable : 0),\n"
         "                (unsigned)(pipe.pMultisampleState ? pipe.pMultisampleState->rasterizationSamples : 0));\n"
         "        for (bi = 0; pipe.pVertexInputState && bi < pipe.pVertexInputState->vertexBindingDescriptionCount; bi++)\n"
-        "           fprintf(f, \"probe PIPE2: binding %u = {%u, %u}\\n\", bi,\n"
+        "           fprintf(f, \"probe PIPE3: binding %u = {%u, %u}\\n\", bi,\n"
         "                   (unsigned)pipe.pVertexInputState->pVertexBindingDescriptions[bi].binding,\n"
         "                   (unsigned)pipe.pVertexInputState->pVertexBindingDescriptions[bi].stride);\n"
         "        for (ai = 0; pipe.pVertexInputState && ai < pipe.pVertexInputState->vertexAttributeDescriptionCount; ai++)\n"
         "        { const VkVertexInputAttributeDescription *a =\n"
         "             &pipe.pVertexInputState->pVertexAttributeDescriptions[ai];\n"
-        "          fprintf(f, \"probe PIPE2: attr %u = {loc %u, bind %u, fmt %d, off %u}\\n\",\n"
+        "          fprintf(f, \"probe PIPE3: attr %u = {loc %u, bind %u, fmt %d, off %u}\\n\",\n"
         "                  ai, (unsigned)a->location, (unsigned)a->binding, (int)a->format, (unsigned)a->offset); }\n"
         "        fclose(f);\n"
         "     } }\n",
@@ -400,74 +400,135 @@ PROBES = [
         "reads, which is the other refusal it can give before compiling anything",
     ),
     (
-        # The compiler's header, at file scope: it opens an extern "C" block, which
-        # cannot be included inside a function body.
-        "gfx/drivers_shader/shader_vulkan.cpp",
-        "#include \"../include/vulkan/vk_sdk_platform.h\"\n",
-        "/* Added by this port (probes): the shader compiler's header, so the probe that\n"
-        " * asks it directly about the stock shader can name its types. It belongs to\n"
-        " * ../PS5_Vulkan and is only used by that probe. */\n"
-        "#include \"../../../PS5_Vulkan/.deps/native/psbc/include/psbc_compile.h\"\n"
-        "#include \"../include/vulkan/vk_sdk_platform.h\"\n",
-        "#include \"../../../PS5_Vulkan/.deps/native/psbc/include/psbc_compile.h\"",
-        "the compiler's own types, for the probe that calls it",
+        # The instrument the objective itself needs: with the Vulkan driver the trace
+        # has no frame line at all - src/display.cpp belongs to the CPU driver - so a
+        # run could only say that init succeeded or failed. This counts the frames the
+        # frontend hands the driver and writes one line every thirty, which is what
+        # "frames reaching the screen" looks like from inside the title.
+        "gfx/drivers/vulkan.c",
+        "   int i, j, k;\n"
+        "   VkSubmitInfo submit_info;\n",
+        "   { static unsigned long probe_frames = 0;\n"
+        "     static unsigned long probe_reported = 0;\n"
+        "     probe_frames++;\n"
+        "     if (probe_frames - probe_reported >= 30)\n"
+        "     {\n"
+        "        FILE *f;\n"
+        "        probe_reported = probe_frames;\n"
+        "        f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "        if (f) { fprintf(f, \"probe FRAME: %lu handed to the driver\\n\", probe_frames);\n"
+        "                 fclose(f); }\n"
+        "     } }\n",
+        "probe FRAME:",
+        "how many frames the Vulkan path is actually presenting",
     ),
     (
-        # Both stock shaders compile with the host build of this compiler, using
-        # the driver's own options (UBO stride 16, sampler at binding 2, stride 48).
-        # The driver refuses the pipeline anyway, and its message is compiled out,
-        # so the compiler is asked here on the console with the same options - the
-        # one thing a host test cannot reproduce. psbc_init() is left alone: the
-        # driver has already initialised the library by the time a pipeline is
-        # built, and calling it again is what crashed the first version of this
-        # probe.
-        "gfx/drivers_shader/shader_vulkan.cpp",
-        "   { VkPipeline probe_pipeline = VK_NULL_HANDLE;\n",
-        "   {\n"
-        "     PsbcCompileOptions probe_options;\n"
-        "     PsbcShaderOutput probe_output;\n"
-        "     PsbcResult probe_result;\n"
-        "     FILE *f;\n"
-        "\n"
-        "     memset(&probe_options, 0, sizeof(probe_options));\n"
-        "     memset(&probe_output, 0, sizeof(probe_output));\n"
-        "     probe_options.target       = PSBC_TARGET_PS5;\n"
-        "     probe_options.optimise     = true;\n"
-        "     probe_options.entrypoint   = \"main\";\n"
-        "     probe_options.address32_hi = 2u;\n"
-        "     probe_options.vertex_attributes[0] = (PsbcVertexAttribute){\n"
-        "        .location = 0, .binding = 0, .format = PSBC_VERTEX_FORMAT_R32G32_FLOAT,\n"
-        "        .offset = 0, .stride = 16, .alignment = 4};\n"
-        "     probe_options.vertex_attributes[1] = (PsbcVertexAttribute){\n"
-        "        .location = 1, .binding = 0, .format = PSBC_VERTEX_FORMAT_R32G32_FLOAT,\n"
-        "        .offset = 8, .stride = 16, .alignment = 4};\n"
-        "     probe_options.vertex_attribute_count = 2;\n"
-        "     probe_options.descriptor_bindings[0] = (PsbcDescriptorBinding){\n"
-        "        .set = 0, .binding = 0, .type = PSBC_DESCRIPTOR_UNIFORM_BUFFER,\n"
-        "        .array_size = 1, .offset = 0, .stride = 16};\n"
-        "     probe_options.descriptor_bindings[1] = (PsbcDescriptorBinding){\n"
-        "        .set = 0, .binding = 2, .type = PSBC_DESCRIPTOR_COMBINED_IMAGE_SAMPLER,\n"
-        "        .array_size = 1, .offset = 16, .stride = 48};\n"
-        "     probe_options.descriptor_binding_count = 2;\n"
-        "\n"
-        "     probe_options.stage = PSBC_STAGE_VERTEX;\n"
-        "     probe_result = psbc_compile_shader(vertex_shader.data(), vertex_shader.size(),\n"
-        "                                        &probe_options, &probe_output);\n"
-        "     f = fopen(\"/app0/trace.txt\", \"a\");\n"
-        "     if (f) { fprintf(f, \"probe PSBC: vertex -> %d (%s)\\n\", (int)probe_result,\n"
-        "                      psbc_result_string(probe_result)); fclose(f); }\n"
-        "     psbc_free_output(&probe_output);\n"
-        "     memset(&probe_output, 0, sizeof(probe_output));\n"
-        "     probe_options.stage = PSBC_STAGE_FRAGMENT;\n"
-        "     probe_result = psbc_compile_shader(fragment_shader.data(), fragment_shader.size(),\n"
-        "                                        &probe_options, &probe_output);\n"
-        "     f = fopen(\"/app0/trace.txt\", \"a\");\n"
-        "     if (f) { fprintf(f, \"probe PSBC: fragment -> %d (%s)\\n\", (int)probe_result,\n"
-        "                      psbc_result_string(probe_result)); fclose(f); }\n"
-        "     psbc_free_output(&probe_output);\n"
-        "   }\n",
-        "probe PSBC:",
-        "the console's own answer for the stock shader, with the driver's options",
+        # The runloop quit on its first iteration and rarch_main returned 0 without a
+        # frame. runloop_check_state's only reachable quit path is the core-shutdown
+        # flag, and the video driver's alive() turns false when the display context's
+        # check_window sets quit - which it does when the frontend's signal handler
+        # state is non-zero. Both are printed here.
+        "gfx/drivers/vulkan.c",
+        "   if (quit)\n"
+        "      vk->flags |= VK_FLAG_QUITTING;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe ALIVE: quit=%d resize=%d width=%u height=%u\\n\",\n"
+        "                      (int)quit, (int)resize, temp_width, temp_height); fclose(f); } }\n",
+        "probe ALIVE:",
+        "whether the display context is asking the runloop to stop, and why",
+    ),
+    (
+        # The quit on the first iteration comes from this flag, and this is the only
+        # place that sets it: a libretro core asking the frontend to shut down. With
+        # no content loaded the core is the dummy one the menu runs on, so the line
+        # that follows says which environment call did it.
+        "runloop.c",
+        "#ifdef HAVE_MENU\n"
+        "         /* Ensure that menu stack is flushed appropriately\n",
+        "         { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "           if (f) { fprintf(f, \"probe SHUTDOWN: a core asked to shut down\\n\"); fclose(f); } }\n"
+        "         runloop_st->flags |= RUNLOOP_FLAG_CORE_SHUTDOWN_INITIATED\n",
+        "probe SHUTDOWN:",
+        "which trigger quit the runloop before the first frame",
+    ),
+
+    (
+        # Which signal, and how early: the answer to why the runloop stopped before
+        # its first frame, and whether the console sends it or something in the
+        # title does.
+        "frontend/drivers/platform_unix.c",
+        "   (void)sig;\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SIGNAL: %d caught, count now %d\\n\",\n"
+        "                      sig, (int)(unix_sighandler_quit + 1)); fclose(f); } }\n"
+        "   (void)sig;\n"
+        "   unix_sighandler_quit++;\n",
+        "probe SIGNAL:",
+        "which signal ends the runloop, and how early",
+    ),
+
+    (
+        'gfx/drivers/vulkan.c',
+        '      vkCmdBeginRenderPass(vk->cmd, &rp_info, VK_SUBPASS_CONTENTS_INLINE);\n',
+        '      { FILE *f = fopen("/app0/trace.txt", "a");\n        if (f) { fprintf(f, "probe REC: begin render pass\\n"); fclose(f); } }\n',
+        'probe REC:',
+        "how far the first frame's recording gets",
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '      vkCmdEndRenderPass(vk->cmd);\n',
+        '      { FILE *f = fopen("/app0/trace.txt", "a");\n        if (f) { fprintf(f, "probe REC: end render pass\\n"); fclose(f); } }\n',
+        'probe REC:',
+        'the far side of the pass: present means the refusal is after it',
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '   vulkan_filter_chain_end_frame((vulkan_filter_chain_t*)filter_chain, vk->cmd);\n',
+        '   { FILE *f = fopen("/app0/trace.txt", "a");\n     if (f) { fprintf(f, "probe REC: chain end frame\\n"); fclose(f); } }\n',
+        'probe REC:',
+        "the chain's own recording, which is where the offscreen passes and the menu copy are",
+    ),
+    (
+        'gfx/drivers/vulkan.c',
+        '   vkEndCommandBuffer(vk->cmd);\n',
+        '   { FILE *f = fopen("/app0/trace.txt", "a");\n     if (f) { fprintf(f, "probe REC: ending the command buffer\\n"); fclose(f); } }\n',
+        'probe REC:',
+        'the last mark before the submit that asserts',
+    ),
+    (
+        # The frame's command buffer already has a render pass open when
+        # vkCmdBeginRenderPass runs, so something between the begin and this line
+        # opened one and did not end it. These four marks bracket that span.
+        "gfx/drivers/vulkan.c",
+        "   vkBeginCommandBuffer(vk->cmd, &begin_info);\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SPAN: command buffer recording\\n\"); fclose(f); } }\n",
+        "probe SPAN: command buffer recording",
+        "the start of the span",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   vulkan_filter_chain_build_offscreen_passes(\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SPAN: offscreen passes\\n\"); fclose(f); } }\n",
+        "probe SPAN: offscreen passes",
+        "the chain's offscreen passes: a pass begun and not ended here would be the one",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "   if (vk->flags & VK_FLAG_MENU_ENABLE)\n",
+        "   { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "     if (f) { fprintf(f, \"probe SPAN: menu upload\\n\"); fclose(f); } }\n",
+        "probe SPAN: menu upload",
+        "the menu texture copy, recorded into this same command buffer",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      rp_info.sType                    = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;\n",
+        "      { FILE *f = fopen(\"/app0/trace.txt\", \"a\");\n"
+        "        if (f) { fprintf(f, \"probe SPAN: about to begin the backbuffer pass\\n\"); fclose(f); } }\n",
+        "probe SPAN: about to begin the backbuffer pass",
+        "the last mark before the assert",
     ),
 ]
 

@@ -294,7 +294,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 15,
+            len(self.blocks()), 21,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 
@@ -727,6 +727,44 @@ class LinkedDriver(unittest.TestCase):
                        "__eh_frame_hdr_start", "__eh_frame_hdr_end"):
             self.assertIn(symbol, defined,
                           f"{symbol} is not in the linked image; the layout no longer provides it")
+
+
+class ProbeSet(unittest.TestCase):
+    """The probe script's inserts are insertions, and are applied safely.
+
+    tools/apply-runtime-probes.py writes `insert + anchor`, so an insert that ends
+    with its own anchor duplicates that line - which is how a probe broke the build
+    three times in one session (a duplicated `vkCreateImage`, a duplicated
+    `switch (runloop_check_state(`, a duplicated
+    `vulkan_filter_chain_build_offscreen_passes(`). It is cheaper to check than to
+    find again.
+    """
+
+    script = ROOT / "tools/apply-runtime-probes.py"
+
+    def probes(self) -> list[tuple[str, str, str, str, str]]:
+        import ast
+
+        tree = ast.parse(self.script.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "PROBES":
+                return ast.literal_eval(node.value)
+        raise AssertionError(f"{self.script} no longer defines PROBES")
+
+    def test_no_insert_repeats_its_own_anchor(self) -> None:
+        for name, anchor, insert, marker, _note in self.probes():
+            self.assertFalse(
+                insert.endswith(anchor),
+                f"{marker!r} in {name} ends with its own anchor, which would "
+                f"duplicate the line it is inserted before")
+
+    def test_every_probe_has_a_marker_and_a_note(self) -> None:
+        for name, _anchor, insert, marker, note in self.probes():
+            self.assertIn(marker, insert,
+                          f"{marker!r} is not in its own insert text")
+            self.assertTrue(note.strip(), f"{marker!r} has no note")
+            self.assertTrue(insert.endswith("\n"),
+                            f"{marker!r} does not end with a newline")
 
 
 class Artifact(unittest.TestCase):

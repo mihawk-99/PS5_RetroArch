@@ -480,6 +480,127 @@ EDITS = [
         "      default: /* Unknown format */\n",
         "patches/series, 0015",
     ),
+    (
+        # ../PS5_Vulkan's pipeline check accepts only VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+        # (and Mesa's meta rectangle list), and its draw path refuses a non-indexed
+        # draw whose first vertex is not zero. RetroArch's Vulkan filter chain draws
+        # its two quads as a four-vertex triangle strip starting at vertex 0, so its
+        # pipeline is refused with VK_ERROR_UNKNOWN and no log line - that project
+        # compiles its own Mesa log out. The three edits below answer both
+        # conditions: the quads become six explicit vertices each in list order, the
+        # pipeline says triangle list, the final pass reads its quad at the new
+        # offset, and the second triangle is drawn through the binding's own offset
+        # because a first vertex other than zero is refused.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   input_assembly.primitiveRestartEnable        = VK_FALSE;\n",
+        "   /* Added by this port (patches/series, 0016): this driver takes triangle\n"
+        "    * lists only. */\n"
+        "   input_assembly.topology                      = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n"
+        "   input_assembly.primitiveRestartEnable        = VK_FALSE;\n",
+        "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;\n"
+        "   input_assembly.primitiveRestartEnable",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   vbo->unmap();\n",
+        "   /* Added by this port (patches/series, 0016): the strip above cannot carry a\n"
+        "    * list's six vertices, so the buffer is rebuilt in list order: each quad as\n"
+        "    * two triangles, the second one reachable at a three-vertex offset because a\n"
+        "    * non-indexed draw may not start anywhere but vertex zero. */\n"
+        "   vbo.reset();\n"
+        "   {\n"
+        "      static const float ps5_triangle_list[] = {\n"
+        "         /* Offscreen: (-1,-1) (-1,+1) (1,-1), then (1,-1) (-1,+1) (1,+1) */\n"
+        "         -1.0f, -1.0f, 0.0f, 0.0f,\n"
+        "         -1.0f, +1.0f, 0.0f, 1.0f,\n"
+        "         +1.0f, -1.0f, 1.0f, 0.0f,\n"
+        "         +1.0f, -1.0f, 1.0f, 0.0f,\n"
+        "         -1.0f, +1.0f, 0.0f, 1.0f,\n"
+        "         +1.0f, +1.0f, 1.0f, 1.0f,\n"
+        "         /* Final: (0,0) (0,1) (1,0), then (1,0) (0,1) (1,1) */\n"
+        "          0.0f,  0.0f, 0.0f, 0.0f,\n"
+        "          0.0f, +1.0f, 0.0f, 1.0f,\n"
+        "         +1.0f,  0.0f, 1.0f, 0.0f,\n"
+        "         +1.0f,  0.0f, 1.0f, 0.0f,\n"
+        "          0.0f, +1.0f, 0.0f, 1.0f,\n"
+        "         +1.0f, +1.0f, 1.0f, 1.0f,\n"
+        "      };\n"
+        "      vbo = std::unique_ptr<Buffer>(new Buffer(device, memory_properties,\n"
+        "               sizeof(ps5_triangle_list), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));\n"
+        "      ptr = vbo->map();\n"
+        "      memcpy(ptr, ps5_triangle_list, sizeof(ps5_triangle_list));\n"
+        "      vbo->unmap();\n"
+        "   }\n"
+        "   vbo->unmap();\n",
+        "ps5_triangle_list",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "      vkCmdBindVertexBuffers(cmd, 0, 1,\n",
+        "      /* Added by this port (patches/series, 0016): the final quad is the second\n"
+        "       * of the two list quads, so it starts three vertices later than it did as a\n"
+        "       * strip. */\n"
+        "      if (final_pass)\n"
+        "         offset = 24 * sizeof(float);\n"
+        "      vkCmdBindVertexBuffers(cmd, 0, 1,\n",
+        "offset = 24 * sizeof(float);",
+    ),
+    (
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   vkCmdDraw(cmd, 4, 1, 0, 0);\n",
+        "   /* Added by this port (patches/series, 0016): a triangle list uses three of\n"
+        "    * these four vertices, and the quad's other triangle is drawn here through the\n"
+        "    * binding's offset - naming it as a first vertex would be refused. */\n"
+        "   {\n"
+        "      const VkDeviceSize base   = final_pass ? 24 * sizeof(float) : 0;\n"
+        "      const VkDeviceSize second = base + 3 * 4 * sizeof(float);\n"
+        "      VkBuffer buffer           = common->vbo->get_buffer();\n"
+        "      vkCmdBindVertexBuffers(cmd, 0, 1, &buffer, &second);\n"
+        "      vkCmdDraw(cmd, 3, 1, 0, 0);\n"
+        "      vkCmdBindVertexBuffers(cmd, 0, 1, &buffer, &base);\n"
+        "   }\n"
+        "   vkCmdDraw(cmd, 4, 1, 0, 0);\n",
+        "vkCmdDraw(cmd, 3, 1, 0, 0);",
+    ),
+
+    (
+        # This driver refuses a sampler whose address mode is not clamp-to-edge, and
+        # a refused vkCreateSampler leaves its output handle untouched. RetroArch's
+        # CommonResources destroys every handle that is not VK_NULL_HANDLE, so the
+        # sixteen samplers this driver refuses are destroyed as if they were real
+        # samplers and the driver asserts on the first one. Zeroing the array first
+        # makes a refused creation the NULL it is.
+        "gfx/drivers_shader/shader_vulkan.cpp",
+        "   info.unnormalizedCoordinates = VK_FALSE;\n",
+        "   info.unnormalizedCoordinates = VK_FALSE;\n"
+        "   /* Added by this port (patches/series, 0017): ../PS5_Vulkan supports the\n"
+        "    * clamp-to-edge samplers alone and returns an error for the rest, leaving\n"
+        "    * the handle it was given untouched - so the array is cleared before it is\n"
+        "    * filled, and a refused creation stays VK_NULL_HANDLE for the destructor. */\n"
+        "   memset(samplers, 0, sizeof(samplers));\n",
+        "memset(samplers, 0, sizeof(samplers));",
+    ),
+
+    (
+        # A console title has no terminal and no SIGTERM sender, and this console
+        # delivers SIGINT/SIGTERM while a title starts. RetroArch's khr_display
+        # context read that state as "the user asked to quit", so the runloop ended
+        # on its first iteration: the trace showed a successful vulkan_init, a
+        # created pipeline, and rarch_main returning 0 without a single frame. The
+        # platform's own lifecycle ends the process, so this context stops asking
+        # the runloop to.
+        "gfx/drivers_context/khr_display_ctx.c",
+        "}\n"
+        "\n"
+        "static bool gfx_ctx_khr_display_set_resize(void *data,\n",
+        "   /* Added by this port (patches/series, 0018): the signal-handler state is\n"
+        "    * not a quit request on a console. */\n"
+        "   *quit                    = false;\n"
+        "}\n"
+        "\n"
+        "static bool gfx_ctx_khr_display_set_resize(void *data,\n",
+        "the signal-handler state is",
+    ),
 ]
 
 

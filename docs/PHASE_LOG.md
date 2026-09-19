@@ -1131,3 +1131,68 @@ leaves the driver, the compiler and the SDK runtime with no symbol table);
 that names an uncaught exception's type. `tools/apply-runtime-probes.py` carries
 the probes that measured all of it - twenty-nine, applied with one command and
 reverted before the shipping build.
+
+## 2026-09-19: The driver initialises, the pipeline is created, and the first frame stops on an open render pass
+
+**Where this round started.** A `tools/run-title.sh` run showed RetroArch selecting
+`video_vulkan`, creating a device, a swapchain and four textures, compiling both stock
+shaders into modules - and then `vkCreateGraphicsPipelines` answering
+`VK_ERROR_UNKNOWN`, with `vulkan_init` returning NULL. Nothing rendered.
+
+**What it took, in order.**
+
+- **The topology.** `../PS5_Vulkan`'s pipeline check accepts
+  `VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST` alone (and Mesa's meta rectangle list), and its
+  draw path refuses a non-indexed draw whose first vertex is not zero. RetroArch's
+  Vulkan filter chain drew its two quads as a four-vertex triangle *strip*. Patches
+  0016 converts them to six-vertex lists, says triangle list, moves the final pass's
+  quad to the new offset, and draws each quad's second triangle through the binding's
+  own offset. `vkCreateGraphicsPipelines` then returned 0 and `vulkan_init` handed back
+  a real pointer.
+- **Samplers.** This driver refuses any sampler whose address mode is not clamp-to-edge
+  and leaves the output handle untouched; `CommonResources` destroys every handle that
+  is not `VK_NULL_HANDLE`, so the sixteen refused ones were destroyed as if they were
+  real samplers and the driver asserted on the first. Patch 0017 clears the array first.
+- **The runloop quit before its first frame.** `rarch_main` returned 0 with no frame
+  drawn. The display context's `check_window` sets `quit` when the frontend's signal
+  handler state is non-zero, and RetroArch's khr_display context read that as "the user
+  asked to quit". Patch 0018 stops this context treating it as one: a console title has
+  no terminal and no SIGTERM sender, and the platform's own lifecycle ends the process.
+- **The value behind that state was garbage, and that is the round's real find.** It
+  read `-285230512`, stable across runs, before any signal had been delivered - because
+  **this port's CRT never zeroed the BSS**. The image's writable segment is
+  `0x104b4` bytes in the file and `0xc7040` in memory, and `_start`
+  (tooling/native/app_crt.cpp) went straight from `_init_env` to the static
+  constructors. Every zero-initialised object in the frontend, in the driver and in the
+  shader compiler therefore started with whatever the memory held: a counter, a
+  flag, a pointer. `tooling/native/ps5-pie.ld` now marks `__bss_start`/`__bss_end` and
+  `_start` clears that range before anything else. A run prints
+  `bss check=0 (must be 0), data check=7 (must be 7)`.
+- **Assertions now say what they are.** `../PS5_Vulkan`'s `__assert` prints the
+  expression, file and line to stderr and then calls `abort`, which does not flush -
+  and the console's libc buffers stderr, so every assertion arrived as a bare
+  `abort is called(system)`. `src/main.cpp` points stderr at `/app0/trace.txt` **and
+  makes it unbuffered**. The trace now reads, for the current blocker:
+
+      probe SPAN: offscreen passes
+      probe SPAN: menu upload
+      probe SPAN: about to begin the backbuffer pass
+      probe REC: begin render pass
+      assertion failed: cmd_buffer->render_pass == NULL
+        (.../vulkan-runtime/src/vulkan/runtime/vk_render_pass.c:2648,
+         vk_common_CmdBeginRenderPass2)
+
+**Where it stands.** The driver initialises, both shaders compile, the pipeline is
+created, the runloop runs, and the first frame records commands until
+`vkCmdBeginRenderPass` - which asserts because the frame's command buffer already has
+a render pass open. The marks bracket it to the span between
+`vulkan_filter_chain_build_offscreen_passes` and the backbuffer pass, which is the
+first-frame history/feedback clear and the menu texture upload. Nothing reaches the
+screen yet.
+
+**Probes and their guard.** `tools/apply-runtime-probes.py` carries thirty-nine probes
+and `tests/test_frontend.py` now checks the set itself: an insert that ends with its
+own anchor duplicates the line it is inserted before, which broke the build three times
+in this round (a duplicated `vkCreateImage`, a duplicated `switch (`, a duplicated
+`vulkan_filter_chain_build_offscreen_passes(`); every probe must carry a marker, a
+note and a trailing newline. All of it is checked before a probe can reach a build.
