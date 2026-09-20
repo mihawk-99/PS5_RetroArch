@@ -10,20 +10,25 @@ software GPU core, with no PS5_Vulkan dependency.
 
 **Done — A1, A2: platform branch and cross build.** `tools/build-ppsspp.sh` fetches
 pinned `f293b10` (29 submodules), applies two zero-fuzz patches, configures the tree
-with `tooling/ppsspp/ps5-toolchain.cmake` and ABI-checks the result:
-18,485,448 bytes, sha256 `038001216b59698c…`, 25 exports, **zero `PT_TLS`**, three
-16 KiB segments (no W+X), `NEEDED` exactly the three allowed modules. Reports:
-`build/cores/ppsspp/{abi.json,build.json}`. `thread_local` needed no patch — the SDK
-uses `-femulated-tls`; two flag shims (`static_assert`, `ZSTD_TRACE`) and a four-call
-libc shim carry the vendored third-party code. Detail: `docs/PHASE_LOG.md`.
+with `tooling/ppsspp/ps5-toolchain.cmake` and ABI-checks the result: 18,485,448 bytes,
+25 exports, **zero `PT_TLS`**, three 16 KiB segments (no W+X), `NEEDED` exactly the
+three allowed modules. Reports: `build/cores/ppsspp/{abi.json,build.json}`.
+`thread_local` needed no patch — the SDK uses `-femulated-tls`; two flag shims
+(`static_assert`, `ZSTD_TRACE`) and a four-call libc shim carry the vendored
+third-party code. Detail: `docs/PHASE_LOG.md`.
 
-**Next — A3: the title link.** All 479 of the core's undefined symbols but
-`localtime_r` resolve from an SDK stub or the libc++ objects the title links, and
-`localtime_r` is the existing `rtime_localtime` alias; the six-core union generates a
-497-binding table cleanly. Unproven: the title link with `ppsspp` in `core_names`.
+**Done — A3: the title link.** `ppsspp` joined `core_names` and the identity inputs;
+all 479 of the core's imports resolve (`localtime_r` through the existing
+`rtime_localtime` alias, `__emutls_get_address` from the clang builtins the title
+already links), the frontend and title link, and `core imports` grows to **497
+bindings for 6 cores**. Title identity `ed3f78147e015696…`, `eboot.bin` 34,655,444
+bytes, six cores staged in `dist/PPSA99169/`. Gates: `format`, `unit` (74 tests) and
+`integration` PASS. Not proven: reproducibility across two builds, and anything on
+the console.
 
-**Then A4/A5:** load with `ppsspp_backend = "none"` and boot a PSP homebrew. Assets
-(`system/PPSSPP/`) and content are owner-supplied.
+**Next — A4: the first console load.** Deploy `dist/PPSA99169/` and load the core
+with `ppsspp_backend = "none"`. Uploads are authorized; the launch needs the owner.
+Then A5: `system/PPSSPP/` assets plus a PSP homebrew, both owner-supplied.
 
 ## Now
 

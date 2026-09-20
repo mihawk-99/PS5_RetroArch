@@ -56,7 +56,7 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
-core_names=(fceumm mgba snes9x fbneo genesis_plus_gx)
+core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp)
 core_files=()
 for core_name in "${core_names[@]}"; do
     bash "$root/tools/build-${core_name//_/-}.sh"
@@ -202,6 +202,7 @@ inputs += [root / name for name in (
     "build/cores/stage/cores/snes9x_libretro.so",
     "build/cores/stage/cores/fbneo_libretro.so",
     "build/cores/stage/cores/genesis_plus_gx_libretro.so",
+    "build/cores/stage/cores/ppsspp_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += [pathlib.Path(name) for name in sys.argv[3:]]
 digest = hashlib.sha256()

@@ -38,8 +38,10 @@ printf '%s  %s\n' "$info_sha" "$info" | sha256sum --check --status || {
 }
 
 # The source tree. A supplied PPSSPP_SOURCE_DIR is used as-is and must already be at
-# the pinned revision; otherwise the pinned revision is fetched into build/cores.
-source_dir="${PPSSPP_SOURCE_DIR:-$root/build/cores/ppsspp-src}"
+# the pinned revision; otherwise the pinned revision is fetched into .deps, which is
+# the cache make clean does not remove - a git checkout with submodules is expensive
+# to refetch, unlike the other cores' single tarball.
+source_dir="${PPSSPP_SOURCE_DIR:-$root/.deps/ppsspp-src}"
 if [[ -n ${PPSSPP_SOURCE_DIR:-} ]]; then
     [[ -d $source_dir ]] || { echo "error: PPSSPP_SOURCE_DIR is not a directory" >&2; exit 2; }
     got=$(git -C "$source_dir" rev-parse HEAD)

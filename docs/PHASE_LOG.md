@@ -2664,3 +2664,45 @@ title link and ABI gate pass, which is the next step.
 
 **Not proven.** The title link with ppsspp in core_names; console load, initialisation
 and teardown; a game. No console was contacted; nothing was uploaded or launched.
+
+## 2026-09-19 — PPSSPP A3: the title links with the core in it
+
+A3 of PPSSPP_Implementation_Plan.md is the proof that the port's import surface is
+complete: build the whole title with `ppsspp` in `core_names`, and let the converter
+refuse any symbol no public SDK stub exports.
+
+**It links.** `ppsspp` joined `core_names` and the build-identity input list in
+tools/build-title.sh, and `bash tools/build-title.sh` (JOBS=14) completed with exit 0:
+all six cores report `core ABI PASS … 25 exports`, `tools/core-imports.py` reports
+**497 explicit native bindings for 6 cores**, and the title built to 161 files with
+`eboot.bin` 34,655,444 bytes at identity
+ed3f78147e015696bb44550e7151352e341d333d78d0dc6d7b4315bf6fd7a9fc. Six cores are
+staged in dist/PPSA99169/cores/, PPSSPP's included as 18,485,448 bytes plus its
+pinned 1,793-byte metadata.
+
+The two imports worth naming are resolved: `__emutls_get_address` is defined in the
+title (local symbol at 0x6c6ae0, pulled from the clang builtins archive the Vulkan
+archives already require) and `localtime_r` goes through the existing
+`rtime_localtime` alias. The title carries 465 undefined symbols, every one of them
+accepted by the converter's stub check.
+
+**Gates.** `bash tools/verify.sh format unit` — PASS, 74 tests. `bash tools/verify.sh
+integration` — PASS, including check-manifest on the rebuilt folder. The build gate
+now builds PPSSPP as well, because that is what A3's acceptance means: the unfinished
+core is in the shipped staging only after its ABI and link gates pass.
+
+**Open: the artifact digest is not reproducible across builds.** Four builds of the
+same pinned revision produced four different sha256 values — 038001216b59698c and
+e27177a3d4e56d80 from a /tmp checkout, then 56627f010acd6cb2 and 79647489be7b794e
+from two consecutive runs against the same .deps checkout, with identical toolchain,
+flags and patches. The generated version string is the same in each
+(v1.20.4-1868-gf293b10fb, or "unknown" on a checkout without tags), and neither
+armips — the only vendored code using __DATE__/__TIME__ — nor any date-like literal
+is linked into the core, so the differing bytes are not yet localized. What is pinned
+is the source revision, the 29 submodule SHAs, the two patches, the toolchain file and
+the shims; what varies is the resulting byte image. The ABI report records the
+artifact hash, so every console claim stays tied to one build. Localizing the
+difference is a follow-up, not an A4 dependency.
+
+**Not proven.** Console load, initialisation, teardown and gameplay. Nothing was
+uploaded or launched, and no console was contacted.
