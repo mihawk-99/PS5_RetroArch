@@ -26,7 +26,18 @@ published to `/app0/system/PPSSPP`). Evidence: `evidence/ppsspp-native/`.
 
 **Blocker — the first frame.** The title takes a SIGSEGV on a worker thread during
 `ThreadManager::Init` (fault address 0x70, frames inside `libkernel.sprx`), so no PSP
-frame has been presented. Renderer-independent, and next.
+frame has been presented. Renderer-independent, and next. The console's libkernel can
+now be symbolized (NID = `SHA1(name || salt)`, byte-reversed, base-64), which names the
+faulting frame `pthread_get_specificarray_np+0x3b` reached from
+`pthread_create_name_np`, resolving a caller address inside the core's anonymous
+mapping and dereferencing the miss.
+
+**Deployed and armed:** the console holds `eac82195…` — the loader probe, the import and
+asset fixes, PPSSPP's thread-pool diagnostic (`ThreadManager::Init: creating N`) and
+`system/PPSSPP` — with the loader test **PASS** (`cycles=8, exports=25, api=1`, both
+negative cases rejected). No `thread-test.txt` is armed, so the next launch goes
+straight to the core: `JOBS=14 bash tools/run-title.sh --no-build --no-deploy
+--core-test=ppsspp --watch 90`, and the log names the last pool step before the crash.
 
 **Driver: rung 1.0 closed, title relinked.** `PS5_Vulkan` `d4e73ff`, embedded
 `libps5vk.ps5.a` `d41f934b…`, title identity `735f7eb1…`, all five gates pass. Still
