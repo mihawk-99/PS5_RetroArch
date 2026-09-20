@@ -1,0 +1,49 @@
+diff --git a/Common/CPUDetect.cpp b/Common/CPUDetect.cpp
+index c5dfa71..3d09771 100644
+--- a/Common/CPUDetect.cpp
++++ b/Common/CPUDetect.cpp
+@@ -30,6 +30,8 @@
+ #include <fcntl.h>
+ #elif PPSSPP_PLATFORM(MAC)
+ #include <sys/sysctl.h>
++#elif PPSSPP_PLATFORM(PS5)
++#include <unistd.h>
+ #endif
+ 
+ #include <cstdint>
+@@ -464,6 +466,18 @@ void CPUInfo::Detect() {
+ 			logical_cpu_count = num / std::max(num_cores, 1);
+ 		}
+ 	}
++#elif PPSSPP_PLATFORM(PS5)
++	// The payload SDK answers the online processor count through sysconf. There is
++	// no /proc, and the console does not report SMT siblings through sysctl, so the
++	// worker pool is sized from the logical count alone. Without this branch the
++	// counts stay at the 1/1 defaults set above and the emulator runs single-core.
++	{
++		long online = sysconf(_SC_NPROCESSORS_ONLN);
++		if (online > 0) {
++			logical_cpu_count = (int)online;
++			num_cores = logical_cpu_count;
++		}
++	}
+ #endif
+ 	if (logical_cpu_count <= 0)
+ 		logical_cpu_count = 1;
+diff --git a/ppsspp_config.h b/ppsspp_config.h
+index 7984a3d..18021e8 100644
+--- a/ppsspp_config.h
++++ b/ppsspp_config.h
+@@ -124,6 +124,12 @@
+     #define PPSSPP_PLATFORM_LINUX 1
+ #elif defined(__OpenBSD__)
+     #define PPSSPP_PLATFORM_OPENBSD 1
++#elif defined(__PROSPERO__)
++    // PlayStation 5 homebrew through the public payload SDK. The target is a
++    // FreeBSD-ABI x86-64 ELF (clang -target x86_64-sie-ps5), which is neither
++    // Linux nor any of the BSDs above: it has no /proc, no dlopen of project
++    // shared objects, and its allocator is the console's own pools.
++    #define PPSSPP_PLATFORM_PS5 1
+ #endif
+ 
+ // Windows ARM/ARM64, and Windows UWP (all), are the only platform that don't do GL at all (until Apple finally removes it)

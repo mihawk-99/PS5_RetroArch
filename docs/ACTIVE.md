@@ -2,6 +2,29 @@
 
 _Updated: 2026-09-19_
 
+## PPSSPP Track A: the core builds
+
+Plan: [PPSSPP_Implementation_Plan.md](../PPSSPP_Implementation_Plan.md); platform
+analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). Track A is PPSSPP on its
+software GPU core, with no PS5_Vulkan dependency.
+
+**Done — A1, A2: platform branch and cross build.** `tools/build-ppsspp.sh` fetches
+pinned `f293b10` (29 submodules), applies two zero-fuzz patches, configures the tree
+with `tooling/ppsspp/ps5-toolchain.cmake` and ABI-checks the result:
+18,485,448 bytes, sha256 `038001216b59698c…`, 25 exports, **zero `PT_TLS`**, three
+16 KiB segments (no W+X), `NEEDED` exactly the three allowed modules. Reports:
+`build/cores/ppsspp/{abi.json,build.json}`. `thread_local` needed no patch — the SDK
+uses `-femulated-tls`; two flag shims (`static_assert`, `ZSTD_TRACE`) and a four-call
+libc shim carry the vendored third-party code. Detail: `docs/PHASE_LOG.md`.
+
+**Next — A3: the title link.** All 479 of the core's undefined symbols but
+`localtime_r` resolve from an SDK stub or the libc++ objects the title links, and
+`localtime_r` is the existing `rtime_localtime` alias; the six-core union generates a
+497-binding table cleanly. Unproven: the title link with `ppsspp` in `core_names`.
+
+**Then A4/A5:** load with `ppsspp_backend = "none"` and boot a PSP homebrew. Assets
+(`system/PPSSPP/`) and content are owner-supplied.
+
 ## Now
 
 **Owner accepted the thumbnail and configuration-reset fixes: “Perfect. Commit”.**

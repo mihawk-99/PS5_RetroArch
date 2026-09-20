@@ -2610,3 +2610,57 @@ runtime/kernel logs were not captured, so no new log-health claim is made.
 Evidence: evidence/thumbnail-input-defaults/ (source/artifact hashes, sanitized
 machine deployment report, owner acceptance). Replay: `bash tools/verify.sh format evidence`.
 Future manual checks and scope: docs/THUMBNAIL_INPUT_DEFAULTS.md.
+
+## 2026-09-19 — PPSSPP Track A: the platform branch and the cross build
+
+The owner asked for an implementation plan and for Track A to start. The plan is
+PPSSPP_Implementation_Plan.md: software GPU core first (no PS5_Vulkan dependency),
+then the Vulkan renderer once the driver work lands, one core binary and two runtime
+configurations. This entry records the first step, which is verified.
+
+**The build.** tools/build-ppsspp.sh fetches pinned PPSSPP at
+f293b10fb2d9dc0c2bc10281444ee3d3e932e6ad with its 29 submodules, resets the tree,
+applies patches/ppsspp/0001-platform-ps5.patch and 0002-cross-build-ps5.patch with
+`patch --fuzz=0`, configures the pinned tree directly with
+tooling/ppsspp/ps5-toolchain.cmake, builds the libretro target with the SDK's own
+prospero-clang wrappers, and runs tools/check-core.py.
+
+Result: `core ABI PASS: ppsspp_libretro.so; 25 exports; kernel_web;
+sha256=038001216b59698c28268860349e0b27e8e8cb940f98dbb12650a90d063d71c6`,
+18,485,448 bytes. readelf on the artifact: zero PT_TLS segments, three 16 KiB load
+segments (flags 5/4/6, no writable-executable), and NEEDED limited to
+libkernel_web.sprx, libSceLibcInternal.sprx and libScePosixForWebKit.sprx.
+Reports: build/cores/ppsspp/abi.json and build.json (revision, 29 submodule SHAs,
+seven port-input hashes). This is a host and artifact result: the core has not been
+deployed or loaded on the console.
+
+**What the toolchain decided, with the measurements.** A TLS probe compiled and
+linked with prospero-clang++ and tooling/native/ps5-core.ld showed zero PT_TLS and one
+undefined import, __emutls_get_address: the SDK compiles with -femulated-tls, so
+PPSSPP's thread_local caches (GPU/Software/Sampler.cpp, DrawPixel.cpp) need no source
+change, contrary to the handoff plan's expectation. Two flag shims were required:
+-Dstatic_assert=_Static_assert, because PPSSPP's own -D_XOPEN_SOURCE=700 pins
+__ISO_C_VISIBLE to 1990 on this FreeBSD-derived libc and ext/xxhash.h then calls an
+undeclared C11 static_assert, and -DZSTD_TRACE=0, the same switch the frontend build
+already uses for zstd's weak tracing hooks. Four libc entry points that vendored
+third-party code calls are declared but not exported by the SDK stubs — swab
+(ext/libpng17), nl_langinfo (ext/armips, ext/SPIRV-Cross), tmpfile (ext/lua/liolib.c)
+and tmpnam (ext/lua/loslib.c) — so tooling/ppsspp/ps5-libc-shims.cpp implements them
+inside the core; the two temporary-file calls refuse with NULL, which both callers
+handle, because this target has no writable /tmp contract and neither is on a boot or
+gameplay path.
+
+**The import audit.** The core has 479 undefined symbols. Cross-checked against every
+SDK shared stub plus the libc++, libc++abi, libunwind and clang-builtins archives the
+title links, exactly one is unresolvable: localtime_r, which tools/core-imports.py
+already aliases to RetroArch's locked rtime_localtime (the mGBA precedent). The union
+of the five shipped cores plus PPSSPP generates a 497-binding table for six cores with
+no TLS or type conflicts; the shipped five-core table was regenerated afterwards, so
+no unfinished core is in the title's import surface yet.
+
+**Gates.** `bash tools/verify.sh format unit` — PASS, 74 tests, 19 s. The build gate is
+untouched: PPSSPP is deliberately not in core_names in tools/build-title.sh until the
+title link and ABI gate pass, which is the next step.
+
+**Not proven.** The title link with ppsspp in core_names; console load, initialisation
+and teardown; a game. No console was contacted; nothing was uploaded or launched.
