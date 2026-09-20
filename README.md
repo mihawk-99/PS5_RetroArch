@@ -1,4 +1,4 @@
-# PS5 RetroArch
+# PS5 RetroArch 🎮
 
 **Native RetroArch for jailbroken PlayStation 5 consoles, with GPU presentation
 through [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan).**
