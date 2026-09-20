@@ -2574,3 +2574,39 @@ latencies are claimed. The unsafe driver logger under arbitrary OOM remains outs
 this frontend fix. Sanitized evidence: evidence/xmb-safe-list-run/. Replay with
 `bash tools/verify.sh format evidence`; runtime and current logging are unchanged
 since the accepted normal build.
+
+
+## 2026-09-19 — Thumbnail channel order and input after configuration reset
+
+Owner reported swapped save-state thumbnail colours and loss of input after Reset
+to Defaults. Patch 0081 preserves the asynchronous image task's supports_rgba flag,
+so decoded pixels match the Vulkan menu texture upload format. Gameplay conversion,
+PNG encoding and synchronous asset loading are unchanged. Patch 0082 defaults the
+joypad backend to ps5 (input already did), and asks the connected controller to
+announce itself again after a live reset clears auto-binds. The next poll restores
+profile discovery once without reopening the device or requiring a new pad sample.
+Logging and PS5_Vulkan sources are unchanged.
+
+Three executable regressions were seen failing before the fixes: wrong red pixel,
+null joypad default, and absent binding refresh. Focused image/default/input tests
+pass afterward. Full verification used:
+`PS5_MEMORY_DIAGNOSTICS=0 PS5_VULKAN_DIR="$PWD/build/xmb-normal-vulkan" bash tools/verify.sh`.
+All five gates passed, with 74 tests, 278 frontend sources and 179 patch edits. The
+first full attempt failed the old four-edit configuration.c inventory; it now counts
+the added joypad-default edit as the fifth. Total inventory grows from 176 to 179.
+No new SDK, dependency, compiler flag or version pin is introduced. The existing
+archive override retains the accepted XMB driver inputs; all four archives and
+three Mesa utility objects match that build.
+
+Identity: e11018a79a62ce91fa723deaad6939c1e48a47bace21b3527ae84f4452148451.
+Exact ELF/map/title/manifest and gate/regression logs: klog/thumbnail-input-build/.
+Eboot-only upload: klog/thumbnail-input-upload-20260919-205531/. Idle was checked,
+runtime identity was read back, and live configuration remained byte-identical.
+Saved input was ps5 with automatic joypad selection, so no config repair was needed.
+No agent launch or kill was sent. Owner subsequently replied “Perfect. Commit”.
+This is acceptance of the reported fixes; individual checklist results and fresh
+runtime/kernel logs were not captured, so no new log-health claim is made.
+
+Evidence: evidence/thumbnail-input-defaults/ (source/artifact hashes, sanitized
+machine deployment report, owner acceptance). Replay: `bash tools/verify.sh format evidence`.
+Future manual checks and scope: docs/THUMBNAIL_INPUT_DEFAULTS.md.

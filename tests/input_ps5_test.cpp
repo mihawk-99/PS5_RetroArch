@@ -204,6 +204,12 @@ int main()
     p = sample();
     feed(p);
     assert(connects == 2);
+    // A config reset must refresh automatic binds without a physical reconnect.
+    ps5_input_reset_autoconfig();
+    ps5_joypad.poll(); // No new samples; the connected sample is retained.
+    assert(connects == 3 && opens == 1 && ps5_joypad.query_pad(0));
+    ps5_joypad.poll();
+    assert(connects == 3); // No per-frame announcement/task storm.
     read_result = -1;
     ps5_joypad.poll();
     assert(!ps5_joypad.query_pad(0) && mapped(RETRO_DEVICE_ID_JOYPAD_MASK) == 0);
@@ -219,6 +225,7 @@ int main()
     assert(ps5_joypad.init(input));
     ps5_joypad.destroy();
     assert(opens == 2 && closes == 2);
+    ps5_input_reset_autoconfig(); // Safe before/after driver lifetime.
     std::puts(
         "PS5 joypad: raw binding capture, axes, user mappings, poll retention and lifecycle PASS");
 }

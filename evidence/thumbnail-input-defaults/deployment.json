@@ -1,0 +1,9 @@
+{
+  "utc": "2026-09-20T00:55:42.288413+00:00",
+  "uploaded": "eboot.bin",
+  "runtime_identity_verified": true,
+  "configuration_unchanged": true,
+  "launched": false,
+  "local_sha256": "aca3f171a2b7d553d5fd035424c53d17b58d4d97bd300659d26e8aefb0c4630a",
+  "served_sha256": "3c3b05f79c1568608585251a558f25e4a2d9b6a0e924d793d31f3c93085850fa"
+}

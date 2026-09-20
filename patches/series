@@ -100,3 +100,9 @@
 
 # Compact XMB nodes, mapped menu objects and checked list construction.
 0080-safe-xmb-list-allocations
+
+# Preserve requested pixel order in asynchronous thumbnail loading.
+0081-async-thumbnail-colour-order
+
+# Native joypad defaults and live auto-binding recovery after reset.
+0082-reset-native-input-defaults

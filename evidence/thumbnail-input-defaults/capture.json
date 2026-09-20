@@ -1,0 +1,16 @@
+{
+  "step": "thumbnail-input-defaults",
+  "revision": "6b857a9 plus changes identified by host-report.json source hashes",
+  "build_identity": "e11018a79a62ce91fa723deaad6939c1e48a47bace21b3527ae84f4452148451",
+  "command": "PS5_MEMORY_DIAGNOSTICS=0 PS5_VULKAN_DIR=\"$PWD/build/xmb-normal-vulkan\" bash tools/verify.sh",
+  "raw_capture": "klog/thumbnail-input-upload-20260919-205531/report.json",
+  "lines": [
+    "All five gates passed; 74 tests; 278 frontend sources; 179 patch edits.",
+    "Async thumbnail conversion preserves requested RGBA order; non-RGBA conversion also passes.",
+    "Compiled input and joypad defaults select ps5; reset restores auto-binding discovery on next poll.",
+    "Three regression tests failed before the fix and pass afterward.",
+    "Uploaded executable runtime identity verified; configuration unchanged; no agent launch or kill.",
+    "Owner response after deployment: Perfect. Commit",
+    "Acceptance is owner confirmation; no fresh console logs or separately reported checklist results."
+  ]
+}

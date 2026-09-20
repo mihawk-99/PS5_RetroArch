@@ -1,0 +1,14 @@
+{
+  "step": "thumbnail-input-defaults",
+  "note": "Host regression/build results and machine-verified deployment, with owner acceptance; no new runtime-log assertion.",
+  "must_contain": [
+    "All five gates passed; 74 tests",
+    "preserves requested RGBA order",
+    "joypad defaults select ps5",
+    "configuration unchanged",
+    "Perfect. Commit",
+    "no fresh console logs"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner confirmed the uploaded fixes and requested commit: Perfect. Commit"
+}

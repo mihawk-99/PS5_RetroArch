@@ -492,6 +492,14 @@ extern "C" input_driver_t input_ps5 = {
     nullptr, /* keypress_vibrate */
 };
 
+// Defaults clear RetroArch's auto-binds without recreating the pad driver.
+// Reannounce once on the next poll, after all default settings have been applied.
+extern "C" void ps5_input_reset_autoconfig() noexcept
+{
+    if (active_pad)
+        active_pad->announced = false;
+}
+
 extern "C" input_device_driver_t ps5_joypad = {
     joypad_init, joypad_query, joypad_destroy, joypad_button, joypad_state, joypad_get_buttons,
     joypad_axis, joypad_poll,  nullptr,        nullptr,       nullptr,      nullptr,

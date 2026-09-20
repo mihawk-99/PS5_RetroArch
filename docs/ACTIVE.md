@@ -4,46 +4,40 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**Owner confirms XMB crashes and periodic stutter are fixed.**
-Landing on `main` with current logging unchanged. Details: `docs/XMB_LIST_SAFETY.md`.
-Acceptance and build evidence: `evidence/xmb-safe-list-run/`.
+**Owner accepted the thumbnail and configuration-reset fixes: “Perfect. Commit”.**
+Landing on `main`; evidence: `evidence/thumbnail-input-defaults/`.
+Details and regression checks: `docs/THUMBNAIL_INPUT_DEFAULTS.md`.
 
-- Tested diagnostic: `88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6`.
-  Owner ran it manually and reports brief hitches roughly every five seconds.
-  Read-only capture: `klog/xmb-stutter-20260919-200720/`; sanitized evidence:
-  `evidence/xmb-safe-list-run/`. No launch or kill was sent by the agent.
-- The matching 55.422-second session has zero allocation failures/dropped records,
-  zero failed image creations or queue-idle calls, and clean frontend/native quit.
-  First sample includes 7,385 compact XMB nodes and 7,386 callbacks. Native peak
-  is 6,518,064 requested bytes; tracked mapped allocations return to zero at exit.
-  Frontend ERROR lines and trace GPU API failure/refusal records are zero.
-- Post-run kernel collection includes backlog; it is not a full launch-to-exit
-  capture. Repeated native dlopen failures at Vulkan init are the existing
-  libvulkan.so.1/libvulkan.so probes, followed by the statically linked entry point.
-- Diagnostic tick runs before presentation: every five seconds it holds the
-  observer mutex, scans 131,072 slots and synchronously writes summary/caller rows.
-  This matches the reported hitch cadence; exact stall duration was not measured.
-- Normal identity: `2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6`.
-  PS5_MEMORY_DIAGNOSTICS=0; all five gates pass, 71 tests, 278/278 sources. ELF
-  inspection confirms observer functions/hooks absent and safe allocator present.
-  `klog/xmb-normal/` preserves exact artifacts, gate log and inspection.
-  Uploaded/readback verified; config preserved; no launch. Capture:
-  `klog/xmb-normal-upload-20260919-201708/`.
-- All four saved driver archives match the tested diagnostic. Mesa utility object
-  bytes differ only in debug compilation-directory information; stripping debug
-  info makes all three byte-identical. PS5_Vulkan source remains unchanged.
-- Accepted changes: nodes 15,488 -> 96 bytes, visible-only optional icon paths,
-  reclaimable mapped node/callback slabs, checked append/prepend/copy operations,
-  first-failure population stop and retry reset on clear. Shared patched headers
-  participate in the full frontend build fingerprint. No driver sources changed.
-- Diagnostic passed all five gates, 71 tests, 278/278 frontend sources. Exact ELF,
-  map, title, manifest, archive hashes and log: `klog/xmb-safe-lists/`.
-  Linked libps5vk is 11ff0f410c80 (older crash used 8c2a1c46a38e).
-- Owner confirmed the normal build fixed the hitches and requested the commit.
-  No new normal-run logs were captured; this acceptance is the owner observation.
-  RetroArch.log, trace and passive klog remain; the observer stays opt-in.
-  Broader RGUI/XMB and game/menu visual checks remain useful follow-ups.
-  The separate unsafe driver error logger under genuine OOM is not fixed here.
+- Async image loading discarded the requested RGBA flag; patch 0081 preserves it.
+  Gameplay pixels and saved PNG encoding are unchanged.
+- Compiled input was ps5 but joypad default was null; patch 0082 selects ps5.
+  Reset also clears auto-binds without recreating the driver, so the next pad poll
+  now reannounces the connected controller once to restore the built-in profile.
+- Three regression tests failed before the fixes; all four focused tests pass
+  afterward, including native-pad recovery without new samples or a device reopen.
+- All five gates pass: 74 tests, 278 frontend sources; normal diagnostics mode.
+  Identity: `e11018a79a62ce91fa723deaad6939c1e48a47bace21b3527ae84f4452148451`.
+  Exact artifacts/gate logs: `klog/thumbnail-input-build/`; sanitized host report
+  in evidence/thumbnail-input-defaults/. Driver archives and Mesa utility objects
+  match the accepted normal XMB build. Logging and PS5_Vulkan unchanged.
+- Uploaded eboot only after idle checks, runtime identity read back, live config
+  unchanged. Capture: `klog/thumbnail-input-upload-20260919-205531/`. Saved joypad
+  selection was empty (automatic), not null; no configuration repair was needed.
+  No launch/kill sent. Owner accepted the fixes after deployment. No fresh console
+  logs or individual checklist results were captured; acceptance is owner observation.
+
+## Accepted XMB baseline
+
+`601e575` fixed large-list allocation failures; `6b857a9` merged the remote README.
+Owner confirmed crash-free navigation, then normal build removed five-second hitches.
+Normal identity: `2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6`.
+Both build modes passed all five gates and 71 tests; current logging was retained.
+Evidence: `evidence/xmb-safe-list-run/`; detail: `docs/XMB_LIST_SAFETY.md`.
+Diagnostic capture had zero allocation failures/drops/image or idle failures,
+zero frontend ERROR/GPU refusals and clean quit. Native requested peak: 6,518,064
+bytes. Kernel capture was post-run backlog, not a full launch-to-exit recording.
+Normal acceptance was owner observation, without a fresh normal-run log capture.
+The unsafe driver error logger under arbitrary OOM remains outside the frontend fix.
 
 ## Failure being addressed
 

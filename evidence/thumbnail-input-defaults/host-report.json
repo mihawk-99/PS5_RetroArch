@@ -1,0 +1,58 @@
+{
+  "kind": "host verification and owner acceptance",
+  "build_identity": "e11018a79a62ce91fa723deaad6939c1e48a47bace21b3527ae84f4452148451",
+  "command": "PS5_MEMORY_DIAGNOSTICS=0 PS5_VULKAN_DIR=\"$PWD/build/xmb-normal-vulkan\" bash tools/verify.sh",
+  "returncode": 0,
+  "gates": [
+    "format",
+    "unit",
+    "build",
+    "integration",
+    "evidence"
+  ],
+  "tests": 74,
+  "frontend_sources": 278,
+  "patch_edits": 179,
+  "regressions_observed_before_fix": [
+    "async thumbnail red/blue order",
+    "compiled joypad selected null",
+    "reset did not request auto-bind refresh"
+  ],
+  "first_full_attempt": "unit failure: expected four configuration.c edits, now five; inventory corrected",
+  "driver_archives": {
+    "libps5vk.ps5.a": "11ff0f410c80ba99863bca4c5545ed100a49f720a480fc2d5bb312ebcd3969d1",
+    "libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7",
+    "libpsbc_driver.ps5.a": "a7605370c28895a3b5a13d0718ebfea2abf1b9cf842633de07533775745b21b8",
+    "libpsbc_support.ps5.a": "e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8"
+  },
+  "mesa_objects_match_accepted_normal_build": true,
+  "memory_observer_present": false,
+  "reset_hook_linked": true,
+  "raw_artifacts": "klog/thumbnail-input-build/",
+  "artifact_sha256": {
+    "llvm-pie.elf": "a4d88f792a52e27a489f3670da013abc16ec6dcd71d0343bd87f530adeeae1e2",
+    "title.map": "c7e018a007f6f834c426eaa43261558cc0bd74c1e010af30015f1143ed019dee",
+    "title_build_identity.h": "a0381722ef138d47f3e23917c050ac322e38e9ef7dfd590b9d2cf1aaeac93951",
+    "eboot.bin": "aca3f171a2b7d553d5fd035424c53d17b58d4d97bd300659d26e8aefb0c4630a",
+    "manifest.sha256": "3e368f09952578786674131e24c8f4b5f02d68887d63aa241a2b4581040821c1"
+  },
+  "source_sha256": {
+    "src/input_ps5.cpp": "17f0c7b0706c736ccd41de36246cdda0eaa1cb5c788ebb0c4cd1964c181690b1",
+    "tools/apply-port-patches.py": "84ffbf56217422537d4400b1555a4a09d1abc2d0dfa9edd0746b6649354f577b",
+    "tests/test_thumbnail_defaults.py": "5dafbf3d349dcf448db3302d19a91fc073f438b406b6b5acd655588eabd6f784",
+    "tests/input_ps5_test.cpp": "b5e43ca730c8eccc3e9c2ce6121c8f464f6751b031b52e093adefe4afd275749",
+    "tests/test_frontend.py": "43e35cab58a8b1444f19888c7fe0f2bc48a97e71f9d486a29c2789a274ee7d3d"
+  },
+  "deployment": {
+    "raw_capture": "klog/thumbnail-input-upload-20260919-205531/",
+    "runtime_identity_verified": true,
+    "configuration_unchanged": true,
+    "launched": false
+  },
+  "owner_acceptance": {
+    "quote": "Perfect. Commit",
+    "scope": "confirmation of the uploaded thumbnail and configuration-reset fixes",
+    "fresh_console_logs_captured": false,
+    "individual_checklist_results": "not separately reported"
+  }
+}
