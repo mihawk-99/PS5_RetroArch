@@ -249,6 +249,18 @@ for core_name in "${core_names[@]}"; do
     cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/cores/"
 done
 
+# PPSSPP resolves its assets as <system>/PPSSPP, and RetroArch's system directory in
+# this title is /app0/system. Without the tree a game boots with "Core system files
+# missing, expect bugs": no flash0 fonts, no language files, no shaders. Only the
+# cores that stage it contribute, so a build without PPSSPP is unchanged.
+if [[ -d $root/build/cores/stage/system/PPSSPP ]]; then
+    mkdir -p "$dist/system"
+    rm -rf -- "$dist/system/PPSSPP"
+    cp -a -- "$root/build/cores/stage/system/PPSSPP" "$dist/system/PPSSPP"
+    printf '==> [title] staged PPSSPP assets: %s files in %s/system/PPSSPP\n' \
+        "$(find "$dist/system/PPSSPP" -type f | wc -l)" "$dist"
+fi
+
 # The Vulkan driver, beside the title, when it exists.
 #
 # RetroArch does not link Vulkan: it dlopens "libvulkan.so.1" at run time

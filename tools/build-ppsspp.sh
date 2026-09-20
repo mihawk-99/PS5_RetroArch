@@ -123,6 +123,28 @@ core=$(find "$build/ps5-build" -maxdepth 2 -name 'ppsspp_libretro.so' -print -qu
 cp -- "$core" "$build/ppsspp_libretro.so"
 python3 tools/check-core.py "$build/ppsspp_libretro.so" --report "$build/abi.json"
 cp -- "$build/ppsspp_libretro.so" "$root/build/cores/stage/cores/ppsspp_libretro.so"
+
+# PPSSPP's runtime asset tree, which the core resolves as <system>/PPSSPP: flash0
+# fonts, the language files, the shader sources, the debugger, the zim atlases,
+# compat.ini and the cheat/known-function tables. Without it a game boots with
+# "Core system files missing, expect bugs" and text, audio and effects are missing.
+#
+# The source checkout is the canonical tree and the complete one: PPSSPP ships
+# assets/ in the repository (193 files), while the build directory only receives a
+# partial copy through CMake's file(INSTALL) rules for the GUI bundle (187 files -
+# it omits cheats.json, knownfuncs.ini, compatvr.ini, redump.csv and two others).
+# The source tree is therefore preferred, and the build tree is only a fallback so
+# an upstream that stops shipping assets/ is noticed here rather than at runtime.
+assets="$source_dir/assets"
+[[ -d $assets ]] || assets=$(find "$build/ps5-build" -maxdepth 2 -type d -name assets -print -quit)
+[[ -n $assets && -d $assets ]] || { echo "error: no PPSSPP asset tree in the source or build tree" >&2; exit 2; }
+rm -rf -- "$root/build/cores/stage/system/PPSSPP"
+mkdir -p "$root/build/cores/stage/system"
+cp -a -- "$assets" "$root/build/cores/stage/system/PPSSPP"
+printf '==> [ppsspp] staged the runtime assets from %s: %s files, %s bytes\n' \
+    "${assets#"$root"/}" \
+    "$(find "$root/build/cores/stage/system/PPSSPP" -type f | wc -l)" \
+    "$(du -sb "$root/build/cores/stage/system/PPSSPP" | cut -f1)"
 cp -- "$info" "$root/build/cores/stage/info/ppsspp_libretro.info"
 
 # The input identity: the commit, every submodule SHA, the patch and tooling hashes,
@@ -144,6 +166,16 @@ report.update(source_revision=revision,
                       text=True).splitlines() if line.startswith(' '))),
               info_revision=info_revision, info_sha256=info_sha)
 report['sdk_compiler_wrapper_sha256'] = sha(pathlib.Path('.deps/native/ps5-payload-sdk/bin/prospero-clang'))
+# The asset tree is a directory, so its identity is a digest over its file names and
+# contents in sorted order rather than one file hash.
+assets_dir = pathlib.Path('build/cores/stage/system/PPSSPP')
+asset_files = sorted(p for p in assets_dir.rglob('*') if p.is_file()) if assets_dir.is_dir() else []
+asset_digest = hashlib.sha256()
+for path in asset_files:
+    asset_digest.update(str(path.relative_to(assets_dir)).encode() + b'\0')
+    asset_digest.update(hashlib.sha256(path.read_bytes()).digest())
+report['ppsspp_assets_files'] = len(asset_files)
+report['ppsspp_assets_sha256'] = asset_digest.hexdigest()
 report['port_inputs_sha256'] = {name: sha(pathlib.Path(name)) for name in
     ['tools/build-ppsspp.sh', 'tooling/ppsspp/ps5-toolchain.cmake',
      'tooling/ppsspp/ps5-libc-shims.cpp', 'tooling/native/core_cxx_runtime.cpp',

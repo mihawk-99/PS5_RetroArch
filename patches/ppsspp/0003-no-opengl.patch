@@ -1,0 +1,104 @@
+diff --git a/Common/CMakeLists.txt b/Common/CMakeLists.txt
+index 7588aa4..916b721 100644
+--- a/Common/CMakeLists.txt
++++ b/Common/CMakeLists.txt
+@@ -353,6 +353,28 @@ add_library(Common STATIC
+ 	${CMAKE_SOURCE_DIR}/ext/jpge/jpge.h
+ )
+ 
++# PS5: no OpenGL context anywhere in this port. The libretro core runs PPSSPP's
++# software GPU core or its Vulkan renderer, and the frontend itself is built with
++# --disable-opengl. The OpenGL backend's raw gl*() calls would become SDK imports
++# that nothing on the console resolves, and the native core loader refuses a core
++# whose import address is null - which is exactly how the first console load failed
++# ("unresolved native runtime import: glGetString").
++if(PPSSPP_PS5)
++	list(REMOVE_ITEM CommonVR
++		GPU/OpenGL/GLDebugLog.cpp
++		GPU/OpenGL/GLSLProgram.cpp
++		GPU/OpenGL/gl3stub.c
++		GPU/OpenGL/GLFeatures.cpp
++		GPU/OpenGL/GLFrameData.cpp
++		GPU/OpenGL/thin3d_gl.cpp
++		GPU/OpenGL/GLMemory.cpp
++		GPU/OpenGL/GLRenderManager.cpp
++		GPU/OpenGL/GLQueueRunner.cpp
++		GPU/OpenGL/GLProfiler.cpp
++		GPU/OpenGL/DataFormatGL.cpp
++		GPU/OpenGL/OpenGLGraphicsContext.cpp)
++endif()
++
+ if(LIBRETRO)
+ 	target_include_directories(Common PRIVATE ${CMAKE_SOURCE_DIR}/libretro/libretro-common/include)
+ endif()
+diff --git a/GPU/CMakeLists.txt b/GPU/CMakeLists.txt
+index a095300..56b5715 100644
+--- a/GPU/CMakeLists.txt
++++ b/GPU/CMakeLists.txt
+@@ -66,7 +66,10 @@ set(GPU_D3D11
+ )
+ 
+ # We build Vulkan even on Apple to avoid annoying build differences.
+-set(GPU_IMPLS ${GPU_GLES} ${GPU_VULKAN})
++set(GPU_IMPLS ${GPU_VULKAN})
++if(NOT PPSSPP_PS5)
++	list(APPEND GPU_IMPLS ${GPU_GLES})
++endif()
+ if(WIN32)
+ 	list(APPEND GPU_IMPLS ${GPU_D3D11})
+ endif()
+diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
+index 8f972d0..a40c7f3 100644
+--- a/libretro/CMakeLists.txt
++++ b/libretro/CMakeLists.txt
+@@ -2,11 +2,18 @@
+ set(LIBRETRO_SRCS
+ 	libretro.cpp
+ 	LibretroGraphicsContext.cpp
+-	LibretroGLContext.cpp
+-	LibretroGLCoreContext.cpp
+ 	LibretroVulkanContext.cpp
+ 	LibretroVulkanPresentation.cpp)
+ 
++# PS5 has no GL context to create, so the two GL backends are not built at all: their
++# gl*() references would otherwise reach the core's import table as symbols nothing on
++# the console resolves (see the note in Common/CMakeLists.txt).
++if(NOT PPSSPP_PS5)
++	set(LIBRETRO_SRCS ${LIBRETRO_SRCS}
++		LibretroGLContext.cpp
++		LibretroGLCoreContext.cpp)
++endif()
++
+ if(WIN32)
+ 	set(LIBRETRO_SRCS ${LIBRETRO_SRCS}
+ 		LibretroD3D11Context.cpp)
+diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
+index 26592b9..710df13 100644
+--- a/libretro/LibretroGraphicsContext.cpp
++++ b/libretro/LibretroGraphicsContext.cpp
+@@ -1,7 +1,9 @@
+ 
+ #include "libretro/LibretroGraphicsContext.h"
++#if !PPSSPP_PLATFORM(PS5)
+ #include "libretro/LibretroGLContext.h"
+ #include "libretro/LibretroGLCoreContext.h"
++#endif
+ #include "libretro/LibretroVulkanContext.h"
+ #ifdef _WIN32
+ #include "libretro/LibretroD3D11Context.h"
+@@ -102,6 +104,7 @@ LibretroGraphicsContext *LibretroGraphicsContext::CreateGraphicsContext() {
+ 		preferred = Libretro::backend;
+ 
+    std::string errorMessage;
++#if !PPSSPP_PLATFORM(PS5)
+ #ifndef USING_GLES2
+ 	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_OPENGL_CORE) {
+ 		ctx = new LibretroGLCoreContext();
+@@ -124,6 +127,7 @@ LibretroGraphicsContext *LibretroGraphicsContext::CreateGraphicsContext() {
+       // Failed? Try next.
+       delete ctx;
+ 	}
++#endif  // !PPSSPP_PLATFORM(PS5)
+ 
+ #ifndef HAVE_LIBNX
+ 	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_VULKAN) {

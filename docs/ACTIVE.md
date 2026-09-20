@@ -8,34 +8,32 @@ Plan: [PPSSPP_Implementation_Plan.md](../PPSSPP_Implementation_Plan.md); platfor
 analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). Track A is PPSSPP on its
 software GPU core, with no PS5_Vulkan dependency.
 
-**Done — A1, A2: platform branch and cross build.** `tools/build-ppsspp.sh` fetches
-pinned `f293b10` (29 submodules), applies two zero-fuzz patches, configures the tree
-with `tooling/ppsspp/ps5-toolchain.cmake` and ABI-checks the result: 18,485,448 bytes,
-25 exports, **zero `PT_TLS`**, three 16 KiB segments (no W+X), `NEEDED` exactly the
-three allowed modules. Reports: `build/cores/ppsspp/{abi.json,build.json}`.
-`thread_local` needed no patch — the SDK uses `-femulated-tls`; two flag shims
-(`static_assert`, `ZSTD_TRACE`) and a four-call libc shim carry the vendored
-third-party code. Detail: `docs/PHASE_LOG.md`.
+**Done — A1-A3: build, ABI and title link.** `tools/build-ppsspp.sh` fetches pinned
+`f293b10` (29 submodules) and ABI-checks a core with **zero `PT_TLS`** and `NEEDED`
+exactly the three allowed modules; `ppsspp` is in `core_names`, so the title links it.
+`thread_local` needed no patch (the SDK uses `-femulated-tls`); two flag shims
+(`static_assert`, `ZSTD_TRACE`) and a libc shim carry the vendored code.
+Reproducibility: `SOURCE_DATE_EPOCH` from the pinned commit, two builds byte-identical.
 
-**Done — A3: the title link.** `ppsspp` joined `core_names` and the identity inputs;
-all 479 of the core's imports resolve (`localtime_r` through the existing
-`rtime_localtime` alias, `__emutls_get_address` from the clang builtins the title
-already links), the frontend and title link, and `core imports` grows to **497
-bindings for 6 cores**. Title identity `ed3f78147e015696…`, `eboot.bin` 34,655,444
-bytes, six cores staged in `dist/PPSA99169/`.
+**Done — A4: the core loads on the console.** The loader diagnostic passes:
+`cycles=8, exports=25, api=1`, identity `73d2aad8…`, `ran 110 initializers`,
+`symbols=19430 relocations=24812 mapped_bytes=18923520`. Three blockers fell, each
+found on the console: unresolvable imports (four `libScePosixForWebKit` symbols now
+shimmed, 83 OpenGL ones excluded by `patches/ppsspp/0003-no-opengl.patch`; table 497 →
+410 bindings), the thread pool (256/512 → **16/32**), and the runtime assets
+(`assets/` from the pinned source, 193 files, staged to `dist/…/system/PPSSPP` and
+published to `/app0/system/PPSSPP`). Evidence: `evidence/ppsspp-native/`.
 
-**Done — reproducibility, and the five cores are undisturbed.** The varying input was
-libpng's `__DATE__`/`__TIME__` banner string; `SOURCE_DATE_EPOCH` is now derived from
-the pinned commit and two consecutive builds are byte-identical
-(`8346e010a8781f8c…`). Rebuilding fceumm and fbneo at the pre-change commit
-`b1dced9` gives the same two hashes as this tree, and mgba, snes9x and Genesis Plus
-GX are byte-identical to their committed evidence, so nothing the PPSSPP work did
-changes a shipped core.
+**Blocker — the first frame.** The title takes a SIGSEGV on a worker thread during
+`ThreadManager::Init` (fault address 0x70, frames inside `libkernel.sprx`), so no PSP
+frame has been presented. Renderer-independent, and next.
 
-**Next — A4: the first console load.** `--core-test=ppsspp` now arms the loader
-diagnostic (eight load/unload cycles of the 18.5 MB core, no `retro_init`, so no
-Vulkan device is created), which is the console step that needs the owner's launch.
-Then A5: `system/PPSSPP/` assets plus a PSP homebrew, both owner-supplied.
+**Driver: rung 1.0 closed, title relinked.** `PS5_Vulkan` `d4e73ff`, embedded
+`libps5vk.ps5.a` `d41f934b…`, title identity `735f7eb1…`, all five gates pass. Still
+missing for PPSSPP's Vulkan renderer: a **combined depth/stencil format** (only D16 and
+D32F exist; PPSSPP asserts without one of D24S8/D32S8/D16S8 — the device-creation
+blocker), **attachments smaller than 3840x2160**, **cull mode**, **colour write
+masks**, **stencil test with dynamic stencil state** and **dynamic blend constants**.
 
 ## Now
 

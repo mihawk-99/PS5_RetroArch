@@ -1,0 +1,59 @@
+{
+  "step": "ppsspp-native",
+  "recorded": "2026-09-20",
+  "revision": "735f7eb1 (title) / 73d2aad8 (the build the console ran)",
+  "command": "JOBS=14 bash tools/run-title.sh --no-build --core-test=ppsspp --watch 150",
+  "raw_capture": "klog/run-PPSA99169-001812.log, klog/core-loader-test-001812.json, klog/retroarch-001812.log",
+  "lines": [
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=PPSSPP",
+    "core loader: ran 110 initializers",
+    "core loader: ready symbols=19430 relocations=24812 mapped_bytes=18923520",
+    "core loader: ran 1 finalizers",
+    "core loader: open failed errno=2",
+    "core ABI PASS: ppsspp_libretro.so; 25 exports; kernel_web",
+    "core imports: 410 explicit native bindings for 6 cores",
+    "ThreadManager::Init(compute threads: 16, all: 32)",
+    "ppsspp assets staged: 193 files, 22689639 bytes",
+    "assets sha256: 223c78b24bff504ba89e20693de70976",
+    "Host verification: PASS format unit build integration evidence"
+  ],
+  "failures_fixed_this_round": [
+    "core loader: unresolved native runtime import: gai_strerror",
+    "core loader: unresolved native runtime import: glGetString"
+  ],
+  "loader": {
+    "build_identity": "build identity: 73d2aad8a13e5ad04dcbc61c605711d5f070d2c471ca3eb958ee4d15397ba186",
+    "passed": true,
+    "cycles": 8,
+    "exports": 25,
+    "api": 1,
+    "missing_rejected": true,
+    "unknown_symbol_rejected": true
+  },
+  "core": {
+    "sha256": "680241a9740228386aacd0a18c558fbaf878dbd99b04ae2b3d920eefd0f45110",
+    "bytes": 18164912,
+    "source_revision": "f293b10fb2d9dc0c2bc10281444ee3d3e932e6ad",
+    "pt_tls_segments": 0,
+    "needed": ["libkernel_web.sprx", "libSceLibcInternal.sprx", "libScePosixForWebKit.sprx"],
+    "imports_structured": 392,
+    "gl_egl_imports": 0
+  },
+  "assets": {
+    "files": 193,
+    "bytes": 22689639,
+    "sha256": "223c78b24bff504ba89e20693de70976",
+    "staged_at": "dist/PPSA99169/system/PPSSPP",
+    "console_path": "/data/homebrew/PPSA99169/system/PPSSPP"
+  },
+  "platform": {
+    "thread_pool": "16 compute / 32 total (was 256 / 512 before the CPUDetect fix)",
+    "cpu_detection": "physical cores from CPUID leaf 0x80000008, SMT siblings from sysconf(_SC_NPROCESSORS_ONLN)"
+  },
+  "first_frame": {
+    "verified": false,
+    "blocker": "SIGSEGV on a worker thread during ThreadManager::Init: fault address 0x70, backtrace frames inside libkernel.sprx text (0x80004055c, 0x800040638, 0x8000407fb per the capture's xotext line 0x800000000-0x800044000)",
+    "raw_capture": "klog/run-PPSA99169-002106.log"
+  },
+  "host_verification": "PASS format unit build integration evidence"
+}

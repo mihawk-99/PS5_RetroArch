@@ -1,5 +1,5 @@
 diff --git a/Common/CPUDetect.cpp b/Common/CPUDetect.cpp
-index c5dfa71..3d09771 100644
+index c5dfa71..ec4da0b 100644
 --- a/Common/CPUDetect.cpp
 +++ b/Common/CPUDetect.cpp
 @@ -30,6 +30,8 @@
@@ -11,27 +11,37 @@ index c5dfa71..3d09771 100644
  #endif
  
  #include <cstdint>
-@@ -464,6 +466,18 @@ void CPUInfo::Detect() {
+@@ -464,6 +466,28 @@ void CPUInfo::Detect() {
  			logical_cpu_count = num / std::max(num_cores, 1);
  		}
  	}
 +#elif PPSSPP_PLATFORM(PS5)
-+	// The payload SDK answers the online processor count through sysconf. There is
-+	// no /proc, and the console does not report SMT siblings through sysctl, so the
-+	// worker pool is sized from the logical count alone. Without this branch the
-+	// counts stay at the 1/1 defaults set above and the emulator runs single-core.
++	// The payload SDK answers the online hardware-thread count through sysconf; there
++	// is no /proc and no sysctl name for it. The two fields are NOT two totals:
++	// ThreadManager::Init multiplies them (numRealCores * numLogicalCoresPerCpu), so
++	// they must be physical cores and threads per core. Setting both from sysconf
++	// (16 and 16 on this console) asked for 256 compute threads and 512 in total,
++	// which is what the first successful console load reported. Take the physical
++	// core count from CPUID leaf 0x80000008 like the AMD branch above, and derive
++	// SMT siblings from the online count.
 +	{
 +		long online = sysconf(_SC_NPROCESSORS_ONLN);
 +		if (online > 0) {
-+			logical_cpu_count = (int)online;
-+			num_cores = logical_cpu_count;
++			num_cores = (int)online;
++			if (max_ex_fn >= 0x80000008) {
++				do_cpuid(cpu_id, 0x80000008);
++				const int physical = (cpu_id[2] & 0xFF) + 1;
++				if (physical > 0 && physical <= online)
++					num_cores = physical;
++			}
++			logical_cpu_count = (int)(online / std::max(num_cores, 1));
 +		}
 +	}
  #endif
  	if (logical_cpu_count <= 0)
  		logical_cpu_count = 1;
 diff --git a/ppsspp_config.h b/ppsspp_config.h
-index 7984a3d..18021e8 100644
+index 7984a3d..f37fe2e 100644
 --- a/ppsspp_config.h
 +++ b/ppsspp_config.h
 @@ -124,6 +124,12 @@
@@ -47,3 +57,14 @@ index 7984a3d..18021e8 100644
  #endif
  
  // Windows ARM/ARM64, and Windows UWP (all), are the only platform that don't do GL at all (until Apple finally removes it)
+@@ -135,6 +141,10 @@
+ #endif
+ #elif PPSSPP_PLATFORM(IOS_APP_STORE)
+ // No GL
++#elif PPSSPP_PLATFORM(PS5)
++// No GL: this port has no GL context driver and never selects PPSSPP's GL backend
++// (see Common/CMakeLists.txt). PPSSPP_API_ANY_GL also gates GPU/GPU.cpp's factory,
++// which is what turns a GLES request into a clean nullptr instead of a build.
+ #else
+ // All other platforms support GL.
+ #define PPSSPP_API_ANY_GL 1

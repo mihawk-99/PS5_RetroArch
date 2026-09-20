@@ -2748,3 +2748,117 @@ replayed, 0 failed).
 
 **Not proven.** Everything console-side: load, initialisation, teardown, and a game.
 The launch needs the owner; the assets (system/PPSSPP/) and content are owner-supplied.
+
+## 2026-09-19 — PPSSPP A4: the core loads on the console, and the assets land in system/
+
+**The core loads.** The console loader test passed for PPSSPP:
+`{"build_identity":"build identity: 73d2aad8a13e5ad0…","core":"ppsspp","passed":true,"cycles":8,
+"exports":25,"api":1,"missing_rejected":true,"unknown_symbol_rejected":true}` — eight full
+load/unload cycles of the 18.1 MB core, all 25 libretro exports, the API version, and
+both negative cases still rejected. The loader log names the real work:
+`ran 110 initializers`, `ready symbols=19430 relocations=24812 mapped_bytes=18923520`.
+
+Three separate blockers had to fall before that, and each was found on the console
+rather than by reading code:
+
+- **Unresolvable imports.** The first run failed with `unresolved native runtime
+  import: gai_strerror`, then `glGetString` once that was fixed. The cause is the
+  loader's rule that every import must have an address: the title can carry imports
+  it never calls, but a core cannot, so any symbol the console leaves null is fatal.
+  Two groups qualified. `libScePosixForWebKit` supplies `gai_strerror`, `getaddrinfo`,
+  `freeaddrinfo` and `isatty` — and no core this title has ever shipped imported
+  anything from that module, so it had never been exercised. They are now implemented
+  in `tooling/ppsspp/ps5-libc-shims.cpp` (resolver refuses with EAI_FAIL, isatty
+  answers 0, which is true). The other 83 were the OpenGL backend, which this port
+  can never use: `patches/ppsspp/0003-no-opengl.patch` drops `Common/GPU/OpenGL/*`,
+  `GPU/GLES/*`, the two libretro GL contexts and PS5's `PPSSPP_API_ANY_GL`, so the
+  core has **zero** gl*/egl* imports and the import table fell from 497 bindings to
+  410. Every remaining import resolves from `libkernel_web` or `libSceLibcInternal`,
+  the two modules the frontend already proves.
+
+- **The thread pool.** The first successful load logged `ThreadManager::Init(compute
+  threads: 256, all: 512)`. PPSSPP's `Init` multiplies its two arguments
+  (`numRealCores * numLogicalCoresPerCpu`), so they are cores and threads-per-core,
+  not two totals; the platform branch had set both from `sysconf`. It now takes the
+  physical core count from CPUID leaf 0x80000008 and derives SMT siblings from the
+  online count: **16 compute / 32 total**, which is right for this console.
+
+- **The runtime assets.** PPSSPP resolves them as `<system>/PPSSPP` and reported
+  "Core system files missing, expect bugs". `tools/build-ppsspp.sh` now stages the
+  **source tree's** `assets/` — the canonical, complete tree (193 files, 22 MiB) —
+  rather than the 187-file partial copy CMake leaves in the build directory (it omits
+  `cheats.json`, `knownfuncs.ini` and four others), and `tools/build-title.sh` copies
+  it to `dist/PPSA99169/system/PPSSPP`, which the deploy publishes. Verified on the
+  console: `/data/homebrew/PPSA99169/system/PPSSPP` holds the full tree including
+  `flash0` (18), `debugger` (12), `shaders` (54) and `lang` (48). The warning is gone
+  from the run log, and the tree's digest is recorded in `build.json`
+  (`ppsspp_assets_sha256 223c78b2…`).
+
+**Still open: the first frame.** With the core loading and the assets found, the run
+reaches `retro_init`'s end and then the title takes a **SIGSEGV on a worker thread**:
+`proc name: eboot.bin`, `thread ID: 102061` (not the main thread), `page fault (user
+read data, page not present)`, `fault address 0x70`, and the backtrace's frames
+(`0x80004055c`, `0x800040638`, `0x8000407fb`) all lie in `libkernel.sprx`'s text
+(0x800000000–0x800044000 per the capture's own `xotext` line), i.e. inside the
+console's thread machinery rather than in PPSSPP's code. The frontend log ends at
+`ThreadManager::Init`, which logs *before* it creates the pool's 32 `std::thread`s —
+so worker-thread creation is where it dies. `patches/ppsspp/0004-software-backend-default.patch`
+is in place for the next run: on PS5 the `ppsspp_backend` default is now `"none"`
+(the libretro software context) because the Vulkan renderer cannot come up against a
+driver with no combined depth/stencil format, and the stalled Vulkan attempt is why
+earlier runs showed no progress past core init. The console's saved core options were
+cleared so the new default applies.
+
+**Gates.** `bash tools/verify.sh` — PASS on all five.
+
+## 2026-09-20 — PPSSPP relinked against rung-1.0, and what that rung does not cover
+
+The owner closed PS5_Vulkan's rung 1.0 (`d4e73ff`, "the depth pair proved -- rung 1.0
+closed": D16_UNORM's and D32_SFLOAT's SAMPLED_IMAGE and BLIT_SRC were the last four
+unreached features) and asked for RetroArch to be built against it, then for PPSSPP to
+follow through it once stability testing is done.
+
+**The relink.** `bash tools/verify.sh` rebuilt the frontend and title against the
+sibling's current archives and passed all five gates (32 captures replayed):
+
+    libps5vk.ps5.a      d41f934b720e9ffff4c8a05b450e7a5a200abaaf9274a94eeefc1f9179704c21
+    libvk_runtime.ps5.a 4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7
+    libpsbc_driver.ps5.a 47db73edf649023688c536e6c1a2b3e5180d582db1440c2f54dbf5bdb4fe64b2
+    libpsbc_support.ps5.a e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8
+
+Title identity 735f7eb1acdc4f41a004eab0e6a86f2d4eab1ab2cf953eed0325ccbd74727c77.
+The sibling's tree is being rebuilt while this work runs — `libps5vk.ps5.a` changed
+twice inside this session (82055034 -> 3f816850 -> d41f934b) and its working tree
+carries uncommitted vertex-format work (`driver/ps5vk_image.c`, `driver/ps5vk_pipeline.c`,
+`tools/build-psbc-ps5.sh`, `tooling/psbc/patch-vertex-formats.py`), one edit of which
+postdates the archive. The hashes above are the ones this link embedded; a fresh
+relink is owed once the sibling's build settles.
+
+**The review: rung 1.0 gives PPSSPP its format matrix, not its renderer.** The rung
+closed reachable format features, the depth pair (attachment, sample, blit, transfers),
+wide, narrow, packed and signed colour targets, transfer coverage and the command and
+limits audits — all of which PPSSPP's texture cache wants. It did not touch the six
+things PPSSPP's Vulkan renderer needs, and the source still refuses each by name:
+
+- Combined depth/stencil: the table holds `VK_FORMAT_D16_UNORM` and
+  `VK_FORMAT_D32_SFLOAT` and no `S8` format at all (`driver/ps5vk_image.c:345,359`),
+  while PPSSPP's `VulkanContext::CreateDevice` requires one of D24_UNORM_S8_UINT,
+  D32_SFLOAT_S8_UINT or D16_UNORM_S8_UINT and asserts without it. This is the device
+  creation blocker, and it is why the earlier Vulkan-default runs stalled rather than
+  progressed.
+- Attachments smaller than 3840x2160: `driver/ps5vk_draw.c:526,570,587,709,754` still
+  reject any other extent, depth, colour, render area and inherited target alike.
+  PPSSPP renders PSP framebuffers at 512x272, 480x272, 384x272 and more.
+- Cull mode and front face (`driver/ps5vk_pipeline.c:825`), stencil test and dynamic
+  stencil state (`:831`, `:819`), per-channel colour write masks (`:858`) and dynamic
+  blend constants (`:819`) are unchanged refusals.
+
+**The other blocker is ours, not the driver's.** The console run after the loader test
+showed the title taking a SIGSEGV on a worker thread inside `ThreadManager::Init`
+(klog/run-PPSA99169-002106.log: fault address 0x70, frames in `libkernel.sprx` text).
+That happens whatever the renderer is, so it is the next step: PPSSPP cannot be
+"loaded through" anything until its thread pool survives creation.
+
+**Console evidence committed.** `evidence/ppsspp-native/` records the loader-test
+result, the import and thread fixes, the asset tree and the open first-frame blocker;
+`bash tools/verify.sh evidence` replays it (32 captures, 0 failed).

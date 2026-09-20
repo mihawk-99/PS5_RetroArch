@@ -1,0 +1,19 @@
+{
+  "step": "ppsspp-native",
+  "note": "PPSSPP Track A: the pinned PPSSPP core loads on the console (eight load/unload cycles), with the four unresolvable-import groups and the thread-pool sizing fixed and the runtime assets staged into the frontend's system folder. The first frame is NOT claimed: the title still takes a SIGSEGV on a worker thread during ThreadManager::Init, before any frame is presented.",
+  "must_contain": [
+    "core loader test: passed=1 cycles=8 exports=25 api=1 name=PPSSPP",
+    "core loader: ready symbols=19430 relocations=24812 mapped_bytes=18923520",
+    "core ABI PASS: ppsspp_libretro.so; 25 exports; kernel_web",
+    "core imports: 410 explicit native bindings for 6 cores",
+    "ThreadManager::Init(compute threads: 16, all: 32)",
+    "ppsspp assets staged: 193 files, 22689639 bytes",
+    "PASS format unit build integration evidence"
+  ],
+  "must_not_contain": [
+    "unresolved native runtime import: gai_strerror",
+    "unresolved native runtime import: glGetString",
+    "ThreadManager::Init(compute threads: 256"
+  ],
+  "human_check": "Owner directed the system-folder layout: PPSSPP's own asset tree (flash0, debugger, shaders, lang and the atlases) must be built into the frontend's system folder. That is staged from the pinned source's assets/ and published to /app0/system/PPSSPP. The owner has not yet seen a PSP frame from this core."
+}
