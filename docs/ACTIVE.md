@@ -61,18 +61,17 @@ Details and regression checks: `docs/THUMBNAIL_INPUT_DEFAULTS.md`.
   No launch/kill sent. Owner accepted the fixes after deployment. No fresh console
   logs or individual checklist results were captured; acceptance is owner observation.
 
-## Accepted XMB baseline
+## Accepted baselines
 
-`601e575` fixed large-list allocation failures; `6b857a9` merged the remote README.
-Owner confirmed crash-free navigation, then normal build removed five-second hitches.
-Normal identity: `2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6`.
-Both build modes passed all five gates and 71 tests; current logging was retained.
-Evidence: `evidence/xmb-safe-list-run/`; detail: `docs/XMB_LIST_SAFETY.md`.
-Diagnostic capture had zero allocation failures/drops/image or idle failures,
-zero frontend ERROR/GPU refusals and clean quit. Native requested peak: 6,518,064
-bytes. Kernel capture was post-run backlog, not a full launch-to-exit recording.
-Normal acceptance was owner observation, without a fresh normal-run log capture.
-The unsafe driver error logger under arbitrary OOM remains outside the frontend fix.
+- XMB: `601e575` fixed large-list allocation failures, `6b857a9` merged the README;
+  the owner confirmed crash-free navigation and the normal build removed the
+  five-second hitches. Detail: `docs/XMB_LIST_SAFETY.md`,
+  `evidence/xmb-safe-list-run/`.
+- Gameplay: Genesis Plus GX frontend `ecfcddd5…` with all five gates green and owner
+  acceptance of colours, sound, controls and menu/next-game transitions;
+  FCEUmm, mGBA, Snes9x and FBNeo evidence stays in `native-core-loading/`,
+  `mgba-native/`, `snes9x-native/` and `fbneo-native/`. Core pins, hashes and
+  acceptance limits are in `docs/PHASE_LOG.md`.
 
 ## Failure being addressed
 
@@ -86,13 +85,10 @@ arbitrary OOM remains outside the frontend fix.
 
 ## Previous console-verified baseline
 
-Genesis Plus GX frontend: `ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445`.
-All five gates passed, 66 tests; owner confirmed gameplay colours, sound, controls
-and clean menu/next-game transitions. Evidence: `evidence/genesis-plus-gx-native/`.
-FCEUmm, mGBA, Snes9x and FBNeo evidence remains in `native-core-loading/`,
-`mgba-native/`, `snes9x-native/` and `fbneo-native/` under evidence/.
-Earlier core source pins, hashes, raw captures and acceptance limits are preserved
-there and in docs/PHASE_LOG.md. No new core is assigned by this follow-up.
+Superseded by the baselines above and recorded in full in `docs/PHASE_LOG.md`: the
+Genesis Plus GX run `ecfcddd5…` (66 tests, owner-confirmed gameplay) and the FCEUmm,
+mGBA, Snes9x and FBNeo runs whose evidence stays in `native-core-loading/`,
+`mgba-native/`, `snes9x-native/` and `fbneo-native/`.
 
 ## Named errors and remaining limits
 
