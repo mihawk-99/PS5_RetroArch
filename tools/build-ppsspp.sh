@@ -179,8 +179,8 @@ report['ppsspp_assets_sha256'] = asset_digest.hexdigest()
 report['port_inputs_sha256'] = {name: sha(pathlib.Path(name)) for name in
     ['tools/build-ppsspp.sh', 'tooling/ppsspp/ps5-toolchain.cmake',
      'tooling/ppsspp/ps5-libc-shims.cpp', 'tooling/native/core_cxx_runtime.cpp',
-     'tooling/native/ps5-core.ld', 'patches/ppsspp/0001-platform-ps5.patch',
-     'patches/ppsspp/0002-cross-build-ps5.patch']}
+     'tooling/native/ps5-core.ld']
+    + [str(path) for path in sorted(pathlib.Path('patches/ppsspp').glob('*.patch'))]}
 (build / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
 printf '==> [ppsspp] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

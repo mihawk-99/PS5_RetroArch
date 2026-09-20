@@ -2862,3 +2862,57 @@ That happens whatever the renderer is, so it is the next step: PPSSPP cannot be
 **Console evidence committed.** `evidence/ppsspp-native/` records the loader-test
 result, the import and thread fixes, the asset tree and the open first-frame blocker;
 `bash tools/verify.sh evidence` replays it (32 captures, 0 failed).
+
+## 2026-09-20 — The PPSSPP worker crash, narrowed to libkernel's module lookup
+
+PPSSPP dies in `ThreadManager::Init` on the console, on the first worker thread. This
+entry records what the crash *is*, and what it is not, because the next attempt should
+start from here rather than repeat the probes.
+
+**The crash, read from the console's own dump.** `klog/run-PPSA99169-002106.log` and
+its successors: SIGSEGV on a thread whose id differs from the process (a worker), fault
+address `0x70`, `rip 0x8000407fb`, and a backtrace of
+`0x80004055c, 0x800040638, 0x20185ea6a, 0x800074d0`.
+
+**The console's libkernel can now be symbolized.** `/system/common/lib/libkernel.sprx`
+is readable over FTP (545,752 bytes, plain ELF) and its 1,270 exports are named by
+NID. SharpProspero's `NidEncoder` documents the mapping — the NID is the first eight
+bytes of `SHA1(name || salt)`, byte-reversed and base-64-encoded with a custom
+alphabet — and it validates against seven documented pairs (`puts=YQ0navp+YIc`,
+`malloc=gQX+4GDQjpM`, …). Computing NIDs for the SDK's 4,328 libkernel/libc symbols
+names 1,111 of that module's exports, which turns every console backtrace inside
+libkernel into function names. That tooling is the reusable result of this round.
+
+**What the backtrace says.** `0x8000407fb` is `pthread_get_specificarray_np + 0x3b`
+(NID `td+DYvbbDfk`), reached from the thread-creation path `pthread_create_name_np`
+(`0x800074d0`). Disassembling it shows why it faults: the function walks the frame
+pointer chain, takes a return address two frames up, calls a table lookup that searches
+0x98-byte records for the range containing that address, and reads `[result+0x70]`
+without checking for null — with `rbx = 0x8000711d0` in the register dump matching
+libkernel's `__stack_chk_guard`, which confirms the reading. The address it could not
+resolve, `0x20185ea6a`, is the third backtrace frame: **a return address inside this
+title's core, which the loader mapped anonymously.** The core is not a registered
+module, so the lookup misses.
+
+**What the probes ruled out.** `src/thread_probe.cpp` (opt-in, `/app0/thread-test.txt`)
+now runs, and passes, every case that could be built in the title: 32 concurrent
+`std::thread`s, `thread_local` access in each of them (the SDK compiles it as emulated
+TLS), a heap object with `std::mutex` and `std::condition_variable` used by 1 and 32
+threads, a thread whose entry point is in an anonymous executable page, a thread whose
+entry point is a *core* export, a thread that calls core code, a libkernel call whose
+immediate caller is an anonymous page, and a thread-specific-data call
+(`pthread_getspecific`) from an anonymous page. All passed
+(`{"stage":"done","created":32,"ran":32,"joined":32,"tls_ok":32}` and successors).
+PPSSPP still dies at the same instruction, so the trigger is not any of those alone.
+
+**Two changes stand regardless.** `patches/ppsspp/0005-ps5-thread-name.patch` stops
+PPSSPP taking its `__FreeBSD__` branch — PS5 defines the macro, so every worker called
+`pthread_set_name_np`, which no earlier core used — and
+`patches/ppsspp/0006-diagnose-thread-pool.patch` is the temporary instrumentation that
+named the failing step (`creating 0`, `created 0`, then death).
+
+**The next attempt.** Remove PPSSPP's `thread_local` uses (the plan's original A2 step,
+now motivated by the emutls path: core TLS becomes `__emutls_get_address` →
+`pthread_getspecific`, which is exactly the family in the backtrace). If that is not
+enough, the fix has to make libkernel's lookup succeed for core addresses, or keep
+libkernel's thread-specific-data path off every stack that contains core frames.
