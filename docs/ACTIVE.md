@@ -76,22 +76,13 @@ The unsafe driver error logger under arbitrary OOM remains outside the frontend 
 
 ## Failure being addressed
 
-- Prior identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
-  Raw: `klog/xmb-first-failure-run-20260919-192044/`; evidence:
-  `evidence/xmb-playlist-allocation-crash/`.
-- First failure: native xmb_list_insert requests 15,488 bytes at 6,509 ms,
-  custom tab 7/index 339/list size 340. Old nodes fall 4 -> 3; then 339 new nodes
-  appear in 23 ms. Native requests rise 4,497,239 -> 11,616,951 bytes. The custom
-  playlist contains 7,384 entries. Rapid input is not needed to trigger this.
-- XMB inserts own 5,265,920 native bytes; playlist array 1,179,664; list arrays
-  473,152; callbacks 220,968. The later SIGSEGV is the Vulkan error logger's NULL
-  write during texture unload/queue-idle allocation failure. Previous collector
-  stopped locally; title was already gone. No second launch or title kill.
-- Main history review e080d81..a18cec6 found unchanged XMB node/list logic and
-  upstream pin. Config/filesystem support may have exposed a larger workload;
-  the early 45-second clean XMB run did not verify this same playlist. No exact
-  regression commit is proven. See docs/XMB_ALLOCATION_INVESTIGATION.md for the
-  earlier lifecycle probe and docs/MEMORY_DIAGNOSTICS.md for observer limits.
+Resolved and superseded. The XMB large-list crash (`601e575`), the hitches after it
+and the thumbnail/input defaults (`e11018a`) are all accepted; the investigation
+record is `docs/XMB_ALLOCATION_INVESTIGATION.md`, the fix notes
+`docs/XMB_LIST_SAFETY.md` and `docs/THUMBNAIL_INPUT_DEFAULTS.md`, and the raw
+captures are `klog/xmb-*` with evidence under `evidence/xmb-*` and
+`evidence/thumbnail-input-defaults/`. The unsafe driver error logger under
+arbitrary OOM remains outside the frontend fix.
 
 ## Previous console-verified baseline
 
