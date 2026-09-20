@@ -72,6 +72,18 @@ for patch_file in "$root"/patches/ppsspp/*.patch; do
     patch --batch --fuzz=0 -d "$source_dir" -p1 < "$patch_file"
 done
 
+# Reproducibility. libpng (ext/libpng17/pngerror.c) embeds __DATE__ and __TIME__ in a
+# banner string, and clang derives both from the clock unless SOURCE_DATE_EPOCH is
+# set. That one varying string also changes the linker's string tail-merging, which
+# moved ~40 KiB of .rodata between two otherwise identical builds; pinning the epoch
+# to the pinned commit's own timestamp removes the only varying input. Deriving it
+# from the revision rather than a literal keeps the value self-documenting: the same
+# checkout has the same epoch forever.
+source_date_epoch=$(git -C "$source_dir" show -s --format=%ct "$revision")
+[[ $source_date_epoch =~ ^[0-9]+$ ]] || {
+    echo "error: could not read the pinned commit timestamp" >&2; exit 2; }
+export SOURCE_DATE_EPOCH="$source_date_epoch"
+
 # This core's destructor registry. Upstream's version script hides it, and its
 # Two objects are linked into the core itself, because neither can come from the
 # title's import table:
@@ -116,14 +128,16 @@ cp -- "$info" "$root/build/cores/stage/info/ppsspp_libretro.info"
 # The input identity: the commit, every submodule SHA, the patch and tooling hashes,
 # and the compiler wrapper. There is no single source digest to check because the
 # tree is a git checkout with submodules, so the SHA set is the identity.
-python3 - "$build" "$source_dir" "$revision" "$info_revision" "$info_sha" <<'PY'
+python3 - "$build" "$source_dir" "$revision" "$info_revision" "$info_sha" "$source_date_epoch" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
 build, source, revision, info_revision, info_sha = (pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]),
                                                     sys.argv[3], sys.argv[4], sys.argv[5])
+source_date_epoch = sys.argv[6]
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 report = json.loads((build / 'abi.json').read_text())
 report.update(source_revision=revision,
+              source_date_epoch=int(source_date_epoch),
               source_submodules=dict(sorted(
                   line.split()[0:2][::-1] for line in subprocess.check_output(
                       ['git', '-C', str(source), 'submodule', 'status', '--recursive'],

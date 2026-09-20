@@ -68,6 +68,16 @@ extern "C" void ps5_core_loader_test_if_requested()
         test_path = "/app0/cores/genesis_plus_gx_libretro.so";
         test_name = "Genesis Plus GX";
     }
+    else if (fields == 1 && !std::strcmp(selection, "ppsspp"))
+    {
+        /* The largest core this title loads: 18.5 MB, 479 imports and a full C++
+         * static-initialisation pass, eight times over. The Vulkan device is not
+         * created here - nothing calls retro_init - so this measures the loader,
+         * not the driver. */
+        test_core = "ppsspp";
+        test_path = "/app0/cores/ppsspp_libretro.so";
+        test_name = "PPSSPP";
+    }
     else if (fields != 1 || std::strcmp(selection, "fceumm"))
     {
         std::fprintf(stderr, "core loader test: unsupported selection\n");

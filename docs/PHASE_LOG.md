@@ -2706,3 +2706,45 @@ difference is a follow-up, not an A4 dependency.
 
 **Not proven.** Console load, initialisation, teardown and gameplay. Nothing was
 uploaded or launched, and no console was contacted.
+
+## 2026-09-19 — PPSSPP A4 preparation: reproducible builds, and the shipped cores are untouched
+
+Two gaps left by A3 are closed, and the console step is armed.
+
+**Reproducibility: found and fixed.** Four builds had produced four hashes. Comparing
+two of them byte by byte localized the difference: .rodata (40,843 bytes), .text
+(3,237), .rela.dyn (971) and the build-id. Dumping both .rodata sections showed the
+same size (1,793,764) with one string in the multiset differing —
+" translated Sep 19 2026 22:48:28" against " translated Sep 19 2026 22:50:27" — which
+is libpng's banner from ext/libpng17/pngerror.c, built from __DATE__ and __TIME__. The
+large footprint comes from the linker's string tail-merging: one varying string
+changes the merge layout, so ~40 KiB moves. clang honours SOURCE_DATE_EPOCH for both
+macros (verified with a two-line probe compiled twice), so tools/build-ppsspp.sh now
+derives the epoch from the pinned commit itself
+(`git show -s --format=%ct $revision`) and exports it. Two consecutive full builds
+after the change: identical, sha256 8346e010a8781f8c… over 18,501,832 bytes. The
+epoch is recorded in build.json as source_date_epoch.
+
+**The five shipped cores are undisturbed, measured rather than assumed.** Rebuilding
+fceumm and fbneo in a detached worktree at the pre-change commit b1dced9 gives
+8f21cea01c018141c0e8e3493b9d73cf5e0f7534dbd5149249684f6bfbab04c1 and
+8c9c402ffa82cb049d346b305294ac824178b5dd14e8cefb394a0ec882861e1e — the same two
+hashes this tree produces with PPSSPP added. mgba (feb1922c…), snes9x (e8b66c5f…) and
+genesis_plus_gx (881b5118…) are byte-identical to their committed evidence. The older
+fceumm and fbneo hashes in klog/thumbnail-input-build/ and evidence/fbneo-native/
+predate changes to those cores' own inputs and are not a PPSSPP regression.
+
+**The A4 vehicle is wired.** --core-test=ppsspp is accepted by tools/run-title.sh and
+by src/core_loader_probe.cpp, which loads /app0/cores/ppsspp_libretro.so eight times,
+checks all 25 libretro exports, the API version and the reported library name
+("PPSSPP"), and writes core-loader-test.json with the build identity. It never calls
+retro_init, so this step creates no Vulkan device and measures the loader alone: an
+18.5 MB module, 479 imports and a full C++ static-initialisation pass, eight times
+over.
+
+**Gates.** `bash tools/verify.sh` — PASS on all five: format, unit (74 tests), build
+(the title now builds and links with six cores), integration, evidence (31 captures
+replayed, 0 failed).
+
+**Not proven.** Everything console-side: load, initialisation, teardown, and a game.
+The launch needs the owner; the assets (system/PPSSPP/) and content are owner-supplied.

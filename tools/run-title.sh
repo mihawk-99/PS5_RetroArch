@@ -50,11 +50,11 @@ while (( $# )); do
         --core-test) core_test=fceumm ;;
         --core-test=*) core_test=${1#*=} ;;
         --gpu-profile) shift; profile=${1:?--gpu-profile needs seconds} ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test[=fceumm|mgba|snes9x|fbneo|genesis_plus_gx]]" >&2; exit 2 ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test[=fceumm|mgba|snes9x|fbneo|genesis_plus_gx|ppsspp]]" >&2; exit 2 ;;
     esac
     shift
 done
-case "$core_test" in none|fceumm|mgba|snes9x|fbneo|genesis_plus_gx) ;; *) echo "unknown core diagnostic: $core_test" >&2; exit 2 ;; esac
+case "$core_test" in none|fceumm|mgba|snes9x|fbneo|genesis_plus_gx|ppsspp) ;; *) echo "unknown core diagnostic: $core_test" >&2; exit 2 ;; esac
 
 [[ $watch =~ ^[0-9]+$ && $profile =~ ^[0-9]+$ ]] || { echo "durations must be integers" >&2; exit 2; }
 (( profile <= 60 )) || { echo "GPU profile duration must be 1..60 seconds" >&2; exit 2; }

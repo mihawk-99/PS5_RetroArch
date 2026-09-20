@@ -22,12 +22,19 @@ all 479 of the core's imports resolve (`localtime_r` through the existing
 `rtime_localtime` alias, `__emutls_get_address` from the clang builtins the title
 already links), the frontend and title link, and `core imports` grows to **497
 bindings for 6 cores**. Title identity `ed3f78147e015696…`, `eboot.bin` 34,655,444
-bytes, six cores staged in `dist/PPSA99169/`. Gates: `format`, `unit` (74 tests) and
-`integration` PASS. Not proven: reproducibility across two builds, and anything on
-the console.
+bytes, six cores staged in `dist/PPSA99169/`.
 
-**Next — A4: the first console load.** Deploy `dist/PPSA99169/` and load the core
-with `ppsspp_backend = "none"`. Uploads are authorized; the launch needs the owner.
+**Done — reproducibility, and the five cores are undisturbed.** The varying input was
+libpng's `__DATE__`/`__TIME__` banner string; `SOURCE_DATE_EPOCH` is now derived from
+the pinned commit and two consecutive builds are byte-identical
+(`8346e010a8781f8c…`). Rebuilding fceumm and fbneo at the pre-change commit
+`b1dced9` gives the same two hashes as this tree, and mgba, snes9x and Genesis Plus
+GX are byte-identical to their committed evidence, so nothing the PPSSPP work did
+changes a shipped core.
+
+**Next — A4: the first console load.** `--core-test=ppsspp` now arms the loader
+diagnostic (eight load/unload cycles of the 18.5 MB core, no `retro_init`, so no
+Vulkan device is created), which is the console step that needs the owner's launch.
 Then A5: `system/PPSSPP/` assets plus a PSP homebrew, both owner-supplied.
 
 ## Now
