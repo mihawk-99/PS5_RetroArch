@@ -2530,3 +2530,47 @@ Artifacts: `evidence/xmb-playlist-allocation-crash/`; raw capture and private
 playlist snapshot: `klog/xmb-first-failure-run-20260919-192044/`. Acceptance is
 attribution of the observed burst, not menu stability. `bash tools/verify.sh
 format evidence` replays the record; no product build was changed.
+
+
+## 2026-09-19 — XMB list safety and normal-build acceptance
+
+Owner confirms the list-safety diagnostic no longer freezes or crashes and the
+normal build eliminates its five-second navigation hitches. Requested landing on
+main with current logging unchanged. RetroArch.log, trace and passive klog remain;
+only the existing opt-in memory observer is disabled in the accepted normal build.
+No PS5_Vulkan sources were modified and no agent launch/kill was issued in this step.
+
+XMB nodes shrink from 15,488 to 96 bytes with visible-only optional icon paths.
+Reclaimable mapped slabs hold nodes/callbacks; checked list insertion and animation
+copy preserve valid ownership on failure, stop failed population and permit retry
+after clear. Patched headers now invalidate all frontend consumer objects. No new
+SDK, dependency, compiler flag or version pin was added. See docs/XMB_LIST_SAFETY.md.
+
+Both `PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh` and
+`PS5_MEMORY_DIAGNOSTICS=0 PS5_VULKAN_DIR="$PWD/build/xmb-normal-vulkan" bash tools/verify.sh`
+passed all five gates, 71 tests and 278 compiled frontend sources. The first gate
+attempt failed the pinned edit count (150); updating it to the actual 176 resolved
+that failure. Fault-injection and 7,384-entry host tests passed ASan/UBSan with
+explicit ownership/mapping accounting. GPU operations are stubbed in host tests.
+Normal inspection initially found different Mesa object hashes; stripped bytes
+match, and recompiling with the original source path reproduced the old hashes:
+the difference is debug compilation-directory information, not runtime code.
+
+Diagnostic identity 88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6
+has zero allocation failures, dropped records, image/idle failures, frontend ERROR
+lines and GPU API failure/refusal records in the matching 55.422-second capture.
+Native requested peak was 6,518,064 bytes; mapped tracking returned to zero at clean
+exit. Kernel backlog collection was post-run, not full launch-to-exit coverage.
+Raw capture: klog/xmb-stutter-20260919-200720/; exact diagnostic artifacts and gates:
+klog/xmb-safe-lists/. Diagnostic sampling scans 131,072 slots synchronously before
+presentation every five seconds, matching the reported hitch cadence.
+
+Normal identity 2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6
+uses the same four archived driver libraries; observer symbols/hooks are absent
+and the safe allocator is present. Artifacts/inspection/gates: klog/xmb-normal/;
+upload identity and unchanged configuration: klog/xmb-normal-upload-20260919-201708/.
+The owner reported “That fixed it”; no fresh normal-run logs or measured stall
+latencies are claimed. The unsafe driver logger under arbitrary OOM remains outside
+this frontend fix. Sanitized evidence: evidence/xmb-safe-list-run/. Replay with
+`bash tools/verify.sh format evidence`; runtime and current logging are unchanged
+since the accepted normal build.

@@ -1,0 +1,21 @@
+{
+  "step": "xmb-safe-list-run",
+  "recorded": "2026-09-19",
+  "revision": "5cbd448 plus verified list safety changes recorded in diagnostic-build.json",
+  "command": "Read-only FTP snapshots of memory-diagnostics.log, retroarch.log and trace.txt; 10-second passive kernel backlog capture; no launch or kill",
+  "raw_capture": "klog/xmb-stutter-20260919-200720/1-memory-diagnostics.log",
+  "build_identity": "88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6",
+  "lines": [
+    "Owner reports no freeze or crash; brief horizontal-navigation hitches roughly every five seconds.",
+    "Runtime identity 88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6.",
+    "First sample: xmb_list_insert 708960 bytes / 7385 nodes; menu_entries_append 4786128 bytes / 7386 callbacks.",
+    "Final allocation failures=0 dropped=0 image_failed=0 idle_failed=0.",
+    "Native peak requested bytes=6518064; final mapped_bytes=0 mapped_count=0.",
+    "Frontend ERROR lines=0; trace GPU API failure/refusal records=0.",
+    "Frontend returned 0; native quit status 0; final diagnostic at 55422 ms.",
+    "Diagnostic sampler runs synchronously before presentation every 5000000000 ns; normal-build owner comparison confirms hitches resolved.",
+    "Post-run kernel backlog is not a complete launch-to-exit capture; no full-run kernel assertion.",
+    "Owner confirms normal build 2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6 fixed the hitches; current logging retained.",
+    "Normal acceptance is an owner report; no new normal-run logs captured."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "kind": "diagnostic host build and deployment record; console outcome in capture.json",
+  "build_identity": "88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6",
+  "command": "PS5_MEMORY_DIAGNOSTICS=1 bash tools/verify.sh",
+  "returncode": 0,
+  "gates": [
+    "format",
+    "unit",
+    "build",
+    "integration",
+    "evidence"
+  ],
+  "unit_tests": 71,
+  "frontend_sources_compiled": 278,
+  "patch_edits": 176,
+  "synthetic_entries": 7384,
+  "node_bytes": 96,
+  "previous_node_bytes": 15488,
+  "callback_bytes": 648,
+  "menu_allocator_native_calls_for_nodes_and_callbacks": 0,
+  "all_menu_mappings_released_after_test": true,
+  "fault_injection_append_prepend_copy_recovery": "passed under ASan/UBSan; graphics and callback binding stubbed",
+  "driver_archives": {
+    "libps5vk.ps5.a": "11ff0f410c80ba99863bca4c5545ed100a49f720a480fc2d5bb312ebcd3969d1",
+    "libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7",
+    "libpsbc_driver.ps5.a": "a7605370c28895a3b5a13d0718ebfea2abf1b9cf842633de07533775745b21b8",
+    "libpsbc_support.ps5.a": "e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8"
+  },
+  "artifact_sha256": {
+    "llvm-pie.elf": "298c18c68e357a8cabd4b79923f8726f7686ad52ddeff279fcf55338dbcdf241",
+    "title.map": "ae38faef1143d2c318dfad775d7f107a6b5e6e5191afa775584424fc6e2b8cb7",
+    "title_build_identity.h": "88b5a9e49e1adbd773c6bb7e178c2a4cd1177d173915c0cc9430d0bb2b1f8f55",
+    "eboot.bin": "a5d3eb7e6e130a770c9badf4d02d654b275d14588d0e685bb8d54f4de6d821a5",
+    "manifest.sha256": "284ebc616cd6862d15c3f0cea65dc6b239585ebba4c68da466796e09ad1b84e2",
+    "archives.json": "f4e5a0a75c177c6576ed62671d19e0e850f1e94d5c4505c01b0aba9c5f1e540b"
+  },
+  "source_sha256": {
+    "src/memory_ps5.cpp": "25fbe90d41b3fab4c88e352da9e100e5e169eb553401fd2fe41fc25144b96663",
+    "src/menu_memory.h": "f350aea67b5bc722c689b900b8f1ce93ac5e0086da39a375e668cfe7d527a2bf",
+    "tools/apply-port-patches.py": "0802da838f52e3cb3a33a1adf1fb7340afc5968da6e858af0304358e1a2a7ca5",
+    "tools/build-retroarch.sh": "06a7476742216cadf120bb58c0ab40b0e310611ce9e217d7dd8f10536350f3c4",
+    "tests/menu_memory_test.cpp": "1838439879b44f0cfea80e0faa57eb4afba62d14c3aa37196241a74f49431dc5",
+    "tests/test_menu_memory.py": "a78eb72ac18be2b289cd5ddca68afede53c2625c44c6aec14a42b823fcd585d7",
+    "tests/test_xmb_safe_lists.py": "e4dc4e579580e6c1dcb8346ac2725dfa63836a0ad45e7d2792cf8f975bd638c9"
+  },
+  "console_verified": true,
+  "deployment": {
+    "raw_capture": "klog/xmb-safe-upload-20260919-200332/",
+    "runtime_identity_verified": true,
+    "configuration_unchanged": true,
+    "launched": false
+  },
+  "launched_by_agent": false
+}

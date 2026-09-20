@@ -97,3 +97,6 @@
 
 # Opt-in, bounded first-failure XMB context; no allocator or menu policy change.
 0079-observe-xmb-allocation-context
+
+# Compact XMB nodes, mapped menu objects and checked list construction.
+0080-safe-xmb-list-allocations

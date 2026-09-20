@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include "memory_diagnostics.hpp"
+#include "menu_memory.h"
 
 extern "C"
 {
@@ -31,6 +32,79 @@ struct alignas(std::max_align_t) Mapping
 };
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 Mapping *mappings = nullptr;
+
+/* Only menu nodes/callbacks use these slabs. Native-library pointers still go
+ * to their original allocator. A slab is reclaimed as soon as its last slot
+ * is freed; no title-lifetime high-water cache and no per-entry mmap. */
+constexpr size_t slab_span = 0x10000;
+struct alignas(std::max_align_t) MenuSlot
+{
+    size_t requested;
+};
+struct alignas(std::max_align_t) MenuSlab
+{
+    MenuSlab *next;
+    size_t stride, capacity, used;
+    uint64_t bits[8];
+};
+MenuSlab *menu_slabs = nullptr;
+
+MenuSlab **find_menu(void *pointer, size_t &index)
+{
+    const uintptr_t address = uintptr_t(pointer);
+    MenuSlab **slot = &menu_slabs;
+    while (*slot)
+    {
+        const uintptr_t first = uintptr_t(*slot + 1) + sizeof(MenuSlot);
+        if (address >= first && address - first < (*slot)->capacity * (*slot)->stride &&
+            (address - first) % (*slot)->stride == 0)
+        {
+            index = (address - first) / (*slot)->stride;
+            return slot;
+        }
+        slot = &(*slot)->next;
+    }
+    return slot;
+}
+
+void *allocate_menu(size_t size)
+{
+    /* This API deliberately accepts only the two small menu object classes. */
+    if (size > 1024)
+    {
+        errno = ENOMEM;
+        return nullptr;
+    }
+    const size_t stride = sizeof(MenuSlot) + (size <= 128 ? 128 : 1024);
+    pthread_mutex_lock(&lock);
+    MenuSlab *slab = menu_slabs;
+    while (slab && (slab->stride != stride || slab->used == slab->capacity))
+        slab = slab->next;
+    if (!slab)
+    {
+        void *mapped =
+            mmap(nullptr, slab_span, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        if (mapped == MAP_FAILED)
+        {
+            pthread_mutex_unlock(&lock);
+            return nullptr;
+        }
+        slab = static_cast<MenuSlab *>(mapped);
+        slab->stride = stride;
+        slab->capacity = (slab_span - sizeof(MenuSlab)) / stride;
+        slab->next = menu_slabs;
+        menu_slabs = slab;
+    }
+    size_t index = 0;
+    while (slab->bits[index / 64] & (UINT64_C(1) << (index % 64)))
+        ++index;
+    slab->bits[index / 64] |= UINT64_C(1) << (index % 64);
+    ++slab->used;
+    auto *slot = reinterpret_cast<MenuSlot *>(reinterpret_cast<char *>(slab + 1) + index * stride);
+    slot->requested = size;
+    pthread_mutex_unlock(&lock);
+    return slot + 1;
+}
 
 Mapping **find(void *pointer)
 {
@@ -68,6 +142,20 @@ void release(void *pointer)
     if (!pointer)
         return;
     pthread_mutex_lock(&lock);
+    size_t index = 0;
+    MenuSlab **menu_slot = find_menu(pointer, index);
+    if (*menu_slot)
+    {
+        MenuSlab *slab = *menu_slot;
+        slab->bits[index / 64] &= ~(UINT64_C(1) << (index % 64));
+        const bool empty = --slab->used == 0;
+        if (empty)
+            *menu_slot = slab->next;
+        pthread_mutex_unlock(&lock);
+        if (empty)
+            munmap(slab, slab_span);
+        return;
+    }
     Mapping **slot = find(pointer);
     Mapping *entry = *slot;
     if (entry)
@@ -90,13 +178,16 @@ void *resize(void *pointer, size_t size)
     }
     pthread_mutex_lock(&lock);
     Mapping *entry = *find(pointer);
-    const size_t old_size = entry ? entry->requested : 0;
+    size_t index = 0;
+    const bool menu = *find_menu(pointer, index) != nullptr;
+    const size_t old_size =
+        menu ? (static_cast<MenuSlot *>(pointer) - 1)->requested : (entry ? entry->requested : 0);
     pthread_mutex_unlock(&lock);
     /* Native buffers retain their allocator: their usable size is not part of
      * this ABI. Never guess it or read a private libc allocation header. */
-    if (!entry)
+    if (!entry && !menu)
         return __real_realloc(pointer, size);
-    void *replacement = allocate(size);
+    void *replacement = menu && size <= 1024 ? allocate_menu(size) : allocate(size);
     if (!replacement)
         return nullptr;
     std::memcpy(replacement, pointer, old_size < size ? old_size : size);
@@ -105,6 +196,17 @@ void *resize(void *pointer, size_t size)
 }
 
 } // namespace
+
+extern "C" void *ps5_menu_malloc(size_t size)
+{
+    const auto caller = uintptr_t(__builtin_return_address(0));
+    void *p = allocate_menu(size);
+    if (p)
+        ps5::memory::add({p, size, caller, ps5::memory::Route::Mapped});
+    else
+        ps5::memory::failure("menu-malloc", size, 0, caller, errno);
+    return p;
+}
 
 extern "C" void *__wrap_malloc(size_t size)
 {
@@ -151,8 +253,10 @@ extern "C" void *__wrap_realloc(void *pointer, size_t size)
     if (p)
     {
         // Realloc of a native pointer stays native even when it crosses 1 MiB.
-        const bool mapped =
-            (!pointer || old.route == ps5::memory::Route::Mapped) && size >= threshold;
+        pthread_mutex_lock(&lock);
+        size_t index = 0;
+        const bool mapped = *find(p) || *find_menu(p, index);
+        pthread_mutex_unlock(&lock);
         ps5::memory::add(
             {p, size, caller, mapped ? ps5::memory::Route::Mapped : ps5::memory::Route::Native});
     }

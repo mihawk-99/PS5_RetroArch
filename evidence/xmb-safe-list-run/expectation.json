@@ -1,0 +1,14 @@
+{
+  "step": "xmb-safe-list-run",
+  "note": "Large-list diagnostic evidence plus normal-build owner acceptance; exact builds recorded alongside.",
+  "must_contain": [
+    "7385 nodes",
+    "7386 callbacks",
+    "failures=0 dropped=0",
+    "mapped_bytes=0 mapped_count=0",
+    "native quit status 0",
+    "normal-build owner comparison confirms hitches resolved"
+  ],
+  "must_not_contain": [],
+  "human_check": "Owner reports no freeze or crash with list fix, then confirms normal build eliminates periodic hitches."
+}

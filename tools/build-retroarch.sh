@@ -201,8 +201,17 @@ mkdir -p "$obj"
 # file stays put, and the mtime test above would then keep 225 objects that were
 # compiled against a different feature set. The flags and the configured header
 # are hashed into a stamp; when it moves, the objects are rebuilt from scratch.
-fingerprint=$(printf '%s\n' "${defines[@]}" "${includes[@]}" |
-    cat - "$configured" | sha256sum | cut -d' ' -f1)
+# Patched headers can change shared layouts (for example file_list_t). Every
+# consumer must rebuild even when its own source file was not patched.
+fingerprint=$({
+    printf '%s\n' "${defines[@]}" "${includes[@]}"
+    cat "$configured"
+    for name in "${patched_files[@]}"; do
+        case "$name" in
+            *.h|*.hpp) cat "$root/build/ra-conf/$name" ;;
+        esac
+    done
+} | sha256sum | cut -d' ' -f1)
 stamp="$obj/.fingerprint"
 if [[ ! -f $stamp || $(<"$stamp") != "$fingerprint" ]]; then
     if [[ -f $stamp ]]; then

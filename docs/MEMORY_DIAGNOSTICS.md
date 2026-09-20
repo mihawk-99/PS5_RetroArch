@@ -1,8 +1,9 @@
 # XMB allocation diagnostic build
 
-This is an opt-in diagnostic, not a fix for the XMB crash. It observes allocation
-lifetimes without increasing the heap, redirecting additional allocations to
-`mmap`, or suppressing Vulkan errors. PS5_Vulkan is read only for this work.
+The opt-in observer records allocation lifetimes without changing allocation
+policy or suppressing Vulkan errors. Allocation-policy fixes apply independently
+of this switch; the accepted XMB list fix is described in
+`docs/XMB_LIST_SAFETY.md`. PS5_Vulkan is read only for this work.
 
 ## Build and host verification
 
@@ -36,6 +37,13 @@ only five failure records with the clock controlled by the test. Vulkan mocks ch
 queue-idle observers preserve arguments, return values and repeat registration.
 These tests do not establish console stability or identify the memory consumer.
 
+The five-second report is synchronous in the presentation path: caller aggregation
+scans 131,072 tracking slots while holding the observer mutex, then writes the
+summary and caller rows. It can disturb frame pacing. Use the normal default
+`PS5_MEMORY_DIAGNOSTICS=0` build for responsiveness comparisons after capturing the
+allocation evidence; RetroArch.log, trace logging and passive klog remain available.
+The option controls the observer, not the XMB allocation fix.
+
 ## Manual console test — only when the owner is ready
 
 Uploads are authorized after checking the console is idle. A launch requires
@@ -65,8 +73,9 @@ previous run. No runner or deployment behavior is changed by this diagnostic.
   from observed ordinary native allocations.
 - `aligned_bytes/count/peak`: the same for `posix_memalign`; this is also native
   memory, not a separate heap. Native pressure includes both native and aligned.
-- `mapped_bytes/count/peak`: requests routed through the existing large-buffer
-  mappings. These exclude mapping headers, page rounding and allocator overhead.
+- `mapped_bytes/count/peak`: requests routed through large-buffer mappings and the menu-object slabs.
+  These exclude mapping headers, page rounding, slab size-class padding and
+  allocator overhead; they are requested bytes, not mapped physical footprint.
 - `failures`: cumulative failures; the first four `failure` rows immediately
   record operation, requested bytes, alignment (or element count for calloc
   overflow), error and caller return address (`pc`). Further details and failure

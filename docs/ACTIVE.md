@@ -4,78 +4,75 @@ _Updated: 2026-09-19_
 
 ## Now
 
-**The first-failure run identifies a large-playlist allocation burst.** Branch:
-`codex/xmb-allocation-diagnostics`. No crash fix is implemented yet.
-Owner authorized launch, then reports the crash happened while scrolling naturally
-and that older builds seemed stable. Rapid input is not required for this failure.
+**Owner confirms XMB crashes and periodic stutter are fixed.**
+Landing on `main` with current logging unchanged. Details: `docs/XMB_LIST_SAFETY.md`.
+Acceptance and build evidence: `evidence/xmb-safe-list-run/`.
 
-- Runtime identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
-- Raw: `klog/xmb-first-failure-run-20260919-192044/`. Evidence:
-  `evidence/xmb-playlist-allocation-crash/`; exact symbols in `klog/xmb-first-failure/`.
-- First failure: xmb_list_insert requests 15,488 bytes at 6,509 ms. Custom tab 7,
-  insertion index 339, list size 340. Previous-tab cleanup reduces node count
-  4 -> 3; new tab creates 339 nodes in 23 ms. No accumulation of old tabs here.
-- Native live requests rise 4,497,239 -> 11,616,951 after old-node cleanup.
-  XMB insert owns 5,265,920 bytes / 340 allocations; JSON playlist array owns
-  1,179,664; file-list arrays 473,152; entry callbacks 220,968.
-- Read-only console inspection finds one custom playlist with 7,384 entries.
-  Complete nodes alone would request 114,363,392 bytes, plus 4,784,832 callback
-  bytes. Native allocation failures precede the driver logger's NULL write.
-- One post-launch SIGSEGV in __vk_log_impl via texture unload/queue-idle error
-  reporting. Console reports no running title. Crash snapshots are saved and
-  the local passive collector is stopped. No second launch or title kill.
-- XMB's non-diagnostic source edits match its initial e080d81 commit. This does
-  not rule out regressions elsewhere or establish an exact native heap limit.
-  Asked whether older builds opened the same full playlist; answer pending.
-- Next design should make large-list allocations safe on the native platform;
-  merely reducing scroll speed or guarding the logger does not finish that job.
-  Do not switch away from XMB/Vulkan or reduce the owner's playlist as a fix.
+- Tested diagnostic: `88d30106ce625e783e899c97ddeab43d4ca16949ddd98cfb129a06190e0c4ec6`.
+  Owner ran it manually and reports brief hitches roughly every five seconds.
+  Read-only capture: `klog/xmb-stutter-20260919-200720/`; sanitized evidence:
+  `evidence/xmb-safe-list-run/`. No launch or kill was sent by the agent.
+- The matching 55.422-second session has zero allocation failures/dropped records,
+  zero failed image creations or queue-idle calls, and clean frontend/native quit.
+  First sample includes 7,385 compact XMB nodes and 7,386 callbacks. Native peak
+  is 6,518,064 requested bytes; tracked mapped allocations return to zero at exit.
+  Frontend ERROR lines and trace GPU API failure/refusal records are zero.
+- Post-run kernel collection includes backlog; it is not a full launch-to-exit
+  capture. Repeated native dlopen failures at Vulkan init are the existing
+  libvulkan.so.1/libvulkan.so probes, followed by the statically linked entry point.
+- Diagnostic tick runs before presentation: every five seconds it holds the
+  observer mutex, scans 131,072 slots and synchronously writes summary/caller rows.
+  This matches the reported hitch cadence; exact stall duration was not measured.
+- Normal identity: `2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6`.
+  PS5_MEMORY_DIAGNOSTICS=0; all five gates pass, 71 tests, 278/278 sources. ELF
+  inspection confirms observer functions/hooks absent and safe allocator present.
+  `klog/xmb-normal/` preserves exact artifacts, gate log and inspection.
+  Uploaded/readback verified; config preserved; no launch. Capture:
+  `klog/xmb-normal-upload-20260919-201708/`.
+- All four saved driver archives match the tested diagnostic. Mesa utility object
+  bytes differ only in debug compilation-directory information; stripping debug
+  info makes all three byte-identical. PS5_Vulkan source remains unchanged.
+- Accepted changes: nodes 15,488 -> 96 bytes, visible-only optional icon paths,
+  reclaimable mapped node/callback slabs, checked append/prepend/copy operations,
+  first-failure population stop and retry reset on clear. Shared patched headers
+  participate in the full frontend build fingerprint. No driver sources changed.
+- Diagnostic passed all five gates, 71 tests, 278/278 frontend sources. Exact ELF,
+  map, title, manifest, archive hashes and log: `klog/xmb-safe-lists/`.
+  Linked libps5vk is 11ff0f410c80 (older crash used 8c2a1c46a38e).
+- Owner confirmed the normal build fixed the hitches and requested the commit.
+  No new normal-run logs were captured; this acceptance is the owner observation.
+  RetroArch.log, trace and passive klog remain; the observer stays opt-in.
+  Broader RGUI/XMB and game/menu visual checks remain useful follow-ups.
+  The separate unsafe driver error logger under genuine OOM is not fixed here.
 
-## Diagnostic readiness and limits
+## Failure being addressed
 
-- Diagnostic d7ad1b3 passed all five host gates, 69 tests, 278/278 frontend sources;
-  `evidence/xmb-first-failure-diagnostic/`. Log: `klog/xmb-first-failure-verify-final.log`.
-- First failure captures per-route top owners, cached numeric XMB context/node
-  counts, and eight transition boundaries without per-entry I/O. Injected 10,006
-  failures produced one expanded snapshot / 9,404 bytes. Normal hooks are inert.
-- Linked libps5vk is 8c2a1c46a38e, versus 900d496a9eb7 in the earlier bounded run;
-  three other archives match. Full hashes preserved. PS5_Vulkan was not modified.
-- Earlier a4a751e58339 run already reproduced the same NULL logger crash;
-  evidence/xmb-memory-crash/. The first diagnostic's unbounded log flood was
-  fixed before both later captures. This step did not build or deploy new code.
-- Procedures and context limitations: `docs/MEMORY_DIAGNOSTICS.md`.
-  Local lifecycle experiment: `docs/XMB_ALLOCATION_INVESTIGATION.md`.
+- Prior identity: `e60deca9412fcedaa59162cc5254fc8e0b13df5c2b3fb4a8187e0b059b0acf00`.
+  Raw: `klog/xmb-first-failure-run-20260919-192044/`; evidence:
+  `evidence/xmb-playlist-allocation-crash/`.
+- First failure: native xmb_list_insert requests 15,488 bytes at 6,509 ms,
+  custom tab 7/index 339/list size 340. Old nodes fall 4 -> 3; then 339 new nodes
+  appear in 23 ms. Native requests rise 4,497,239 -> 11,616,951 bytes. The custom
+  playlist contains 7,384 entries. Rapid input is not needed to trigger this.
+- XMB inserts own 5,265,920 native bytes; playlist array 1,179,664; list arrays
+  473,152; callbacks 220,968. The later SIGSEGV is the Vulkan error logger's NULL
+  write during texture unload/queue-idle allocation failure. Previous collector
+  stopped locally; title was already gone. No second launch or title kill.
+- Main history review e080d81..a18cec6 found unchanged XMB node/list logic and
+  upstream pin. Config/filesystem support may have exposed a larger workload;
+  the early 45-second clean XMB run did not verify this same playlist. No exact
+  regression commit is proven. See docs/XMB_ALLOCATION_INVESTIGATION.md for the
+  earlier lifecycle probe and docs/MEMORY_DIAGNOSTICS.md for observer limits.
 
-## Previous console-verified baseline (Genesis Plus GX)
+## Previous console-verified baseline
 
-- Frontend identity: `ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445`.
-- Genesis Plus GX source: `c2838c7dc4236fc2fe94e5dbd08b41486067918e`.
-- Core SHA-256: `881b5118e6afe700d8de21df679b7e51a458c0bb2fe11603b96373d87f6a2fe0`.
-  13,388,248 bytes; 25 callbacks. Pins, imports and port-input hashes are in evidence.
-- All five host gates pass, 66 tests: `/tmp/genesis-verify.log`.
-  Post-build format check: `/tmp/genesis-format-final.log`.
-  Symbol-bearing ELF/map: `klog/genesis-ecfcddd5-symbols.elf` and corresponding .map.
-- `tools/run-title.sh --no-build --core-test=genesis_plus_gx --watch 240` verified
-  deployment, eight load/export/API/name/unload cycles and failed-load/menu
-  recovery. Both reports pass. Content was selected manually by the owner.
-- Two current-build launches are in trace. Frontend snapshots show a .md member
-  loaded from an archive, XRGB8888 callbacks, 256x192 geometry, and returns to
-  the 320x240 dummy menu. Owner verified clean menu and next-game transitions.
-  Core-declared FPS/audio rates are metadata, not performance measurements.
-- Zero Vulkan refusals, GPU API failure records or kernel fatal signals.
-  Eight audio close reports have errors=0. Both launches reached rarch_main
-  return 0 and native quit status 0 before the watch window ended; this is not
-  a claim of 240 seconds of continuous gameplay.
-- Raw: `klog/genesis-first-run.log`, `klog/run-PPSA99169-171959.log`,
-  `klog/genesis-first-1789852896044371016-retroarch.log` (first launch),
-  `klog/genesis-first-live-retroarch.log` (second launch),
-  `klog/genesis-first-live-trace.txt` (both). Relaunch truncates retroarch.log;
-  preserved timestamped snapshots prevent losing the earlier failures.
-- FCEUmm, mGBA, Snes9x and FBNeo bytes match their accepted builds. Their prior
-  evidence remains in native-core-loading/, mgba-native/, snes9x-native/ and
-  fbneo-native/ under evidence/.
-- PS5_Vulkan was not modified. Four archive hashes matched before/after build;
-  exact linked hashes are in the evidence. The owner develops it concurrently.
+Genesis Plus GX frontend: `ecfcddd57febbb484c2e0724e95f43bbffb3ddd9b9c22aa9c1cf3e37af4a9445`.
+All five gates passed, 66 tests; owner confirmed gameplay colours, sound, controls
+and clean menu/next-game transitions. Evidence: `evidence/genesis-plus-gx-native/`.
+FCEUmm, mGBA, Snes9x and FBNeo evidence remains in `native-core-loading/`,
+`mgba-native/`, `snes9x-native/` and `fbneo-native/` under evidence/.
+Earlier core source pins, hashes, raw captures and acceptance limits are preserved
+there and in docs/PHASE_LOG.md. No new core is assigned by this follow-up.
 
 ## Named errors and remaining limits
 

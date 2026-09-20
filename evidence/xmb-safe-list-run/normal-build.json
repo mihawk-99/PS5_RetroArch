@@ -1,0 +1,73 @@
+{
+  "kind": "normal-build binary inspection and owner acceptance",
+  "build_identity": "2d0743abbcf289efd0a549929d25ce7512968fc93cba8163467fdd3641c8fcf6",
+  "memory_diagnostics": false,
+  "observer_symbols_absent": [
+    "ps5::memory::tick(",
+    "ps5::memory::init(",
+    "ps5::memory::add(",
+    "ps5::memory::take(",
+    "ps5::memory::failure(",
+    "__wrap_posix_memalign",
+    "ps5_memory_xmb_context",
+    "ps5_memory_xmb_stage",
+    "ps5_memory_xmb_node",
+    "memory_create(",
+    "memory_destroy(",
+    "memory_idle("
+  ],
+  "allocator_symbols_present": [
+    "ps5_menu_malloc",
+    "__wrap_malloc",
+    "__wrap_calloc",
+    "__wrap_realloc",
+    "__wrap_free"
+  ],
+  "xmb_references_menu_allocator": true,
+  "xmb_references_observer": false,
+  "driver_archives_match_tested_diagnostic": true,
+  "driver_archives": {
+    "libps5vk.ps5.a": "11ff0f410c80ba99863bca4c5545ed100a49f720a480fc2d5bb312ebcd3969d1",
+    "libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7",
+    "libpsbc_driver.ps5.a": "a7605370c28895a3b5a13d0718ebfea2abf1b9cf842633de07533775745b21b8",
+    "libpsbc_support.ps5.a": "e36d3e2a3fa93b0a74db15b9efce7aad4ed7ac4e024de98d5f23dc5fee90acf8"
+  },
+  "mesa_utility_non_debug_bytes_match_tested_diagnostic": true,
+  "mesa_object_difference": "debug information only: local archive mirror changes compilation directory",
+  "mesa_objects": {
+    "u_thread.o": "64680e06567c7fe4a9e25d87446dd51148bda229629ee78713a10c9b748196ef",
+    "anon_file.o": "270186d0bcc924c15cbcd838c1240cbbba40ddd261fb140e1b0807ec536f9e13",
+    "os_file.o": "0e29e9b453de36119685f4d54beecc3e16634418893bf8cf8b134d156fbc6aa6"
+  },
+  "artifact_sha256": {
+    "llvm-pie.elf": "58c4e6995fbd552160a2e61c29f3e16d44e98d4b472c20a94c6599872ab0e9eb",
+    "title.map": "73b1e9d84ba01d07619b43fab3f150989a585e4fe447e9f0638bfd0a63ef9df7",
+    "title_build_identity.h": "2966c614319e7d69116037064fcbb81005339134f3a0d4e13447b0d4890948d7",
+    "eboot.bin": "ee3ba559e19a03d532dba8f466e1dee3a17f082319ca795a5b43c9afebb141a8",
+    "manifest.sha256": "b2c1609d0350c96b35d2257fd7f84cb0102e3725963cb813b24f2d607193b9b2"
+  },
+  "console_acceptance": {
+    "source": "owner report after uploaded normal build",
+    "quote": "That fixed it. Commit in main branch as is and keep whatever logging we have now",
+    "result": "periodic navigation hitches resolved",
+    "new_normal_run_logs_captured": false
+  },
+  "command": "PS5_MEMORY_DIAGNOSTICS=0 PS5_VULKAN_DIR=\"$PWD/build/xmb-normal-vulkan\" bash tools/verify.sh",
+  "gates": [
+    "format",
+    "unit",
+    "build",
+    "integration",
+    "evidence"
+  ],
+  "returncode": 0,
+  "tests": 71,
+  "frontend_sources_compiled": 278,
+  "deployment": {
+    "raw_capture": "klog/xmb-normal-upload-20260919-201708/",
+    "runtime_identity_verified": true,
+    "configuration_unchanged": true,
+    "launched": false
+  },
+  "launched_by_agent": false
+}
