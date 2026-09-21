@@ -3011,3 +3011,28 @@ Record: `evidence/driver-1.0-native-byte-order/deploy.json`; the raw deploy log 
 
 Still open, and the next thing to record: the owner's launch of this build, which is what
 decides the colours.
+
+## 2026-09-20 — the owner accepts the native byte order on the console
+
+The owner launched the published build and reports it "flawless", with the colours
+accurate now that the red/blue compensation is gone. That is the acceptance of this
+step: the menu, the core frames and the transitions between them draw with the correct
+channels while the frontend keeps libretro's own byte order, which is what the
+withdrawal of 0014's substitution, 0075 and 0077 was for.
+
+**What kind of evidence this is, and is not.** It is an owner observation, like the
+accepted baselines before it: no klog run was started for this launch, so there is no
+distilled capture, no `/app0/trace.txt` and no kernel log for it, and no per-core
+checklist was walked. What is machine-checked about the deployed bytes is in
+`deploy.json` (sizes, read-back and the six cores' SHA-256), and what is machine-checked
+about the build is in `capture.json` (the five gates, the identity, and that the identity
+covers the frozen driver archives). The acceptance itself is the owner's words.
+
+**Not covered.** PPSSPP was not launched on this build, so its parked first-frame blocker
+is unchanged and untested here; the other cores' individual behaviours were not
+re-checked one by one; and there is no captured 90-second run for the build.
+
+The step's record is `evidence/driver-1.0-native-byte-order/`: `capture.json` (gates,
+identity, driver revision), `expectation.json` (what the run must show, now carrying the
+owner's words as its human check), `driver-archives.json` (which driver the link carries)
+and `deploy.json` (what was published and read back).

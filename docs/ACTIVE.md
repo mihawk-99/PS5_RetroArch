@@ -2,7 +2,15 @@
 
 _Updated: 2026-09-20_
 
-## Now: the title is relinked against the migrated driver, on its own byte order
+## Now: the console accepted the native byte order
+
+**Accepted on the console.** The owner launched the published build and reports it
+flawless, with the colours accurate now that the red/blue compensation is gone: menu,
+core frames and the transitions between them draw the right channels while the frontend
+keeps libretro's own byte order. That closes the step below — the driver's `v0-formats`
+battery proves the fetch order, and the console's own picture now proves the frontend's
+half of it. It is an owner observation: no klog run was started for the launch, so there
+is no distilled capture or trace for it, and PPSSPP was not launched on this build.
 
 **Driver (`../PS5_Vulkan` `8b311e3`) is at rung 1.0 with its SDK fork migrated.** The
 format audit has no gaps (179 required, 58 reported, 0 missing, 55 conditional, split
@@ -34,15 +42,12 @@ byte-identical. The frozen archives were re-hashed unchanged after the build and
 printed identity was recomputed from its own input list and matched, so the eboot names
 the driver it carries. Record: `evidence/driver-1.0-native-byte-order/`.
 
-**Pending, and the only thing that decides the colours: a console run.** The withdrawn
-path is the one the owner accepted earlier; the native byte order has host evidence and
-the driver's own console `v0-formats` battery. **This build is now on the console**
-(upload only, no launch: 354 files, eboot re-signed to 35,144,676 bytes with this build's
-markers, `libvulkan.so.1` at the title root and in `sce_module/`, all six cores
-SHA-256-verified; `evidence/driver-1.0-native-byte-order/deploy.json`). The console was
-busy with `PPSA99988` when the owner approved publishing anyway. Launch it and check menu
-colours, core colours, and the Quick Menu over a paused game; until that is recorded,
-this step is host-verified only.
+**What is still open here.** PPSSPP was not launched on this build, so its parked
+first-frame blocker is untouched and untested by this step; no captured 90-second run
+exists for it either (the acceptance is the owner's observation, recorded in
+`expectation.json`'s human check and `capture.json`). If a machine-readable run is wanted
+later, start klog and use
+`JOBS=14 bash tools/run-title.sh --no-build --no-deploy --watch 120`.
 
 ## PPSSPP Track A: parked at the owner's request
 
@@ -62,6 +67,9 @@ in the backtrace.
 
 ## Accepted baselines
 
+- Native byte order on driver `8b311e3`: eboot `82534b86…`, identity `f9e4ea6c…`, all
+  five gates green, owner acceptance of the colours with the red/blue compensation gone.
+  Detail: `evidence/driver-1.0-native-byte-order/`, `docs/PHASE_LOG.md` (2026-09-20).
 - XMB: `601e575` fixed large-list allocation failures, `6b857a9` merged the README;
   crash-free navigation and no five-second hitches. Detail: `docs/XMB_LIST_SAFETY.md`,
   `evidence/xmb-safe-list-run/`.

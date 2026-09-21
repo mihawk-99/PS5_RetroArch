@@ -20,5 +20,5 @@
     "ANCHOR NOT FOUND",
     "error: the driver's Mesa utility objects did not build"
   ],
-  "human_check": "Not yet seen on the console. The withdrawn path is the one the owner accepted earlier (colours confirmed for FCEUmm, mGBA, Snes9x, FBNeo and the XMB), and the native byte order has host evidence plus the driver's own console v0-formats battery; the first launch of this build is what decides the title's colours, the Quick Menu over a paused game and core frames. Until that run is recorded this step is host-verified only."
+  "human_check": "Owner, after launching the published build on the console: \"this version of RetroArch is flawless. Colors are accurate now even with red/blue compensation gone.\" That is the acceptance of the withdrawn path: the menu, the core frames and the transition between them draw with the correct channels while the frontend keeps libretro's own byte order. It is an owner observation and not a distilled capture - no klog run was started for this launch and no trace or kernel log was collected, so the record is the owner's words plus the deployment read-back in deploy.json. PPSSPP was not exercised by this run."
 }

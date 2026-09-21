@@ -56,5 +56,13 @@
     "0015: the bpp case upstream's VK_REMAP_TO_TEXFMT and 0027 both need",
     "0081: supports_rgba follows the requested order (upstream's own TODO)"
   ],
-  "console_verification": "pending: no console run of this build yet; the owner's colour check is what decides it"
+  "console_verification": {
+    "result": "accepted",
+    "who": "the owner, launching the published build",
+    "words": "this version of RetroArch is flawless. Colors are accurate now even with red/blue compensation gone.",
+    "covers": "the menu, core frames and the transitions between them, with the frontend keeping libretro's own byte order",
+    "kind": "owner observation; no klog run was started for this launch and no trace or kernel log was distilled",
+    "not_covered": "PPSSPP (not launched on this build), a captured 90-second run, and the other cores' individual checks on this build",
+    "record": "evidence/driver-1.0-native-byte-order/deploy.json for the published bytes and their read-back"
+  }
 }

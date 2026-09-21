@@ -2913,3 +2913,21 @@ running the tool by hand to read a count changes a build input and with it the
 build identity. The identity does not lie about what it hashed — recomputing it
 from its own inputs reproduced the printed identity — but a tree whose include was
 rewritten by hand no longer describes the eboot that was built from it.
+
+## 2026-09-20 — the native byte order is confirmed on the console
+
+The owner launched the build that carries `../PS5_Vulkan` `8b311e3` and this port's
+withdrawn compensation, and reports it flawless with the colours accurate. So the
+pair is settled from both ends: the driver's own `v0-formats` battery proves that
+`VK_FORMAT_B8G8R8A8_UNORM` fetches B, G, R, A in the order an application writes
+them, and the frontend's own screen proves that keeping libretro's little-endian
+XRGB8888 through the upload draws the right channels — menu, core frames and the
+transitions between them. The condition that made 0014, 0075 and 0077 necessary is
+therefore not merely absent from the driver's format table but absent from the
+picture the console draws.
+
+Two limits belong with that sentence rather than after it. The acceptance is an
+owner observation: no kernel log or trace was captured for the launch, so there is
+no distilled record of the run itself, only of the bytes that were deployed and the
+gates the build passed. And PPSSPP was not launched, so the parked first-frame
+blocker is untouched and untested by this step.
