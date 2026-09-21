@@ -1,0 +1,24 @@
+{
+  "note": "The driver the title links, frozen out of ../PS5_Vulkan into build/frozen-driver/ before this build and verified unchanged after it: the archives are copied to a stable tree and PS5_VULKAN_DIR/PS5_VULKAN_ICD point at it, because that project is developed concurrently and a rebuilt archive under the title's link is a different driver. Keys are the paths under the driver's root, as in evidence/mgba-native/driver-archives.json.",
+  "ps5_vulkan_revision": "8b311e3027a3f8988615847e7da38ed0b245883d",
+  "ps5_vulkan_subject": "Migrate the driver to ps5-opengl 0.3.0's compiler fork, and close the console SIGFPE at its owner",
+  "ps5_vulkan_state": "The format audit is unchanged by the migration (179 formats required, 58 reported, 0 missing a required feature, 55 conditional, split 0/0/0/0/0), and driver/ps5vk_image.c is not touched by this commit: VK_FORMAT_B8G8R8A8_UNORM still carries SAMPLED_IMAGE_BIT with the 8_8_8_8_UNORM descriptor word and the ZYXW selectors, which is the fetch order the frontend's own XRGB8888 bytes rely on. What the commit does change is the shader compiler (ps5-opengl 0.3.0's opengnm-psbc tree, metadata v14), the compute dispatch words, a null shader module in ps5vk_compile_stage that faulted every meta clear/blit/resolve, and a driver-owned 32 MiB compile stack.",
+  "archives_are_current_for_the_tree": "no driver/*.c, driver/*.h, tooling/*.py or tools/*.sh file is newer than the archives, and the driver's working tree is clean at this revision",
+  "frozen_at": "build/frozen-driver (git-ignored; the two commands that build it are in docs/PHASE_LOG.md)",
+  "archives": {
+    "build/driver/ps5/libps5vk.ps5.a": "8ff68c27c52a47deaf13e7f008352a43b8e00503e81aa6ed89388823c114391e",
+    "build/driver/ps5/libpsbc_driver.ps5.a": "7a71bfa72936092df1eab966ca7f908b0139ce506978cd6e63771ef7b0982f60",
+    ".deps/native/psbc/lib/libpsbc_support.ps5.a": "3a58df8a9078f8eee6e6670c4b72a71cabd60d4a1df7753152f91f2ce3ad5655",
+    ".deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a": "4106a2c56b269bc52a3976b6bc0134c00b5006ff5358a4b45355afce4a907aa7"
+  },
+  "runtime_icd": {
+    "build/driver/ps5/libvulkan.so.1": "d4a90c9dcf2ea7d74e989c637cad7a5d31bee8ca2a7d1767a2a46d79034e54a4"
+  },
+  "driver_archives_unchanged_during_the_build": true,
+  "title": {
+    "build_identity": "f9e4ea6c9d6261cda7854fed71c854e0f138aa8733f54869733d3727919f54fe",
+    "eboot_bytes": 34703515,
+    "eboot_sha256": "82534b86717cf423dcc12b6014dcb1d68cfe9de2d3c8c88817cc13a93d24d629"
+  },
+  "identity_covers_these_archives": "tools/build-title.sh's printed identity f9e4ea6c9d6261cda7854fed71c854e0f138aa8733f54869733d3727919f54fe was recomputed from that script's own input list - src/, the frontend archive, config.h, the six core objects, the four driver archives and the three Mesa utility objects - against these exact frozen archive hashes, and matched. The identity string is compiled into the title, so the shipped eboot names the driver it carries."
+}

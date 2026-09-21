@@ -1,4 +1,4 @@
-"""Check every RGB565 colour through the exact core and frontend upload helpers."""
+"""Check every RGB565 colour through the exact core conversion and its upload bytes."""
 import ctypes
 from pathlib import Path
 import subprocess
@@ -13,7 +13,6 @@ class Snes9xVideo(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             source = Path(td) / 'video.cpp'
             source.write_text('#include "' + str(ROOT / 'tooling/snes9x/ps5-video.h') + '"\n'
-                              '#include "' + str(ROOT / 'src/core_frame_ps5.cpp') + '"\n'
                               'extern "C" bool convert(uint32_t *d, size_t n, '
                               'const uint16_t *s, size_t p, unsigned w, unsigned h) '
                               '{ return ps5_snes9x_frame(d, n, s, p, w, h); }\n')
@@ -25,20 +24,18 @@ class Snes9xVideo(unittest.TestCase):
             convert.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
                                 ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint]
             convert.restype = ctypes.c_bool
-            upload = api.ps5_core_frame_rgba
-            upload.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
-                               ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint]
             # All 65536 inputs, not only primaries, catch bit-order/green-width errors.
             src = (ctypes.c_uint16 * 65536)(*range(65536))
             core = (ctypes.c_uint32 * 65536)()
-            gpu = (ctypes.c_uint8 * (65536 * 4))()
             self.assertTrue(convert(core, 65536, src, 512, 256, 256))
-            upload(gpu, 1024, core, 1024, 256, 256)
+            self.assertEqual(list(src), list(range(65536)))
+            # These are the bytes an upload copies into a B8G8R8A8 image, which is
+            # libretro's little-endian XRGB8888 layout: blue, green, red, unused.
+            pixels = (ctypes.c_uint8 * (65536 * 4)).from_buffer(core)
             for pixel in range(65536):
                 r, g, b = pixel >> 11, (pixel >> 5) & 63, pixel & 31
-                self.assertEqual(list(gpu[pixel * 4:pixel * 4 + 4]),
-                                 [r * 8 + r // 4, g * 4 + g // 16, b * 8 + b // 4, 255])
-            self.assertEqual(list(src), list(range(65536)))
+                self.assertEqual(list(pixels[pixel * 4:pixel * 4 + 4]),
+                                 [b * 8 + b // 4, g * 4 + g // 16, r * 8 + r // 4, 0])
             # Actual common, hires, NTSC and 4x widths; non-tight input row pitch.
             for width, height in [(256, 224), (512, 478), (602, 239), (1024, 478)]:
                 pitch = (width + 8) * 2

@@ -1,0 +1,24 @@
+{
+  "step": "driver-1.0-native-byte-order",
+  "note": "The frontend builds and links against ../PS5_Vulkan 8b311e3 with the red/blue compensations withdrawn, and every gate replays. The withdrawal is visible in the build's own patch report: 0014's format substitution, 0075's core-frame RGBA upload and 0077's menu colour and cached-frame ownership are exchanged for the upstream text they replaced, so the frontend uploads libretro's little-endian XRGB8888 into a VK_FORMAT_B8G8R8A8_UNORM image the driver samples in that same byte order. The driver archives were frozen before the build and re-hashed unchanged after it, and the build identity - which covers those archives and is compiled into the title - was recomputed from tools/build-title.sh's own input list and matched.",
+  "must_contain": [
+    "==> [ra] compiled 278 of 278 sources",
+    "gfx/drivers/vulkan.c: withdrawn (patches/series, 0075: matching)",
+    "gfx/drivers/vulkan.c: withdrawn (patches/series, 0075: libretro XRGB)",
+    "gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: decode menu images for sampled RGBA)",
+    "gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: preserve original core pixels across cached frames)",
+    "gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: upload decoded menu images as RGBA)",
+    "core ABI PASS: fceumm_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: ppsspp_libretro.so; 25 exports; kernel_web",
+    "core imports: 409 explicit native bindings for 6 cores",
+    "==> [title] build identity: f9e4ea6c9d6261cda7854fed71c854e0f138aa8733f54869733d3727919f54fe",
+    "eboot.bin 34703515 bytes",
+    "verify: PASS (format unit build integration evidence)"
+  ],
+  "must_not_contain": [
+    "verify: FAIL",
+    "ANCHOR NOT FOUND",
+    "error: the driver's Mesa utility objects did not build"
+  ],
+  "human_check": "Not yet seen on the console. The withdrawn path is the one the owner accepted earlier (colours confirmed for FCEUmm, mGBA, Snes9x, FBNeo and the XMB), and the native byte order has host evidence plus the driver's own console v0-formats battery; the first launch of this build is what decides the title's colours, the Quick Menu over a paused game and core frames. Until that run is recorded this step is host-verified only."
+}

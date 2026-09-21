@@ -58,17 +58,18 @@ int main() {
                 r'static UINT32 __cdecl ' + name + r'\([^}]+\}', video).group()
                 for name in ['HighCol16', 'HighCol32'])
             (work / 'video.cpp').write_text(
-                '#include <cassert>\n#include <cstdint>\nusing UINT32 = uint32_t;\nusing INT32 = int32_t;\n#define __cdecl\n' + functions + '\n'
-                f'#include "{ROOT}/src/core_frame_ps5.cpp"\n'
+                '#include <cassert>\n#include <cstdint>\n#include <cstring>\nusing UINT32 = uint32_t;\nusing INT32 = int32_t;\n#define __cdecl\n' + functions + '\n'
                 f'#include "{ROOT}/tooling/fbneo/ps5-video.h"\n' + r'''
 int main() {
     for (unsigned r = 0; r < 256; ++r)
         for (unsigned g = 0; g < 256; ++g)
             for (unsigned b = 0; b < 256; ++b) {
                 uint32_t native = HighCol32(r, g, b, 0);
-                uint8_t gpu[4] = {};
-                ps5_core_frame_rgba(gpu, 4, &native, 4, 1, 1);
-                assert(gpu[0] == r && gpu[1] == g && gpu[2] == b && gpu[3] == 255);
+                /* The upload copies these bytes into a B8G8R8A8 image, so
+                   libretro's little-endian XRGB8888 word is blue, green, red. */
+                uint8_t bytes[4];
+                memcpy(bytes, &native, 4);
+                assert(bytes[0] == b && bytes[1] == g && bytes[2] == r && bytes[3] == 0);
                 uint16_t packed = HighCol16(r, g, b, 0);
                 assert(packed == ((r >> 3) << 11 | (g >> 2) << 5 | b >> 3));
             }

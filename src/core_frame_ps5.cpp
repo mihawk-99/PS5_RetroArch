@@ -1,22 +1,14 @@
-/* Convert libretro's little-endian XRGB8888 to the sampled RGBA8 upload format. */
-#include <cstddef>
-#include <cstdint>
-
-extern "C" void ps5_core_frame_rgba(void *output, size_t stride, const void *input, size_t pitch,
-                                    unsigned width, unsigned height)
-{
-    auto *dst = static_cast<uint8_t *>(output);
-    auto *src = static_cast<const uint8_t *>(input);
-    for (unsigned y = 0; y < height; ++y, dst += stride, src += pitch)
-        for (unsigned x = 0; x < width; ++x)
-        {
-            const uint8_t blue = src[4 * x], green = src[4 * x + 1], red = src[4 * x + 2];
-            dst[4 * x] = red;
-            dst[4 * x + 1] = green;
-            dst[4 * x + 2] = blue;
-            dst[4 * x + 3] = 255;
-        }
-}
+/* The padded source quad a software core's frame is sampled through.
+ *
+ * Nothing here touches channels, and that is a measured property of the pair on
+ * either side rather than an omission. A software core hands libretro
+ * little-endian XRGB8888, and ../PS5_Vulkan samples VK_FORMAT_B8G8R8A8_UNORM in
+ * that format's own B, G, R, A byte order - its 8_8_8_8_UNORM descriptor word
+ * with the ZYXW selectors (driver/ps5vk_image.c), which its own v0-formats
+ * battery proves on the console. The two layouts are the same four bytes, so the
+ * frontend's upload is a row copy and this file holds only the geometry a
+ * 256-byte-row image needs when its sampled width is wider than the core's.
+ */
 
 /* Two triangle-list quads, with UVs restricted to the logical source image.
  * The caller uses a buffer belonging to the current, fence-retired sync slot. */

@@ -87,11 +87,16 @@
 # Opt-in native loader diagnostic verifies rejected loads preserve the live menu.
 0074-native-core-recovery-diagnostic
 
-0075-native-core-rgba-upload
+# 0075 and 0077 are withdrawn. Both existed because this driver's B8G8R8A8_UNORM
+#      entry was not a sampled one: the frontend's software core frames and its
+#      menu images ask for that format, 0014's substitution turned them into
+#      R8G8B8A8 images, and their bytes were then read in the wrong order - the
+#      red and blue reversal. The entry is sampled now, so the frontend keeps
+#      libretro's own byte order again. Their markers are in the WITHDRAWN tuple
+#      of tools/apply-port-patches.py, which exchanges each insertion for the
+#      upstream text it replaced.
 
 0076-archive-read-error-diagnostics
-
-0077-vulkan-menu-colour-and-cached-frame-ownership
 
 0078-crop-padded-core-source
 
@@ -106,3 +111,8 @@
 
 # Native joypad defaults and live auto-binding recovery after reset.
 0082-reset-native-input-defaults
+
+# 0083  an image is the format it was asked for: 0014's substitution to
+#       R8G8B8A8_UNORM is withdrawn, its usage mask kept, and 0027's and 0015's
+#       comments re-stated for the reason each still has
+0083-image-is-the-requested-format

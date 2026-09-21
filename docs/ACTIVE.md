@@ -1,139 +1,105 @@
 # Active work
 
-_Updated: 2026-09-19_
+_Updated: 2026-09-20_
 
-## PPSSPP Track A: the core builds
+## Now: the title is relinked against the migrated driver, on its own byte order
+
+**Driver (`../PS5_Vulkan` `8b311e3`) is at rung 1.0 with its SDK fork migrated.** The
+format audit has no gaps (179 required, 58 reported, 0 missing, 55 conditional, split
+0/0/0/0/0) and `driver/ps5vk_image.c` was not touched by the migration, so
+`VK_FORMAT_B8G8R8A8_UNORM` still samples through the `8_8_8_8_UNORM` word with the
+`ZYXW` selectors — the byte order libretro's little-endian XRGB8888 already is. What the
+migration changed is the shader compiler (ps5-opengl 0.3.0's `opengnm-psbc` tree,
+metadata v14), the compute dispatch words, a null shader module in `ps5vk_compile_stage`
+that faulted every meta clear/blit/resolve, and a driver-owned 32 MiB compile stack. The
+"ACO SIGFPE" is closed and was never ACO: rebased, it was the probe's own unfilled
+`std::array` row dividing by a zero texel size. Archived in
+`evidence/driver-1.0-native-byte-order/driver-archives.json`.
+
+**Withdrawn here: the red/blue compensation.** 0014's format substitution, 0075's
+core-frame RGBA upload and 0077's menu colour and cached-frame ownership existed only
+because the driver could not sample the frontend's own byte order. They are now in
+`tools/apply-port-patches.py`'s `WITHDRAWN` tuple, which exchanges each insertion for the
+upstream text it replaced, so an existing build tree and a fresh one converge.
+`src/core_frame_ps5.cpp` no longer converts channels. Kept, each for a reason that does
+not depend on the sample order: **0027/0055** (the 16-bit RGUI frame is converted by hand
+into R8G8B8A8, because a B4G4R4A4 view with a B/R swizzle is still refused), **0015**
+(upstream's own `VK_REMAP_TO_TEXFMT` needs the bpp case) and **0081** (upstream's TODO:
+`supports_rgba` follows the order a caller asked for).
+
+**Verified here.** `tools/verify.sh` with the driver frozen into `build/frozen-driver/`
+passes all five gates (format, unit 75 tests, build, integration, evidence); title
+identity `f9e4ea6c…`, eboot 34,703,515 bytes sha256 `82534b86…`, two consecutive runs
+byte-identical. The frozen archives were re-hashed unchanged after the build and the
+printed identity was recomputed from its own input list and matched, so the eboot names
+the driver it carries. Record: `evidence/driver-1.0-native-byte-order/`.
+
+**Pending, and the only thing that decides the colours: a console run.** The withdrawn
+path is the one the owner accepted earlier; the native byte order has host evidence and
+the driver's own console `v0-formats` battery. Deploy, then have the owner launch:
+`JOBS=14 bash tools/run-title.sh --no-build --deploy --watch 120`, and check menu
+colours, core colours, and the Quick Menu over a paused game. Until that is recorded,
+this step is host-verified only.
+
+## PPSSPP Track A: parked at the owner's request
 
 Plan: [PPSSPP_Implementation_Plan.md](../PPSSPP_Implementation_Plan.md); platform
-analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). Track A is PPSSPP on its
-software GPU core, with no PS5_Vulkan dependency.
+analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). A1–A4 are done: the core is
+built from pinned `f293b10` (29 submodules, zero `PT_TLS`, the three allowed `NEEDED`
+modules), ABI-checked, linked into the title, and loaded on the console with the runtime
+assets staged (`cycles=8, exports=25, api=1`; `evidence/ppsspp-native/`).
 
-**Done — A1-A3: build, ABI and title link.** `tools/build-ppsspp.sh` fetches pinned
-`f293b10` (29 submodules) and ABI-checks a core with **zero `PT_TLS`** and `NEEDED`
-exactly the three allowed modules; `ppsspp` is in `core_names`, so the title links it.
-`thread_local` needed no patch (the SDK uses `-femulated-tls`); two flag shims
-(`static_assert`, `ZSTD_TRACE`) and a libc shim carry the vendored code.
-Reproducibility: `SOURCE_DATE_EPOCH` from the pinned commit, two builds byte-identical.
-
-**Done — A4: the core loads on the console.** The loader diagnostic passes:
-`cycles=8, exports=25, api=1`, identity `73d2aad8…`, `ran 110 initializers`,
-`symbols=19430 relocations=24812 mapped_bytes=18923520`. Three blockers fell, each
-found on the console: unresolvable imports (four `libScePosixForWebKit` symbols now
-shimmed, 83 OpenGL ones excluded by `patches/ppsspp/0003-no-opengl.patch`; table 497 →
-410 bindings), the thread pool (256/512 → **16/32**), and the runtime assets
-(`assets/` from the pinned source, 193 files, staged to `dist/…/system/PPSSPP` and
-published to `/app0/system/PPSSPP`). Evidence: `evidence/ppsspp-native/`.
-
-**Blocker — the first frame.** The title takes a SIGSEGV on a worker thread during
-`ThreadManager::Init` (fault address 0x70, frames inside `libkernel.sprx`), so no PSP
-frame has been presented. Renderer-independent, and next. The console's libkernel can
-now be symbolized (NID = `SHA1(name || salt)`, byte-reversed, base-64), which names the
-faulting frame `pthread_get_specificarray_np+0x3b` reached from
-`pthread_create_name_np`, resolving a caller address inside the core's anonymous
-mapping and dereferencing the miss.
-
-**Deployed and armed:** the console holds `eac82195…` — the loader probe, the import and
-asset fixes, PPSSPP's thread-pool diagnostic (`ThreadManager::Init: creating N`) and
-`system/PPSSPP` — with the loader test **PASS** (`cycles=8, exports=25, api=1`, both
-negative cases rejected). No `thread-test.txt` is armed, so the next launch goes
-straight to the core: `JOBS=14 bash tools/run-title.sh --no-build --no-deploy
---core-test=ppsspp --watch 90`, and the log names the last pool step before the crash.
-
-**Driver: rung 1.0 closed, title relinked.** `PS5_Vulkan` `d4e73ff`, embedded
-`libps5vk.ps5.a` `d41f934b…`, title identity `735f7eb1…`, all five gates pass. Still
-missing for PPSSPP's Vulkan renderer: a **combined depth/stencil format** (only D16 and
-D32F exist; PPSSPP asserts without one of D24S8/D32S8/D16S8 — the device-creation
-blocker), **attachments smaller than 3840x2160**, **cull mode**, **colour write
-masks**, **stencil test with dynamic stencil state** and **dynamic blend constants**.
-
-## Now
-
-**Owner accepted the thumbnail and configuration-reset fixes: “Perfect. Commit”.**
-Landing on `main`; evidence: `evidence/thumbnail-input-defaults/`.
-Details and regression checks: `docs/THUMBNAIL_INPUT_DEFAULTS.md`.
-
-- Async image loading discarded the requested RGBA flag; patch 0081 preserves it.
-  Gameplay pixels and saved PNG encoding are unchanged.
-- Compiled input was ps5 but joypad default was null; patch 0082 selects ps5.
-  Reset also clears auto-binds without recreating the driver, so the next pad poll
-  now reannounces the connected controller once to restore the built-in profile.
-- Three regression tests failed before the fixes; all four focused tests pass
-  afterward, including native-pad recovery without new samples or a device reopen.
-- All five gates pass: 74 tests, 278 frontend sources; normal diagnostics mode.
-  Identity: `e11018a79a62ce91fa723deaad6939c1e48a47bace21b3527ae84f4452148451`.
-  Exact artifacts/gate logs: `klog/thumbnail-input-build/`; sanitized host report
-  in evidence/thumbnail-input-defaults/. Driver archives and Mesa utility objects
-  match the accepted normal XMB build. Logging and PS5_Vulkan unchanged.
-- Uploaded eboot only after idle checks, runtime identity read back, live config
-  unchanged. Capture: `klog/thumbnail-input-upload-20260919-205531/`. Saved joypad
-  selection was empty (automatic), not null; no configuration repair was needed.
-  No launch/kill sent. Owner accepted the fixes after deployment. No fresh console
-  logs or individual checklist results were captured; acceptance is owner observation.
+**Blocker — the first frame.** A SIGSEGV on a worker thread during `ThreadManager::Init`
+(fault address 0x70, frames inside `libkernel.sprx`, `pthread_get_specificarray_np+0x3b`
+reached from `pthread_create_name_np`). Every isolation probe passes. The console's
+libkernel can now be symbolized (NID = `SHA1(name || salt)`, byte-reversed, base-64),
+which is what named the frame. Next attempt: remove PPSSPP's `thread_local` uses, since
+core TLS compiles to `__emutls_get_address` → `pthread_getspecific`, exactly the family
+in the backtrace.
 
 ## Accepted baselines
 
 - XMB: `601e575` fixed large-list allocation failures, `6b857a9` merged the README;
-  the owner confirmed crash-free navigation and the normal build removed the
-  five-second hitches. Detail: `docs/XMB_LIST_SAFETY.md`,
+  crash-free navigation and no five-second hitches. Detail: `docs/XMB_LIST_SAFETY.md`,
   `evidence/xmb-safe-list-run/`.
-- Gameplay: Genesis Plus GX frontend `ecfcddd5…` with all five gates green and owner
-  acceptance of colours, sound, controls and menu/next-game transitions;
-  FCEUmm, mGBA, Snes9x and FBNeo evidence stays in `native-core-loading/`,
-  `mgba-native/`, `snes9x-native/` and `fbneo-native/`. Core pins, hashes and
-  acceptance limits are in `docs/PHASE_LOG.md`.
-
-## Failure being addressed
-
-Resolved and superseded. The XMB large-list crash (`601e575`), the hitches after it
-and the thumbnail/input defaults (`e11018a`) are all accepted; the investigation
-record is `docs/XMB_ALLOCATION_INVESTIGATION.md`, the fix notes
-`docs/XMB_LIST_SAFETY.md` and `docs/THUMBNAIL_INPUT_DEFAULTS.md`, and the raw
-captures are `klog/xmb-*` with evidence under `evidence/xmb-*` and
-`evidence/thumbnail-input-defaults/`. The unsafe driver error logger under
-arbitrary OOM remains outside the frontend fix.
-
-## Previous console-verified baseline
-
-Superseded by the baselines above and recorded in full in `docs/PHASE_LOG.md`: the
-Genesis Plus GX run `ecfcddd5…` (66 tests, owner-confirmed gameplay) and the FCEUmm,
-mGBA, Snes9x and FBNeo runs whose evidence stays in `native-core-loading/`,
-`mgba-native/`, `snes9x-native/` and `fbneo-native/`.
+- Gameplay: Genesis Plus GX frontend `ecfcddd5…`, all five gates green, owner acceptance
+  of colours, sound, controls and menu/next-game transitions. FCEUmm, mGBA, Snes9x and
+  FBNeo evidence stays in `native-core-loading/`, `mgba-native/`, `snes9x-native/` and
+  `fbneo-native/`. Core pins, hashes and acceptance limits are in `docs/PHASE_LOG.md`.
+- Thumbnail and configuration-reset fixes accepted (patches 0081/0082):
+  `evidence/thumbnail-input-defaults/`, `docs/THUMBNAIL_INPUT_DEFAULTS.md`.
 
 ## Named errors and remaining limits
 
-- First frontend snapshot has five intentional missing-core recovery errors and
-  two archive-extraction failures. The owner identified the failing content as
-  ARCADE - Sega System 16 & 32: these boards belong to FBNeo, not Genesis Plus GX.
-  Archive structure was not inspected; no general archive fix is inferred.
-- Second-launch frontend snapshot has zero ERROR lines. Neither run records an
-  invalid bitmap viewport or rejected XRGB8888 format.
-- Console verification does not cover every supported Sega system, BIOS/disc/CHD,
-  NTSC/interlace options, SRAM/state round trips, long-run A/V or performance.
-  Silence/discard counters include menu/start/stop; zero backend errors is not
-  proof of uninterrupted audio across all workloads.
-- Existing upstream compiler warnings include old zlib prototypes, Tremor's
-  long-to-int abs conversion and unused blip_discard_samples_dirty missing return.
-  That blip helper has no callers in this source. Disc codecs remain unverified
-  on console; warnings are not suppressed or treated as runtime acceptance.
-- Loader still rejects TLS, legacy init/fini, nonempty preinit and unsupported
-  relocations/dependencies. General unwind registration is absent. Cores share
-  the frontend process; safe load rejection cannot isolate arbitrary core faults.
+- First frontend snapshot has five intentional missing-core recovery errors and two
+  archive-extraction failures; the owner identified the content as Sega System 16 & 32,
+  which belongs to FBNeo. No general archive fix is inferred.
+- Console verification does not cover every supported system, BIOS/disc/CHD, NTSC and
+  interlace options, SRAM/state round trips, long-run A/V or performance. Zero backend
+  errors is not proof of uninterrupted audio across all workloads.
+- Upstream compiler warnings (old zlib prototypes, Tremor's long-to-int abs conversion,
+  an unused blip helper's missing return) are neither suppressed nor treated as
+  acceptance.
+- The loader still rejects TLS, legacy init/fini, nonempty preinit and unsupported
+  relocations/dependencies; cores share the frontend process, so a rejected load is safe
+  but an arbitrary core fault is not isolated.
+- The withdrawn path has the console history; the native byte order does not yet. A
+  colour regression would show as red and blue exchanged in the menu, in core frames or
+  in thumbnails, and is the first thing to check on the next run.
 
 ## Preserved platform and file locations
 
-XMB stays default and RGUI selectable. Vulkan remains the presentation route;
-video_ps5 stays selectable as CPU fallback. Native audio/input/binding, config
-saving, FTP permissions and directory browsing remain. Useful logs are retained.
-Deployments preserve live settings/games.
+XMB stays default and RGUI selectable. Vulkan remains the presentation route; video_ps5
+stays selectable as CPU fallback. Native audio/input/binding, config saving, FTP
+permissions and directory browsing remain. Deployments preserve live settings/games.
 
-FTP base `/data/homebrew/PPSA99169/` corresponds to in-title `/app0`.
-Use content/, system/, cores/, config/retroarch.cfg, savefiles/, savestates/.
-Genesis Plus GX Sega CD BIOS files use system/ root; FBNeo uses system/fbneo/.
-See `docs/DEPLOYMENT.md` for procedures and metadata-listed BIOS filenames.
+FTP base `/data/homebrew/PPSA99169/` corresponds to in-title `/app0`. Use content/,
+system/, cores/, config/retroarch.cfg, savefiles/, savestates/. Genesis Plus GX Sega CD
+BIOS files use system/ root; FBNeo uses system/fbneo/. See `docs/DEPLOYMENT.md`.
 
 ## Operating notes
 
-Uploads are authorized; check console idle before deployment. A new launch needs
-owner intervention. Start klog first, preserve old logs and capture allocation,
-frontend and trace logs. Never interrupt another title. Preserve crash/freeze logs
-before relaunch. No new core or unrelated driver work is assigned by this file.
+Uploads are authorized; check console idle before deployment. A new launch needs owner
+intervention. Start klog first, preserve old logs, and capture allocation, frontend and
+trace logs. Never interrupt another title. No new core or unrelated driver work is
+assigned by this file.

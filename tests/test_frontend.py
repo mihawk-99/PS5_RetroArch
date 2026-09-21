@@ -293,6 +293,48 @@ class PortPatches(unittest.TestCase):
             with self.subTest(file=name, marker=marker):
                 self.assertIn(marker, replacement)
 
+    def withdrawn(self) -> list:
+        import ast
+        source = self.script.read_text(encoding="utf-8")
+        for node in ast.parse(source).body:
+            if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "WITHDRAWN":
+                return ast.literal_eval(node.value)
+        raise AssertionError(f"{self.script} no longer defines WITHDRAWN")
+
+    def test_every_withdrawal_names_one_patch(self) -> None:
+        """A withdrawal that names no block, or names one twice, restores nothing.
+
+        The withdrawal is that block's own substitution in reverse, so its marker
+        has to be a marker some EDITS block defines and no two withdrawals may
+        share one: the second would look for an insertion the first has removed.
+        """
+        markers = [edit[3] for edit in self.blocks()]
+        withdrawn = self.withdrawn()
+        self.assertEqual(len(set(withdrawn)), len(withdrawn),
+                         f"a marker is withdrawn twice: {sorted(withdrawn)}")
+        for marker in withdrawn:
+            self.assertIn(marker, markers,
+                          f"WITHDRAWN names {marker!r}, which no EDITS block defines")
+
+    def test_no_withdrawal_removes_an_edit_the_port_still_needs(self) -> None:
+        """The withdrawn blocks are the ones that existed for the old driver.
+
+        They are named here rather than counted, because a withdrawal is a
+        behaviour change on the console: 0014's format substitution, 0075's core
+        frame upload and 0077's menu colour and cached-frame ownership were all
+        answers to a B8G8R8A8 entry that was not sampled. Withdrawing another
+        block means re-checking that claim.
+        """
+        self.assertEqual(
+            sorted(self.withdrawn()),
+            sorted([
+                'patches/series, 0075: matching',
+                'patches/series, 0075: libretro XRGB',
+                'patches/series, 0077: decode menu images for sampled RGBA',
+                'patches/series, 0077: upload decoded menu images as RGBA',
+                'patches/series, 0077: preserve original core pixels across cached frames',
+            ]))
+
     def test_the_patch_set_is_the_size_it_should_be(self) -> None:
         """Pinned so an accidental addition or deletion is a visible diff.
 
@@ -300,7 +342,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 179,
+            len(self.blocks()), 185,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 

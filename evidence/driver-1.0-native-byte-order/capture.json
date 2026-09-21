@@ -1,0 +1,60 @@
+{
+  "step": "driver-1.0-native-byte-order",
+  "recorded": "2026-09-20",
+  "revision": "ca02af3 (title source) / 8b311e3 (the driver the link carries)",
+  "command": "PS5_VULKAN_DIR=$PWD/build/frozen-driver PS5_VULKAN_ICD=$PWD/build/frozen-driver/build/driver/ps5/libvulkan.so.1 bash tools/verify.sh",
+  "raw_capture": "build/verify-native-byte-order.log",
+  "raw_lines": 7718,
+  "raw_bytes": 3172524,
+  "lines": [
+    "==> [ra] compiled 278 of 278 sources",
+    "==> [ra] archived 278 objects into build/ra/libretroarch.a",
+    "  gfx/drivers/vulkan.c: withdrawn (patches/series, 0075: matching)",
+    "  gfx/drivers/vulkan.c: withdrawn (patches/series, 0075: libretro XRGB)",
+    "  gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: decode menu images for sampled RGBA)",
+    "  gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: preserve original core pixels across cached frames)",
+    "  gfx/drivers/vulkan.c: withdrawn (patches/series, 0077: upload decoded menu images as RGBA)",
+    "core ABI PASS: fceumm_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: mgba_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: snes9x_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: fbneo_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: genesis_plus_gx_libretro.so; 25 exports; kernel_web",
+    "core ABI PASS: ppsspp_libretro.so; 25 exports; kernel_web",
+    "core imports: 409 explicit native bindings for 6 cores",
+    "==> [title] build identity: f9e4ea6c9d6261cda7854fed71c854e0f138aa8733f54869733d3727919f54fe",
+    "==> [title] staged the Vulkan driver: libvulkan.so.1 (16862080 bytes)",
+    "==> [title] built /home/mihawk/Desktop/PS5_Homebrews/PS5_RetroArch/dist/PPSA99169 (354 files, eboot.bin 34703515 bytes)",
+    "eboot.bin is a fake self application image (4f153d1d)",
+    "verify: PASS (format unit build integration evidence)"
+  ],
+  "gates": {
+    "format": "PASS (1s)",
+    "unit": "PASS (12s)",
+    "build": "PASS (247s)",
+    "integration": "PASS (10s)",
+    "evidence": "PASS (0s)"
+  },
+  "title": {
+    "build_identity": "f9e4ea6c9d6261cda7854fed71c854e0f138aa8733f54869733d3727919f54fe",
+    "eboot_bytes": 34703515,
+    "eboot_sha256": "82534b86717cf423dcc12b6014dcb1d68cfe9de2d3c8c88817cc13a93d24d629",
+    "reproducible": "two consecutive gate runs built the same eboot byte for byte"
+  },
+  "driver": {
+    "ps5_vulkan_revision": "8b311e3027a3f8988615847e7da38ed0b245883d",
+    "archives_frozen_at": "build/frozen-driver",
+    "archive_hashes": "evidence/driver-1.0-native-byte-order/driver-archives.json",
+    "identity_recomputed_from_the_frozen_inputs": true
+  },
+  "withdrawn": [
+    "0014's format substitution: an image is the format it was asked for",
+    "0075: vk->tex_fmt R8G8B8A8 and the per-frame ps5_core_frame_rgba conversion",
+    "0077: RGBA menu decode/upload and the refused writable software framebuffer"
+  ],
+  "kept": [
+    "0027 and 0055: the 16-bit RGUI frame, converted by hand into R8G8B8A8",
+    "0015: the bpp case upstream's VK_REMAP_TO_TEXFMT and 0027 both need",
+    "0081: supports_rgba follows the requested order (upstream's own TODO)"
+  ],
+  "console_verification": "pending: no console run of this build yet; the owner's colour check is what decides it"
+}

@@ -2857,3 +2857,59 @@ No historical regression verdict or exact heap-capacity claim is established.
 See `evidence/xmb-playlist-allocation-crash/` for sanitized first-failure owners,
 context history, source comparison and playlist counts. Raw user data remains
 in ignored capture storage.
+
+## 2026-09-20 — the driver samples the byte order the frontend uploads
+
+`../PS5_Vulkan`'s `VK_FORMAT_B8G8R8A8_UNORM` entry is a sampled one
+(`driver/ps5vk_image.c`: `SAMPLED_IMAGE_BIT`, the linear filter, the transfer and
+blit pairs, and the `8_8_8_8_UNORM` word with the `ZYXW` selectors, which read the
+memory's B, G, R, A as R, G, B, A). That project's `v0-formats` battery proves the
+fetch on the console and `docs/M5_PHASE_C.md`'s round 6 records the words:
+`B8G8R8A8_UNORM` takes `ZYXW`, "VideoOut's byte order", while
+`A8B8G8R8_UNORM_PACK32` takes `WZYX` because the console's fetch of *that* format
+reverses. The frontend uploads libretro's little-endian XRGB8888, whose four bytes
+are the same B, G, R, A, so the two now agree byte for byte and no conversion
+between them is owed.
+
+Four of this port's changes existed because that entry did not:
+
+- **0014** substituted `R8G8B8A8_UNORM` for any format whose entry did not
+  advertise `SAMPLED_IMAGE_BIT`. An application's B, G, R, A bytes then landed in
+  an image the driver reads as R, G, B, A: the red and blue reversal. The usage
+  mask in the same block is what actually mattered, and it stays.
+- **0075** made `vk->tex_fmt` R8G8B8A8 for a 32-bit core frame and converted every
+  frame's channels on the CPU into it, because a B8G8R8A8 staging buffer beside a
+  substituted R8G8B8A8 image selected `vulkan_copy_staging_to_dynamic`'s
+  RGB565-only compute branch and aborted there.
+- **0077** decoded menu images as RGBA and uploaded them as R8G8B8A8, and refused
+  the writable software framebuffer so that the XRGB-to-RGBA conversion could not
+  mutate cached source pixels while the Quick Menu paused emulation.
+- **0081** is kept. It makes `supports_rgba` follow the order a caller asked for,
+  where upstream leaves `false` behind its own TODO. It is inert without an RGBA
+  request and correct with one, so it is not part of the reversal.
+
+The withdrawal is `tools/apply-port-patches.py`'s `WITHDRAWN` tuple: each marker
+names an EDITS block whose insertion is exchanged for the upstream text it
+replaced. A tree that already carries the insertion and a fresh tree end in the
+same file, which is checked by applying the patcher to a copy of
+`vendor/retroarch`'s `gfx/drivers/vulkan.c` and to the withdrawn `build/ra-conf`
+and comparing the two (identical). Two blocks that look like the same decision
+stay, for reasons that do not depend on the sample order: **0027** and **0055**
+convert the menu's 16-bit RGBA4444 frame by hand into R8G8B8A8, because this
+driver still refuses a view whose component mapping is not the identity and so
+cannot sample the B4G4R4A4 texture with the B/R swizzle upstream asks for; and
+**0015** stays for upstream's own `VK_REMAP_TO_TEXFMT`, which turns an RGB565
+request into R8G8B8A8.
+
+What this does not establish: the withdrawn path is the one the console accepted
+earlier (owner-confirmed colours in `native-core-loading/`, `mgba-native/` and
+`xmb-safe-list-run/`), and the native byte order has host evidence and the
+driver's own console battery so far. The first console run after this change is
+what decides the title's colours.
+
+A second finding, from the same round: `tools/core-imports.py` rewrites
+`build/core_imports.inc`, and that file is insertion-ordered by the core list, so
+running the tool by hand to read a count changes a build input and with it the
+build identity. The identity does not lie about what it hashed — recomputing it
+from its own inputs reproduced the printed identity — but a tree whose include was
+rewritten by hand no longer describes the eboot that was built from it.

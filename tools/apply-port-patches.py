@@ -20,6 +20,10 @@ Every edit prints `applied` or `present`, so the script reports what it did rath
 than leaving the tree in an unknown state. Nothing is ever written to
 vendor/retroarch: the tree passed in is the configured copy under build/.
 
+A change the driver has outgrown is withdrawn rather than deleted: its marker
+goes in WITHDRAWN below, and the script exchanges that insertion for the upstream
+text it replaced, so a tree that already carried it and a fresh one agree.
+
 Exit status is 0 when every edit is present at the end, 1 otherwise.
 """
 
@@ -2428,7 +2432,163 @@ EDITS = [
     ('tasks/task_image.c', "   /* TODO/FIXME - shouldn't we set this ? */\n   image->ti.supports_rgba           = false;", '   /* patches/series, 0081: async images honor the renderer channel order. */\n   image->ti.supports_rgba           = supports_rgba;', 'patches/series, 0081: async images'),
     ('configuration.c', '      case JOYPAD_NULL:\n         break;', '      case JOYPAD_NULL:\n         /* patches/series, 0082: native joypad survives configuration reset. */\n         return "ps5";', 'patches/series, 0082: native joypad'),
     ('retroarch.c', '      case CMD_EVENT_MENU_RESET_TO_DEFAULT_CONFIG:\n         config_set_defaults(global_get_ptr());\n         break;', '      case CMD_EVENT_MENU_RESET_TO_DEFAULT_CONFIG:\n      {\n         /* patches/series, 0082: resetting defaults also clears auto-binds. */\n         extern void ps5_input_reset_autoconfig(void);\n         config_set_defaults(global_get_ptr());\n         ps5_input_reset_autoconfig();\n         break;\n      }', 'patches/series, 0082: resetting defaults'),
+    # 0083: the requested format is the image's format.
+    #
+    # ../PS5_Vulkan samples B8G8R8A8_UNORM in the byte order an application
+    # uploads: the 8_8_8_8_UNORM word with the ZYXW selectors, which is Mesa's
+    # radv_compose_swizzle for that format's description and which that project's
+    # v0-formats battery proves on the console (docs/BLOCKERS.md defect 13,
+    # docs/M5_PHASE_C.md round 6). An image is therefore the format it was asked
+    # for, and 0014's substitution is withdrawn: reading an application's B, G, R,
+    # A bytes as R, G, B, A is the red and blue reversal that made the port ask
+    # for R8G8B8A8 everywhere (0075, 0077). What 0014 was really protecting stays
+    # - the usage mask, which is derived from the requested format's own
+    # features, so it cannot change what an image holds. Every format the
+    # frontend asks for now advertises SAMPLED, so the substitution no longer
+    # fired in any case; a format that does lose SAMPLED is better refused at
+    # draw time than silently reinterpreted.
+    (
+        "gfx/drivers/vulkan.c",
+        "   /* Added by this port (patches/series, 0014): a create-info may only ask\n"
+        "    * for usage bits the format advertises, and a texture that cannot be\n"
+        "    * sampled is not a texture. Masking handles the first; the second is\n"
+        "    * handled by asking for R8G8B8A8_UNORM, which this driver reports as\n"
+        "    * sampled and which is the same image for a uniform colour. Only image\n"
+        "    * types are touched: STAGING and READBACK are buffers here. */\n",
+        "   /* Added by this port (patches/series, 0014): a create-info may only ask for\n"
+        "    * usage bits the format advertises. ../PS5_Vulkan refuses an image whose\n"
+        "    * usage its format's features do not allow, and upstream asks for\n"
+        "    * SAMPLED | TRANSFER_DST | TRANSFER_SRC on the 4x4 blank and the 1x1\n"
+        "    * default texture. The mask is built from the requested format's own\n"
+        "    * features, so it cannot change what an image holds. Only image types are\n"
+        "    * touched: STAGING and READBACK are buffers here.\n"
+        "    * patches/series, 0083: the mask is the whole edit. */\n",
+        "patches/series, 0083: the mask is the whole edit",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      VkFormat request          = info.format;\n"
+        "\n"
+        "      memset(&format_properties, 0, sizeof(format_properties));\n"
+        "      vkGetPhysicalDeviceFormatProperties(vk->context->gpu,\n"
+        "            request, &format_properties);\n"
+        "      if (   !(format_properties.optimalTilingFeatures\n"
+        "                  & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)\n"
+        "          && request != VK_FORMAT_R8G8B8A8_UNORM)\n"
+        "      {\n"
+        "         request = VK_FORMAT_R8G8B8A8_UNORM;\n"
+        "         memset(&format_properties, 0, sizeof(format_properties));\n"
+        "         vkGetPhysicalDeviceFormatProperties(vk->context->gpu,\n"
+        "               request, &format_properties);\n"
+        "      }\n",
+        "      /* patches/series, 0083: the requested format is the image's format. */\n"
+        "      VkFormat request          = info.format;\n"
+        "\n"
+        "      memset(&format_properties, 0, sizeof(format_properties));\n"
+        "      vkGetPhysicalDeviceFormatProperties(vk->context->gpu,\n"
+        "            request, &format_properties);\n",
+        "patches/series, 0083: the requested format",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      info.format = request;\n"
+        "      info.usage &= allowed;\n",
+        "      /* patches/series, 0083: nothing to write back to the image's format. */\n"
+        "      info.usage &= allowed;\n",
+        "patches/series, 0083: nothing to write back",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      if (request != format)\n"
+        "      {\n"
+        "         /* The view, the staging buffer's pitch and tex.format are all\n"
+        "          * built from this local, so a substituted format has to reach\n"
+        "          * all four or the view is created for a format the image is not. */\n"
+        "         format           = request;\n"
+        "         buffer_width     = (width * vulkan_format_to_bpp(format) + 3u) & ~3u;\n"
+        "         buffer_info.size = buffer_width * height;\n"
+        "      }\n",
+        "      /* patches/series, 0083: no substituted format reaches the view, the\n"
+        "       * staging pitch or tex.format, so nothing is written back from it. */\n",
+        "patches/series, 0083: no substituted format",
+    ),
+    (
+        # 0027's decision stays; only its reason moves. The format it names has to
+        # be a 32-bit one the conversion below can write and this driver can
+        # sample, and both textures keep whatever it names, so the substitution
+        # 0027 cited is no longer part of the argument.
+        "gfx/drivers/vulkan.c",
+        "      /* Added by this port (patches/series, 0027): ../PS5_Vulkan samples only\n"
+        "       * views whose component mapping is the identity (ps5vk_draw.c,\n"
+        "       * V0-formats), so the B4G4R4A4 texture and its B/R view swizzle cannot be\n"
+        "       * sampled: the draw is refused. The 32-bit texture and the CPU conversion\n"
+        "       * below carry the same pixels with no swizzle, which is the branch a device\n"
+        "       * without B4G4R4A4 tiling already takes. The format is named rather than\n"
+        "       * left at B8G8R8A8 because the staging texture keeps the format it is\n"
+        "       * created with: ../PS5_Vulkan's B8G8R8A8 entry is not a sampled one, so the\n"
+        "       * image is substituted to R8G8B8A8 and a staging texture in B8G8R8A8 would\n"
+        "       * make the two formats differ - which takes the compute path, whose\n"
+        "       * storage-image descriptor the driver has no entry for. */\n",
+        "      /* Added by this port (patches/series, 0027): ../PS5_Vulkan samples only\n"
+        "       * views whose component mapping is the identity (ps5vk_draw.c,\n"
+        "       * V0-formats), so the B4G4R4A4 texture and its B/R view swizzle cannot be\n"
+        "       * sampled: the draw is refused. The 32-bit texture and the CPU conversion\n"
+        "       * below carry the same pixels with no swizzle, which is the branch a device\n"
+        "       * without B4G4R4A4 tiling already takes.\n"
+        "       * patches/series, 0083: the format the conversion writes is named here\n"
+        "       * because it writes 32 bits per texel, and R8G8B8A8_UNORM is the 32-bit\n"
+        "       * format this driver samples through the identity selectors - the order\n"
+        "       * the store below is written in. Both the staging texture and the optimal\n"
+        "       * image are created with this one local, so naming it here is what keeps\n"
+        "       * the two from differing, which would take the compute path whose\n"
+        "       * storage-image descriptor the driver has no entry for. */\n",
+        "patches/series, 0083: the format the conversion writes",
+    ),
+    (
+        # 0015's case is still required: upstream's own VK_REMAP_TO_TEXFMT turns an
+        # RGB565 request into R8G8B8A8_UNORM, and 0027 names that format for the
+        # 16-bit menu frame. Only its reason is rewritten.
+        "gfx/drivers/vulkan.c",
+        "      /* Added by this port (patches/series, 0015): the format 0014 is\n"
+        "       * substituted with when a format cannot be sampled. Without this\n"
+        "       * case the staging buffer sized from it came out zero bytes long,\n"
+        "       * and the driver aborted inside vk_buffer_init. */\n",
+        "      /* Added by this port (patches/series, 0015): 32 bits per pixel for\n"
+        "       * R8G8B8A8_UNORM. Upstream's own VK_REMAP_TO_TEXFMT turns an RGB565\n"
+        "       * request into this format, and the 16-bit menu frame is converted into\n"
+        "       * it by hand (patches/series, 0027), so the staging buffer sized from it\n"
+        "       * must not come out zero bytes long: ../PS5_Vulkan's vk_buffer_init\n"
+        "       * aborts on a zero size.\n"
+        "       * patches/series, 0083: 32 bits per pixel for the format 0027 names and\n"
+        "       * upstream's own remap produces. */\n",
+        "patches/series, 0083: 32 bits per pixel for",
+    ),
 ]
+
+# Changes that are withdrawn rather than deleted, by marker.
+#
+# An entry here names an insertion this driver no longer needs, and the
+# withdrawal is that entry's own substitution in reverse: the text it inserted
+# is exchanged for the upstream text it replaced. Nothing leaves EDITS, because
+# build/ra-conf already holds the insertion - a patch that is merely deleted
+# from this file stays applied in every tree that already has it, which is the
+# silent state the whole script exists to avoid.
+#
+# 0075 and 0077 were written while this driver's B8G8R8A8_UNORM entry advertised
+# the colour-attachment bit alone. The frontend asks for that format for its
+# software core frames and for its menu images, the substitution above turned
+# every one of them into an R8G8B8A8 image, and the bytes were then read in the
+# wrong order: the red and blue reversal. The entry is sampled now, so the
+# frontend uploads the core's own pixels again, decodes and uploads menu images
+# in the order they are decoded, and hands out its writable software framebuffer
+# instead of refusing it.
+WITHDRAWN = (
+    'patches/series, 0075: matching',
+    'patches/series, 0075: libretro XRGB',
+    'patches/series, 0077: decode menu images for sampled RGBA',
+    'patches/series, 0077: upload decoded menu images as RGBA',
+    'patches/series, 0077: preserve original core pixels across cached frames',
+)
 
 
 def main() -> int:
@@ -2460,6 +2620,26 @@ def main() -> int:
             continue
         path.write_text(text.replace(anchor, replacement, 1), encoding="utf-8")
         print(f"  {name}: applied")
+
+    # Withdrawals are processed after every insertion, so a fresh tree and a tree
+    # that already carried the withdrawn text end in the same state.
+    for name, anchor, replacement, marker in EDITS:
+        if marker not in WITHDRAWN:
+            continue
+        path = tree / name
+        if not path.is_file():
+            print(f"  {name}: MISSING (withdrawal, {marker})")
+            ok = False
+            continue
+        text = path.read_text(encoding="utf-8")
+        if replacement not in text:
+            # Either this tree never carried the insertion or the withdrawal has
+            # already run. Both end in the upstream text the withdrawal restores.
+            print(f"  {name}: upstream ({marker})")
+            continue
+        path.write_text(text.replace(replacement, anchor, 1), encoding="utf-8")
+        print(f"  {name}: withdrawn ({marker})")
+
     return 0 if ok else 1
 
 

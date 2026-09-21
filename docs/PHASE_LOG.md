@@ -2916,3 +2916,79 @@ now motivated by the emutls path: core TLS becomes `__emutls_get_address` →
 `pthread_getspecific`, which is exactly the family in the backtrace). If that is not
 enough, the fix has to make libkernel's lookup succeed for core addresses, or keep
 libkernel's thread-specific-data path off every stack that contains core frames.
+
+## 2026-09-20 — relinked against the migrated driver with the red/blue compensation withdrawn
+
+**Task.** Two asks: build the frontend against `../PS5_Vulkan` now that its migration
+landed (`8b311e3`), and remove this port's red/blue compensation, which existed only
+because that driver could not sample the frontend's own byte order.
+
+**Driver review — `8b311e3`, "Migrate the driver to ps5-opengl 0.3.0's compiler fork,
+and close the console SIGFPE at its owner".** The compile-side surface moved: the
+driver links ps5-opengl 0.3.0's `opengnm-psbc` tree (upstream `a92a1228` + the
+release's patch, tree `a27cbecc`, metadata v14) with this repository's compiler patches
+on top, `patch-compute-metadata.py` is dropped, `patch-vertex-formats.py`'s anchor moved
+and a new `patch-aco-min-waves.py` restores `program->workgroup_size`'s
+"unknown is UINT_MAX" invariant before `calc_min_waves`. The console SIGFPE that round
+15 had laid at ACO's door was the *probe's* own: earlier symbolization had missed the
+PIE load base (`xotext: 0000000000400000`), and rebased, `rip 0x430b34` is `div %r13d`
+in `run_sampled_format_frames`, dividing by an unfilled `std::array<SampledFormat, 10>`
+row's zero texel size; both tables now declare their rows and a `static_assert` makes a
+declared-but-unfilled row a build error (console: pid 299, seven of seven cases, 1581
+PASS records, no `signal:`). Three fixes in the same commit matter here: `ps5vk_compile_stage`
+dereferenced a null shader module for the NIR stages Mesa's meta operations hand it —
+every meta clear, blit and resolve faulted — `ps5vk_queue_flip` recorded the wrong
+submission's words, and shader compilation now runs on a driver-allocated 32 MiB stack
+via `pthread_attr_setstack`, so an application thread's small stack cannot overflow the
+compiler's recursion. **What the port depends on is unchanged**: `driver/ps5vk_image.c`
+is not touched, `VK_FORMAT_B8G8R8A8_UNORM` still carries `SAMPLED_IMAGE_BIT` with the
+`8_8_8_8_UNORM` word and the `ZYXW` selectors, and the format audit's counts are the same
+(179 required, 58 reported, 0 missing, 55 conditional, split 0/0/0/0/0).
+
+**Withdrawn: 0014's format substitution, 0075, 0077.** `tools/apply-port-patches.py`
+grew an 0083 group (the substitution goes, the usage mask stays, and 0027's and 0015's
+comments are restated for the reasons they still have) and a `WITHDRAWN` tuple that
+exchanges each named insertion for the upstream text it replaced, so an existing tree
+and a fresh one converge — checked by patching a copy of `vendor/retroarch`'s
+`gfx/drivers/vulkan.c` and the withdrawn `build/ra-conf` and comparing (identical).
+`src/core_frame_ps5.cpp` no longer converts channels: the upload is a row copy of
+libretro's little-endian XRGB8888 into a B8G8R8A8 image, which is the same four bytes.
+Four tests now assert the core's own bytes instead of the conversion's output, and two
+new `tests/test_frontend.py` cases pin the mechanism (a withdrawal must name exactly one
+EDITS block, and the withdrawn set is named). The patch-count pin moved 179 → 185.
+
+**Build and gates.** `PS5_VULKAN_DIR=$PWD/build/frozen-driver
+PS5_VULKAN_ICD=$PWD/build/frozen-driver/build/driver/ps5/libvulkan.so.1 bash
+tools/verify.sh` — format PASS (1s), unit PASS (12s, 75 tests), build PASS (247s),
+integration PASS (10s), evidence PASS (0s), `verify: PASS (format unit build
+integration evidence)`. Title identity `f9e4ea6c…`, eboot 34,703,515 bytes sha256
+`82534b86…`, and two consecutive gate runs built it byte for byte the same. The four
+driver archives were frozen into `build/frozen-driver/` before the build and re-hashed
+unchanged after it, and the printed identity was recomputed from `tools/build-title.sh`'s
+own input list against those hashes and matched, so the eboot's embedded identity names
+the driver it carries. Record: `evidence/driver-1.0-native-byte-order/`.
+
+**Four runs before the green one, at the same detail.** 1) The first `tools/verify.sh`
+failed at `unit`: three new 0083 markers did not appear in their own replacements — the
+port pins that so a rebuild cannot append an edit twice — and the patch-count pin was
+stale; both fixed (`build/verify-native-byte-order-first-run.log`). 2) The second failed
+at `build` after 324 s because the frozen tree's `.deps/work` symlink was one level short
+and the Mesa utility sources read as missing (`…-second-run.log`). 3) A third was
+interrupted mid-build when the driver's `8b311e3` landed and the freeze was rebuilt
+(`…-third-run-killed.log`). 4) The fourth passed format, unit, build and integration and
+failed only at `evidence`, because the new step directory held no `capture.json` /
+`expectation.json` yet (`…-gates-4-of-5.log`).
+
+**Also found.** `tools/core-imports.py` rewrites `build/core_imports.inc`, and that file
+is insertion-ordered by the core list: running the tool by hand to read a count changes a
+build input and with it the build identity. The identity does not lie about what it
+hashed — recomputing it from its own inputs reproduced both printed identities — but a
+tree whose include was rewritten by hand no longer describes the eboot built from it.
+
+**Pending, and the only thing that decides the colours: a console run.** The withdrawn
+path is the one the owner accepted earlier (`native-core-loading/`, `mgba-native/`,
+`xmb-safe-list-run/`), and the native byte order has host evidence plus the driver's own
+console `v0-formats` battery. The command is
+`JOBS=14 bash tools/run-title.sh --no-build --deploy --watch 120` with the owner
+launching; the check is menu colours, core colours, and the Quick Menu over a paused
+game.
