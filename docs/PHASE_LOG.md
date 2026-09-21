@@ -2992,3 +2992,22 @@ console `v0-formats` battery. The command is
 `JOBS=14 bash tools/run-title.sh --no-build --deploy --watch 120` with the owner
 launching; the check is menu colours, core colours, and the Quick Menu over a paused
 game.
+
+## 2026-09-20 — the native-byte-order build is published (upload only)
+
+`python3 tools/deploy-title.py` published the build from the previous entry and read it
+back: 354 files, `eboot.bin` stored as 35,144,676 bytes (the console re-signs the fake
+self; the tool re-uploaded once when the first read-back differed and then confirmed this
+build's four markers), `libvulkan.so.1` at the title root and in `sce_module/` as
+16,869,880 bytes with the build's library confirmed, and all six cores
+SHA-256-verified. The console's own `sce_module/libc.prx` was kept, as designed.
+
+The console was **not idle** when the deploy started: the control endpoint answered
+`count=1 title=PPSA99988`. `tools/run-title.sh` refuses an upload in that state, so this
+was the owner's explicit decision to publish anyway; no title was launched or closed by
+this step, and the running title's files are not touched by the title folder's paths.
+Record: `evidence/driver-1.0-native-byte-order/deploy.json`; the raw deploy log is
+`build/deploy-driver-8b311e3.log` (git-ignored).
+
+Still open, and the next thing to record: the owner's launch of this build, which is what
+decides the colours.

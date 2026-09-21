@@ -36,9 +36,12 @@ the driver it carries. Record: `evidence/driver-1.0-native-byte-order/`.
 
 **Pending, and the only thing that decides the colours: a console run.** The withdrawn
 path is the one the owner accepted earlier; the native byte order has host evidence and
-the driver's own console `v0-formats` battery. Deploy, then have the owner launch:
-`JOBS=14 bash tools/run-title.sh --no-build --deploy --watch 120`, and check menu
-colours, core colours, and the Quick Menu over a paused game. Until that is recorded,
+the driver's own console `v0-formats` battery. **This build is now on the console**
+(upload only, no launch: 354 files, eboot re-signed to 35,144,676 bytes with this build's
+markers, `libvulkan.so.1` at the title root and in `sce_module/`, all six cores
+SHA-256-verified; `evidence/driver-1.0-native-byte-order/deploy.json`). The console was
+busy with `PPSA99988` when the owner approved publishing anyway. Launch it and check menu
+colours, core colours, and the Quick Menu over a paused game; until that is recorded,
 this step is host-verified only.
 
 ## PPSSPP Track A: parked at the owner's request
