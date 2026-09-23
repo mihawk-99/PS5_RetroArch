@@ -4,6 +4,12 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+# Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
+source "$root/tools/core-stamp.sh"
+core_stamp_skip fceumm \
+    "$root/build/cores/stage/cores/fceumm_libretro.so" \
+    "$root/build/cores/stage/info/fceumm_libretro.info" \
+    -- "$root/tools/build-fceumm.sh" "$root/patches/fceumm" "$root/tooling/fceumm"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 sdk="$root/.deps/native/ps5-payload-sdk"
 [[ -x $sdk/bin/prospero-clang ]] || { echo "error: bootstrap this project's SDK first" >&2; exit 2; }
@@ -47,7 +53,7 @@ tar -xzf "$archive" --strip-components=1 -C "$work"
 # LIBM is empty because the public libc stub exports the math functions.
 # Clang's PS5 default is --build-id=uuid; override it for repeatable artifacts.
 make -C "$work" -f Makefile.libretro -j"${JOBS:-8}" platform=unix \
-    CC="$CC" CXX="$CXX" AR="$AR" LD="$LD" \
+    CC="${core_ccache:+$core_ccache }$CC" CXX="${core_ccache:+$core_ccache }$CXX" AR="$AR" LD="$LD" \
     GIT_VERSION="\" ${revision:0:7}\"" LIBM= \
     LIBS='-lkernel_web -lSceLibcInternal -lScePosixForWebKit' \
     LDFLAGS="-nostdlib -nodefaultlibs -Wl,--build-id=sha1 -Wl,-T,$root/tooling/native/ps5-core.ld"
@@ -64,4 +70,5 @@ report['sdk_compiler_wrapper_sha256'] = hashlib.sha256(
     pathlib.Path('.deps/native/ps5-payload-sdk/bin/prospero-clang').read_bytes()).hexdigest()
 (work / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
+core_stamp_write
 printf '==> [fceumm] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

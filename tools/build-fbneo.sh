@@ -4,6 +4,12 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+# Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
+source "$root/tools/core-stamp.sh"
+core_stamp_skip fbneo \
+    "$root/build/cores/stage/cores/fbneo_libretro.so" \
+    "$root/build/cores/stage/info/fbneo_libretro.info" \
+    -- "$root/tools/build-fbneo.sh" "$root/patches/fbneo" "$root/tooling/fbneo"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 sdk="$root/.deps/native/ps5-payload-sdk"
 [[ -x $sdk/bin/prospero-clang ]] || { echo "error: bootstrap this project's SDK first" >&2; exit 2; }
@@ -52,7 +58,7 @@ patch --batch --fuzz=0 -d "$work" -p1 < "$root/patches/fbneo/native-catalogue-st
 # C++ runtime imports resolve against the title's SDK runtime at native load time.
 # No separate payload CRT/libc or host libraries are linked into this core.
 make -C "$work/src/burner/libretro" -f "$root/tooling/fbneo/Makefile.ps5" -j"${JOBS:-8}" platform=unix \
-    CC="$CC" CXX="$CXX" AR="$AR" LD="$LD" \
+    CC="${core_ccache:+$core_ccache }$CC" CXX="${core_ccache:+$core_ccache }$CXX" AR="$AR" LD="$LD" \
     GIT_VERSION="${revision:0:7}" GIT_DATE= \
     PS5_FBNEO_PORT_DIR="$root/tooling/fbneo" \
     LIBS="$work/core_cxx_runtime.o -lkernel_web -lSceLibcInternal -lScePosixForWebKit" \
@@ -76,4 +82,5 @@ report['port_inputs_sha256'] = {name: hashlib.sha256(pathlib.Path(name).read_byt
                  'tooling/fbneo/Makefile.ps5')}
 (work / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
+core_stamp_write
 printf '==> [fbneo] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

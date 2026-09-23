@@ -15,6 +15,13 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+# Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
+source "$root/tools/core-stamp.sh"
+core_stamp_skip ppsspp \
+    "$root/build/cores/stage/cores/ppsspp_libretro.so" \
+    "$root/build/cores/stage/info/ppsspp_libretro.info" \
+    "$root/build/cores/stage/system/PPSSPP" \
+    -- "$root/tools/build-ppsspp.sh" "$root/patches/ppsspp" "$root/tooling/ppsspp"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 sdk="$root/.deps/native/ps5-payload-sdk"
 [[ -x $sdk/bin/prospero-clang ]] || { echo "error: bootstrap this project's SDK first" >&2; exit 2; }
@@ -107,6 +114,7 @@ export GIT_CEILING_DIRECTORIES="$root/build/cores"
 # source lists through ${CMAKE_SOURCE_DIR}, so a wrapper project would break them.
 echo "==> [ppsspp] configuring"
 cmake -S "$source_dir" -B "$build/ps5-build" \
+    ${core_ccache:+-DCMAKE_C_COMPILER_LAUNCHER=$core_ccache -DCMAKE_CXX_COMPILER_LAUNCHER=$core_ccache} \
     -DCMAKE_TOOLCHAIN_FILE="$root/tooling/ppsspp/ps5-toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
     -DPS5_CORE_LINK_INPUTS="$link_inputs" \
@@ -183,4 +191,5 @@ report['port_inputs_sha256'] = {name: sha(pathlib.Path(name)) for name in
     + [str(path) for path in sorted(pathlib.Path('patches/ppsspp').glob('*.patch'))]}
 (build / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
+core_stamp_write
 printf '==> [ppsspp] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

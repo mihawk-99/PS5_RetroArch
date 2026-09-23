@@ -3036,3 +3036,32 @@ The step's record is `evidence/driver-1.0-native-byte-order/`: `capture.json` (g
 identity, driver revision), `expectation.json` (what the run must show, now carrying the
 owner's words as its human check), `driver-archives.json` (which driver the link carries)
 and `deploy.json` (what was published and read back).
+
+## 2026-09-23 — Rebuilds in seconds
+
+A rebuild that changed nothing took 269 s: the six cores (255 s, PPSSPP 122 s and
+FBNeo 77 s of it) were extracted and compiled from scratch every time, the host
+signing tool was recompiled every time (6.5 s), and the patcher rewrote files it
+did not change (0075/0077's withdrawn text was inserted and withdrawn again), so
+their objects recompiled.
+
+- tools/core-stamp.sh: each core is skipped when a hash of its build script (which
+  pins revision and digests), its patches and port tooling, the shared loader
+  files, the ABI checker and the SDK compiler wrappers matches the stamp and its
+  staged outputs exist. PS5_FORCE_CORES=1 builds anyway.
+- ccache in tooling/prospero-clang18 (frontend and title sources) and on the
+  cores' make lines and CMake launchers; PS5_DISABLE_CCACHE=1 opts out.
+- tools/apply-port-patches.py computes each file's final text in memory and writes
+  only when it differs.
+- tools/build.sh rebuilds the host tool only when its sources, headers, zlib or the
+  host compiler change.
+- tools/deploy-title.py uploads only files whose digest differs from what this
+  checkout last verified on the same console (build/deployed/<host>-<title>.json);
+  --all uploads and verifies everything.
+
+Measured on this host: no-change rebuild 269 s -> 2.2 s; a port-file edit 2.4 s;
+a driver archive change 2.4 s (relink, sign, manifest); a forced FBNeo rebuild with
+a warm cache 77 s -> 2.8 s; the first build after these changes 304 s (fills the
+stamps and the cache). Deploy: full 74.4 s, nothing changed 0.3 s, after a
+port-file edit 12.4 s (eboot.bin and the metadata). build/ is only removed by
+`make clean`.

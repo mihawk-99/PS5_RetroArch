@@ -2600,14 +2600,25 @@ def main() -> int:
         print(f"error: no such tree: {tree}", file=sys.stderr)
         return 2
 
+    # Every file's final text is computed in memory -- insertions first, then the
+    # withdrawals -- and written only when it differs from what is on disk. A file
+    # that ends where it started keeps its timestamp, so the frontend's compile
+    # loop, which rebuilds an object older than its source, leaves it alone. This
+    # used to write each insertion as it went, and 0075/0077's withdrawn text was
+    # inserted and withdrawn again on every run: vulkan.c was rewritten and
+    # recompiled by builds that changed nothing.
     ok = True
+    texts: dict[str, str] = {}
+    originals: dict[str, str] = {}
     for name, anchor, replacement, marker in EDITS:
         path = tree / name
-        if not path.is_file():
-            print(f"  {name}: MISSING")
-            ok = False
-            continue
-        text = path.read_text(encoding="utf-8")
+        if name not in texts:
+            if not path.is_file():
+                print(f"  {name}: MISSING")
+                ok = False
+                continue
+            texts[name] = originals[name] = path.read_text(encoding="utf-8")
+        text = texts[name]
         if marker in text:
             print(f"  {name}: present")
             continue
@@ -2618,27 +2629,25 @@ def main() -> int:
             print(f"  {name}: ANCHOR NOT FOUND ({anchor.strip()!r})")
             ok = False
             continue
-        path.write_text(text.replace(anchor, replacement, 1), encoding="utf-8")
+        texts[name] = text.replace(anchor, replacement, 1)
         print(f"  {name}: applied")
 
-    # Withdrawals are processed after every insertion, so a fresh tree and a tree
-    # that already carried the withdrawn text end in the same state.
+    # Withdrawals follow every insertion, so a fresh tree and a tree that already
+    # carried the withdrawn text end in the same state.
     for name, anchor, replacement, marker in EDITS:
-        if marker not in WITHDRAWN:
+        if marker not in WITHDRAWN or name not in texts:
             continue
-        path = tree / name
-        if not path.is_file():
-            print(f"  {name}: MISSING (withdrawal, {marker})")
-            ok = False
-            continue
-        text = path.read_text(encoding="utf-8")
+        text = texts[name]
         if replacement not in text:
-            # Either this tree never carried the insertion or the withdrawal has
-            # already run. Both end in the upstream text the withdrawal restores.
             print(f"  {name}: upstream ({marker})")
             continue
-        path.write_text(text.replace(replacement, anchor, 1), encoding="utf-8")
+        texts[name] = text.replace(replacement, anchor, 1)
         print(f"  {name}: withdrawn ({marker})")
+
+    for name, text in texts.items():
+        if text != originals[name]:
+            (tree / name).write_text(text, encoding="utf-8")
+            print(f"  {name}: written")
 
     return 0 if ok else 1
 

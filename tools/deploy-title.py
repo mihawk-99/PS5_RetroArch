@@ -2,7 +2,8 @@
 # PS5 RetroArch - publish dist/<TITLE_ID>/ to the console.
 #
 #   tools/deploy-title.py --check    report what the console holds now
-#   tools/deploy-title.py            publish the folder and verify every file
+#   tools/deploy-title.py            publish what changed since the last verified deploy
+#   tools/deploy-title.py --all      publish and verify every file
 #   tools/deploy-title.py --clean    remove both the temporary and the old image
 #
 # Modelled on ../PS5_Vulkan/tools/deploy.sh, which is the deployment path that
@@ -21,6 +22,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -195,7 +197,13 @@ def so_marker(local: Path) -> bytes:
     return blob[middle:middle + 32]
 
 
-def do_deploy(settings: dict, tid: str) -> int:
+def deployed_record_path(settings: dict, tid: str) -> Path:
+    """Where this checkout remembers what it last verified on one console."""
+    host = str(settings.get("host", "console")).replace("/", "_").replace(":", "_")
+    return ROOT / "build" / "deployed" / f"{host}-{tid}.json"
+
+
+def do_deploy(settings: dict, tid: str, force: bool = False) -> int:
     # Files the console refused to replace. Reported at the end, not fatal: see the
     # note where sce_module/libc.prx is handled.
     kept_runtime: list[tuple[str, int, str]] = []
@@ -212,13 +220,27 @@ def do_deploy(settings: dict, tid: str) -> int:
     ordered = [p for p in files if p not in critical] + [p for p in critical if p in files]
     markers = program_markers(artifact / "eboot.bin") if (artifact / "eboot.bin").is_file() else []
 
+    # Only what changed is uploaded. A file whose digest matches the one this
+    # checkout last verified on the same console is skipped: uploading and reading
+    # back all ~354 files is most of a deployment's time, and a rebuild changes a
+    # few. The record holds only files whose read-back passed below, and --all
+    # uploads everything, for a console whose files changed some other way.
+    record_path = deployed_record_path(settings, tid)
+    record: dict[str, str] = {}
+    if not force and record_path.is_file():
+        record = json.loads(record_path.read_text())
+    skipped = 0
     remote_root = join(HOMEBREW, tid)
-    with connect(**settings) as ftp:
+    try:
+      with connect(**settings) as ftp:
         print(f"==> [deploy] {len(ordered)} files to {remote_root}/")
         for local in ordered:
             relative = local.relative_to(artifact).as_posix()
             remote = join(remote_root, relative)
             expected = hashlib.sha256(local.read_bytes()).hexdigest()
+            if record.get(relative) == expected:
+                skipped += 1
+                continue
             upload_atomic(ftp, local, remote)
             size, digest = remote_digest(ftp, remote)
             # A read-back can itself be the flaky part, so the same wrong answer
@@ -246,6 +268,7 @@ def do_deploy(settings: dict, tid: str) -> int:
                         f"title on the console is not this build")
                 print(f"    {relative:28} {len(served):>10,} bytes stored; all "
                       f"{len(markers)} of this build's markers present  ok")
+                record[relative] = expected
                 continue
             if relative.startswith('cores/') and relative.endswith('.so'):
                 # The FCEUmm ELF is served unchanged on this native-title route.
@@ -253,6 +276,7 @@ def do_deploy(settings: dict, tid: str) -> int:
                 if digest != expected:
                     raise SystemExit(f'{relative}: core SHA-256 readback mismatch')
                 print(f"    {relative:28} {size:>10,} bytes; full core SHA-256 verified  ok")
+                record[relative] = expected
                 continue
             if relative.endswith(".so") or relative.endswith(".so.1"):
                 # A shared object is re-signed by the console on write, so it is
@@ -271,6 +295,7 @@ def do_deploy(settings: dict, tid: str) -> int:
                         f"not the one this build staged")
                 print(f"    {relative:28} {len(served):>10,} bytes stored (re-signed by "
                       f"the console); this build's library confirmed  ok")
+                record[relative] = expected
                 continue
             if digest != expected:
                 # libc.prx is the one file this console will not let go of, and it
@@ -289,23 +314,35 @@ def do_deploy(settings: dict, tid: str) -> int:
                     print("    ^ the title runs against the console's copy; "
                           "everything else is verified below")
                     kept_runtime.append((relative, size, digest))
+                    record[relative] = expected
                     continue
                 raise SystemExit(
                     f"{relative}: the console serves {size} bytes with sha256 "
                     f"{digest[:16]}, the file here is {local.stat().st_size} bytes "
                     f"with {expected[:16]}")
             print(f"    {relative:28} {size:>10,} bytes  {digest[:16]}  ok")
+            record[relative] = expected
             if relative.endswith('.info'):
                 # RetroArch caches missing metadata too. Ask it to re-read the
                 # newly uploaded info on next startup without changing settings.
                 refresh_core_info(ftp, remote)
         present_root = list_names(ftp, remote_root)
         present_sys = list_names(ftp, join(remote_root, "sce_sys"))
+    finally:
+        # Saved even when a later file fails: what passed stays recorded.
+        record_path.parent.mkdir(parents=True, exist_ok=True)
+        record_path.write_text(json.dumps(record, indent=1, sort_keys=True) + "\n")
+    if skipped:
+        print(f"==> [deploy] {skipped} unchanged files skipped (already verified on this "
+              f"console; --all uploads everything)")
     for required, where in (("eboot.bin", present_root), ("param.json", present_sys)):
         if required not in where:
             raise SystemExit(f"upload finished but {required} is not listed")
     if kept_runtime:
         print("==> [deploy] published; the console's own runtime library was kept")
+    elif skipped:
+        print("==> [deploy] published what changed; everything else was verified by an "
+              "earlier deployment")
     else:
         print("==> [deploy] every file on the console is byte for byte the file here")
     return 0
@@ -324,8 +361,8 @@ def do_clean(settings: dict, tid: str) -> int:
 
 def main() -> int:
     action = sys.argv[1] if len(sys.argv) > 1 else ""
-    if action not in {"", "--check", "--clean"}:
-        print(f"usage: {Path(sys.argv[0]).name} [--check|--clean]", file=sys.stderr)
+    if action not in {"", "--check", "--clean", "--all"}:
+        print(f"usage: {Path(sys.argv[0]).name} [--all|--check|--clean]", file=sys.stderr)
         return 2
     settings = load_settings()
     tid = title_id()
@@ -333,7 +370,7 @@ def main() -> int:
         return do_check(settings, tid)
     if action == "--clean":
         return do_clean(settings, tid)
-    return do_deploy(settings, tid)
+    return do_deploy(settings, tid, force=action == "--all")
 
 
 if __name__ == "__main__":

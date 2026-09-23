@@ -19,7 +19,14 @@ if [ -z "$compiler" ]; then
     exit 2
 fi
 
-exec "$compiler" \
+# ccache in front when it is installed (PS5_DISABLE_CCACHE=1 opts out): the
+# frontend's and the title's sources then replay from the cache when unchanged.
+launcher=""
+if [ "${PS5_DISABLE_CCACHE:-0}" != 1 ] && command -v ccache >/dev/null 2>&1; then
+    launcher=ccache
+fi
+
+exec $launcher "$compiler" \
     -target x86_64-sie-ps5 \
     -fvisibility-nodllstorageclass=default \
     -isysroot "$sdk_root" \

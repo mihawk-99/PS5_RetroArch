@@ -4,6 +4,12 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+# Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
+source "$root/tools/core-stamp.sh"
+core_stamp_skip mgba \
+    "$root/build/cores/stage/cores/mgba_libretro.so" \
+    "$root/build/cores/stage/info/mgba_libretro.info" \
+    -- "$root/tools/build-mgba.sh" "$root/patches/mgba" "$root/tooling/mgba"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 sdk="$root/.deps/native/ps5-payload-sdk"
 [[ -x $sdk/bin/prospero-clang ]] || { echo "error: bootstrap this project's SDK first" >&2; exit 2; }
@@ -49,6 +55,7 @@ export GIT_CEILING_DIRECTORIES="$root/build/cores"
 # The wrapper selects only upstream's libretro target and native runtime imports.
 # CMake is required by this pinned upstream revision; target flags use XRGB8888.
 cmake -S "$root/tooling/mgba" -B "$work/ps5-build" \
+    ${core_ccache:+-DCMAKE_C_COMPILER_LAUNCHER=$core_ccache -DCMAKE_CXX_COMPILER_LAUNCHER=$core_ccache} \
     -DCMAKE_TOOLCHAIN_FILE="$root/tooling/mgba/ps5-toolchain.cmake" \
     -DMGBA_SOURCE_DIR="$work" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$work/ps5-build" --target mgba_libretro --parallel "${JOBS:-8}"
@@ -71,4 +78,5 @@ report['port_inputs_sha256'] = {name: hashlib.sha256(pathlib.Path(name).read_byt
                  'tooling/mgba/ps5-video.h')}
 (work / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
+core_stamp_write
 printf '==> [mgba] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

@@ -4,6 +4,12 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+# Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
+source "$root/tools/core-stamp.sh"
+core_stamp_skip genesis_plus_gx \
+    "$root/build/cores/stage/cores/genesis_plus_gx_libretro.so" \
+    "$root/build/cores/stage/info/genesis_plus_gx_libretro.info" \
+    -- "$root/tools/build-genesis-plus-gx.sh" "$root/patches/genesis-plus-gx" "$root/tooling/genesis-plus-gx"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 sdk="$root/.deps/native/ps5-payload-sdk"
 [[ -x $sdk/bin/prospero-clang ]] || { echo "error: bootstrap this project's SDK first" >&2; exit 2; }
@@ -54,7 +60,7 @@ patch --batch --fuzz=0 -d "$work" -p1 < "$root/patches/genesis-plus-gx/native-xr
 # Disable optional zstd weak tracing hooks: no external trace provider is linked.
 # Use the existing native import table and no separate payload CRT/libc.
 CFLAGS="-I$root/tooling/genesis-plus-gx -DZSTD_TRACE=0" make -C "$work" -f Makefile.libretro -j"${JOBS:-8}" platform=unix \
-    CC="$CC" CXX="$CXX" AR="$AR" LD="$LD" \
+    CC="${core_ccache:+$core_ccache }$CC" CXX="${core_ccache:+$core_ccache }$CXX" AR="$AR" LD="$LD" \
     GIT_VERSION="\" ${revision:0:7}\"" HAVE_CDROM=0 \
     SHARED='-shared -Wl,--version-script=libretro/link.T -Wl,-z,undefs' \
     LIBS='-lkernel_web -lSceLibcInternal -lScePosixForWebKit' \
@@ -75,4 +81,5 @@ report['port_inputs_sha256'] = {name: hashlib.sha256(pathlib.Path(name).read_byt
                  'patches/genesis-plus-gx/native-xrgb-output.patch', 'tooling/genesis-plus-gx/ps5-video.h')}
 (work / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
+core_stamp_write
 printf '==> [genesis_plus_gx] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

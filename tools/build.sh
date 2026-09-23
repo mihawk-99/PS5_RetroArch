@@ -90,11 +90,21 @@ dist="$root/dist"
 native="$root/tooling/native"
 tool="$build/host/ps5-native-tool"
 mkdir -p "$build/host" "$build/obj" "$dist"
-"$cxx" -std=c++20 -O2 -Wall -Wextra -Werror \
-    -I "$zlib_root/usr/include" \
-    "$native/native_app_builder.cpp" "$native/self_container.cpp" \
-    "$native/elf_object.cpp" "$native/sce_module_writer.cpp" \
-    "$zlib_archive" -o "$tool"
+# The host tool is rebuilt only when what it is built from changes: it took
+# 6.5 s of a 9 s rebuild that changed nothing. The stamp hashes its sources and
+# headers, the zlib archive and the host compiler.
+tool_stamp=$({
+    sha256sum "$native"/*.cpp "$native"/*.hpp "$native"/*.h "$zlib_archive" 2>/dev/null
+    "$cxx" --version
+} | sha256sum | cut -d' ' -f1)
+if [[ ! -x $tool || ! -f $tool.stamp || $(<"$tool.stamp") != "$tool_stamp" ]]; then
+    "$cxx" -std=c++20 -O2 -Wall -Wextra -Werror \
+        -I "$zlib_root/usr/include" \
+        "$native/native_app_builder.cpp" "$native/self_container.cpp" \
+        "$native/elf_object.cpp" "$native/sce_module_writer.cpp" \
+        "$zlib_archive" -o "$tool"
+    printf '%s\n' "$tool_stamp" > "$tool.stamp"
+fi
 
 mapfile -d '' -t source_paths < <(
     find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' \) \
