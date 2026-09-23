@@ -3065,3 +3065,22 @@ a warm cache 77 s -> 2.8 s; the first build after these changes 304 s (fills the
 stamps and the cache). Deploy: full 74.4 s, nothing changed 0.3 s, after a
 port-file edit 12.4 s (eboot.bin and the metadata). build/ is only removed by
 `make clean`.
+
+## 2026-09-23 — 120 Hz by default, 60 Hz fallback, on the current driver
+
+The title declares high-frame-rate output (attribute3 0x80040) and links
+../PS5_Vulkan 8577153, which offers 3840x2160 at 119880 mHz first and selects it at
+swapchain creation. Patch 0084: the display context picks the largest mode, then
+the highest refresh. Patch 0085: `video_refresh_rate` follows the chosen mode and
+a saved swap interval of 1 becomes automatic above 100 Hz. The seed config ships
+119.88 and automatic for fresh installs. main.cpp drops `--menu` when args.txt
+names a core or content.
+
+Console, FCEUmm with 1943 for 1,800 frames through args.txt, driver profile armed:
+119.88 Hz selected, `video_refresh_rate` 60.000 -> 119.880, swap interval 1 made
+automatic, 1,199 presents per 10 s (8.342 ms), ~30 s for the 1,800 frames of a
+60.10 FPS core (evidence/output-120hz). Same build with attribute3 0: 59.94 Hz only,
+119.880 -> 59.940, 600 presents per 10 s, the same ~30 s (evidence/output-60hz-
+fallback). My configuration and history were snapshotted before and restored to
+their exact bytes after. tools/verify.sh PASS (five gates, 75 tests, patch count
+185 -> 188 for 0084's two edits and 0085), 35 captures replay.

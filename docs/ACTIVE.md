@@ -1,89 +1,68 @@
 # Active work
 
-_Updated: 2026-09-20_
+_Updated: 2026-09-23_
 
-## Now: the console accepted the native byte order
+## Now: 120 Hz by default, on the current driver
 
-**Accepted on the console.** The owner launched the published build and reports it
-flawless, with the colours accurate now that the red/blue compensation is gone: menu,
-core frames and the transitions between them draw the right channels while the frontend
-keeps libretro's own byte order. That closes the step below — the driver's `v0-formats`
-battery proves the fetch order, and the console's own picture now proves the frontend's
-half of it. It is an owner observation: no klog run was started for the launch, so there
-is no distilled capture or trace for it, and PPSSPP was not launched on this build.
+**RetroArch presents at 119.88 Hz where the display allows it, and at 59.94 Hz where
+it does not, with cores at their own speed either way.** The title declares
+high-frame-rate output (`sce_sys/param.json` `attribute3` 0x80040), so
+`../PS5_Vulkan` (8577153, jobs/r51-output-mode) offers a 3840x2160 119.88 Hz mode
+first and selects it at swapchain creation. Patch 0084 makes the display context
+pick the largest mode and then the highest refresh (upstream ignored refresh, or
+rejected any mode more than 1 Hz from a saved 59.94); 0085 makes
+`video_refresh_rate` follow the mode it got and turns a saved swap interval of 1
+into automatic above 100 Hz, so a 60 FPS core presents each frame for two
+vblanks. The seed config ships `video_refresh_rate 119.88` and
+`video_swap_interval 0` for fresh installs; an existing config is corrected at run
+time. Evidence: `evidence/output-120hz` (FCEUmm, 1,800 frames in ~30 s at 1,199
+presents per 10 s) and `evidence/output-60hz-fallback` (same build without the
+metadata: 59.94 Hz, 600 presents per 10 s, same speed).
 
-**Driver (`../PS5_Vulkan` `8b311e3`) is at rung 1.0 with its SDK fork migrated.** The
-format audit has no gaps (179 required, 58 reported, 0 missing, 55 conditional, split
-0/0/0/0/0) and `driver/ps5vk_image.c` was not touched by the migration, so
-`VK_FORMAT_B8G8R8A8_UNORM` still samples through the `8_8_8_8_UNORM` word with the
-`ZYXW` selectors — the byte order libretro's little-endian XRGB8888 already is. What the
-migration changed is the shader compiler (ps5-opengl 0.3.0's `opengnm-psbc` tree,
-metadata v14), the compute dispatch words, a null shader module in `ps5vk_compile_stage`
-that faulted every meta clear/blit/resolve, and a driver-owned 32 MiB compile stack. The
-"ACO SIGFPE" is closed and was never ACO: rebased, it was the probe's own unfilled
-`std::array` row dividing by a zero texel size. Archived in
-`evidence/driver-1.0-native-byte-order/driver-archives.json`.
+**The title now links the current driver**, hundreds of driver commits past
+`8b311e3`: the mapped-only target flush, the bounded marker spin, parallel blits,
+the NIR cache, the per-build shader cache and the output-mode selection. Game and
+menu launched and ran on it; a systematic per-core recheck on it has not been done.
 
-**Withdrawn here: the red/blue compensation.** 0014's format substitution, 0075's
-core-frame RGBA upload and 0077's menu colour and cached-frame ownership existed only
-because the driver could not sample the frontend's own byte order. They are now in
-`tools/apply-port-patches.py`'s `WITHDRAWN` tuple, which exchanges each insertion for the
-upstream text it replaced, so an existing build tree and a fresh one converge.
-`src/core_frame_ps5.cpp` no longer converts channels. Kept, each for a reason that does
-not depend on the sample order: **0027/0055** (the 16-bit RGUI frame is converted by hand
-into R8G8B8A8, because a B4G4R4A4 view with a B/R swizzle is still refused), **0015**
-(upstream's own `VK_REMAP_TO_TEXFMT` needs the bpp case) and **0081** (upstream's TODO:
-`supports_rgba` follows the order a caller asked for).
+**`args.txt` can launch content.** `-L core` and a path in `/app0/args.txt` now
+start a game directly (main.cpp drops `--menu`, which RetroArch refuses beside
+content), which is how a run measures a core without a pad.
 
-**Verified here.** `tools/verify.sh` with the driver frozen into `build/frozen-driver/`
-passes all five gates (format, unit 75 tests, build, integration, evidence); title
-identity `f9e4ea6c…`, eboot 34,703,515 bytes sha256 `82534b86…`, two consecutive runs
-byte-identical. The frozen archives were re-hashed unchanged after the build and the
-printed identity was recomputed from its own input list and matched, so the eboot names
-the driver it carries. Record: `evidence/driver-1.0-native-byte-order/`.
+**Rebuilds take seconds** (docs/PHASE_LOG.md): a no-change rebuild 269 s -> 2.2 s,
+a port-file or driver change ~2.4 s; deployment uploads only changed files
+(`tools/deploy-title.py --all` for everything).
 
-**What is still open here.** PPSSPP was not launched on this build, so its parked
-first-frame blocker is untouched and untested by this step; no captured 90-second run
-exists for it either (the acceptance is the owner's observation, recorded in
-`expectation.json`'s human check and `capture.json`). If a machine-readable run is wanted
-later, start klog and use
-`JOBS=14 bash tools/run-title.sh --no-build --no-deploy --watch 120`.
+## Next
 
-## PPSSPP Track A: parked at the owner's request
+1. Recheck each core on the current driver (menu, FCEUmm, mGBA, Snes9x, FBNeo,
+   Genesis Plus GX), colours and audio included.
+2. PPSSPP from scratch (the current core crashes on its first frame, parked below).
+3. Simplify the port without losing behaviour.
+
+## PPSSPP Track A: parked
 
 Plan: [PPSSPP_Implementation_Plan.md](../PPSSPP_Implementation_Plan.md); platform
-analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). A1–A4 are done: the core is
-built from pinned `f293b10` (29 submodules, zero `PT_TLS`, the three allowed `NEEDED`
-modules), ABI-checked, linked into the title, and loaded on the console with the runtime
-assets staged (`cycles=8, exports=25, api=1`; `evidence/ppsspp-native/`).
-
-**Blocker — the first frame.** A SIGSEGV on a worker thread during `ThreadManager::Init`
-(fault address 0x70, frames inside `libkernel.sprx`, `pthread_get_specificarray_np+0x3b`
-reached from `pthread_create_name_np`). Every isolation probe passes. The console's
-libkernel can now be symbolized (NID = `SHA1(name || salt)`, byte-reversed, base-64),
-which is what named the frame. Next attempt: remove PPSSPP's `thread_local` uses, since
-core TLS compiles to `__emutls_get_address` → `pthread_getspecific`, exactly the family
-in the backtrace.
+analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). The core builds from pinned
+`f293b10`, is ABI-checked, linked and loaded on the console (`evidence/ppsspp-native/`),
+and crashes on its first frame: a SIGSEGV on a worker thread during
+`ThreadManager::Init`, inside `libkernel.sprx` (`pthread_get_specificarray_np+0x3b`
+from `pthread_create_name_np`).
 
 ## Accepted baselines
 
-- Native byte order on driver `8b311e3`: eboot `82534b86…`, identity `f9e4ea6c…`, all
-  five gates green, owner acceptance of the colours with the red/blue compensation gone.
-  Detail: `evidence/driver-1.0-native-byte-order/`, `docs/PHASE_LOG.md` (2026-09-20).
-- XMB: `601e575` fixed large-list allocation failures, `6b857a9` merged the README;
-  crash-free navigation and no five-second hitches. Detail: `docs/XMB_LIST_SAFETY.md`,
-  `evidence/xmb-safe-list-run/`.
-- Gameplay: Genesis Plus GX frontend `ecfcddd5…`, all five gates green, owner acceptance
-  of colours, sound, controls and menu/next-game transitions. FCEUmm, mGBA, Snes9x and
-  FBNeo evidence stays in `native-core-loading/`, `mgba-native/`, `snes9x-native/` and
-  `fbneo-native/`. Core pins, hashes and acceptance limits are in `docs/PHASE_LOG.md`.
-- Thumbnail and configuration-reset fixes accepted (patches 0081/0082):
-  `evidence/thumbnail-input-defaults/`, `docs/THUMBNAIL_INPUT_DEFAULTS.md`.
+- Native byte order on driver `8b311e3`: I accepted the colours with the red/blue
+  compensation gone (`evidence/driver-1.0-native-byte-order/`).
+- XMB: large-list allocation failures fixed (`601e575`), crash-free navigation
+  (`docs/XMB_LIST_SAFETY.md`, `evidence/xmb-safe-list-run/`).
+- Gameplay: Genesis Plus GX colours, sound, controls and transitions accepted;
+  FCEUmm, mGBA, Snes9x and FBNeo evidence in `native-core-loading/`, `mgba-native/`,
+  `snes9x-native/`, `fbneo-native/`.
+- Thumbnail and configuration-reset fixes (patches 0081/0082).
 
 ## Named errors and remaining limits
 
 - First frontend snapshot has five intentional missing-core recovery errors and two
-  archive-extraction failures; the owner identified the content as Sega System 16 & 32,
+  archive-extraction failures; I identified the content as Sega System 16 & 32,
   which belongs to FBNeo. No general archive fix is inferred.
 - Console verification does not cover every supported system, BIOS/disc/CHD, NTSC and
   interlace options, SRAM/state round trips, long-run A/V or performance. Zero backend
@@ -110,7 +89,7 @@ BIOS files use system/ root; FBNeo uses system/fbneo/. See `docs/DEPLOYMENT.md`.
 
 ## Operating notes
 
-Uploads are authorized; check console idle before deployment. A new launch needs owner
+Uploads are authorized; check console idle before deployment. A launch without args.txt needs my
 intervention. Start klog first, preserve old logs, and capture allocation, frontend and
 trace logs. Never interrupt another title. No new core or unrelated driver work is
 assigned by this file.

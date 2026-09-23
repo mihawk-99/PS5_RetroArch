@@ -116,3 +116,14 @@
 #       R8G8B8A8_UNORM is withdrawn, its usage mask kept, and 0027's and 0015's
 #       comments re-stated for the reason each still has
 0083-image-is-the-requested-format
+
+# 0084  pick the display mode by size, then highest refresh: 120 Hz where the
+#       driver offers it, 60 Hz where it does not; keep the refresh chosen
+#       gfx/common/vulkan_common.c
+0084-display-mode-highest-refresh
+#
+# 0085  report the chosen mode's refresh, make video_refresh_rate follow it, and
+#       make a saved swap interval of 1 automatic above 100 Hz so a 60 FPS core
+#       keeps its speed
+#       gfx/drivers_context/khr_display_ctx.c
+0085-report-the-display-refresh

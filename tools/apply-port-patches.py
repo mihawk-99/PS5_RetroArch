@@ -2563,6 +2563,95 @@ EDITS = [
         "       * upstream's own remap produces. */\n",
         "patches/series, 0083: 32 bits per pixel for",
     ),
+    (
+        # The driver now reports every mode VideoOut offers, fastest first:
+        # 3840x2160 at 119880 mHz when the title declares high-frame-rate output
+        # and the console supports it, and at 59940 mHz always (../PS5_Vulkan
+        # jobs/r51-output-mode). Upstream picks the largest mode and ignores its
+        # refresh when no size is asked for, and rejects any mode more than 1 Hz
+        # from video_refresh_rate when one is -- which, with a saved 59.94, would
+        # never select 120 Hz. This port's choice: the size asked for (or the
+        # largest), then the highest refresh among those; the refresh chosen is
+        # kept for the context, which reports it (0085).
+        "gfx/common/vulkan_common.c",
+        "      for (i = 0; i < mode_count; i++)\n"
+        "      {\n"
+        "         const VkDisplayModePropertiesKHR *mode = &modes[i];\n"
+        "         if (vulkan_update_display_mode(width, height, mode, info))\n"
+        "            best_mode = modes[i].displayMode;\n"
+        "      }\n",
+        "      /* Added by this port (patches/series, 0084): the requested size (or the\n"
+        "       * largest), then the highest refresh -- 120 Hz where the display offers\n"
+        "       * it, its 60 Hz mode where it does not. */\n"
+        "      {\n"
+        "         uint32_t best_refresh = 0;\n"
+        "         for (i = 0; i < mode_count; i++)\n"
+        "         {\n"
+        "            const VkDisplayModePropertiesKHR *mode = &modes[i];\n"
+        "            unsigned mode_width  = mode->parameters.visibleRegion.width;\n"
+        "            unsigned mode_height = mode->parameters.visibleRegion.height;\n"
+        "            unsigned mode_area   = mode_width * mode_height;\n"
+        "            unsigned best_area   = (*width) * (*height);\n"
+        "            if (info->width && info->height\n"
+        "                  && (mode_width != info->width || mode_height != info->height))\n"
+        "               continue;\n"
+        "            if (mode_area > best_area\n"
+        "                  || (mode_area == best_area && mode->parameters.refreshRate > best_refresh))\n"
+        "            {\n"
+        "               *width       = mode_width;\n"
+        "               *height      = mode_height;\n"
+        "               best_refresh = mode->parameters.refreshRate;\n"
+        "               best_mode    = mode->displayMode;\n"
+        "            }\n"
+        "         }\n"
+        "         vulkan_ps5_display_refresh_x1000 = best_refresh;\n"
+        "      }\n",
+        "patches/series, 0084): the requested size",
+    ),
+    (
+        # The variable 0084 writes and 0085 reads.
+        "gfx/common/vulkan_common.c",
+        "static bool vulkan_create_display_surface(gfx_ctx_vulkan_data_t *vk,\n",
+        "/* Added by this port (patches/series, 0084): the refresh, in millihertz, of\n"
+        " * the display mode the last display surface was created with. */\n"
+        "unsigned vulkan_ps5_display_refresh_x1000;\n"
+        "\n"
+        "static bool vulkan_create_display_surface(gfx_ctx_vulkan_data_t *vk,\n",
+        "patches/series, 0084): the refresh, in millihertz,",
+    ),
+    (
+        # The context reported video_refresh_rate as the display's refresh
+        # whatever mode it got. It now reports the mode's own refresh, and makes
+        # the setting follow it, because RetroArch paces, resamples audio and
+        # picks its automatic swap interval from that value: a 119.88 Hz display
+        # believed to be 59.94 would run a 60 FPS core twice as fast. A swap
+        # interval of 1 saved from the 60 Hz era is made automatic when the mode
+        # runs above 100 Hz, so a 60 FPS core presents each frame for two
+        # vblanks; any other saved interval is left as chosen.
+        "gfx/drivers_context/khr_display_ctx.c",
+        "   khr->refresh_rate_x1000        = info.refresh_rate_x1000;\n",
+        "   /* Added by this port (patches/series, 0085): the chosen mode's refresh. */\n"
+        "   {\n"
+        "      extern unsigned vulkan_ps5_display_refresh_x1000;\n"
+        "      unsigned mode_refresh = vulkan_ps5_display_refresh_x1000;\n"
+        "      khr->refresh_rate_x1000     = mode_refresh ? mode_refresh : info.refresh_rate_x1000;\n"
+        "      float refresh_delta = settings->floats.video_refresh_rate - mode_refresh / 1000.0f;\n"
+        "      if (refresh_delta < 0.0f)\n"
+        "         refresh_delta = -refresh_delta;\n"
+        "      if (mode_refresh && refresh_delta > 0.5f)\n"
+        "      {\n"
+        "         RARCH_LOG(\"[PS5] Display runs at %.3f Hz; video_refresh_rate follows it (was %.3f).\\n\",\n"
+        "               mode_refresh / 1000.0f, settings->floats.video_refresh_rate);\n"
+        "         settings->floats.video_refresh_rate = mode_refresh / 1000.0f;\n"
+        "      }\n"
+        "      if (mode_refresh > 100000 && settings->uints.video_swap_interval == 1)\n"
+        "      {\n"
+        "         RARCH_LOG(\"[PS5] Swap interval 1 at %.3f Hz made automatic.\\n\", mode_refresh / 1000.0f);\n"
+        "         settings->uints.video_swap_interval = 0;\n"
+        "      }\n"
+        "   }\n",
+        "patches/series, 0085): the chosen mode's refresh.",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

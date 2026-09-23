@@ -1,0 +1,12 @@
+{
+  "step": "output-60hz-fallback",
+  "note": "Fallback: without the metadata the driver offers 59.94 Hz only; RetroArch follows it down (119.880 -> 59.940), the automatic swap interval is 1, the display presents 600 times per 10 s (16.683 ms) and the same 1,800 frames take the same ~30 s: correct speed.",
+  "must_contain": [
+    "[PS5] Display runs at 59.940 Hz; video_refresh_rate follows it (was 119.880).",
+    "frame_ms=16.683"
+  ],
+  "must_not_contain": [
+    "[ps5vk] output: 119.88 Hz selected"
+  ],
+  "human_check": ""
+}

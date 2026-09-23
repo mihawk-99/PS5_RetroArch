@@ -219,6 +219,16 @@ int main()
     std::size_t base_count = sizeof(argv) / sizeof(argv[0]) - 1;
     for (std::size_t i = 0; i < base_count; i++)
         argv_with_extras[i] = argv[i];
+    /* --menu starts in the menu and RetroArch refuses it beside a content path
+     * ("--menu was used, but content file was passed as well"), so it is left out
+     * when the extras name a core or content: `-L core` and a path launch a game
+     * directly, which is how a run measures a core without a person at the pad. */
+    bool extras_launch_content = false;
+    for (int i = 0; i < extra_count; i++)
+        if (std::strcmp(extra_storage[i], "-L") == 0 || extra_storage[i][0] != '-')
+            extras_launch_content = true;
+    if (extras_launch_content && base_count > 0 && argv[base_count - 1] == arg_menu)
+        base_count--;
     for (int i = 0; i < extra_count; i++)
         argv_with_extras[base_count + i] = extra_storage[i];
     argv_with_extras[base_count + extra_count] = nullptr;

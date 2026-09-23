@@ -1,0 +1,13 @@
+{
+  "step": "output-120hz",
+  "note": "RetroArch at 120 Hz: the driver selects 119.88 Hz because the title declares it; patch 0084 picks the highest-refresh 4K mode, 0085 makes video_refresh_rate follow the mode (saved 60.000 -> 119.880) and a saved swap interval of 1 automatic. FCEUmm (60.10 FPS) ran 1,800 frames in ~30 s while the display presented 1,199 times per 10 s (8.342 ms): two vblanks a core frame, correct speed.",
+  "must_contain": [
+    "[ps5vk] output: 119.88 Hz selected",
+    "[PS5] Display runs at 119.880 Hz; video_refresh_rate follows it (was 60.000).",
+    "[PS5] Swap interval 1 at 119.880 Hz made automatic.",
+    "FPS: 60.10",
+    "frame_ms=8.342"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}
