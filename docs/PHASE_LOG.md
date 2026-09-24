@@ -3117,3 +3117,27 @@ replacements ran.
 vkQuake on the same driver: 119.88 Hz selected, 119.88 FPS at 4K. tools/verify.sh
 PASS (patch count 188 -> 193 for 0086's five edits), 37 captures replay; driver
 check PASS.
+
+## 2026-09-24 — God of War: Ghost of Sparta at 10x: correct picture, full speed
+
+The run is PPSSPP with the torture defaults (4800x2720, 16x anisotropy, auto
+max-quality filtering) from a slot-0 save state, loaded with `--entryslot=0`.
+
+- **Picture.** The blue, banded Kratos in the menu and the brown tint with
+  flat-silhouette characters in gameplay were stale GPU state in
+  ../PS5_Vulkan (a draw left the previous draw's blend, write mask, cull and
+  clip words in place). With every draw recording them, both match PPSSPP's
+  software renderer (`klog/final-menu-ss-gow.png`, `klog/fifo-ss-ss-gow.png`).
+- **Speed.** The driver's present used to wait until its flip was shown,
+  which gave RetroArch's doubled 120 Hz presents one vblank per frame. Its
+  swapchain is now a three-image FIFO queue: the audio windows went from
+  ~420,000 of 480,000 frames with silence filled in (`klog/pace1-trace.txt`)
+  to 480,000 of 480,000 with none (`klog/pace2-trace.txt`), at 1198 flips per
+  10 s. Sonic on Genesis Plus GX runs at full speed with the same driver.
+- **Startup.** About one launch in three aborted with `thread constructor
+  failed: Resource temporarily unavailable`; the core thread factory now
+  retries EAGAIN for up to two seconds, and the terminate handler logs an
+  exception's what() and code.
+
+Still open: 8x MSAA (the driver exposes neither renderpass2 nor depth/stencil
+resolve, and supports 4x only), and a long gameplay soak.
