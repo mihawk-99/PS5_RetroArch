@@ -322,8 +322,8 @@ class PortPatches(unittest.TestCase):
         They are named here rather than counted, because a withdrawal is a
         behaviour change on the console: 0014's format substitution, 0075's core
         frame upload and 0077's menu colour and cached-frame ownership were all
-        answers to a B8G8R8A8 entry that was not sampled. Withdrawing another
-        block means re-checking that claim.
+        answers to a B8G8R8A8 entry that was not sampled. Withdrawing another block means
+        re-checking that claim.
         """
         self.assertEqual(
             sorted(self.withdrawn()),
@@ -342,7 +342,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 194,
+            len(self.blocks()), 196,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 

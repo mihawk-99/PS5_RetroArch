@@ -30,6 +30,8 @@
 
 #include <pthread.h>
 
+extern "C" void ps5_sampler_add_thread(pthread_t thread, const void *start);
+
 namespace
 {
 /* A core thread's smallest stack. The console's default is far smaller than a
@@ -74,6 +76,8 @@ int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes, void
     }
     if (attributes == nullptr)
         pthread_attr_destroy(&own);
+    if (result == 0)
+        ps5_sampler_add_thread(*thread, reinterpret_cast<const void *>(start));
     return result;
 }
 

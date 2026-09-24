@@ -137,5 +137,11 @@
 0086-scaler-frames-only-for-scaling
 #
 # 0087  line-buffer the log file, so a fault keeps the lines before it
-#       verbosity.c
+#       verbosity.c (0088 replaces the buffering)
 0087-line-buffered-log
+
+# 0088  a 256 KiB log buffer, written out by the title's flusher (src/main.cpp):
+#       line buffering wrote to the console's storage once a line on the
+#       logging thread, which stalled frames while a save state loaded
+#       verbosity.c
+0088-log-buffer-for-the-flusher

@@ -33,11 +33,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <exception>
 #include <new>
 #include <stdexcept>
 #include <system_error>
 #include <typeinfo>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <cxxabi.h>
@@ -53,6 +55,7 @@ extern "C" int sceSystemServiceHideSplashScreen();
 extern "C" void ps5_vulkan_profile_init();
 extern "C" void ps5_crash_report_install();
 extern "C" void ps5_core_threads_start();
+extern "C" void ps5_sampler_start();
 /* ../PS5_Vulkan's driver/ps5vk_debug.h: whether VideoOut outlives a swapchain.
  * Weak, so a build without the driver links. */
 extern "C" void ps5vk_display_retain(bool retain) __attribute__((weak));
@@ -85,6 +88,26 @@ constexpr const char *config_path = "/app0/config/retroarch.cfg";
  * and its what() are written to the trace here - the difference between "the
  * compiler refused this shader" and "a wild size reached a container", which are
  * not the same bug and were not distinguishable from the outside. */
+/* Writes every buffered output stream out -- the trace file and RetroArch's
+ * log among them -- four times a second, off the threads that log. */
+void *log_flusher(void *)
+{
+    const timespec interval = {0, 250 * 1000 * 1000};
+    for (;;)
+    {
+        nanosleep(&interval, nullptr);
+        std::fflush(nullptr);
+    }
+    return nullptr;
+}
+
+void start_log_flusher()
+{
+    pthread_t thread;
+    if (pthread_create(&thread, nullptr, log_flusher, nullptr) == 0)
+        pthread_detach(thread);
+}
+
 void on_terminate()
 {
     const std::type_info *type = abi::__cxa_current_exception_type();
@@ -132,6 +155,7 @@ void on_terminate()
     if (pretty)
         std::free(pretty);
     ps5::debug::mark(line);
+    std::fflush(stderr);
 
     std::abort();
 }
@@ -168,12 +192,18 @@ int main()
         ps5::debug::mark("could not send stderr to the trace file");
     else
     {
-        /* Unbuffered, because everything that writes an error and then aborts -
-         * an assertion, a C++ terminate - would otherwise lose it: the console's
-         * libc buffers this stream and abort does not flush. The assert message is
-         * what a console run needs most and it was the one thing never printed. */
-        std::setvbuf(stderr, nullptr, _IONBF, 0);
-        std::fputs("stderr is the trace file (unbuffered)\n", stderr);
+        /* Buffered, and written out by a flusher thread four times a second. It
+         * was unbuffered so that an assertion or a terminate, which abort without
+         * flushing, kept their message; but every line was then its own write to
+         * the console's storage, which takes milliseconds, on whatever thread
+         * logged it -- often the one running frames. Loading a God of War save
+         * state stalled the picture for hundreds of milliseconds in fprintf alone
+         * (2026-09-24, the sampler). The crash and terminate handlers flush
+         * first, so a failing run still leaves its last lines. */
+        static char stderr_buffer[64 * 1024];
+        std::setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
+        std::fputs("stderr is the trace file (buffered, flushed every 250 ms)\n", stderr);
+        start_log_flusher();
     }
 
     std::set_terminate(on_terminate);
@@ -209,6 +239,26 @@ int main()
     (void)config_path;
 
     ps5::debug::mark("argv built: retroarch -f -c /app0/config/retroarch.cfg --verbose --log-file");
+
+    /* Test files belong to one launch. A test run writes /app0/test-run.txt just
+     * before it starts the title, and the launch consumes it; a launch without
+     * it is someone playing, so any test file an interrupted run left behind is
+     * deleted before anything reads it. Otherwise a stale args.txt started every
+     * later launch straight into a test game that quit itself, and a stale flag
+     * kept the driver's logging or the sampler running (2026-09-24). */
+    if (std::remove("/app0/test-run.txt") != 0)
+    {
+        static const char *const test_files[] = {
+            "/app0/args.txt",           "/app0/pad-script.txt", "/app0/ps5vk-no-retain.txt",
+            "/app0/ppsspp-options.txt", "/app0/ps5vk-ab.txt",   "/app0/ps5-sampler.txt",
+            "/app0/ps5vk-profile.txt",  "/app0/ps5vk-log.txt",  "/app0/ps5vk-vblank-probe.txt",
+        };
+        unsigned removed = 0;
+        for (const char *const path : test_files)
+            removed += std::remove(path) == 0 ? 1u : 0u;
+        if (removed != 0)
+            ps5::debug::mark_value("stale test files removed", static_cast<int>(removed));
+    }
 
     /* Extra arguments, one per line, from /app0/args.txt when that file is there.
      *
@@ -268,6 +318,7 @@ int main()
 
     ps5_crash_report_install();
     ps5_core_threads_start();
+    ps5_sampler_start();
     ps5_audio_test_if_requested();
     ps5_core_loader_test_if_requested();
     ps5_thread_test_if_requested();

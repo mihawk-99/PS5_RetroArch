@@ -2757,6 +2757,41 @@ EDITS = [
         "   setvbuf(g_verbosity->fp, (char*)g_verbosity->buf, _IOLBF, 0x4000);\n",
         "patches/series, 0087): line-buffered, so a fault",
     ),
+    (
+        # 0088: the log file's buffer holds 256 KiB instead of 16. The title's
+        # flusher (src/main.cpp) writes it out four times a second; a burst of
+        # core log lines -- PPSSPP logs dozens while a save state loads -- then
+        # fills memory rather than forcing a write to the console's storage on
+        # the thread that logged it.
+        # It rewrites 0087's line buffering, whose marker it keeps so 0087 still
+        # reads as applied.
+        "verbosity.c",
+        "   g_verbosity->buf         = calloc(1, 0x4000);\n"
+        "   /* Changed by this port (patches/series, 0087): line-buffered, so a fault\n"
+        "    * keeps the lines before it. */\n"
+        "   setvbuf(g_verbosity->fp, (char*)g_verbosity->buf, _IOLBF, 0x4000);\n",
+        "   /* Changed by this port (patches/series, 0088): 256 KiB, written out by\n"
+        "    * the title's flusher rather than by the thread that logs. It replaces\n"
+        "    * (patches/series, 0087): line-buffered, so a fault kept its lines, and\n"
+        "    * wrote to the console's storage once a line on the logging thread. */\n"
+        "   g_verbosity->buf         = calloc(1, 0x40000);\n"
+        "   setvbuf(g_verbosity->fp, (char*)g_verbosity->buf, _IOFBF, 0x40000);\n",
+        "patches/series, 0088): 256 KiB, written out by",
+    ),
+    (
+        # 0088 too: the logger flushed after every message, which made the
+        # buffer's size moot -- each line was still a write to storage on the
+        # logging thread. The title's flusher writes it out instead.
+        "verbosity.c",
+        "      fprintf(fp, \"%s \", tag_v);\n"
+        "      vfprintf(fp, fmt, ap);\n"
+        "      fflush(fp);\n",
+        "      fprintf(fp, \"%s \", tag_v);\n"
+        "      vfprintf(fp, fmt, ap);\n"
+        "      /* Changed by this port (patches/series, 0088): no flush per message;\n"
+        "       * the title's flusher writes the log out four times a second. */\n",
+        "patches/series, 0088): no flush per message",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

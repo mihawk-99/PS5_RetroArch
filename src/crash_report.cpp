@@ -32,6 +32,14 @@ namespace
 {
 void report(int signal, siginfo_t *info, void *context_pointer)
 {
+    /* stderr is buffered (src/main.cpp): what it holds -- an assertion's
+     * message above all -- is written out first, unless the crashing thread
+     * holds the stream, where flushing would deadlock instead of reporting. */
+    if (ftrylockfile(stderr) == 0)
+    {
+        std::fflush(stderr);
+        funlockfile(stderr);
+    }
     const ucontext_t *context = static_cast<const ucontext_t *>(context_pointer);
     /* The console's mcontext is not the SDK header's FreeBSD layout: measured on
      * a call through a null pointer (FBNeo, 2026-09-23), rip, cs (0x43), rflags,
