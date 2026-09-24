@@ -18,7 +18,43 @@ extern "C"
     void __real_free(void *);
     void *__wrap_malloc(size_t);
     void __wrap_free(void *);
+    /* src/overflow_heap.c: direct memory, for when these routes refuse. Weak, so
+     * the host tests, which link this file without it, run with no overflow heap. */
+    __attribute__((weak)) int ps5_overflow_owns(const void *);
+    __attribute__((weak)) void *ps5_overflow_malloc(size_t);
+    __attribute__((weak)) void *ps5_overflow_calloc(size_t, size_t);
+    __attribute__((weak)) void *ps5_overflow_realloc(void *, size_t);
+    __attribute__((weak)) void *ps5_overflow_memalign(size_t, size_t);
+    __attribute__((weak)) void ps5_overflow_free(void *);
 }
+
+namespace
+{
+bool overflow_owns(const void *p)
+{
+    return ps5_overflow_owns && ps5_overflow_owns(p);
+}
+void *overflow_malloc(size_t n)
+{
+    return ps5_overflow_malloc ? ps5_overflow_malloc(n) : nullptr;
+}
+void *overflow_calloc(size_t c, size_t n)
+{
+    return ps5_overflow_calloc ? ps5_overflow_calloc(c, n) : nullptr;
+}
+void *overflow_realloc(void *p, size_t n)
+{
+    return ps5_overflow_realloc(p, n);
+}
+void *overflow_memalign(size_t a, size_t n)
+{
+    return ps5_overflow_memalign ? ps5_overflow_memalign(a, n) : nullptr;
+}
+void overflow_free(void *p)
+{
+    ps5_overflow_free(p);
+}
+} // namespace
 
 namespace
 {
@@ -117,7 +153,11 @@ Mapping **find(void *pointer)
 void *allocate(size_t size)
 {
     if (size < threshold)
-        return __real_malloc(size ? size : 1);
+    {
+        /* libc's private heap is small; when it refuses, direct memory serves. */
+        void *native = __real_malloc(size ? size : 1);
+        return native ? native : overflow_malloc(size);
+    }
     if (size > SIZE_MAX - sizeof(Mapping) - (page - 1))
     {
         errno = ENOMEM;
@@ -125,8 +165,8 @@ void *allocate(size_t size)
     }
     const size_t span = (sizeof(Mapping) + size + page - 1) & ~(page - 1);
     void *memory = mmap(nullptr, span, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    if (memory == MAP_FAILED)
-        return nullptr;
+    if (memory == MAP_FAILED) /* flexible memory is small too */
+        return overflow_malloc(size);
     auto *entry = static_cast<Mapping *>(memory);
     entry->requested = size;
     entry->span = span;
@@ -141,6 +181,11 @@ void release(void *pointer)
 {
     if (!pointer)
         return;
+    if (overflow_owns(pointer))
+    {
+        overflow_free(pointer);
+        return;
+    }
     pthread_mutex_lock(&lock);
     size_t index = 0;
     MenuSlab **menu_slot = find_menu(pointer, index);
@@ -176,6 +221,8 @@ void *resize(void *pointer, size_t size)
         release(pointer);
         return nullptr;
     }
+    if (overflow_owns(pointer))
+        return overflow_realloc(pointer, size);
     pthread_mutex_lock(&lock);
     Mapping *entry = *find(pointer);
     size_t index = 0;
@@ -186,7 +233,11 @@ void *resize(void *pointer, size_t size)
     /* Native buffers retain their allocator: their usable size is not part of
      * this ABI. Never guess it or read a private libc allocation header. */
     if (!entry && !menu)
+    {
+        /* A native buffer's usable size is libc's, so a refused realloc cannot
+         * move it to the overflow heap; it fails as libc says. */
         return __real_realloc(pointer, size);
+    }
     void *replacement = menu && size <= 1024 ? allocate_menu(size) : allocate(size);
     if (!replacement)
         return nullptr;
@@ -237,6 +288,8 @@ extern "C" void *__wrap_calloc(size_t count, size_t size)
     const size_t bytes = count * size;
     void *p = bytes < threshold ? (bytes ? __real_calloc(count, size) : __real_calloc(1, 1))
                                 : allocate(bytes);
+    if (!p && bytes < threshold)
+        p = overflow_calloc(1, bytes);
     if (p)
         ps5::memory::add(
             {p, bytes, caller,
@@ -282,3 +335,75 @@ extern "C" int __wrap_posix_memalign(void **out, size_t alignment, size_t size)
     return result;
 }
 #endif
+
+/* A core's allocations, bound here by tools/core-imports.py: overflow heap first.
+ * The console's system libraries allocate their own objects - a condition
+ * variable, AGC's state - from the same small libc heap the title's routes use,
+ * and a core that fills it breaks them from under the frontend: PPSSPP's symbol
+ * map filled it, after which the driver's pthread_cond_init and sceAgcInit
+ * failed inside vkCreateDevice. So a core's memory comes from direct memory
+ * (src/overflow_heap.c), and the title's routes only when that refuses. Frees
+ * need no binding: release() and resize() route a pointer by its address. */
+
+extern "C" void *ps5_core_malloc(size_t size)
+{
+    void *p = overflow_malloc(size);
+    return p ? p : allocate(size);
+}
+
+extern "C" void *ps5_core_calloc(size_t count, size_t size)
+{
+    if (size && count > SIZE_MAX / size)
+    {
+        errno = ENOMEM;
+        return nullptr;
+    }
+    void *p = overflow_calloc(count, size);
+    if (!p && (p = allocate(count * size)))
+        std::memset(p, 0, count * size);
+    return p;
+}
+
+extern "C" void *ps5_core_realloc(void *pointer, size_t size)
+{
+    if (!pointer)
+        return ps5_core_malloc(size);
+    return resize(pointer, size);
+}
+
+extern "C" void *ps5_core_aligned_alloc(size_t alignment, size_t size)
+{
+    return overflow_memalign(alignment, size);
+}
+
+extern "C" int ps5_core_posix_memalign(void **out, size_t alignment, size_t size)
+{
+    if (alignment < sizeof(void *) || (alignment & (alignment - 1)) != 0)
+        return EINVAL;
+    void *p = overflow_memalign(alignment, size);
+    if (!p)
+        return ENOMEM;
+    *out = p;
+    return 0;
+}
+
+extern "C" char *ps5_core_strdup(const char *text)
+{
+    const size_t bytes = std::strlen(text) + 1;
+    char *copy = static_cast<char *>(ps5_core_malloc(bytes));
+    if (copy)
+        std::memcpy(copy, text, bytes);
+    return copy;
+}
+
+extern "C" void *ps5_core_new(size_t size)
+{
+    if (void *p = ps5_core_malloc(size ? size : 1))
+        return p;
+    __builtin_trap();
+}
+
+extern "C" void *ps5_core_new_nothrow(size_t size, const void *)
+{
+    return ps5_core_malloc(size ? size : 1);
+}

@@ -135,3 +135,7 @@
 #       libretro-common/include/gfx/video_frame.h
 #       tasks/task_screenshot.c
 0086-scaler-frames-only-for-scaling
+#
+# 0087  line-buffer the log file, so a fault keeps the lines before it
+#       verbosity.c
+0087-line-buffered-log

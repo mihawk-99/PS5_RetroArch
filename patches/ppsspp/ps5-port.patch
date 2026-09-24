@@ -1,0 +1,532 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 910f32214..8e18a1387 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -308,7 +308,8 @@ elseif(NOT OPENGL_LIBRARIES AND USING_GLES2)
+ 	set(OPENGL_LIBRARIES GLESv2 EGL)
+ endif()
+ 
+-if(NOT OPENGL_LIBRARIES)
++# PS5: no GL library exists and none is used; the port is Vulkan only.
++if(NOT OPENGL_LIBRARIES AND NOT PPSSPP_PS5)
+ 	if(POLICY CMP0072)
+ 		cmake_policy(SET CMP0072 NEW)
+ 	endif()
+@@ -974,6 +975,13 @@ endif()
+ 
+ target_compile_definitions(Common PRIVATE Z7_CRC_NUM_TABLES=1)
+ 
++# PS5: the GL backend is not built. Its gl*() calls would become imports nothing on
++# the console resolves, and the native core loader refuses a core with one.
++if(PPSSPP_PS5)
++	file(GLOB PS5_GL_SOURCES ${CMAKE_SOURCE_DIR}/Common/GPU/OpenGL/*.cpp ${CMAKE_SOURCE_DIR}/Common/GPU/OpenGL/*.c)
++	set_source_files_properties(${PS5_GL_SOURCES} TARGET_DIRECTORY Common PROPERTIES HEADER_FILE_ONLY TRUE)
++endif()
++
+ if(TARGET Ext::GLEW)
+ 	target_link_libraries(Common Ext::GLEW)
+ endif()
+@@ -1743,7 +1751,8 @@ if(ANDROID)
+ 	target_link_libraries(native log EGL OpenSLES)
+ elseif(WIN32)
+ 	target_link_libraries(native ws2_32 winmm)
+-elseif(${CMAKE_SYSTEM_NAME} MATCHES "^(DragonFly|FreeBSD|NetBSD)$")
++elseif(${CMAKE_SYSTEM_NAME} MATCHES "^(DragonFly|FreeBSD|NetBSD)$" AND NOT PPSSPP_PS5)
++	# PS5 has no libexecinfo, and nothing the core builds calls backtrace().
+ 	target_link_libraries(native execinfo)
+ endif()
+ 
+@@ -1985,7 +1994,10 @@ set(GPU_D3D11
+ )
+ 
+ # We build Vulkan even on Apple to avoid annoying build differences.
+-set(GPU_IMPLS ${GPU_GLES} ${GPU_VULKAN})
++set(GPU_IMPLS ${GPU_VULKAN})
++if(NOT PPSSPP_PS5)
++	list(APPEND GPU_IMPLS ${GPU_GLES})
++endif()
+ if(WIN32)
+ 	list(APPEND GPU_IMPLS ${GPU_D3D11})
+ endif()
+diff --git a/Common/CPUDetect.cpp b/Common/CPUDetect.cpp
+index f45ef3ce5..03c07091b 100644
+--- a/Common/CPUDetect.cpp
++++ b/Common/CPUDetect.cpp
+@@ -30,6 +30,8 @@
+ #include <fcntl.h>
+ #elif PPSSPP_PLATFORM(MAC)
+ #include <sys/sysctl.h>
++#elif PPSSPP_PLATFORM(PS5)
++#include <unistd.h>
+ #endif
+ 
+ #include <cstdint>
+@@ -465,6 +467,28 @@ void CPUInfo::Detect() {
+ 			logical_cpu_count = num / std::max(num_cores, 1);
+ 		}
+ 	}
++#elif PPSSPP_PLATFORM(PS5)
++	// The payload SDK answers the online hardware-thread count through sysconf; there
++	// is no /proc and no sysctl name for it. The two fields are NOT two totals:
++	// ThreadManager::Init multiplies them (numRealCores * numLogicalCoresPerCpu), so
++	// they must be physical cores and threads per core. Setting both from sysconf
++	// (16 and 16 on this console) asked for 256 compute threads and 512 in total,
++	// which is what the first successful console load reported. Take the physical
++	// core count from CPUID leaf 0x80000008 like the AMD branch above, and derive
++	// SMT siblings from the online count.
++	{
++		long online = sysconf(_SC_NPROCESSORS_ONLN);
++		if (online > 0) {
++			num_cores = (int)online;
++			if (max_ex_fn >= 0x80000008) {
++				do_cpuid(cpu_id, 0x80000008);
++				const int physical = (cpu_id[2] & 0xFF) + 1;
++				if (physical > 0 && physical <= online)
++					num_cores = physical;
++			}
++			logical_cpu_count = (int)(online / std::max(num_cores, 1));
++		}
++	}
+ #endif
+ 	if (logical_cpu_count <= 0)
+ 		logical_cpu_count = 1;
+diff --git a/Common/ExceptionHandlerSetup.cpp b/Common/ExceptionHandlerSetup.cpp
+index f1b977888..8c9df7168 100644
+--- a/Common/ExceptionHandlerSetup.cpp
++++ b/Common/ExceptionHandlerSetup.cpp
+@@ -239,6 +239,12 @@ static void sigsegv_handler(int sig, siginfo_t* info, void* raw_context) {
+ 	// Get all the information we can out of the context.
+ #ifdef __OpenBSD__
+ 	ucontext_t* ctx = context;
++#elif PPSSPP_PLATFORM(PS5)
++	// The console's machine context is the FreeBSD layout six words further on
++	// than the SDK header places it: measured on a console fault, rip, cs (0x43),
++	// rflags, rsp and ss (0x3b) sat at words 26-30, the trap number (12), the
++	// fault address and the error code at 22, 23 and 25, rbp beside rsp at 15.
++	mcontext_t* ctx = (mcontext_t *)((uint64_t *)&context->uc_mcontext + 6);
+ #else
+ 	mcontext_t* ctx = &context->uc_mcontext;
+ #endif
+diff --git a/Common/GPU/Vulkan/thin3d_vulkan.cpp b/Common/GPU/Vulkan/thin3d_vulkan.cpp
+index d0f2fd37f..248bc9402 100644
+--- a/Common/GPU/Vulkan/thin3d_vulkan.cpp
++++ b/Common/GPU/Vulkan/thin3d_vulkan.cpp
+@@ -44,6 +44,10 @@
+ 
+ using namespace PPSSPP_VK;
+ 
++#if PPSSPP_PLATFORM(PS5) && defined(__LIBRETRO__)
++bool PS5TestFlag(const char *name);  // libretro/libretro.cpp
++#endif
++
+ namespace Draw {
+ 
+ // This can actually be replaced with a cast as the values are in the right order.
+@@ -940,6 +944,13 @@ VKContext::VKContext(VulkanContext *vulkan, bool useRenderThread)
+ 	caps_.preferredDepthBufferFormat = DataFormatFromVulkanDepth(vulkan->GetDeviceInfo().preferredDepthStencilFormat);
+ 	caps_.texture3DSupported = true;
+ 	caps_.textureDepthSupported = true;
++#if PPSSPP_PLATFORM(PS5) && defined(__LIBRETRO__)
++	{
++		// PS5 A/B test flag (libretro/libretro.cpp): no sampled depth.
++		if (::PS5TestFlag("ps5_no_depth_texture"))
++			caps_.textureDepthSupported = false;
++	}
++#endif
+ 	caps_.fragmentShaderInt32Supported = true;
+ 	caps_.textureNPOTFullySupported = true;
+ 	caps_.fragmentShaderDepthWriteSupported = true;
+diff --git a/Common/MemArenaPosix.cpp b/Common/MemArenaPosix.cpp
+index a413f4eaf..a16f5c3fd 100644
+--- a/Common/MemArenaPosix.cpp
++++ b/Common/MemArenaPosix.cpp
+@@ -51,7 +51,28 @@ bool MemArena::NeedsProbing() {
+ 	return false;
+ }
+ 
++#if PPSSPP_PLATFORM(PS5)
++extern "C" int32_t sceKernelReserveVirtualRange(void **addr, size_t len, int flags, size_t alignment);
++#endif
++
+ bool MemArena::GrabMemSpace(size_t size) {
++#if PPSSPP_PLATFORM(PS5)
++	// PS5: an anonymous shared-memory object is the backing every view maps; the
++	// console has no /dev/shm or /tmp, and named objects are not needed.
++	fd = shm_open(SHM_ANON, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
++	if (fd < 0) {
++		ERROR_LOG(Log::MemMap, "PS5: shm_open(SHM_ANON) failed: %s", strerror(errno));
++		return false;
++	}
++	if (ftruncate(fd, size) != 0) {
++		ERROR_LOG(Log::MemMap, "PS5: ftruncate(%d, %08x) failed: %s", fd, (int)size, strerror(errno));
++		close(fd);
++		fd = -1;
++		return false;
++	}
++	INFO_LOG(Log::MemMap, "PS5: guest memory is an anonymous shared object of %08x bytes (fd %d)", (int)size, fd);
++	return true;
++#endif
+ #ifndef NO_MMAP
+ 	constexpr mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+ 
+@@ -122,7 +143,7 @@ void *MemArena::CreateView(s64 offset, size_t size, void *base)
+ 		((base == 0) ? 0 : MAP_FIXED), fd, offset);
+ 
+ 	if (retval == MAP_FAILED) {
+-		NOTICE_LOG(Log::MemMap, "mmap on %s (fd: %d) failed: %s", ram_temp_file.c_str(), (int)fd, strerror(errno));
++		ERROR_LOG(Log::MemMap, "mmap on %s (fd: %d) failed: %s (view %08x+%08x at %p)", ram_temp_file.c_str(), (int)fd, strerror(errno), (int)offset, (int)size, base);
+ 		return 0;
+ 	}
+ 	return retval;
+@@ -136,6 +157,28 @@ void MemArena::ReleaseView(s64 offset, void* view, size_t size) {
+ }
+ 
+ u8* MemArena::Find4GBBase() {
++#if PPSSPP_PLATFORM(PS5)
++	// PS5: an anonymous PROT_NONE mapping of that size is charged to the title's
++	// small flexible-memory budget and fails, and the hardcoded fallback below
++	// would map over whatever lives there. The kernel's own virtual-range
++	// reservation holds 4 GiB without backing it; views are then mapped into it
++	// with MAP_FIXED. It is kept for the life of the process and reused.
++	// The address asked for is 0x6_0000_0000: outside the 4 GiB window at high
++	// word 2, which the console's Vulkan driver needs for every GPU-visible
++	// mapping (a first run without a hint landed at 0x2_0227_0000, in it).
++	static void *reserved = nullptr;
++	if (!reserved) {
++		void *address = (void *)0x600000000ULL;
++		const int32_t result = sceKernelReserveVirtualRange(&address, 0x100000000ULL, 0, 0x10000);
++		if (result != 0) {
++			ERROR_LOG(Log::MemMap, "PS5: reserving 4 GiB failed: %08x", (unsigned)result);
++			return nullptr;
++		}
++		reserved = address;
++		INFO_LOG(Log::MemMap, "PS5: guest address space reserved at %p (4 GiB)", reserved);
++	}
++	return static_cast<u8 *>(reserved);
++#endif
+ 	// Now, create views in high memory where there's plenty of space.
+ #if PPSSPP_ARCH(64BIT) && !defined(USE_ASAN) && !defined(NO_MMAP)
+ 	// We should probably just go look in /proc/self/maps for some free space.
+diff --git a/Common/MemoryUtil.cpp b/Common/MemoryUtil.cpp
+index be2a14ddb..a48cae66d 100644
+--- a/Common/MemoryUtil.cpp
++++ b/Common/MemoryUtil.cpp
+@@ -189,7 +189,19 @@ void *AllocateExecutableMemory(size_t size) {
+ 	if (PlatformIsWXExclusive())
+ 		prot = PROT_READ | PROT_WRITE;  // POST_EXEC is added later in this case.
+ 
++#if PPSSPP_PLATFORM(PS5)
++	// PS5: a mapping asked for with PROT_EXEC is returned but does not execute;
++	// one mapped read-write and then made executable with mprotect does (console
++	// probes of this platform). So the protection is added in a second step.
++	void* ptr = mmap(map_hint, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
++	if (ptr != MAP_FAILED && prot != (PROT_READ | PROT_WRITE) && mprotect(ptr, size, prot) != 0) {
++		ERROR_LOG(Log::MemMap, "Failed to make %d bytes executable, errno=%d", (int)size, errno);
++		munmap(ptr, size);
++		ptr = MAP_FAILED;
++	}
++#else
+ 	void* ptr = mmap(map_hint, size, prot, MAP_ANON | MAP_PRIVATE, -1, 0);
++#endif
+ 
+ 	if (ptr == MAP_FAILED) {
+ 		ptr = nullptr;
+diff --git a/Common/Thread/ThreadUtil.cpp b/Common/Thread/ThreadUtil.cpp
+index e842a0312..12a87d20b 100644
+--- a/Common/Thread/ThreadUtil.cpp
++++ b/Common/Thread/ThreadUtil.cpp
+@@ -143,7 +143,11 @@ void SetCurrentThreadName(const char *threadName) {
+ 	pthread_setname_np(pthread_self(), threadName);
+ #elif defined(__APPLE__)
+ 	pthread_setname_np(threadName);
+-#elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
++// PS5 is x86_64-sie-ps5, which defines __FreeBSD__, but its libkernel's
++// pthread_set_name_np is not usable from a title: calling it on a fresh worker thread
++// faults inside libkernel (fault address 0x70) and takes the process down. Skip it and
++// keep the name in the TLS variable the way the unknown-platform path does.
++#elif (defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)) && !PPSSPP_PLATFORM(PS5)
+ 	pthread_set_name_np(pthread_self(), threadName);
+ #elif defined(__NetBSD__)
+ 	pthread_setname_np(pthread_self(), "%s", (void*)threadName);
+diff --git a/GPU/Vulkan/GPU_Vulkan.cpp b/GPU/Vulkan/GPU_Vulkan.cpp
+index a36f54c68..5f28c3b22 100644
+--- a/GPU/Vulkan/GPU_Vulkan.cpp
++++ b/GPU/Vulkan/GPU_Vulkan.cpp
+@@ -266,7 +266,13 @@ u32 GPU_Vulkan::CheckGPUFeatures() const {
+ 		}
+ 	}
+ 
+-	if (!draw_->GetBugs().Has(Draw::Bugs::PVR_BAD_16BIT_TEXFORMATS)) {
++#if PPSSPP_PLATFORM(PS5) && defined(__LIBRETRO__)
++	extern bool PS5TestFlag(const char *name);
++	const bool ps5_no_16bit = PS5TestFlag("ps5_no_16bit_formats");
++#else
++	const bool ps5_no_16bit = false;
++#endif
++	if (!ps5_no_16bit && !draw_->GetBugs().Has(Draw::Bugs::PVR_BAD_16BIT_TEXFORMATS)) {
+ 		// These are VULKAN_4444_FORMAT and friends.
+ 		// Note that we are now using the correct set of formats - the only cases where some may be missing
+ 		// are non-conformant implementations like MoltenVK.
+diff --git a/GPU/Vulkan/TextureCacheVulkan.cpp b/GPU/Vulkan/TextureCacheVulkan.cpp
+index 242421e7f..6fbbc6a07 100644
+--- a/GPU/Vulkan/TextureCacheVulkan.cpp
++++ b/GPU/Vulkan/TextureCacheVulkan.cpp
+@@ -570,7 +570,27 @@ void TextureCacheVulkan::ReleaseTexture(TexCacheEntry *entry, bool delete_them)
+ 	entry->vkTex = nullptr;
+ }
+ 
++#if PPSSPP_PLATFORM(PS5) && defined(__LIBRETRO__)
++// PS5 A/B test flags (libretro/libretro.cpp, PS5TestFlag): one 16-bit format
++// decoded to 8888 instead, to find which one the console's driver samples wrong.
++extern bool PS5TestFlag(const char *name);
++static VkFormat PS5FilterFormat(VkFormat format) {
++	if ((format == VULKAN_4444_FORMAT && PS5TestFlag("ps5_no_4444")) ||
++		(format == VULKAN_1555_FORMAT && PS5TestFlag("ps5_no_1555")) ||
++		(format == VULKAN_565_FORMAT && PS5TestFlag("ps5_no_565")))
++		return VULKAN_8888_FORMAT;
++	return format;
++}
++#else
++static VkFormat PS5FilterFormat(VkFormat format) { return format; }
++#endif
++
++static VkFormat getClutDestFormatVulkanUnfiltered(GEPaletteFormat format);
+ VkFormat getClutDestFormatVulkan(GEPaletteFormat format) {
++	return PS5FilterFormat(getClutDestFormatVulkanUnfiltered(format));
++}
++
++static VkFormat getClutDestFormatVulkanUnfiltered(GEPaletteFormat format) {
+ 	switch (format) {
+ 	case GE_CMODE_16BIT_ABGR4444:
+ 		return VULKAN_4444_FORMAT;
+@@ -970,11 +990,11 @@ VkFormat TextureCacheVulkan::GetDestFormat(GETextureFormat format, GEPaletteForm
+ 	case GE_TFMT_CLUT32:
+ 		return getClutDestFormatVulkan(clutFormat);
+ 	case GE_TFMT_4444:
+-		return VULKAN_4444_FORMAT;
++		return PS5FilterFormat(VULKAN_4444_FORMAT);
+ 	case GE_TFMT_5551:
+-		return VULKAN_1555_FORMAT;
++		return PS5FilterFormat(VULKAN_1555_FORMAT);
+ 	case GE_TFMT_5650:
+-		return VULKAN_565_FORMAT;
++		return PS5FilterFormat(VULKAN_565_FORMAT);
+ 	case GE_TFMT_8888:
+ 	case GE_TFMT_DXT1:
+ 	case GE_TFMT_DXT3:
+diff --git a/ext/glew/CMakeLists.txt b/ext/glew/CMakeLists.txt
+index 317b4b231..72fc2e63a 100644
+--- a/ext/glew/CMakeLists.txt
++++ b/ext/glew/CMakeLists.txt
+@@ -1,5 +1,6 @@
+ find_package(GLEW)
+-if(NOT USE_LIBNX)
++# PS5: no GL, so no GLEW (the port is Vulkan only).
++if(NOT USE_LIBNX AND NOT PPSSPP_PS5)
+   if((NOT APPLE OR USE_SYSTEM_FFMPEG) AND GLEW_FOUND)
+     add_library(system_glew INTERFACE)
+     add_library(Ext::GLEW ALIAS system_glew)
+diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
+index d304b4dba..3944a7418 100644
+--- a/libretro/CMakeLists.txt
++++ b/libretro/CMakeLists.txt
+@@ -2,11 +2,19 @@
+ set(LIBRETRO_SRCS
+ 	libretro.cpp
+ 	LibretroGraphicsContext.cpp
+-	LibretroGLContext.cpp
+-	LibretroGLCoreContext.cpp
+ 	LibretroVulkanContext.cpp
+ 	libretro_vulkan.cpp)
+ 
++# PS5 has no GL context to create (see the root CMakeLists.txt).
++if(NOT PPSSPP_PS5)
++	set(LIBRETRO_SRCS ${LIBRETRO_SRCS}
++		LibretroGLContext.cpp
++		LibretroGLCoreContext.cpp)
++else()
++	set(LIBRETRO_SRCS ${LIBRETRO_SRCS}
++		ps5_gl_stubs.cpp)
++endif()
++
+ if(WIN32)
+ 	set(LIBRETRO_SRCS ${LIBRETRO_SRCS}
+ 		LibretroD3D11Context.cpp)
+diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
+index cc7a272e2..c6edc680b 100644
+--- a/libretro/LibretroGraphicsContext.cpp
++++ b/libretro/LibretroGraphicsContext.cpp
+@@ -1,7 +1,9 @@
+ 
+ #include "libretro/LibretroGraphicsContext.h"
++#if !PPSSPP_PLATFORM(PS5)
+ #include "libretro/LibretroGLContext.h"
+ #include "libretro/LibretroGLCoreContext.h"
++#endif
+ #include "libretro/LibretroVulkanContext.h"
+ #ifdef _WIN32
+ #include "libretro/LibretroD3D11Context.h"
+@@ -101,6 +103,8 @@ LibretroGraphicsContext *LibretroGraphicsContext::CreateGraphicsContext() {
+ 	if (Libretro::backend != RETRO_HW_CONTEXT_DUMMY)
+ 		preferred = Libretro::backend;
+ 
++// PS5: Vulkan only; the GL contexts are not built.
++#if !PPSSPP_PLATFORM(PS5)
+ #ifndef USING_GLES2
+ 	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_OPENGL_CORE) {
+ 		ctx = new LibretroGLCoreContext();
+@@ -120,6 +124,7 @@ LibretroGraphicsContext *LibretroGraphicsContext::CreateGraphicsContext() {
+ 		}
+ 		delete ctx;
+ 	}
++#endif  // !PPSSPP_PLATFORM(PS5)
+ 
+ #ifndef HAVE_LIBNX
+ 	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_VULKAN) {
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 3b2f10317..f786cdb94 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -391,8 +391,79 @@ static bool set_variable_visibility(void)
+    return updated;
+ }
+ 
++#if PPSSPP_PLATFORM(PS5)
++#include <fcntl.h>
++#include <unistd.h>
++// PS5 test aid: /app0/ppsspp-options.txt, when present, holds `key=value` lines
++// that answer RETRO_ENVIRONMENT_GET_VARIABLE for those keys instead of the
++// frontend. The console's FTP server cannot read or write the frontend's
++// per-core options folder, so this is how a run sets options without a person
++// at the pad. The file is never shipped.
++static retro_environment_t ps5_frontend_environ_cb;
++static std::vector<std::pair<std::string, std::string>> ps5_option_overrides;
++
++static bool ps5_environ_cb(unsigned cmd, void *data) {
++   if (cmd == RETRO_ENVIRONMENT_GET_VARIABLE && data) {
++      struct retro_variable *var = (struct retro_variable *)data;
++      for (const auto &entry : ps5_option_overrides) {
++         if (var->key && entry.first == var->key) {
++            var->value = entry.second.c_str();
++            return true;
++         }
++      }
++   }
++   return ps5_frontend_environ_cb(cmd, data);
++}
++
++// A test flag from the same file: `name=1` present. Read by the GPU backend for
++// A/B runs (see GPU/Vulkan/GPU_Vulkan.cpp).
++bool PS5TestFlag(const char *name) {
++   for (const auto &entry : ps5_option_overrides)
++      if (entry.first == name && entry.second == "1")
++         return true;
++   return false;
++}
++
++static retro_environment_t ps5_wrap_environment(retro_environment_t cb) {
++   ps5_frontend_environ_cb = cb;
++   ps5_option_overrides.clear();
++   // POSIX reads: this file's FILE is libretro-common's RFILE.
++   int fd = open("/app0/ppsspp-options.txt", O_RDONLY);
++   if (fd >= 0) {
++      std::string text;
++      char chunk[512];
++      ssize_t got;
++      while ((got = read(fd, chunk, sizeof(chunk))) > 0)
++         text.append(chunk, (size_t)got);
++      close(fd);
++      size_t at = 0;
++      while (at < text.size()) {
++         size_t end = text.find('\n', at);
++         if (end == std::string::npos)
++            end = text.size();
++         std::string line = text.substr(at, end - at);
++         at = end + 1;
++         size_t eq = line.find('=');
++         if (eq == std::string::npos)
++            continue;
++         std::string key = line.substr(0, eq), value = line.substr(eq + 1);
++         while (!value.empty() && (value.back() == '\r' || value.back() == ' '))
++            value.pop_back();
++         while (!key.empty() && key.back() == ' ')
++            key.pop_back();
++         if (!key.empty())
++            ps5_option_overrides.emplace_back(key, value);
++      }
++   }
++   return ps5_option_overrides.empty() ? cb : ps5_environ_cb;
++}
++#endif
++
+ void retro_set_environment(retro_environment_t cb)
+ {
++#if PPSSPP_PLATFORM(PS5)
++   cb = ps5_wrap_environment(cb);
++#endif
+    environ_cb = cb;
+ 
+    bool option_categories = false;
+diff --git a/libretro/libretro_vulkan.cpp b/libretro/libretro_vulkan.cpp
+index 8fb670003..7a5ee3c7c 100644
+--- a/libretro/libretro_vulkan.cpp
++++ b/libretro/libretro_vulkan.cpp
+@@ -140,6 +140,18 @@ static VKAPI_ATTR VkResult VKAPI_CALL vkCreateDevice_libretro(VkPhysicalDevice p
+    }
+ 
+    VkResult res = vkCreateDevice_org(physicalDevice, &newInfo, pAllocator, pDevice);
++#if PPSSPP_PLATFORM(PS5)
++   // PS5: a refused device is otherwise silent; name what was asked for.
++   if (res != VK_SUCCESS) {
++      ERROR_LOG(Log::G3D, "vkCreateDevice returned %d with %u extensions:", (int)res, newInfo.enabledExtensionCount);
++      for (uint32_t i = 0; i < newInfo.enabledExtensionCount; i++)
++         ERROR_LOG(Log::G3D, "  extension %s", newInfo.ppEnabledExtensionNames[i]);
++      for (const auto& pair : originalFeaturePointers)
++         for (uint32_t i = 0; i < sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32); i++)
++            if (((VkBool32 *)pair.first)[i])
++               ERROR_LOG(Log::G3D, "  feature index %u enabled", i);
++   }
++#endif
+ 
+    // The above code potentially modifies application memory. Restore it to avoid unexpected side effects.
+    for (const auto& pair : originalFeaturePointers) {
+diff --git a/libretro/ps5_gl_stubs.cpp b/libretro/ps5_gl_stubs.cpp
+new file mode 100644
+index 000000000..ac7e7b60f
+--- /dev/null
++++ b/libretro/ps5_gl_stubs.cpp
+@@ -0,0 +1,11 @@
++// PS5: the GL backend is not built (see the root CMakeLists.txt), but the shared
++// shader generators still read the GL feature set when they are asked for a GLSL
++// target. This port only asks them for Vulkan, so the set is left empty.
++#include "ppsspp_config.h"
++#include "Common/GPU/OpenGL/GLFeatures.h"
++
++GLExtensions gl_extensions;
++
++int GLExtensions::GLSLVersion() {
++	return 0;
++}
+diff --git a/ppsspp_config.h b/ppsspp_config.h
+index faef7e478..5c2ed0f93 100644
+--- a/ppsspp_config.h
++++ b/ppsspp_config.h
+@@ -124,10 +124,17 @@
+     #define PPSSPP_PLATFORM_LINUX 1
+ #elif defined(__OpenBSD__)
+     #define PPSSPP_PLATFORM_OPENBSD 1
++#elif defined(__PROSPERO__)
++    // PlayStation 5 homebrew through the public payload SDK. The target is a
++    // FreeBSD-ABI x86-64 ELF (clang -target x86_64-sie-ps5), which is neither
++    // Linux nor any of the BSDs above: it has no /proc, no dlopen of project
++    // shared objects, and its allocator is the console's own pools.
++    #define PPSSPP_PLATFORM_PS5 1
+ #endif
+ 
+ // Windows ARM/ARM64, and Windows UWP (all), are the only platform that don't do GL at all (until Apple finally removes it)
+-#if !PPSSPP_PLATFORM(WINDOWS) || ((!PPSSPP_ARCH(ARM) && !PPSSPP_ARCH(ARM64)) && !PPSSPP_PLATFORM(UWP))
++// PS5: no GL. The port presents through the frontend's Vulkan device only.
++#if (!PPSSPP_PLATFORM(WINDOWS) || ((!PPSSPP_ARCH(ARM) && !PPSSPP_ARCH(ARM64)) && !PPSSPP_PLATFORM(UWP))) && !PPSSPP_PLATFORM(PS5)
+ #define PPSSPP_API_ANY_GL 1
+ #endif
+ 

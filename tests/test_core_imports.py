@@ -22,7 +22,8 @@ class CoreImports(unittest.TestCase):
             collected = imports.collect_imports(['one.so', 'two.so'])
         self.assertEqual(len(collected), 5)
         generated = imports.generate(collected)
-        self.assertEqual(generated.count('asm("malloc")'), 1)
+        # A core's malloc is the title's overflow-first allocator (src/memory_ps5.cpp).
+        self.assertEqual(generated.count('asm("ps5_core_malloc")'), 1)
         self.assertIn('[] asm("__isthreaded")', generated)
         self.assertIn('asm("rtime_localtime")', generated)
         self.assertIn('asm("ps5_rewinddir")', generated)

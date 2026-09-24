@@ -49,6 +49,7 @@ extern "C" int sceSystemServiceHideSplashScreen();
 
 extern "C" void ps5_vulkan_profile_init();
 extern "C" void ps5_crash_report_install();
+extern "C" void ps5_core_threads_start();
 /* ../PS5_Vulkan's driver/ps5vk_debug.h: whether VideoOut outlives a swapchain.
  * Weak, so a build without the driver links. */
 extern "C" void ps5vk_display_retain(bool retain) __attribute__((weak));
@@ -238,6 +239,7 @@ int main()
     argv_with_extras[base_count + extra_count] = nullptr;
 
     ps5_crash_report_install();
+    ps5_core_threads_start();
     ps5_audio_test_if_requested();
     ps5_core_loader_test_if_requested();
     ps5_thread_test_if_requested();

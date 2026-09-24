@@ -26,6 +26,8 @@
 #include <ucontext.h>
 #include <unistd.h>
 
+extern "C" int sceKernelAvailableFlexibleMemorySize(std::size_t *size);
+
 namespace
 {
 void report(int signal, siginfo_t *info, void *context_pointer)
@@ -43,15 +45,17 @@ void report(int signal, siginfo_t *info, void *context_pointer)
     std::uintptr_t top = 0;
     if (rsp >= 4096 && (rsp & 7) == 0)
         top = *reinterpret_cast<const std::uintptr_t *>(rsp);
+    std::size_t flexible = 0;
+    sceKernelAvailableFlexibleMemorySize(&flexible);
     char line[256];
     const int length = std::snprintf(
         line, sizeof(line),
         "crash: signal %d fault=0x%016llx rip=0x%016llx rsp=0x%016llx [rsp]=0x%016llx "
-        "handler=0x%016llx\n",
+        "handler=0x%016llx flexible_free=%zu\n",
         signal, static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(info->si_addr)),
         static_cast<unsigned long long>(rip), static_cast<unsigned long long>(rsp),
         static_cast<unsigned long long>(top),
-        static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(&report)));
+        static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(&report)), flexible);
     const int fd = open("/app0/trace.txt", O_WRONLY | O_APPEND);
     if (fd >= 0 && length > 0)
         (void)!write(fd, line, static_cast<std::size_t>(length));

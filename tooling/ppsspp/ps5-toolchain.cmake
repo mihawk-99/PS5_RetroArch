@@ -24,6 +24,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Read by the pinned tree's CMakeLists guards (patch 0002) and by this file.
 set(PPSSPP_PS5 ON CACHE BOOL "" FORCE)
 
+# (The core does ask for a VK_KHR_display surface - build-ppsspp.sh sets
+# USE_VULKAN_DISPLAY_KHR - which libretro_vulkan.cpp answers with the frontend's.)
 # No X11 and no Wayland: a libretro core never creates a surface or a swapchain, the
 # frontend owns presentation, and neither library exists in the payload SDK sysroot.
 # Left on, USING_X11_VULKAN puts X11_Xlib_INCLUDE_PATH-NOTFOUND into the include list

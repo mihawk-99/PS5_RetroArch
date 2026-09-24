@@ -2744,6 +2744,19 @@ EDITS = [
         "   }\n",
         "patches/series, 0086): a conversion that could not",
     ),
+    (
+        # The log file was fully buffered in 16 KiB, so a title that faults loses
+        # the lines that led up to it: a PPSSPP out-of-memory trap took the last
+        # 20 lines of core start-up with it. Line buffering writes each line as it
+        # is logged; RetroArch does not log per frame, so the cost is start-up and
+        # event lines only.
+        "verbosity.c",
+        "   setvbuf(g_verbosity->fp, (char*)g_verbosity->buf, _IOFBF, 0x4000);\n",
+        "   /* Changed by this port (patches/series, 0087): line-buffered, so a fault\n"
+        "    * keeps the lines before it. */\n"
+        "   setvbuf(g_verbosity->fp, (char*)g_verbosity->buf, _IOLBF, 0x4000);\n",
+        "patches/series, 0087): line-buffered, so a fault",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

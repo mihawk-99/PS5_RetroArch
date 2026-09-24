@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Cross-build pinned PPSSPP's libretro core with this title's SDK.
+# Cross-build PPSSPP's libretro core (release v1.20.4) with this title's SDK.
 #
-# Output: build/cores/stage/{cores,info}/ppsspp_libretro.{so,info}; build-title.sh
-# stages those in /app0. Track A of PPSSPP_Implementation_Plan.md: this builds the
-# core, checks its ABI, and says nothing about whether it runs.
+# Output: build/cores/stage/{cores,info}/ppsspp_libretro.{so,info} and the runtime
+# assets in build/cores/stage/system/PPSSPP; build-title.sh stages those in /app0.
+# The core renders through the frontend's Vulkan device (no GL is built) and runs
+# the x86-64 JIT.
+#
+# The port is one patch, patches/ppsspp/ps5-port.patch, applied to the pinned
+# tree. PPSSPP_DEV=1 builds the tree as it stands instead (no reset, no patch), which
+# is how the port is edited: change .deps/ppsspp-src, build with PPSSPP_DEV=1, then
+# write the patch back with `git -C .deps/ppsspp-src diff > patches/ppsspp/ps5-port.patch`.
 #
 # Unlike the other cores, PPSSPP needs its git submodules (ext/glslang, ext/armips,
 # libretro/libretro-common and the rest), so the fetch is a pinned clone rather than
@@ -17,7 +23,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 # Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
 source "$root/tools/core-stamp.sh"
-core_stamp_skip ppsspp \
+[[ -n ${PPSSPP_DEV:-} ]] || core_stamp_skip ppsspp \
     "$root/build/cores/stage/cores/ppsspp_libretro.so" \
     "$root/build/cores/stage/info/ppsspp_libretro.info" \
     "$root/build/cores/stage/system/PPSSPP" \
@@ -28,7 +34,7 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 export PS5_PAYLOAD_SDK="$sdk"
 export PS5_CLANG=/usr/bin/clang
 
-revision=f293b10fb2d9dc0c2bc10281444ee3d3e932e6ad
+revision=fa50bb1976065c4f8b1b47af227d367fe9771555  # v1.20.4
 info_revision=5a74858ab2f7a50cebb5a6330895bc38899531c0
 info_sha=2e9becab17d0db4222e9655bb9b065167e5bcf599ca16256be72beb8f38e646d
 cache="$root/.deps/downloads"
@@ -61,23 +67,27 @@ else
         git clone --filter=blob:none --no-checkout \
             https://github.com/hrydgard/ppsspp.git "$source_dir"
     fi
-    git -C "$source_dir" fetch --quiet origin "$revision" 2>/dev/null ||
-        git -C "$source_dir" fetch --quiet origin
-    git -C "$source_dir" checkout --force --quiet "$revision"
+    if [[ -z ${PPSSPP_DEV:-} ]]; then
+        git -C "$source_dir" cat-file -e "$revision^{commit}" 2>/dev/null ||
+            git -C "$source_dir" fetch --quiet origin tag v1.20.4
+        git -C "$source_dir" checkout --force --quiet "$revision"
+    fi
     got=$(git -C "$source_dir" rev-parse HEAD)
-    [[ $got == "$revision" ]] || { echo "error: fetched $got, wanted $revision" >&2; exit 2; }
+    [[ $got == "$revision" ]] || { echo "error: the tree is at $got, wanted $revision" >&2; exit 2; }
 fi
 
 # A clean tree, every time: the patches below are applied to a known state, so a
 # stale object or a half-applied edit cannot ship. -e keeps nothing; the build
 # directory is inside the tree and is recreated.
-echo "==> [ppsspp] resetting the pinned tree and applying port patches"
-git -C "$source_dir" checkout --force --quiet "$revision"
-git -C "$source_dir" clean -qfdx
-git -C "$source_dir" submodule update --init --recursive --quiet
-for patch_file in "$root"/patches/ppsspp/*.patch; do
-    patch --batch --fuzz=0 -d "$source_dir" -p1 < "$patch_file"
-done
+if [[ -n ${PPSSPP_DEV:-} ]]; then
+    echo "==> [ppsspp] PPSSPP_DEV: building the tree as it stands"
+else
+    echo "==> [ppsspp] resetting the pinned tree and applying the port patch"
+    git -C "$source_dir" checkout --force --quiet "$revision"
+    git -C "$source_dir" clean -qfdx
+    git -C "$source_dir" submodule update --init --recursive --quiet
+    git -C "$source_dir" apply --whitespace=nowarn "$root/patches/ppsspp/ps5-port.patch"
+fi
 
 # Reproducibility. libpng (ext/libpng17/pngerror.c) embeds __DATE__ and __TIME__ in a
 # banner string, and clang derives both from the clock unless SOURCE_DATE_EPOCH is
@@ -100,13 +110,45 @@ export SOURCE_DATE_EPOCH="$source_date_epoch"
 #   ps5-libc-shims.o    the four libc entry points vendored third-party code calls
 #                       and the payload SDK does not export (see that file)
 build="$root/build/cores/ppsspp"
-rm -rf -- "$build"
+# The build directory is kept between builds (ccache and make do the rest); a
+# changed configuration below is picked up by CMake's own re-run.
 mkdir -p "$build" "$root/build/cores/stage/cores" "$root/build/cores/stage/info"
 "$sdk/bin/prospero-clang++" -std=c++11 -fPIC -fno-exceptions -fno-rtti \
     -c "$root/tooling/native/core_cxx_runtime.cpp" -o "$build/core_cxx_runtime.o"
 "$sdk/bin/prospero-clang++" -std=c++17 -O2 -fPIC -Wall -Wextra \
     -c "$root/tooling/ppsspp/ps5-libc-shims.cpp" -o "$build/ps5-libc-shims.o"
 link_inputs="$build/core_cxx_runtime.o $build/ps5-libc-shims.o"
+
+# FFmpeg, for the PSP's video and some audio: the pinned tree's own FFmpeg 3.0.2
+# (its ffmpeg submodule), cross-built with the SDK compiler and the decoder,
+# demuxer and parser set PPSSPP's linux_x86-64.sh selects, without assembly (as
+# that script does) and without zlib. Game menus and cutscenes are videos: without
+# it God of War's title background is left undecoded garbage. Rebuilt only when
+# this configuration changes.
+ffmpeg_prefix="$build/ffmpeg"
+ffmpeg_flags=(--enable-cross-compile --target-os=freebsd --arch=x86_64
+    --cc="$sdk/bin/prospero-clang" --ar="$sdk/bin/prospero-ar"
+    --ranlib="$sdk/bin/prospero-ranlib" --nm=nm
+    --disable-shared --enable-static --enable-pic --disable-yasm --disable-zlib
+    --disable-everything --disable-avdevice --disable-filters --disable-programs
+    --disable-network --disable-avfilter --disable-postproc --disable-encoders
+    --disable-doc --disable-debug
+    --extra-cflags="-D__STDC_CONSTANT_MACROS -O2 -fPIC -w"
+    --enable-decoder=h264,mpeg4,h263,h263p,mpeg2video,mjpeg,mjpegb,aac,aac_latm,atrac3,atrac3p,mp3,pcm_s16le,pcm_s8
+    --enable-demuxer=h264,h263,m4v,mpegps,mpegvideo,avi,mp3,aac,pmp,oma,pcm_s16le,pcm_s8,wav
+    --enable-parser=h264,mpeg4video,mpegvideo,aac,aac_latm,mpegaudio
+    --enable-protocol=file)
+ffmpeg_stamp="$(printf '%s\n' "${ffmpeg_flags[@]}" "$(git -C "$source_dir/ffmpeg" rev-parse HEAD)" | sha256sum | cut -c1-16)"
+if [[ ! -f $ffmpeg_prefix/lib/libavcodec.a || $(cat "$ffmpeg_prefix/stamp" 2>/dev/null) != "$ffmpeg_stamp" ]]; then
+    echo "==> [ppsspp] building FFmpeg for the PS5"
+    rm -rf -- "$build/ffmpeg-build" "$ffmpeg_prefix"
+    mkdir -p "$build/ffmpeg-build"
+    (cd "$build/ffmpeg-build" &&
+        "$source_dir/ffmpeg/configure" --prefix="$ffmpeg_prefix" "${ffmpeg_flags[@]}" > configure.log &&
+        make -j"${JOBS:-16}" > make.log && make install > install.log) || {
+        echo "error: the FFmpeg build failed; see $build/ffmpeg-build" >&2; exit 1; }
+    echo "$ffmpeg_stamp" > "$ffmpeg_prefix/stamp"
+fi
 
 # An extracted core must not inherit RetroArch's parent Git version or dirty state.
 export GIT_CEILING_DIRECTORIES="$root/build/cores"
@@ -118,13 +160,15 @@ cmake -S "$source_dir" -B "$build/ps5-build" \
     -DCMAKE_TOOLCHAIN_FILE="$root/tooling/ppsspp/ps5-toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
     -DPS5_CORE_LINK_INPUTS="$link_inputs" \
-    -DLIBRETRO=ON -DUNITTEST=OFF -DUSE_CCACHE=OFF \
-    -DUSE_FFMPEG=OFF -DUSE_DISCORD=OFF -DUSE_MINIUPNPC=OFF \
+    -DLIBRETRO=ON -DUNITTEST=OFF -DHEADLESS=OFF -DUSE_CCACHE=OFF \
+    -DUSE_FFMPEG=ON -DUSE_SYSTEM_FFMPEG=OFF -DFFMPEG_DIR="$ffmpeg_prefix" \
+    -DUSE_DISCORD=OFF -DUSE_MINIUPNPC=OFF \
     -DUSE_SYSTEM_LIBPNG=OFF -DUSE_SYSTEM_ZSTD=OFF -DUSE_SYSTEM_LIBZIP=OFF \
     -DUSE_SYSTEM_FREETYPE=OFF \
-    -DUSE_NO_MMAP=ON -DUSING_GLES2=ON -DOPENGL_LIBRARIES= -DX11_LIBRARIES=
+    -DUSING_GLES2=OFF -DUSE_WAYLAND_WSI=OFF -DUSING_X11_VULKAN=OFF \
+    -DUSE_VULKAN_DISPLAY_KHR=ON
 echo "==> [ppsspp] building the libretro target"
-cmake --build "$build/ps5-build" --target ppsspp_libretro --parallel "${JOBS:-8}"
+cmake --build "$build/ps5-build" --target ppsspp_libretro --parallel "${JOBS:-16}"
 
 core=$(find "$build/ps5-build" -maxdepth 2 -name 'ppsspp_libretro.so' -print -quit)
 [[ -n $core && -f $core ]] || { echo "error: no ppsspp_libretro.so was produced" >&2; exit 2; }
@@ -188,8 +232,8 @@ report['port_inputs_sha256'] = {name: sha(pathlib.Path(name)) for name in
     ['tools/build-ppsspp.sh', 'tooling/ppsspp/ps5-toolchain.cmake',
      'tooling/ppsspp/ps5-libc-shims.cpp', 'tooling/native/core_cxx_runtime.cpp',
      'tooling/native/ps5-core.ld']
-    + [str(path) for path in sorted(pathlib.Path('patches/ppsspp').glob('*.patch'))]}
+    + ['patches/ppsspp/ps5-port.patch']}
 (build / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
 PY
-core_stamp_write
+[[ -n ${PPSSPP_DEV:-} ]] || core_stamp_write
 printf '==> [ppsspp] built and ABI-checked revision %s; console loading is a separate gate\n' "$revision"

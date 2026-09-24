@@ -1,0 +1,3 @@
+dlmalloc 2.8.6 (Doug Lea, 2023 MIT-licensed release), from https://gee.cs.oswego.edu/pub/misc/malloc.c
+sha256 be7be56b40b4b31417e74e77687f9b96127ea6cae534cf236aee40a4c739508d
+Used by src/overflow_heap.c as an mspace over direct memory.
