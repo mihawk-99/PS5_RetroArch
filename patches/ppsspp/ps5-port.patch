@@ -384,15 +384,16 @@ index cc7a272e2..c6edc680b 100644
  #ifndef HAVE_LIBNX
  	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_VULKAN) {
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 3b2f10317..f786cdb94 100644
+index 3b2f10317..b7ba51961 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
-@@ -391,8 +391,79 @@ static bool set_variable_visibility(void)
+@@ -391,8 +391,131 @@ static bool set_variable_visibility(void)
     return updated;
  }
  
 +#if PPSSPP_PLATFORM(PS5)
 +#include <fcntl.h>
++#include <sys/stat.h>
 +#include <unistd.h>
 +// PS5 test aid: /app0/ppsspp-options.txt, when present, holds `key=value` lines
 +// that answer RETRO_ENVIRONMENT_GET_VARIABLE for those keys instead of the
@@ -459,10 +460,61 @@ index 3b2f10317..f786cdb94 100644
 +}
 +#endif
 +
++#if PPSSPP_PLATFORM(PS5)
++// PS5: the port's default profile, the heaviest the console is meant to hold:
++// Vulkan, the JIT, 10x internal resolution (4800x2720), 8x MSAA, 16x
++// anisotropic filtering, "Auto max quality" texture filtering, hardware
++// transform and software skinning on, high spline quality, full-resolution
++// effects, no frameskip and no speed hacks. These are defaults: a value the
++// player saved in RetroArch's core options file still wins.
++static void ps5_apply_default_profile() {
++   static const struct { const char *key; const char *value; } profile[] = {
++      { "ppsspp_backend", "vulkan" },
++      { "ppsspp_cpu_core", "JIT" },
++      { "ppsspp_internal_resolution", "4800x2720" },
++      { "ppsspp_mulitsample_level", "x8" },
++      { "ppsspp_texture_anisotropic_filtering", "16x" },
++      { "ppsspp_texture_filtering", "Auto max quality" },
++      { "ppsspp_gpu_hardware_transform", "enabled" },
++      { "ppsspp_software_skinning", "enabled" },
++      { "ppsspp_spline_quality", "High" },
++      { "ppsspp_lower_resolution_for_effects", "disabled" },
++      { "ppsspp_frameskip", "disabled" },
++      { "ppsspp_auto_frameskip", "disabled" },
++      { "ppsspp_skip_buffer_effects", "disabled" },
++      { "ppsspp_skip_gpu_readbacks", "disabled" },
++      { "ppsspp_lazy_texture_caching", "disabled" },
++      { "ppsspp_disable_range_culling", "disabled" },
++   };
++   for (auto &def : option_defs_us) {
++      if (!def.key)
++         break;
++      for (const auto &entry : profile)
++         if (!strcmp(def.key, entry.key))
++            def.default_value = entry.value;
++   }
++
++   // Once: an options file saved by an earlier core would keep its values over
++   // these defaults (RetroArch reads it when the options are set, just after
++   // this), so the first run of this profile sets it aside, recoverable.
++   const char *saved = "/app0/config/PPSSPP/PPSSPP.opt";
++   const char *marker = "/app0/config/PPSSPP/ps5-default-profile-v1";
++   struct stat st;
++   if (stat(marker, &st) != 0) {
++      if (stat(saved, &st) == 0)
++         rename(saved, "/app0/config/PPSSPP/PPSSPP.opt.before-ps5-profile");
++      int fd = open(marker, O_WRONLY | O_CREAT | O_TRUNC, 0666);
++      if (fd >= 0)
++         close(fd);
++   }
++}
++#endif
++
  void retro_set_environment(retro_environment_t cb)
  {
 +#if PPSSPP_PLATFORM(PS5)
 +   cb = ps5_wrap_environment(cb);
++   ps5_apply_default_profile();
 +#endif
     environ_cb = cb;
  

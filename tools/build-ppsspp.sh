@@ -129,7 +129,7 @@ ffmpeg_prefix="$build/ffmpeg"
 ffmpeg_flags=(--enable-cross-compile --target-os=freebsd --arch=x86_64
     --cc="$sdk/bin/prospero-clang" --ar="$sdk/bin/prospero-ar"
     --ranlib="$sdk/bin/prospero-ranlib" --nm=nm
-    --disable-shared --enable-static --enable-pic --disable-yasm --disable-zlib
+    --disable-shared --enable-static --enable-pic --disable-asm --disable-zlib
     --disable-everything --disable-avdevice --disable-filters --disable-programs
     --disable-network --disable-avfilter --disable-postproc --disable-encoders
     --disable-doc --disable-debug
