@@ -26,6 +26,10 @@ extern "C"
     __attribute__((weak)) void *ps5_overflow_realloc(void *, size_t);
     __attribute__((weak)) void *ps5_overflow_memalign(size_t, size_t);
     __attribute__((weak)) void ps5_overflow_free(void *);
+    /* libc's own public answer to how large one of its blocks is. Weak: a
+     * stub-listed import can resolve to nothing on the console (openat did),
+     * and the realloc fallback below is skipped when it is absent. */
+    __attribute__((weak)) size_t malloc_usable_size(const void *);
 }
 
 namespace
@@ -154,9 +158,15 @@ void *allocate(size_t size)
 {
     if (size < threshold)
     {
-        /* libc's private heap is small; when it refuses, direct memory serves. */
-        void *native = __real_malloc(size ? size : 1);
-        return native ? native : overflow_malloc(size);
+        /* Direct memory first, libc's private heap only when it refuses. The
+         * private heap is small, and libc's own internal allocations (strdup,
+         * stdio buffers) have nowhere else to go: while the title's small
+         * blocks filled it first, Dolphin's shader compiles and a save state
+         * exhausted it, and RetroArch's config save crashed on a strdup that
+         * returned NULL (2026-09-24). Cores already allocate this way
+         * (ps5_core_malloc). */
+        void *overflow = overflow_malloc(size ? size : 1);
+        return overflow ? overflow : __real_malloc(size ? size : 1);
     }
     if (size > SIZE_MAX - sizeof(Mapping) - (page - 1))
     {
@@ -234,9 +244,23 @@ void *resize(void *pointer, size_t size)
      * this ABI. Never guess it or read a private libc allocation header. */
     if (!entry && !menu)
     {
-        /* A native buffer's usable size is libc's, so a refused realloc cannot
-         * move it to the overflow heap; it fails as libc says. */
-        return __real_realloc(pointer, size);
+        /* A native buffer grows in libc's heap while libc allows. When the heap
+         * is exhausted it moves to the overflow heap, as malloc and calloc
+         * already do: its old size is libc's own malloc_usable_size, never a
+         * guess or a read of libc's private header. Without this, the driver's
+         * shader compiler failed a small realloc on Dolphin's ubershader with
+         * 316 MB of flexible memory free and wrote through the null it got
+         * (copy_entry_create, 2026-09-24). */
+        void *grown = __real_realloc(pointer, size);
+        if (grown || !malloc_usable_size || !ps5_overflow_malloc)
+            return grown;
+        const size_t old_size = malloc_usable_size(pointer);
+        void *moved = overflow_malloc(size);
+        if (!moved)
+            return nullptr;
+        std::memcpy(moved, pointer, old_size < size ? old_size : size);
+        __real_free(pointer);
+        return moved;
     }
     void *replacement = menu && size <= 1024 ? allocate_menu(size) : allocate(size);
     if (!replacement)
@@ -264,9 +288,9 @@ extern "C" void *__wrap_malloc(size_t size)
     const auto caller = uintptr_t(__builtin_return_address(0));
     void *p = allocate(size);
     if (p)
-        ps5::memory::add(
-            {p, size, caller,
-             size < threshold ? ps5::memory::Route::Native : ps5::memory::Route::Mapped});
+        ps5::memory::add({p, size, caller,
+                          size < threshold && !overflow_owns(p) ? ps5::memory::Route::Native
+                                                                : ps5::memory::Route::Mapped});
     else
         ps5::memory::failure("malloc", size, 0, caller, errno);
     return p;
@@ -286,14 +310,14 @@ extern "C" void *__wrap_calloc(size_t count, size_t size)
         return nullptr;
     }
     const size_t bytes = count * size;
-    void *p = bytes < threshold ? (bytes ? __real_calloc(count, size) : __real_calloc(1, 1))
-                                : allocate(bytes);
+    /* Small blocks: direct memory first, as allocate() explains. */
+    void *p = bytes < threshold ? overflow_calloc(1, bytes ? bytes : 1) : allocate(bytes);
     if (!p && bytes < threshold)
-        p = overflow_calloc(1, bytes);
+        p = bytes ? __real_calloc(count, size) : __real_calloc(1, 1);
     if (p)
-        ps5::memory::add(
-            {p, bytes, caller,
-             bytes < threshold ? ps5::memory::Route::Native : ps5::memory::Route::Mapped});
+        ps5::memory::add({p, bytes, caller,
+                          bytes < threshold && !overflow_owns(p) ? ps5::memory::Route::Native
+                                                                 : ps5::memory::Route::Mapped});
     else
         ps5::memory::failure("calloc", bytes, 0, caller, errno);
     return p;

@@ -1,0 +1,16 @@
+{
+  "step": "dolphin-wind-waker-boot",
+  "note": "Dolphin boots Wind Waker to its title screen on the console: JIT64 with fastmem, Vulkan through PS5_Vulkan, 1800 frames at 119.88 Hz output, zero driver refusals, zero failed Vulkan calls, audio closed with errors=0 and discarded=0, clean exit. The title screen is NOT yet correct: the logo, sky, clouds and text render, but the mountain in the background is missing (reported on the console; open). Screenshots are not committed.",
+  "must_contain": [
+    "Fastmem enabled = Yes",
+    "CPU Core: JIT64",
+    "refusals: 0",
+    "failed calls in retroarch.log: 0",
+    "rarch_main returned = 0"
+  ],
+  "must_not_contain": [
+    "crash:",
+    "errors=1"
+  ],
+  "human_check": ""
+}

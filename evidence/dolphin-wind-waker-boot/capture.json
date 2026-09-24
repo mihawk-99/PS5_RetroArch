@@ -1,0 +1,30 @@
+{
+  "step": "dolphin-wind-waker-boot",
+  "recorded": "2026-09-24T16:14:34Z",
+  "console_run": "dol12",
+  "revision": "port (this commit), driver ../PS5_Vulkan 9e63105 (R58), libretro/dolphin c6630001e0 + patches/dolphin/ps5-port.patch",
+  "command": "args.txt: -L /app0/cores/dolphin_libretro.so '/app0/content/Nintendo - GameCube/<Wind Waker>.rvz' --max-frames=1800 --max-frames-ss (screenshot fetched and removed; state snapshotted and restored)",
+  "raw_capture": "klog/dol12-evidence.txt",
+  "raw_lines": 18,
+  "raw_bytes": 1049,
+  "lines": [
+    "== dolphin: Legend of Zelda, The - The Wind Waker (USA).rvz, 1800 frames, JIT64 + fastmem, Vulkan",
+    "core loader: ready symbols=29383 relocations=64546 mapped_bytes=36683776",
+    "core loader: ready symbols=29383 relocations=64546 mapped_bytes=36683776",
+    "[ps5vk] output: 119.88 Hz selected",
+    "[ps5vk] presented content: image 2, 51 of 64 sampled texels lit",
+    "[ps5vk] presented content: image 2, 51 of 64 sampled texels lit",
+    "[ps5vk] presented content: image 2, 51 of 64 sampled texels lit",
+    "rarch_main returned = 0",
+    "audio ps5: closed accepted=2529889 played=2529889 discarded=0 silence=301727 calls=11061 errors=0 peak=3072 capacity=3072 drain=00000100 close=00000000",
+    "[ps5vk] output: default mode restored",
+    "[INFO] [Core] Loading dynamic libretro core from: \"/app0/cores/dolphin_libretro.so\".",
+    "DolphinLibretro/Boot.cpp:649 N[BOOT]: CPU Core: JIT64",
+    "DolphinLibretro/Boot.cpp:650 N[BOOT]: Fastmem enabled = Yes",
+    "[INFO] [Vulkan] Using GPU index 0.",
+    "[INFO] [Vulkan] Using GPU index 0.",
+    "[INFO] [Vulkan] Using GPU: \"PS5 AGC GPU (ps5vk)\".",
+    "refusals: 0",
+    "failed calls in retroarch.log: 0"
+  ]
+}

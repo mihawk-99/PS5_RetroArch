@@ -1,7 +1,7 @@
 /*
  * PS5 RetroArch - libc functions a core imports that the console's SDK does not
- * resolve, or resolves to something that faults: gmtime_r, arc4random and
- * statvfs.
+ * resolve, or resolves to something that faults: gmtime_r, arc4random,
+ * statvfs and utimensat.
  *
  * Copyright (C) 2026 Mihawk
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -14,7 +14,11 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/time.h>
 #include <time.h>
 
 uint64_t sceKernelReadTsc(void);
@@ -73,4 +77,35 @@ int ps5_statvfs(const char *path, struct statvfs *result)
     result->f_bavail = result->f_bfree;
     result->f_namemax = 255;
     return 0;
+}
+
+/* utimensat: libc++'s std::filesystem::last_write_time(path, time) sets a file's
+ * times with it, and Dolphin's core links that setter (its file utilities), so
+ * the title's libc++ archive needs it; the SDK exports no such symbol. The
+ * console's libkernel has utimes, which takes microseconds. Only what those
+ * callers pass is supported: paths relative to the working directory
+ * (AT_FDCWD), both times given or both left to "now". */
+int utimensat(int directory, const char *path, const struct timespec times[2], int flags)
+{
+    (void)flags;
+    if (directory != AT_FDCWD)
+    {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (times == NULL || (times[0].tv_nsec == UTIME_NOW && times[1].tv_nsec == UTIME_NOW))
+        return utimes(path, NULL);
+    if (times[0].tv_nsec == UTIME_OMIT || times[1].tv_nsec == UTIME_OMIT ||
+        times[0].tv_nsec == UTIME_NOW || times[1].tv_nsec == UTIME_NOW)
+    {
+        errno = ENOSYS;
+        return -1;
+    }
+    struct timeval values[2];
+    for (int index = 0; index < 2; ++index)
+    {
+        values[index].tv_sec = times[index].tv_sec;
+        values[index].tv_usec = times[index].tv_nsec / 1000;
+    }
+    return utimes(path, values);
 }

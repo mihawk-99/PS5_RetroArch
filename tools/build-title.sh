@@ -56,7 +56,7 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
-core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp)
+core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp dolphin)
 core_files=()
 for core_name in "${core_names[@]}"; do
     bash "$root/tools/build-${core_name//_/-}.sh"
@@ -203,6 +203,7 @@ inputs += [root / name for name in (
     "build/cores/stage/cores/fbneo_libretro.so",
     "build/cores/stage/cores/genesis_plus_gx_libretro.so",
     "build/cores/stage/cores/ppsspp_libretro.so",
+    "build/cores/stage/cores/dolphin_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += [pathlib.Path(name) for name in sys.argv[3:]]
 digest = hashlib.sha256()
@@ -216,6 +217,11 @@ identity = digest.hexdigest()
 print("==> [title] build identity: " + identity)
 PY
 
+# The title's libc++ (std::filesystem) calls libc's opendir, which the console
+# refuses, and openat/fdopendir/unlinkat/fchmodat, which its libkernel does not
+# export; src/ps5_directory.cpp implements all of them (a core's own imports of
+# the directory calls are bound to the same functions by tools/core-imports.py).
+directory_wrap_flags="--wrap=opendir --wrap=readdir --wrap=closedir --wrap=fdopendir --wrap=openat --wrap=unlinkat --wrap=fchmodat"
 echo "==> [title] step 2/3: the title"
 # Large frontend/core buffers use mapped memory; wrap all ownership operations.
 PS5_PAYLOAD_SDK="$sdk" \
@@ -226,7 +232,7 @@ APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-c
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
-APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free $memory_wrap_flags" \
+APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free $memory_wrap_flags $directory_wrap_flags" \
     make app
 
 title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \
@@ -259,6 +265,15 @@ if [[ -d $root/build/cores/stage/system/PPSSPP ]]; then
     cp -a -- "$root/build/cores/stage/system/PPSSPP" "$dist/system/PPSSPP"
     printf '==> [title] staged PPSSPP assets: %s files in %s/system/PPSSPP\n' \
         "$(find "$dist/system/PPSSPP" -type f | wc -l)" "$dist"
+fi
+# Dolphin resolves its Sys tree as <system>/dolphin-emu/Sys (game settings, shader
+# sources, fonts, title databases); its User tree lives in the save directory.
+if [[ -d $root/build/cores/stage/system/dolphin-emu ]]; then
+    mkdir -p "$dist/system"
+    rm -rf -- "$dist/system/dolphin-emu"
+    cp -a -- "$root/build/cores/stage/system/dolphin-emu" "$dist/system/dolphin-emu"
+    printf '==> [title] staged Dolphin Sys: %s files in %s/system/dolphin-emu\n' \
+        "$(find "$dist/system/dolphin-emu" -type f | wc -l)" "$dist"
 fi
 
 # The Vulkan driver, beside the title, when it exists.

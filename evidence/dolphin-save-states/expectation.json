@@ -1,0 +1,12 @@
+{
+  "step": "dolphin-save-states",
+  "note": "Saving a Dolphin state on the title screen completes (93185136 bytes) and RetroArch exits cleanly; before patch 0090 the thumbnail readback overran its buffer by ~1 MB and crashed (dolss1). Loading a state at launch succeeds and exits cleanly; before small title allocations went to direct memory first, the config save at exit crashed on a NULL strdup from an exhausted libc heap (dolld1).",
+  "must_contain": [
+    "Loading entry state from <state> succeeded.",
+    "rarch_main returned = 0"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}

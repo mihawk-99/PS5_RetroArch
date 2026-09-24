@@ -1,80 +1,51 @@
 # Active work
 
-_Updated: 2026-09-23_
+_Updated: 2026-09-24_
 
-## Now: 120 Hz by default, on the current driver
+## Now: Dolphin (GameCube) with Wind Waker
 
-**RetroArch presents at 119.88 Hz where the display allows it, and at 59.94 Hz where
-it does not, with cores at their own speed either way.** The title declares
-high-frame-rate output (`sce_sys/param.json` `attribute3` 0x80040), so
-`../PS5_Vulkan` offers a 3840x2160 119.88 Hz mode first, and only when the
-console has accepted it (jobs/r53-output-retention: the output is configured when
-the modes are listed, so a refusal leaves 59.94 Hz as the only mode and RetroArch
-never believes 119.88). Patch 0084 makes the display context
-pick the largest mode and then the highest refresh (upstream ignored refresh, or
-rejected any mode more than 1 Hz from a saved 59.94); 0085 makes
-`video_refresh_rate` follow the mode it got and turns a saved swap interval of 1
-into automatic above 100 Hz, so a 60 FPS core presents each frame for two
-vblanks. The seed config ships `video_refresh_rate 119.88` and
-`video_swap_interval 0` for fresh installs; an existing config is corrected at run
-time. Evidence: `evidence/output-120hz` (FCEUmm, 1,800 frames in ~30 s at 1,199
-presents per 10 s) and `evidence/output-60hz-fallback` (same build without the
-metadata: 59.94 Hz, 600 presents per 10 s, same speed).
+**Goal:** Wind Waker correct, full speed, with audio, input and saves, stable
+in long play; then the 6x/UberShader/EFB/MSAA torture profiles. Driver work it
+needs goes into ../PS5_Vulkan as general fixes with their own probes.
 
-**The title now links the current driver**, hundreds of driver commits past
-`8b311e3`: the mapped-only target flush, the bounded marker spin, parallel blits,
-the NIR cache, the per-build shader cache and the output-mode selection. Every
-shipped core was rechecked on it at 119.88 Hz (`evidence/core-recheck-current-driver`):
-FCEUmm, Snes9x, mGBA (GBA from .7z, and GB), FBNeo, Genesis Plus GX (Mega Drive,
-Master System, Game Gear); 1,200 frames each, colours checked on the exit
-screenshot, audio closed with no errors or discards, clean exit.
+**Where it is.** The core (libretro/dolphin `c6630001e0`, Dolphin 2609) builds
+with `tools/build-dolphin.sh` and one patch, `patches/dolphin/ps5-port.patch`,
+and ships in the title. Wind Waker boots to its title screen and plays its
+intro with JIT64 and fastmem, zero driver refusals and clean audio
+(`evidence/dolphin-wind-waker-boot`); save states save and load
+(`evidence/dolphin-save-states`).
 
-**No black screen between menu, game and content changes.** RetroArch recreates
-its swapchain (and on content changes its whole Vulkan context) when the menu
-opens or closes, content closes or loads, and a video setting needs a reinit. The
-driver used to close VideoOut each time, switching the output back to 60 Hz and up
-again. main.cpp now retains VideoOut (`ps5vk_display_retain`): the previous image
-stays on screen and the mode never changes (`evidence/display-retention`: menu
-6-7 ms, close content 280 ms, run from History 437 ms, 0 black presents; released,
-the same events took 297-760 ms with a mode switch each). Quitting releases it and
-restores the default mode. `/app0/ps5vk-no-retain.txt` gives the old behaviour for
-a comparison run.
+What the bring-up needed, by layer:
 
-**FBNeo's screenshot no longer crashes** (patch 0086): the scaler allocated ~97 MB
-of frames a same-size conversion never reads, the allocation failed beside FBNeo's
-170 MB core, and the screenshot called an unset converter.
+- **Platform (core patch):** guest RAM is one direct-memory allocation mapped
+  at every mirror (a shared-memory object's views were charged to flexible
+  memory and ran out); the fastmem arena is a kernel range reservation away
+  from the GPU window; JIT code is mapped RW, made RWX, at a hint of
+  0x3_0000_0000 (the console refuses an unplaceable hint); the fault handler
+  reads the console's shifted mcontext and takes SIGBUS; a 32 MiB code cache;
+  thread naming skipped; the large entry-point map off. libc entry points the
+  console lacks are in `tooling/dolphin/ps5-libc-shims.cpp`.
+- **Title:** `openat`/`fdopendir`/`unlinkat`/`fchmodat` and libc's `opendir`
+  family are implemented or rerouted for the title's libc++
+  (`src/ps5_directory.cpp`, `--wrap`); `utimensat` over `utimes`; small
+  allocations go to direct memory first, and a refused libc realloc moves the
+  block there (`src/memory_ps5.cpp`).
+- **Frontend patches:** 0089 enables VK_KHR_get_physical_device_properties2 on
+  the instance; 0090 keeps the synchronous readback inside the caller's
+  viewport (the save-state thumbnail overran and crashed).
+- **Driver (../PS5_Vulkan):** R57 clamp-to-border samplers, R58 primitive
+  restart, one-layer array depth views, an opt-in SPIR-V dump.
 
-**Test aids.** `/app0/pad-script.txt` presses buttons on a timeline
-(src/input_ps5.cpp), so a run can open menus and load content without a person at
-the pad. A fatal signal appends its rip, rsp, return address and stack words to
-trace.txt (src/crash_report.cpp; the console's mcontext has rip at word 26 and rsp
-at 29, not where the SDK header puts them), and the core loader's "ready" line
-carries the core's base, so build/title.map symbolises a crash.
-
-**`args.txt` can launch content.** `-L core` and a path in `/app0/args.txt` now
-start a game directly (main.cpp drops `--menu`, which RetroArch refuses beside
-content), which is how a run measures a core without a pad.
-
-**Rebuilds take seconds** (docs/PHASE_LOG.md): a no-change rebuild 269 s -> 2.2 s,
-a port-file or driver change ~2.4 s; deployment uploads only changed files
-(`tools/deploy-title.py --all` for everything).
+**Open:** the mountain on the title screen is missing (a texture path, not yet
+located); performance and long-play stability are unmeasured; the torture
+profiles have not started. Test runs: `/app0/dolphin-options.txt` overrides
+core options for one run (test file, removed on any other launch).
 
 ## Next
 
-1. PPSSPP from scratch (the current core crashes on its first frame, parked below).
-2. Simplify the port without losing behaviour.
-3. Content changes still hold the previous image for 0.3-0.5 s while RetroArch
-   rebuilds its Vulkan context; keeping the context (not only VideoOut) would
-   shorten that.
-
-## PPSSPP Track A: parked
-
-Plan: [PPSSPP_Implementation_Plan.md](../PPSSPP_Implementation_Plan.md); platform
-analysis: [PPSSPP_Core_Plan.md](../PPSSPP_Core_Plan.md). The core builds from pinned
-`f293b10`, is ABI-checked, linked and loaded on the console (`evidence/ppsspp-native/`),
-and crashes on its first frame: a SIGSEGV on a worker thread during
-`ThreadManager::Init`, inside `libkernel.sprx` (`pthread_get_specificarray_np+0x3b`
-from `pthread_create_name_np`).
+1. Find the missing mountain: A/B the driver's mip, EFB-copy and texture paths
+   against a saved in-game state.
+2. Measure speed at 1x with JIT64 and fastmem; then long play.
 
 ## Accepted baselines
 
@@ -86,6 +57,8 @@ from `pthread_create_name_np`).
   FCEUmm, mGBA, Snes9x and FBNeo evidence in `native-core-loading/`, `mgba-native/`,
   `snes9x-native/`, `fbneo-native/`.
 - Thumbnail and configuration-reset fixes (patches 0081/0082).
+- PPSSPP (God of War: Ghost of Sparta, Yu-Gi-Oh! GX Tag Force at 10x): picture,
+  full speed at 120 Hz, save states, fast-forward, close and reopen.
 
 ## Named errors and remaining limits
 

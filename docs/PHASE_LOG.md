@@ -3141,3 +3141,38 @@ max-quality filtering) from a slot-0 save state, loaded with `--entryslot=0`.
 
 Still open: 8x MSAA (the driver exposes neither renderpass2 nor depth/stencil
 resolve, and supports 4x only), and a long gameplay soak.
+
+## 2026-09-24 — Dolphin boots Wind Waker; save states work
+
+libretro/dolphin (`c6630001e0`, Dolphin 2609) cross-builds with one patch and
+ships in the title. In order, what stopped it on the console and what fixed it:
+
+1. `openat` resolved to address 0 inside the title's libc++ (`remove_all`); the
+   `*at` family and libc's refused `opendir` are now the title's own (`--wrap`).
+2. VMA could not load `vkGetPhysicalDeviceMemoryProperties2KHR` on RetroArch's
+   Vulkan 1.0 instance: patch 0089 enables the extension when offered.
+3. `vkCreateSampler` refused clamp-to-border: ../PS5_Vulkan R57.
+4. Jit64's 200 MB code space did not fit flexible memory: 32 MiB on PS5.
+5. The driver's compiler faulted in `copy_entry_create` on a NULL realloc
+   from libc's exhausted private heap: a refused realloc now moves the block to
+   direct memory (located with the driver's new opt-in SPIR-V dump; the same
+   modules compile on the host).
+6. The fastmem logical views failed to map and flexible memory fell to 10 MB:
+   guest RAM is now direct memory mapped at each mirror.
+7. JIT code first landed inside the GPU window, then its hint was refused:
+   code is mapped at 0x3_0000_0000.
+8. 101 pipelines were refused for primitive restart: ../PS5_Vulkan R58.
+
+Wind Waker then reached its title screen with zero refusals and clean audio
+(dol12). I first recorded that screenshot as correct; it is not, because the
+mountain in the background is missing, which is open.
+
+Save states: saving crashed in the thumbnail readback, which overran its buffer
+by ~1 MB after re-rendering the cached frame recomputed the viewport (patch
+0090). Loading a state then crashed at exit on a NULL strdup: libc's private
+heap was exhausted because the title's small blocks filled it first; they now
+go to direct memory first (dolss1-3, dolld1-2). The startup popup "Failed to
+load Vulkan library" was Dolphin probing a host library a libretro core does
+not use; it is an info line now.
+
+tools/verify.sh PASS (patch count 199), 39 captures replay.

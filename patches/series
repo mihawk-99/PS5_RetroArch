@@ -145,3 +145,15 @@
 #       logging thread, which stalled frames while a save state loaded
 #       verbosity.c
 0088-log-buffer-for-the-flusher
+
+# 0089  enable VK_KHR_get_physical_device_properties2 on the instance when it is
+#       offered: a core on a Vulkan 1.0 instance reaches the *2 queries only
+#       through it (Dolphin's allocator)
+#       gfx/common/vulkan_common.c
+0089-instance-properties2
+
+# 0090  the synchronous Vulkan readback copies no more than the viewport its
+#       caller allocated for: the cached frame it re-renders can recompute the
+#       viewport, and a save-state thumbnail of Dolphin's frame overran by ~1 MB
+#       gfx/drivers/vulkan.c
+0090-readback-within-caller-viewport

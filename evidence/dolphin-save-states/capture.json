@@ -1,0 +1,21 @@
+{
+  "step": "dolphin-save-states",
+  "recorded": "2026-09-24T16:55:56Z",
+  "console_run": "dolss3, dolld2",
+  "revision": "port (this commit), patch 0090, overflow-first small allocations; driver ../PS5_Vulkan 9e63105",
+  "command": "save: RA_CFG input_save_state_btn=14 + pad script '22.0 L3 0.3'; load: args.txt ... --entryslot=0 (state files snapshotted and restored)",
+  "raw_capture": "klog/dolss-evidence.txt",
+  "raw_lines": 9,
+  "raw_bytes": 633,
+  "lines": [
+    "== save: L3 bound to save state (run config), pressed at 22 s on the title screen",
+    "input: pad script press 0 at 22.00 s: 0x4000",
+    "rarch_main returned = 0",
+    "audio ps5: closed accepted=2526097 played=2526097 discarded=0 silence=262511 calls=10893 errors=0 peak=3072 capacity=3072 drain=00000100 close=00000000",
+    "[INFO] [State] Saving state <state>, 93185136 bytes.",
+    "== load: --entryslot=0 with a saved state",
+    "rarch_main returned = 0",
+    "audio ps5: closed accepted=2867081 played=2867081 discarded=0 silence=111479 calls=11635 errors=0 peak=3072 capacity=3072 drain=00000100 close=00000000",
+    "[INFO] [State] Loading entry state from <state> succeeded."
+  ]
+}

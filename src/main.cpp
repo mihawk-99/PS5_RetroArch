@@ -249,9 +249,17 @@ int main()
     if (std::remove("/app0/test-run.txt") != 0)
     {
         static const char *const test_files[] = {
-            "/app0/args.txt",           "/app0/pad-script.txt", "/app0/ps5vk-no-retain.txt",
-            "/app0/ppsspp-options.txt", "/app0/ps5vk-ab.txt",   "/app0/ps5-sampler.txt",
-            "/app0/ps5vk-profile.txt",  "/app0/ps5vk-log.txt",  "/app0/ps5vk-vblank-probe.txt",
+            "/app0/args.txt",
+            "/app0/pad-script.txt",
+            "/app0/ps5vk-no-retain.txt",
+            "/app0/ppsspp-options.txt",
+            "/app0/ps5vk-ab.txt",
+            "/app0/ps5-sampler.txt",
+            "/app0/ps5vk-profile.txt",
+            "/app0/ps5vk-log.txt",
+            "/app0/ps5vk-vblank-probe.txt",
+            "/app0/ps5vk-spirv-dump.txt",
+            "/app0/dolphin-options.txt",
         };
         unsigned removed = 0;
         for (const char *const path : test_files)

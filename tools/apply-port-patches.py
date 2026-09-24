@@ -2792,6 +2792,70 @@ EDITS = [
         "       * the title's flusher writes the log out four times a second. */\n",
         "patches/series, 0088): no flush per message",
     ),
+    (
+        # 0089: the instance enables VK_KHR_get_physical_device_properties2 when
+        # the implementation offers it. A core on a Vulkan 1.0 instance (the
+        # console's driver reports 1.0) can only reach the *2 queries through
+        # that extension, and a core without the v2 create_instance hook cannot
+        # ask for it: Dolphin's memory allocator needs
+        # vkGetPhysicalDeviceMemoryProperties2KHR, and its device creation failed
+        # without it (2026-09-24). It is optional, so an implementation without it
+        # is unchanged.
+        "gfx/common/vulkan_common.c",
+        "static const char *vulkan_optional_instance_extensions[] = {\n"
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "   VULKAN_COLORSPACE_EXTENSION_NAME\n"
+        "#endif\n"
+        "};\n",
+        "static const char *vulkan_optional_instance_extensions[] = {\n"
+        "   /* Added by this port (patches/series, 0089): the *2 queries on a 1.0\n"
+        "    * instance, which cores such as Dolphin need. */\n"
+        "   \"VK_KHR_get_physical_device_properties2\",\n"
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "   VULKAN_COLORSPACE_EXTENSION_NAME\n"
+        "#endif\n"
+        "};\n",
+        "patches/series, 0089): the *2 queries on a 1.0",
+    ),
+    (
+        # 0090: the synchronous readback copies no more than the viewport the
+        # caller sized its buffer for. take_screenshot allocates vp.width *
+        # vp.height * 3 from the viewport as it stands, and this function then
+        # re-renders the cached frame, which recomputes vk->vp; with Dolphin's
+        # frame the new viewport was taller and the copy ran about 1 MB past the
+        # buffer's end, so saving a state (whose thumbnail is this readback)
+        # crashed RetroArch (2026-09-24).
+        "gfx/drivers/vulkan.c",
+        "      vk->flags |= VK_FLAG_READBACK_PENDING;\n"
+        "\n"
+        "      if (!is_idle)\n"
+        "         video_driver_cached_frame();\n",
+        "      /* Changed by this port (patches/series, 0090): the viewport the\n"
+        "       * caller sized its buffer for, before the cached frame below can\n"
+        "       * recompute it. */\n"
+        "      unsigned caller_width  = vk->vp.width;\n"
+        "      unsigned caller_height = vk->vp.height;\n"
+        "      vk->flags |= VK_FLAG_READBACK_PENDING;\n"
+        "\n"
+        "      if (!is_idle)\n"
+        "         video_driver_cached_frame();\n",
+        "patches/series, 0090): the viewport the",
+    ),
+    (
+        # 0090 too: the copy's size is clamped to that viewport.
+        "gfx/drivers/vulkan.c",
+        "         unsigned vp_width  = (vk->vp.width  > vk->video_width)  ? vk->video_width  : vk->vp.width;\n"
+        "         unsigned vp_height = (vk->vp.height > vk->video_height) ? vk->video_height : vk->vp.height;\n",
+        "         unsigned vp_width  = (vk->vp.width  > vk->video_width)  ? vk->video_width  : vk->vp.width;\n"
+        "         unsigned vp_height = (vk->vp.height > vk->video_height) ? vk->video_height : vk->vp.height;\n"
+        "         /* Changed by this port (patches/series, 0090): never more than the\n"
+        "          * caller's buffer holds. */\n"
+        "         if (vp_width > caller_width)\n"
+        "            vp_width = caller_width;\n"
+        "         if (vp_height > caller_height)\n"
+        "            vp_height = caller_height;\n",
+        "patches/series, 0090): never more than the",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.
