@@ -34,6 +34,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <new>
+#include <stdexcept>
+#include <system_error>
 #include <typeinfo>
 #include <unistd.h>
 
@@ -98,9 +101,34 @@ void on_terminate()
      * from std::bad_array_new_length (an array length that cannot be valid). */
     int status = 0;
     char *pretty = abi::__cxa_demangle(type->name(), nullptr, nullptr, &status);
-    char line[256];
-    std::snprintf(line, sizeof line, "terminate: exception type=%s",
-                  (status == 0 && pretty) ? pretty : type->name());
+    /* The thrown object itself is readable without rethrowing: for the
+     * standard exception types a message and, for std::system_error, the
+     * error code say which call failed (a thread that could not be created, a
+     * mutex that could not be locked) rather than only that one did. */
+    const char *what = "";
+    int code = 0;
+    void *object = abi::__cxa_current_primary_exception();
+    if (object)
+    {
+        /* Without RTTI the type is matched by its mangled name. */
+        const char *name = type->name();
+        const auto is = [name](const char *mangled) { return std::strcmp(name, mangled) == 0; };
+        if (is("NSt3__112system_errorE"))
+        {
+            const auto *error = static_cast<const std::system_error *>(object);
+            what = error->what();
+            code = error->code().value();
+        }
+        else if (is("NSt3__112length_errorE") || is("NSt3__113runtime_errorE") ||
+                 is("NSt3__111logic_errorE") || is("NSt3__112out_of_rangeE") ||
+                 is("St9bad_alloc") || is("St20bad_array_new_length"))
+        {
+            what = static_cast<const std::exception *>(object)->what();
+        }
+    }
+    char line[512];
+    std::snprintf(line, sizeof line, "terminate: exception type=%s what=\"%s\" code=%d",
+                  (status == 0 && pretty) ? pretty : type->name(), what, code);
     if (pretty)
         std::free(pretty);
     ps5::debug::mark(line);

@@ -43,6 +43,8 @@ struct Audio
     size_t capacity = 0, head = 0, count = 0, peak = 0;
     bool active = true, shutdown = false, failed = false, nonblock = false, in_output = false;
     uint64_t accepted = 0, played = 0, discarded = 0, silence = 0, calls = 0, errors = 0;
+    /* played and silence at the last window summary. */
+    uint64_t window_played = 0, window_silence = 0;
     alignas(16) int16_t output[grain * 2] = {};
 };
 
@@ -82,6 +84,19 @@ void *worker(void *opaque)
         {
             a->played += frames;
             a->silence += grain - frames;
+        }
+        /* One line per ten seconds of output, AudioOut's own clock (1875 grains
+         * of 256 frames at 48 kHz): the frames the core delivered and the
+         * silence the worker had to fill in. Silence in a window where the
+         * core is running means the emulation fell behind real time. */
+        constexpr uint64_t window_calls = 10 * rate / grain;
+        if (a->calls % window_calls == 0)
+        {
+            std::fprintf(stderr, "audio ps5: window played=%llu silence=%llu\n",
+                         (unsigned long long)(a->played - a->window_played),
+                         (unsigned long long)(a->silence - a->window_silence));
+            a->window_played = a->played;
+            a->window_silence = a->silence;
         }
         pthread_cond_broadcast(&a->changed);
     }

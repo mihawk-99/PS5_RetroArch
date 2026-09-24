@@ -22,8 +22,10 @@
  * the caller waits, so the pointers it passes stay valid until the factory is done.
  */
 
+#include <cerrno>
 #include <condition_variable>
 #include <cstdio>
+#include <ctime>
 #include <mutex>
 
 #include <pthread.h>
@@ -55,7 +57,21 @@ int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes, void
     size_t stack = 0;
     if (pthread_attr_getstacksize(&own, &stack) != 0 || stack < core_minimum_stack)
         pthread_attr_setstacksize(&own, core_minimum_stack);
-    const int result = pthread_create(thread, &own, start, argument);
+    /* EAGAIN is the console saying the stack could not be had right now: the
+     * title's flexible memory is small, and other threads hold large transient
+     * pieces of it (the Vulkan driver's 32 MiB shader-compile stack among them).
+     * PPSSPP's thread pool starts while the frontend compiles its first shaders,
+     * and std::thread turns a refusal into a C++ terminate, which killed about
+     * one launch in three ("thread constructor failed: Resource temporarily
+     * unavailable", 2026-09-24). A refusal is retried for up to two seconds
+     * before it is passed on. */
+    int result = pthread_create(thread, &own, start, argument);
+    for (int attempt = 0; result == EAGAIN && attempt < 200; ++attempt)
+    {
+        const timespec pause = {0, 10 * 1000 * 1000};
+        nanosleep(&pause, nullptr);
+        result = pthread_create(thread, &own, start, argument);
+    }
     if (attributes == nullptr)
         pthread_attr_destroy(&own);
     return result;
