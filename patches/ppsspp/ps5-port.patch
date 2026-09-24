@@ -137,7 +137,7 @@ index d0f2fd37f..248bc9402 100644
  	caps_.textureNPOTFullySupported = true;
  	caps_.fragmentShaderDepthWriteSupported = true;
 diff --git a/Common/MemArenaPosix.cpp b/Common/MemArenaPosix.cpp
-index a413f4eaf..a16f5c3fd 100644
+index a413f4eaf..bbd68c9d1 100644
 --- a/Common/MemArenaPosix.cpp
 +++ b/Common/MemArenaPosix.cpp
 @@ -51,7 +51,28 @@ bool MemArena::NeedsProbing() {
@@ -178,7 +178,7 @@ index a413f4eaf..a16f5c3fd 100644
  		return 0;
  	}
  	return retval;
-@@ -136,6 +157,28 @@ void MemArena::ReleaseView(s64 offset, void* view, size_t size) {
+@@ -136,6 +157,42 @@ void MemArena::ReleaseView(s64 offset, void* view, size_t size) {
  }
  
  u8* MemArena::Find4GBBase() {
@@ -187,14 +187,28 @@ index a413f4eaf..a16f5c3fd 100644
 +	// small flexible-memory budget and fails, and the hardcoded fallback below
 +	// would map over whatever lives there. The kernel's own virtual-range
 +	// reservation holds 4 GiB without backing it; views are then mapped into it
-+	// with MAP_FIXED. It is kept for the life of the process and reused.
++	// with MAP_FIXED. It is kept while the core is loaded and reused.
 +	// The address asked for is 0x6_0000_0000: outside the 4 GiB window at high
 +	// word 2, which the console's Vulkan driver needs for every GPU-visible
 +	// mapping (a first run without a hint landed at 0x2_0227_0000, in it).
 +	static void *reserved = nullptr;
 +	if (!reserved) {
 +		void *address = (void *)0x600000000ULL;
-+		const int32_t result = sceKernelReserveVirtualRange(&address, 0x100000000ULL, 0, 0x10000);
++		int32_t result = sceKernelReserveVirtualRange(&address, 0x100000000ULL, 0, 0x10000);
++		// The static above lives in the core image, and RetroArch unloads the
++		// core when content closes: a reloaded core starts with it null while
++		// the previous instance's reservation (and any view it left mapped)
++		// still holds the range, and a second game failed with 8002000c
++		// ("Memory init failed", 2026-09-24). The range is this arena's alone,
++		// so whatever an earlier instance left there is released and the
++		// reservation made again.
++		if (result != 0) {
++			munmap((void *)0x600000000ULL, 0x100000000ULL);
++			address = (void *)0x600000000ULL;
++			result = sceKernelReserveVirtualRange(&address, 0x100000000ULL, 0, 0x10000);
++			if (result == 0)
++				INFO_LOG(Log::MemMap, "PS5: released the previous instance's 4 GiB and reserved it again");
++		}
 +		if (result != 0) {
 +			ERROR_LOG(Log::MemMap, "PS5: reserving 4 GiB failed: %08x", (unsigned)result);
 +			return nullptr;
@@ -248,6 +262,29 @@ index e842a0312..12a87d20b 100644
  	pthread_set_name_np(pthread_self(), threadName);
  #elif defined(__NetBSD__)
  	pthread_setname_np(pthread_self(), "%s", (void*)threadName);
+diff --git a/Core/FrameTiming.cpp b/Core/FrameTiming.cpp
+index 79a6e46f6..ef2af194a 100644
+--- a/Core/FrameTiming.cpp
++++ b/Core/FrameTiming.cpp
+@@ -88,6 +88,18 @@ void FrameTiming::ComputePresentMode(Draw::DrawContext *draw, bool fastForward)
+ 
+ 	_dbg_assert_(draw->GetDeviceCaps().presentModesSupported != (Draw::PresentMode)0);
+ 
++#if PPSSPP_PLATFORM(PS5)
++	// PS5 port: RetroArch presents, and paces fast-forward itself (its
++	// fast-forward frame skipping). Skipping flips here as well -- a FIFO-only
++	// device's fallback -- kept retro_run from returning for most frames, and
++	// with the port's fast-forward frameskip the frames that were both drawn
++	// and allowed to flip came about twice a second: choppy fast-forward
++	// (2026-09-24). Every frame flips; the frontend decides what is shown.
++	fastForwardSkipFlip_ = false;
++	presentMode_ = Draw::PresentMode::FIFO;
++	return;
++#endif
++
+ 	if (draw->GetDeviceCaps().presentModesSupported == Draw::PresentMode::FIFO) {
+ 		// Only FIFO mode is supported (like on iOS and some GLES backends).
+ 		fastForwardSkipFlip_ = true;
 diff --git a/GPU/Vulkan/GPU_Vulkan.cpp b/GPU/Vulkan/GPU_Vulkan.cpp
 index a36f54c68..5f28c3b22 100644
 --- a/GPU/Vulkan/GPU_Vulkan.cpp
@@ -384,7 +421,7 @@ index cc7a272e2..c6edc680b 100644
  #ifndef HAVE_LIBNX
  	if (preferred == RETRO_HW_CONTEXT_DUMMY || preferred == RETRO_HW_CONTEXT_VULKAN) {
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 3b2f10317..b7ba51961 100644
+index 3b2f10317..64f47e11b 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
 @@ -391,8 +391,131 @@ static bool set_variable_visibility(void)
@@ -519,6 +556,51 @@ index 3b2f10317..b7ba51961 100644
     environ_cb = cb;
  
     bool option_categories = false;
+@@ -476,6 +599,36 @@ static std::string map_psp_language_to_i18n_locale(int val)
+    }
+ }
+ 
++// PS5 port: fast-forward unthrottles and skips drawing. The libretro build draws every
++// emulated frame while RetroArch fast-forwards, so at a high internal
++// resolution fast-forward barely outran the GPU (God of War at 10x: ~1.3x).
++// PPSSPP's own frontends skip frames when fast-forwarding; here, while
++// RetroArch reports it, three of every four frames are not drawn, and the
++// frameskip the options set is back the moment it stops. Normal play keeps
++// the option's value (the PS5 default is off).
++static void ps5_fast_forward_frameskip() {
++   static bool active = false;
++   static int saved = 0;
++   bool fastForwarding = false;
++   if (!environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastForwarding))
++      fastForwarding = false;
++   // PPSSPP's own frame throttle is off only when it knows it is being fast-
++   // forwarded, which upstream tells it only with "force lag sync" on. With it
++   // off, __DisplayFlip kept sleeping to hold real time while RetroArch fast-
++   // forwarded, and the console's short sleeps overshoot: fast-forward crawled
++   // at a few frames a second (sampled in __DisplayFlip, 2026-09-24).
++   PSP_CoreParameter().fastForward = fastForwarding;
++   if (fastForwarding) {
++      if (!active)
++         saved = g_Config.iFrameSkip;
++      active = true;
++      g_Config.iFrameSkip = 3;
++   } else if (active) {
++      g_Config.iFrameSkip = saved;
++      active = false;
++   }
++}
++
+ static void check_dynamic_variables(CoreParameter &coreParam) {
+    if (g_Config.bForceLagSync)
+    {
+@@ -1755,6 +1908,7 @@ void retro_run(void)
+       check_variables(PSP_CoreParameter());
+    else
+       check_dynamic_variables(PSP_CoreParameter());
++   ps5_fast_forward_frameskip();
+ 
+    retro_input();
+ 
 diff --git a/libretro/libretro_vulkan.cpp b/libretro/libretro_vulkan.cpp
 index 8fb670003..7a5ee3c7c 100644
 --- a/libretro/libretro_vulkan.cpp

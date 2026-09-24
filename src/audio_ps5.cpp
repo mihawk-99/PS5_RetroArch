@@ -263,6 +263,11 @@ void nonblock(void *opaque, bool enabled)
 {
     auto *a = static_cast<Audio *>(opaque);
     pthread_mutex_lock(&a->mutex);
+    /* RetroArch switches this with fast-forward (runloop.c), so the line is
+     * the frontend's own record of fast-forward starting and stopping. */
+    if (a->nonblock != enabled)
+        std::fprintf(stderr, "audio ps5: %s\n",
+                     enabled ? "nonblocking (fast-forward)" : "blocking");
     a->nonblock = enabled;
     pthread_cond_broadcast(&a->changed);
     pthread_mutex_unlock(&a->mutex);

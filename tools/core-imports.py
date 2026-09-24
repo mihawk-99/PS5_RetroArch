@@ -46,7 +46,10 @@ def generate(imports):
                '_Znwm': 'ps5_core_new', '_Znam': 'ps5_core_new',
                '_ZnwmRKSt9nothrow_t': 'ps5_core_new_nothrow',
                # src/libc_shims.c: the SDK resolves this import to nothing.
-               'arc4random': 'ps5_arc4random'}
+               'arc4random': 'ps5_arc4random',
+               # src/libc_shims.c: the console libc's statvfs faults (it rests
+               # on statfs, which only libkernel_sys carries).
+               'statvfs': 'ps5_statvfs'}
     for index, (name, kind) in enumerate(sorted(imports.items())):
         target = aliases.get(name, name)
         declaration = f'void core_import_{index}()' if kind == 'FUNC' else f'char core_import_{index}[]'

@@ -22,9 +22,11 @@
  * the caller waits, so the pointers it passes stay valid until the factory is done.
  */
 
+#include <atomic>
 #include <cerrno>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <mutex>
 
@@ -42,11 +44,40 @@ namespace
  * Asked-for sizes above it are kept. */
 constexpr size_t core_minimum_stack = 2u * 1024u * 1024u;
 
+/* Core threads alive: started through the trampoline below and not yet returned
+ * from their start routine. A core's code must stay mapped while any of them
+ * runs -- PPSSPP detaches the threads of its dedicated tasks, so nothing joins
+ * them before RetroArch closes the core -- and the loader asks before it unmaps
+ * one (src/core_loader_ps5.cpp). */
+std::atomic<unsigned> live_core_threads{0};
+
+struct Start
+{
+    void *(*start)(void *);
+    void *argument;
+};
+
+void *core_thread_trampoline(void *opaque)
+{
+    const Start run = *static_cast<Start *>(opaque);
+    std::free(opaque);
+    void *const result = run.start(run.argument);
+    live_core_threads.fetch_sub(1, std::memory_order_acq_rel);
+    return result;
+}
+
 /* The attributes a core's thread is created with: the core's own, with the stack
  * raised to the minimum. */
-int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes, void *(*start)(void *),
-                       void *argument)
+int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes,
+                       void *(*core_start)(void *), void *core_argument)
 {
+    auto *const run = static_cast<Start *>(std::malloc(sizeof(Start)));
+    if (run == nullptr)
+        return EAGAIN;
+    *run = {core_start, core_argument};
+    void *(*const start)(void *) = core_thread_trampoline;
+    void *const argument = run;
+    live_core_threads.fetch_add(1, std::memory_order_acq_rel);
     pthread_attr_t own;
     if (attributes != nullptr)
     {
@@ -54,7 +85,13 @@ int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes, void
     }
     else if (pthread_attr_init(&own) != 0)
     {
-        return pthread_create(thread, nullptr, start, argument);
+        const int result = pthread_create(thread, nullptr, start, argument);
+        if (result != 0)
+        {
+            live_core_threads.fetch_sub(1, std::memory_order_acq_rel);
+            std::free(run);
+        }
+        return result;
     }
     size_t stack = 0;
     if (pthread_attr_getstacksize(&own, &stack) != 0 || stack < core_minimum_stack)
@@ -77,7 +114,14 @@ int create_core_thread(pthread_t *thread, const pthread_attr_t *attributes, void
     if (attributes == nullptr)
         pthread_attr_destroy(&own);
     if (result == 0)
-        ps5_sampler_add_thread(*thread, reinterpret_cast<const void *>(start));
+    {
+        ps5_sampler_add_thread(*thread, reinterpret_cast<const void *>(core_start));
+    }
+    else
+    {
+        live_core_threads.fetch_sub(1, std::memory_order_acq_rel);
+        std::free(run);
+    }
     return result;
 }
 
@@ -113,6 +157,12 @@ void *factory(void *)
     return nullptr;
 }
 } // namespace
+
+/* How many core threads are still running their start routine. */
+extern "C" unsigned ps5_core_threads_live()
+{
+    return live_core_threads.load(std::memory_order_acquire);
+}
 
 extern "C" void ps5_core_threads_start()
 {

@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <pthread.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -497,6 +498,8 @@ extern "C" void *ps5_core_dlsym(void *handle, const char *name)
     return answer;
 }
 
+extern "C" unsigned ps5_core_threads_live();
+
 extern "C" int ps5_core_dlclose(void *handle)
 {
     pthread_mutex_lock(&mutex);
@@ -508,11 +511,34 @@ extern "C" int ps5_core_dlclose(void *handle)
             if (--m->references == 0)
             {
                 *at = m->next;
+                /* A core's threads must be gone before its code is: PPSSPP
+                 * detaches the threads of its dedicated tasks, and one still
+                 * running after the unmap faulted on a jump into code that was
+                 * no longer there -- closing a PSP game and loading the next
+                 * crashed (2026-09-24). Their exit is waited for, up to two
+                 * seconds; a core whose threads outlive that stays mapped. */
+                unsigned live = ps5_core_threads_live();
+                for (unsigned waited = 0; live != 0 && waited < 200; ++waited)
+                {
+                    const timespec pause = {0, 10 * 1000 * 1000};
+                    nanosleep(&pause, nullptr);
+                    live = ps5_core_threads_live();
+                }
                 for (size_t i = m->finalizer_count; i; --i)
                     reinterpret_cast<void (*)()>(m->finalizers[i - 1])();
                 if (m->finalizer_count)
                     std::fprintf(stderr, "core loader: ran %zu finalizers\n", m->finalizer_count);
-                release(m);
+                if (live == 0)
+                {
+                    release(m);
+                }
+                else
+                {
+                    std::fprintf(
+                        stderr,
+                        "core loader: %u core thread(s) still running; the core stays mapped\n",
+                        live);
+                }
             }
             pthread_mutex_unlock(&mutex);
             return 0;

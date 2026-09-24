@@ -41,6 +41,7 @@ extern "C" void clear_events() { events = 0; }
 extern "C" int get_events() { return events; }
 extern "C" void allow_import(bool value) { allow = value; }
 static int native_add(int value) { return value + 40; }
+extern "C" unsigned ps5_core_threads_live() { return 0; }
 extern "C" void *ps5_core_import(const char *name) {
     if (allow && !std::strcmp(name, "native_add")) return reinterpret_cast<void *>(&native_add);
 #define BIND(symbol) if (!std::strcmp(name, #symbol)) return reinterpret_cast<void *>(&symbol)

@@ -40,7 +40,10 @@ complete core compatibility or Vulkan conformance.
 | Filesystem and configuration | ✅ Directory browsing, configuration loading/saving and FTP-writable application folders |
 | Core loading | ✅ Native shared-core loader, official `.info` discovery and recovery from rejected loads |
 | Content loading | ✅ Tested games and archives with the cores below |
-| Colour and menu transitions | ✅ Corrected pixel uploads; owner-verified Quick Menu/Close Content/next-game transitions |
+| Colour and menu transitions | ✅ Corrected pixel uploads; Quick Menu/Close Content/next-game transitions I verified on the console |
+| Hardware-rendered cores | ✅ PPSSPP renders through PS5_Vulkan (Vulkan backend, JIT), tested at 10× internal resolution |
+| Save states and fast-forward | ✅ Save/load states (including `--entryslot`) and fast-forward, tested with PPSSPP and mGBA |
+| 120 Hz output | ✅ 120 Hz by default where the display offers it, 60 Hz fallback |
 | CPU video fallback | ✅ `video_ps5` remains registered and selectable |
 | Development diagnostics | ✅ `retroarch.log`, startup/GPU trace, kernel captures and optional buffered frame timing |
 
@@ -52,10 +55,10 @@ test coverage and known exceptions.
 
 ## Available cores
 
-The title build includes these cores and their official metadata. All five
+The title build includes these cores and their official metadata. Five of them
 **render emulated games in software**; RetroArch uploads their frames and presents
-them through Vulkan. None of these ports establishes hardware-rendered Vulkan
-core support.
+them through Vulkan. PPSSPP **renders on the GPU** through PS5_Vulkan, with its
+Vulkan backend and its JIT.
 
 | Core | Systems covered by the core | Console verification in this port |
 | --- | --- | --- |
@@ -63,7 +66,8 @@ core support.
 | [mGBA](https://github.com/libretro/mgba) | Game Boy, Game Boy Color, Game Boy Advance | ✅ GB/GBC/GBA loading, corrected colours and clean menu/next-game transitions. [Evidence](evidence/mgba-native/) |
 | [Snes9x](https://github.com/libretro/snes9x) | SNES / Super Famicom | ✅ Tested gameplay, colours, audio/input and menu transitions; not every special chip or video mode. [Evidence](evidence/snes9x-native/) |
 | [FinalBurn Neo](https://github.com/libretro/FBNeo) | Supported arcade boards, including Neo Geo and Sega System 16/32 | ✅ Tested arcade games using both native 32-bit and converted 16-bit output; not every board or ROM set. [Evidence](evidence/fbneo-native/) |
-| [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | Mega Drive / Genesis, Master System, Game Gear, SG-1000, Sega CD | ✅ Owner-confirmed Genesis gameplay and clean transitions. Other Sega systems and disc/BIOS paths still need separate acceptance. [Evidence](evidence/genesis-plus-gx-native/) |
+| [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | Mega Drive / Genesis, Master System, Game Gear, SG-1000, Sega CD | ✅ Genesis gameplay and clean transitions, which I confirmed on the console. Other Sega systems and disc/BIOS paths still need separate acceptance. [Evidence](evidence/genesis-plus-gx-native/) |
+| [PPSSPP](https://github.com/hrydgard/ppsspp) v1.20.4 | PlayStation Portable | ✅ God of War: Ghost of Sparta and Yu-Gi-Oh! GX Tag Force at 10× internal resolution (4800×2720), 16× anisotropy: correct picture, full speed at 120 Hz, save states, fast-forward, and closing and reopening games. MSAA is not yet available (see below). |
 
 Use **FBNeo for Sega System 16/32 arcade sets**, rather than Genesis Plus GX.
 FBNeo needs compatible arcade sets and receives its ZIP/7z archives intact.
@@ -79,9 +83,10 @@ compatible. No games or BIOS files are bundled.
 Software core → video callback → RetroArch Vulkan video driver
                                 → statically linked libps5vk → PS5 display
 XMB / RGUI ──────────────────────┘
+PPSSPP (hardware core) → Vulkan through RetroArch's HW context → libps5vk
 ```
 
-[PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan), also maintained by Mihawk,
+[PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan), which I also maintain,
 is the separate GPU-driver project used here. RetroArch is already rendering
 through it; completing the driver's Vulkan 1.0 coverage is not a prerequisite
 for the working paths demonstrated by this application. Driver conformance and
@@ -97,11 +102,17 @@ pixel adapters preserve the renderer's buffers while matching the frontend's
 upload format. The CPU video backend remains available as a fallback; the
 current default is `video_driver = "vulkan"`, `menu_driver = "xmb"`.
 
-Executable-memory support has passed a native RW → RX code-execution probe.
-That is a foundation for JIT, **not acceptance of PPSSPP's dynarec in this build**.
-The previously developed PPSSPP build is separate work; its integration here is
-still pending. The native loader also has explicit limits, including no TLS or
-general exception-unwind registration. See the [runtime contract](docs/REFERENCE.md#native-in-process-core-loader).
+PPSSPP's JIT runs: its code memory is mapped read-write and then made
+executable, and its fast-memory fault handler reads the console's own signal
+context layout. The port builds PPSSPP v1.20.4 with one patch
+(`patches/ppsspp/ps5-port.patch`) and FFmpeg 3.0.2 for game videos. It starts
+with the settings I test with (10× internal resolution, 16× anisotropy, auto
+max-quality filtering, hardware transform, software skinning, no frameskip, no
+speed hacks); an existing `PPSSPP.opt` is set aside once as
+`PPSSPP.opt.before-ps5-profile`. The native loader has explicit limits, including
+no TLS or general exception-unwind registration, and it waits for a core's
+threads to finish before unmapping the core. See the
+[runtime contract](docs/REFERENCE.md#native-in-process-core-loader).
 
 ## Roadmap
 
@@ -122,7 +133,9 @@ in this port, even if upstream RetroArch already offers the feature.**
 - ❌ BIOS/system-file coverage, disc swapping and multi-disc acceptance tests.
 - ❌ RetroAchievements and netplay; networking is disabled in the current frontend build.
 - ❌ User Slang shader presets and multipass effects validated on PS5_Vulkan.
-- ❌ 4K output/upscaling, VRR, 120 Hz and HDR validated in this application.
+- ✅ 120 Hz output where the display offers it, with a 60 Hz fallback.
+- ✅ Save states and fast-forward, including PPSSPP.
+- ❌ 4K output/upscaling, VRR and HDR validated in this application.
 - ❌ Low-latency features, runahead and sustained per-core performance measurements.
 - ❌ Broader compatibility testing and release qualification.
 
@@ -141,11 +154,13 @@ in this port, even if upstream RetroArch already offers the feature.**
 | ❌ | MAME — expand arcade coverage beyond FBNeo |
 | ❌ | Beetle PSX HW — PlayStation, targeting the Vulkan renderer |
 | ❌ | Nintendo 64 — evaluate Mupen64Plus-Next / ParaLLEl-N64 with ParaLLEl-RDP |
-| ❌ | PPSSPP — integrate prior PS5 JIT work, then validate Vulkan rendering |
+| ✅ | PPSSPP — PSP, Vulkan rendering and JIT; tested games only |
+| ❌ | PPSSPP MSAA — needs render pass 2 and depth/stencil resolve in PS5_Vulkan |
 | ❌ | Dolphin — later GameCube / Wii milestone |
 
 Future entries are development targets, not a promised release order. Hardware
-rendering introduces new Vulkan requirements beyond presenting software frames.
+rendering introduces new Vulkan requirements beyond presenting software frames;
+PPSSPP is the first core that exercises them.
 
 ## Build from source
 
@@ -235,8 +250,8 @@ Console details belong in the ignored `.env`, based on `.env.example`.
 
 A successful build proves neither gameplay nor correct rendering. Core acceptance
 includes native loading, gameplay, colour checks, audio/input, Quick Menu →
-Close Content, and loading another game. The console owner's visual confirmation
-is recorded alongside logs; a camera can miss refresh-synchronous flicker.
+Close Content, and loading another game. I record my own visual confirmation on
+the console alongside the logs; a camera can miss refresh-synchronous flicker.
 
 The current gameplay milestone passed all five host gates with 66 Python tests;
 23 recorded captures replay successfully. Exact results and limitations are in
