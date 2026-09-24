@@ -16,9 +16,18 @@
  * same offsets, including `connected` at 0x4c and the timestamp at 0x50. The static
  * assertions are what keeps a wrong layout from compiling quietly.
  *
+ * A run without a person at the pad can script it: /app0/pad-script.txt, when
+ * present, holds one press a line, `<seconds> <BUTTON>[+<BUTTON>...] [<held
+ * seconds>]`, timed from the first poll, with RetroPad names (B Y SELECT START
+ * UP DOWN LEFT RIGHT A X L R L2 R2 L3 R3) and `#` comments. The pressed buttons
+ * are added to the pad's own, and the pad counts as connected while a script is
+ * loaded, so RetroArch binds it. One trace line a press. Testing only: the file
+ * is never shipped.
+ *
  * Reference: docs/REFERENCE.md, "Input".
  */
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -122,6 +131,93 @@ struct PadState
 };
 
 PadState *active_pad = nullptr;
+
+/* The pad script (see the top of this file). */
+struct ScriptPress
+{
+    double at;
+    double until;
+    std::uint32_t mask;
+    bool announced;
+};
+constexpr int script_capacity = 128;
+constexpr double script_default_hold = 0.15;
+ScriptPress script[script_capacity];
+int script_count = 0;
+bool script_started = false;
+std::chrono::steady_clock::time_point script_start;
+
+std::uint32_t retropad_button(const char *name) noexcept
+{
+    static const char *const names[16] = {"B",    "Y",     "SELECT", "START", "UP", "DOWN",
+                                          "LEFT", "RIGHT", "A",      "X",     "L",  "R",
+                                          "L2",   "R2",    "L3",     "R3"};
+    for (unsigned i = 0; i < 16; ++i)
+        if (std::strcmp(name, names[i]) == 0)
+            return UINT32_C(1) << i;
+    return 0;
+}
+
+void load_script() noexcept
+{
+    std::FILE *file = std::fopen("/app0/pad-script.txt", "rb");
+    if (file == nullptr)
+        return;
+    char line[160];
+    while (script_count < script_capacity && std::fgets(line, sizeof(line), file) != nullptr)
+    {
+        char *hash = std::strchr(line, '#');
+        if (hash != nullptr)
+            *hash = '\0';
+        double at = 0.0;
+        double held = script_default_hold;
+        char buttons[96] = {0};
+        const int fields = std::sscanf(line, "%lf %95s %lf", &at, buttons, &held);
+        if (fields < 2)
+            continue;
+        std::uint32_t mask = 0;
+        for (char *name = std::strtok(buttons, "+"); name != nullptr;
+             name = std::strtok(nullptr, "+"))
+            mask |= retropad_button(name);
+        if (mask != 0)
+            script[script_count++] = ScriptPress{at, at + held, mask, false};
+    }
+    std::fclose(file);
+    char note[96];
+    std::snprintf(note, sizeof(note), "input: pad script loaded, %d presses", script_count);
+    ps5_input_trace(note);
+}
+
+/* The scripted buttons held now, as RetroPad bits. */
+std::uint32_t script_buttons() noexcept
+{
+    if (script_count == 0)
+        return 0;
+    const auto now = std::chrono::steady_clock::now();
+    if (!script_started)
+    {
+        script_started = true;
+        script_start = now;
+    }
+    const double seconds = std::chrono::duration<double>(now - script_start).count();
+    std::uint32_t mask = 0;
+    for (int i = 0; i < script_count; ++i)
+    {
+        ScriptPress &press = script[i];
+        if (seconds < press.at || seconds >= press.until)
+            continue;
+        mask |= press.mask;
+        if (!press.announced)
+        {
+            press.announced = true;
+            char note[96];
+            std::snprintf(note, sizeof(note), "input: pad script press %d at %.2f s: 0x%04x", i,
+                          seconds, static_cast<unsigned>(press.mask));
+            ps5_input_trace(note);
+        }
+    }
+    return mask;
+}
 
 PadState *state_of(void *data) noexcept
 {
@@ -293,7 +389,11 @@ void close_pad(void *data) noexcept
 void *joypad_init(void *) noexcept
 {
     if (!active_pad)
+    {
         active_pad = state_of(open_pad());
+        if (active_pad && script_count == 0)
+            load_script();
+    }
     if (active_pad)
         ps5_input_trace("input: ps5 joypad registered (16 buttons, 6 axes)");
     return active_pad;
@@ -316,7 +416,7 @@ void joypad_poll() noexcept
     for (int i = 0; i < active_pad->sample_count; ++i)
         if (!latest || active_pad->samples[i].timestamp_us > latest->timestamp_us)
             latest = &active_pad->samples[i];
-    connected = latest && latest->connected;
+    connected = (latest && latest->connected) || script_count != 0;
     if (connected != active_pad->announced)
     {
         active_pad->announced = connected;
@@ -336,10 +436,11 @@ std::uint32_t joypad_buttons(unsigned port) noexcept
 {
     if (port != 0 || !active_pad)
         return 0;
+    const std::uint32_t scripted = script_buttons();
     const PadSample *sample = newest_sample(*active_pad);
     if (!sample)
-        return 0;
-    auto mask = pad_buttons_to_retropad(sample->buttons);
+        return scripted;
+    auto mask = pad_buttons_to_retropad(sample->buttons) | scripted;
     if (sample->left_trigger > 127)
         mask |= UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_L2;
     if (sample->right_trigger > 127)

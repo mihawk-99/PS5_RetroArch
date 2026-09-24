@@ -127,3 +127,11 @@
 #       keeps its speed
 #       gfx/drivers_context/khr_display_ctx.c
 0085-report-the-display-refresh
+#
+# 0086  allocate the scaler's intermediate frames only for scaling, and fail a
+#       screenshot whose conversion cannot be set up instead of calling an unset
+#       converter (FBNeo's 4K screenshot crashed on a null call)
+#       libretro-common/gfx/scaler/scaler.c
+#       libretro-common/include/gfx/video_frame.h
+#       tasks/task_screenshot.c
+0086-scaler-frames-only-for-scaling

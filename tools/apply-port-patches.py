@@ -2652,6 +2652,98 @@ EDITS = [
         "   }\n",
         "patches/series, 0085): the chosen mode's refresh.",
     ),
+    (
+        # A pixel-format conversion at the same size uses none of the scaler's
+        # intermediate frames, yet they were allocated first: about 97 MB for a
+        # 4K screenshot. With FBNeo's 170 MB core loaded the allocation failed,
+        # scaler_ctx_gen_filter returned before marking the context unscaled,
+        # and the screenshot called a converter that was never set: a call
+        # through a null pointer (klog/r53-core-fbneo6). The frames are now
+        # allocated only for the scaling path that reads them.
+        "libretro-common/gfx/scaler/scaler.c",
+        "   if (!allocate_frames(ctx))\n"
+        "      return false;\n"
+        "\n"
+        "   if (     ctx->in_width  == ctx->out_width\n",
+        "   /* Added by this port (patches/series, 0086): the intermediate frames are\n"
+        "    * allocated below, for the scaling path only. */\n"
+        "   if (     ctx->in_width  == ctx->out_width\n",
+        "patches/series, 0086): the intermediate frames are",
+    ),
+    (
+        "libretro-common/gfx/scaler/scaler.c",
+        "   else\n"
+        "   {\n"
+        "      ctx->scaler_horiz = scaler_argb8888_horiz;\n",
+        "   else\n"
+        "   {\n"
+        "      /* Added by this port (patches/series, 0086): only scaling reads them. */\n"
+        "      if (!allocate_frames(ctx))\n"
+        "         return false;\n"
+        "      ctx->scaler_horiz = scaler_argb8888_horiz;\n",
+        "patches/series, 0086): only scaling reads them.",
+    ),
+    (
+        # A context that could not be set up is not used: the conversion reports
+        # it, and the screenshot fails with its message instead of crashing.
+        "libretro-common/include/gfx/video_frame.h",
+        "static INLINE void video_frame_convert_to_bgr24(\n",
+        "/* Changed by this port (patches/series, 0086): false when the scaler could\n"
+        " * not be set up, in which case nothing is converted. */\n"
+        "static INLINE bool video_frame_convert_to_bgr24(\n",
+        "patches/series, 0086): false when the scaler could",
+    ),
+    (
+        "libretro-common/include/gfx/video_frame.h",
+        "   scaler->scaler_type = SCALER_TYPE_POINT;\n"
+        "\n"
+        "   scaler_ctx_gen_filter(scaler);\n"
+        "\n"
+        "   scaler->in_stride   = in_pitch;\n"
+        "   scaler->out_stride  = width * 3;\n"
+        "\n"
+        "   scaler_ctx_scale_direct(scaler, output, input);\n"
+        "}\n",
+        "   scaler->scaler_type = SCALER_TYPE_POINT;\n"
+        "\n"
+        "   /* patches/series, 0086: a context that failed is not used. */\n"
+        "   if (!scaler_ctx_gen_filter(scaler))\n"
+        "      return false;\n"
+        "\n"
+        "   scaler->in_stride   = in_pitch;\n"
+        "   scaler->out_stride  = width * 3;\n"
+        "\n"
+        "   scaler_ctx_scale_direct(scaler, output, input);\n"
+        "   return true;\n"
+        "}\n",
+        "patches/series, 0086: a context that failed is not used.",
+    ),
+    (
+        "tasks/task_screenshot.c",
+        "   video_frame_convert_to_bgr24(\n"
+        "         scaler,\n"
+        "         state->out_buffer,\n"
+        "         (const uint8_t*)state->frame + ((int)state->height - 1)\n"
+        "         * state->pitch,\n"
+        "         state->width, state->height,\n"
+        "         -state->pitch);\n",
+        "   /* Changed by this port (patches/series, 0086): a conversion that could not\n"
+        "    * be set up fails the screenshot; the task reports the failure. */\n"
+        "   if (!video_frame_convert_to_bgr24(\n"
+        "         scaler,\n"
+        "         state->out_buffer,\n"
+        "         (const uint8_t*)state->frame + ((int)state->height - 1)\n"
+        "         * state->pitch,\n"
+        "         state->width, state->height,\n"
+        "         -state->pitch))\n"
+        "   {\n"
+        "      scaler_ctx_gen_reset(&state->scaler);\n"
+        "      free(state->out_buffer);\n"
+        "      state->out_buffer = NULL;\n"
+        "      return false;\n"
+        "   }\n",
+        "patches/series, 0086): a conversion that could not",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

@@ -48,6 +48,10 @@ extern "C" int rarch_main(int argc, char *argv[], void *data);
 extern "C" int sceSystemServiceHideSplashScreen();
 
 extern "C" void ps5_vulkan_profile_init();
+extern "C" void ps5_crash_report_install();
+/* ../PS5_Vulkan's driver/ps5vk_debug.h: whether VideoOut outlives a swapchain.
+ * Weak, so a build without the driver links. */
+extern "C" void ps5vk_display_retain(bool retain) __attribute__((weak));
 extern "C" void ps5_audio_test_if_requested();
 extern "C" void ps5_core_loader_test_if_requested();
 extern "C" void ps5_thread_test_if_requested();
@@ -233,14 +237,30 @@ int main()
         argv_with_extras[base_count + i] = extra_storage[i];
     argv_with_extras[base_count + extra_count] = nullptr;
 
+    ps5_crash_report_install();
     ps5_audio_test_if_requested();
     ps5_core_loader_test_if_requested();
     ps5_thread_test_if_requested();
+    /* RetroArch tears its whole Vulkan context down and builds it again when it
+     * loads or closes content and when a video setting needs a reinit. Retained,
+     * the driver keeps VideoOut, its mode and the last frame on screen across
+     * that, where it would otherwise blank the panel and switch the output back
+     * to 60 Hz and up again: about half a second of black each time.
+     * /app0/ps5vk-no-retain.txt turns it off, for a comparison run. */
+    if (std::FILE *no_retain = std::fopen("/app0/ps5vk-no-retain.txt", "rb"))
+    {
+        std::fclose(no_retain);
+        ps5::debug::mark("display: VideoOut released with each swapchain (ps5vk-no-retain.txt)");
+    }
+    else if (ps5vk_display_retain != nullptr)
+        ps5vk_display_retain(true);
     const int status =
         rarch_main(static_cast<int>(base_count + extra_count), argv_with_extras, nullptr);
 
     /* If this line is on the console, the frontend ran and returned by itself. */
     ps5::debug::mark_value("rarch_main returned", status);
+    if (ps5vk_display_retain != nullptr)
+        ps5vk_display_retain(false);
     ps5::memory::finish();
 
     return status;
@@ -253,6 +273,9 @@ extern "C" int sceSystemServiceLoadExec(const char *, const char *const *);
 extern "C" void catchReturnFromMain(int status)
 {
     ps5::debug::mark_value("native quit: frontend status", status);
+    /* The output leaves in its default mode (a second release is a no-op). */
+    if (ps5vk_display_retain != nullptr)
+        ps5vk_display_retain(false);
     std::fflush(nullptr);
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     ps5::debug::mark_value("native quit: system service result", result);

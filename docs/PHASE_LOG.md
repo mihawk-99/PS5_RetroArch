@@ -3084,3 +3084,36 @@ automatic, 1,199 presents per 10 s (8.342 ms), ~30 s for the 1,800 frames of a
 fallback). My configuration and history were snapshotted before and restored to
 their exact bytes after. tools/verify.sh PASS (five gates, 75 tests, patch count
 185 -> 188 for 0084's two edits and 0085), 35 captures replay.
+
+## 2026-09-23 — VideoOut kept across swapchains; every core rechecked; FBNeo screenshot fixed
+
+Black screen on menu open/close, content close/load and video reinits: RetroArch
+recreates its swapchain for each, and the driver closed VideoOut with it (restoring
+60 Hz) and reopened it (selecting 119.88 Hz). ../PS5_Vulkan now keeps one VideoOut
+per process: `ps5vk_display_retain(true)` (main.cpp) keeps it, its framebuffers and
+the image on screen between swapchains, on any device; `false` (on quit) closes it
+and restores the default mode. The same driver change configures 119.88 Hz when the
+display modes are listed, so the mode is offered only once the console accepted
+it, closing the edge where a refusal left RetroArch believing 119.88 Hz.
+
+Console, FCEUmm 1943 with a pad script (menu, Close Content, History run, menu
+twice): retained, every handover kept the output with 0 black presents (menu 6-7 ms,
+close content 280 ms, History 437 ms); with /app0/ps5vk-no-retain.txt the same
+events opened a new output each time, 297-760 ms and a mode switch each. Quit from
+the main menu: "output: default mode restored", status 0
+(evidence/display-retention).
+
+Core recheck at 119.88 Hz, 1,200 frames and an exit screenshot each: FCEUmm,
+Snes9x, mGBA (GBA .7z, GB), FBNeo, Genesis Plus GX (MD, SMS, GG), all correct
+colours, audio errors=0 discarded=0, status 0 (evidence/core-recheck-current-
+driver). FBNeo's exit screenshot crashed: a new crash reporter (src/crash_report.cpp)
+put the return address in scaler_ctx_scale via screenshot_dump_direct; the scaler
+had failed to allocate ~97 MB of intermediate frames a same-size conversion never
+uses. Patch 0086 allocates them only for scaling and fails a screenshot whose
+conversion cannot be set up. The first Master System and Game Gear files were web
+pages saved under ROM names; RetroArch refused them and exited cleanly, and the
+replacements ran.
+
+vkQuake on the same driver: 119.88 Hz selected, 119.88 FPS at 4K. tools/verify.sh
+PASS (patch count 188 -> 193 for 0086's five edits), 37 captures replay; driver
+check PASS.

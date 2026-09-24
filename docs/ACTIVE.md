@@ -7,8 +7,10 @@ _Updated: 2026-09-23_
 **RetroArch presents at 119.88 Hz where the display allows it, and at 59.94 Hz where
 it does not, with cores at their own speed either way.** The title declares
 high-frame-rate output (`sce_sys/param.json` `attribute3` 0x80040), so
-`../PS5_Vulkan` (8577153, jobs/r51-output-mode) offers a 3840x2160 119.88 Hz mode
-first and selects it at swapchain creation. Patch 0084 makes the display context
+`../PS5_Vulkan` offers a 3840x2160 119.88 Hz mode first, and only when the
+console has accepted it (jobs/r53-output-retention: the output is configured when
+the modes are listed, so a refusal leaves 59.94 Hz as the only mode and RetroArch
+never believes 119.88). Patch 0084 makes the display context
 pick the largest mode and then the highest refresh (upstream ignored refresh, or
 rejected any mode more than 1 Hz from a saved 59.94); 0085 makes
 `video_refresh_rate` follow the mode it got and turns a saved swap interval of 1
@@ -21,8 +23,33 @@ metadata: 59.94 Hz, 600 presents per 10 s, same speed).
 
 **The title now links the current driver**, hundreds of driver commits past
 `8b311e3`: the mapped-only target flush, the bounded marker spin, parallel blits,
-the NIR cache, the per-build shader cache and the output-mode selection. Game and
-menu launched and ran on it; a systematic per-core recheck on it has not been done.
+the NIR cache, the per-build shader cache and the output-mode selection. Every
+shipped core was rechecked on it at 119.88 Hz (`evidence/core-recheck-current-driver`):
+FCEUmm, Snes9x, mGBA (GBA from .7z, and GB), FBNeo, Genesis Plus GX (Mega Drive,
+Master System, Game Gear); 1,200 frames each, colours checked on the exit
+screenshot, audio closed with no errors or discards, clean exit.
+
+**No black screen between menu, game and content changes.** RetroArch recreates
+its swapchain (and on content changes its whole Vulkan context) when the menu
+opens or closes, content closes or loads, and a video setting needs a reinit. The
+driver used to close VideoOut each time, switching the output back to 60 Hz and up
+again. main.cpp now retains VideoOut (`ps5vk_display_retain`): the previous image
+stays on screen and the mode never changes (`evidence/display-retention`: menu
+6-7 ms, close content 280 ms, run from History 437 ms, 0 black presents; released,
+the same events took 297-760 ms with a mode switch each). Quitting releases it and
+restores the default mode. `/app0/ps5vk-no-retain.txt` gives the old behaviour for
+a comparison run.
+
+**FBNeo's screenshot no longer crashes** (patch 0086): the scaler allocated ~97 MB
+of frames a same-size conversion never reads, the allocation failed beside FBNeo's
+170 MB core, and the screenshot called an unset converter.
+
+**Test aids.** `/app0/pad-script.txt` presses buttons on a timeline
+(src/input_ps5.cpp), so a run can open menus and load content without a person at
+the pad. A fatal signal appends its rip, rsp, return address and stack words to
+trace.txt (src/crash_report.cpp; the console's mcontext has rip at word 26 and rsp
+at 29, not where the SDK header puts them), and the core loader's "ready" line
+carries the core's base, so build/title.map symbolises a crash.
 
 **`args.txt` can launch content.** `-L core` and a path in `/app0/args.txt` now
 start a game directly (main.cpp drops `--menu`, which RetroArch refuses beside
@@ -34,10 +61,11 @@ a port-file or driver change ~2.4 s; deployment uploads only changed files
 
 ## Next
 
-1. Recheck each core on the current driver (menu, FCEUmm, mGBA, Snes9x, FBNeo,
-   Genesis Plus GX), colours and audio included.
-2. PPSSPP from scratch (the current core crashes on its first frame, parked below).
-3. Simplify the port without losing behaviour.
+1. PPSSPP from scratch (the current core crashes on its first frame, parked below).
+2. Simplify the port without losing behaviour.
+3. Content changes still hold the previous image for 0.3-0.5 s while RetroArch
+   rebuilds its Vulkan context; keeping the context (not only VideoOut) would
+   shorten that.
 
 ## PPSSPP Track A: parked
 

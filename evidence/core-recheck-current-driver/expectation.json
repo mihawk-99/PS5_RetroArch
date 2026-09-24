@@ -1,0 +1,14 @@
+{
+  "step": "core-recheck-current-driver",
+  "note": "Every shipped core on the current driver at 119.88 Hz: FCEUmm (NES), Snes9x (SNES), mGBA (GBA from .7z, and GB), FBNeo (CPS1), Genesis Plus GX (Mega Drive, Master System, Game Gear). Each ran 1,200 frames, took its exit screenshot (colours checked by eye; screenshots are not committed), closed audio with errors=0 and discarded=0, returned 0 and restored the default output mode. FBNeo's exit screenshot crashed on a null call in scaler_ctx_scale before patch 0086 (the crash report and its symbolised return address are the last lines); with 0086 it saves.",
+  "must_contain": [
+    "== fbneo7: sf2.zip",
+    "== gpgx-gg: Addams Family, The (World).zip",
+    "rarch_main returned = 0",
+    "[ps5vk] output: default mode restored"
+  ],
+  "must_not_contain": [
+    "errors=1"
+  ],
+  "human_check": ""
+}

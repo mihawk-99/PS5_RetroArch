@@ -421,8 +421,9 @@ bool load(Module *m)
     m->finalizer_count = finalizer_count;
     if (initializer_count)
         std::fprintf(stderr, "core loader: ran %zu initializers\n", initializer_count);
-    std::fprintf(stderr, "core loader: ready symbols=%zu relocations=%zu mapped_bytes=%zu\n",
-                 m->symbol_count, relocations, m->span);
+    std::fprintf(stderr,
+                 "core loader: ready symbols=%zu relocations=%zu mapped_bytes=%zu base=%p\n",
+                 m->symbol_count, relocations, m->span, static_cast<void *>(m->base));
     return true;
 }
 } // namespace

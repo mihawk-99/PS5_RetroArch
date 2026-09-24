@@ -1,0 +1,15 @@
+{
+  "step": "display-retention",
+  "note": "RetroArch recreates its swapchain on menu open and close, close content and loading content. Before, each recreation closed VideoOut (restoring 60 Hz) and reopened it (selecting 119.88 Hz again): an output-mode switch and a blank panel every time (run B: 297-760 ms from the last present to the new swapchain, output opened each time). Retained, the same events keep the output, its mode and the previous image on screen (run A: menu 6-7 ms, close content 280 ms, run from History 437 ms, output kept every time, 0 black presents). Quitting releases it and restores the default mode (run C).",
+  "must_contain": [
+    "[ps5vk] swapchain handover: output kept, previous image on screen; 7.0 ms",
+    "display: VideoOut released with each swapchain (ps5vk-no-retain.txt)",
+    "[ps5vk] swapchain handover: output opened; 296.7 ms",
+    "[ps5vk] output: default mode restored",
+    "native quit: frontend status = 0"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}
