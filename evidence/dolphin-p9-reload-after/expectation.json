@@ -1,0 +1,14 @@
+{
+  "step": "dolphin-p9-reload-after",
+  "note": "After: 2 more mappings a reload (182, 184, 186, 188) with the bytes at 592 MiB throughout; flexible memory drops 2 MiB once and holds; four reloads, no crash.",
+  "must_contain": [
+    "input: pad script RELOAD at",
+    "direct_live=182/592MiB",
+    "direct_live=188/592MiB"
+  ],
+  "must_not_contain": [
+    "crash:",
+    "direct_live=250/593MiB"
+  ],
+  "human_check": ""
+}

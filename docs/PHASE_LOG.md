@@ -3348,3 +3348,50 @@ On title 5beca7cc (../PS5_Vulkan R74) and, for MSAA, its successors:
   ubershaders, 16x AF): correct and stable at 92-97% (RE4), 72-77% (Melee) and
   60-64% (Wind Waker), GPU-bound -- the uncompressed 8x surfaces at 6x
   quadruple the GPU work of Profile 3.
+
+## 2026-09-25 — Profile 8, the shader cache; Profile 9, reloads
+
+**Profile 8.** Profile 1 on each game twice with the driver's shader cache in a
+new, empty directory (`CACHE_DIR`), then again with the cache that run left
+(title cbcf5b03). Cold, the pipelines compiled for the first time stalled the
+game 88 ms in total (RE4), 124 ms (Melee) and 156 ms (Wind Waker); Melee lost
+3% of one window. Warm, nothing compiled, every steady window was at 100% and
+Melee's late frames fell from 19 to 6. The test caches were removed afterwards;
+my own cache was not touched.
+
+**Profile 9.** Four reloads of each game in one process: the menu opened and
+closed ten times, three state loads, a screenshot, then Close Content through
+the Quick Menu and the content loaded again with its core, a state load and a
+screenshot after each (`<seconds> RELOAD`, a new pad-script action that pushes
+the same load the menu's history does, with the core and content from
+`/app0/args.txt`). No crash, no refused call, the right picture after each load,
+and 100% in each window without a menu or a load in it.
+
+- A first pad-script action that closed the content itself crashed Dolphin: it
+  unloaded the core from the input poll, which runs inside retro_run, and the
+  core's next step read freed state. That is the test aid's fault, not the
+  core's -- a menu close happens between runs -- so the action was removed and
+  the script closes through the Quick Menu as a player does.
+- The driver's new `direct_live` field showed each reload keeping 13 more
+  direct-memory mappings (title 26c9daa0). This port's patch 0021 was the
+  cause: it creates wide default and blank textures after upstream's 1x1 and
+  4x4 ones and stores them in the same slots, so the small ones -- an image,
+  its memory and its view each -- were never destroyed, on every swapchain
+  change for the default and every video init for the blank. Patch 0092
+  releases each small texture before its slot is reused.
+- The same count was wrong in one direction: destroying a graphics pipeline's
+  zeroed compute mapping released direct memory at offset 0 and took a mapping
+  off the count. ../PS5_Vulkan now releases and counts only a mapping with
+  bytes.
+- With both (title 9c623566; `evidence/dolphin-p9-reload-before`, `-after`),
+  the count grows by 2 a reload (182, 184, 186, 188
+  at each reload's first state load) and the driver's bytes stay at 592 MiB; before,
+  its bytes rose from 592 to 593 MiB over the same four. Flexible memory drops
+  2 MiB once, after the first reload, and then holds. The two mappings a reload
+  are small -- under the MiB the profile resolves -- and still unidentified.
+
+Two side effects of my earlier test runs remain on the console: RetroArch's
+content history and runtime logs recorded the test loads, and the FTP account
+may not change `playlists/` or the core's state directory, so I cannot clean
+them from here. Every run now turns history and runtime logging off in its
+configuration, and Profile 10 keeps its states in a directory of its own.

@@ -21,8 +21,14 @@
  * seconds>]`, timed from the first poll, with RetroPad names (B Y SELECT START
  * UP DOWN LEFT RIGHT A X L R L2 R2 L3 R3) and `#` comments. The pressed buttons
  * are added to the pad's own, and the pad counts as connected while a script is
- * loaded, so RetroArch binds it. One trace line a press. Testing only: the file
- * is never shipped.
+ * loaded, so RetroArch binds it. One trace line a press. One line is an action
+ * rather than a press, for the reload stress (Profile 9): `<seconds> RELOAD`
+ * loads /app0/args.txt's core and content again in the same process, as the
+ * menu's history does. It is meant for the menu, after the script closed the
+ * content through the Quick Menu: the poll runs inside the core's retro_run
+ * while content runs, and unloading a core from there crashed Dolphin inside
+ * its own frame (2026-09-25), which is why there is no CLOSE action. Testing
+ * only: the file is never shipped.
  *
  * Reference: docs/REFERENCE.md, "Input".
  */
@@ -38,6 +44,9 @@
 #include <gfx/video_defines.h>
 
 #include <input/input_driver.h>
+#include "content.h"
+#include "retroarch_types.h"
+#include "tasks/task_content.h"
 #include <tasks/tasks_internal.h>
 
 extern "C"
@@ -144,6 +153,16 @@ constexpr int script_capacity = 128;
 constexpr double script_default_hold = 0.15;
 ScriptPress script[script_capacity];
 int script_count = 0;
+/* The script's RELOAD actions (the top of this file), run once each from the
+ * poll on the main thread. */
+struct ScriptAction
+{
+    double at;
+    bool done;
+};
+constexpr int action_capacity = 32;
+ScriptAction actions[action_capacity];
+int action_count = 0;
 bool script_started = false;
 std::chrono::steady_clock::time_point script_start;
 
@@ -175,6 +194,11 @@ void load_script() noexcept
         const int fields = std::sscanf(line, "%lf %95s %lf", &at, buttons, &held);
         if (fields < 2)
             continue;
+        if (std::strcmp(buttons, "RELOAD") == 0 && action_count < action_capacity)
+        {
+            actions[action_count++] = ScriptAction{at, false};
+            continue;
+        }
         std::uint32_t mask = 0;
         for (char *name = std::strtok(buttons, "+"); name != nullptr;
              name = std::strtok(nullptr, "+"))
@@ -405,8 +429,75 @@ void joypad_destroy() noexcept
     active_pad = nullptr;
 }
 
+/* The core and content /app0/args.txt names: the line after -L, and the first
+ * line that is not an option. */
+bool args_paths(char *core, std::size_t core_size, char *content, std::size_t content_size) noexcept
+{
+    std::FILE *file = std::fopen("/app0/args.txt", "rb");
+    if (file == nullptr)
+        return false;
+    char line[512];
+    bool next_is_core = false;
+    core[0] = content[0] = '\0';
+    while (std::fgets(line, sizeof(line), file) != nullptr)
+    {
+        line[std::strcspn(line, "\r\n")] = '\0';
+        if (next_is_core)
+        {
+            std::snprintf(core, core_size, "%s", line);
+            next_is_core = false;
+        }
+        else if (std::strcmp(line, "-L") == 0)
+            next_is_core = true;
+        else if (line[0] != '-' && line[0] != '\0' && content[0] == '\0')
+            std::snprintf(content, content_size, "%s", line);
+    }
+    std::fclose(file);
+    return core[0] != '\0' && content[0] != '\0';
+}
+
+/* Runs the script's RELOAD actions whose time has come. */
+void run_script_actions() noexcept
+{
+    if (action_count == 0)
+        return;
+    if (!script_started)
+    {
+        script_started = true;
+        script_start = std::chrono::steady_clock::now();
+    }
+    const double seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - script_start).count();
+    for (int i = 0; i < action_count; ++i)
+    {
+        ScriptAction &action = actions[i];
+        if (action.done || seconds < action.at)
+            continue;
+        action.done = true;
+        char core[256];
+        char content[256];
+        bool pushed = false;
+#ifdef HAVE_MENU
+        if (args_paths(core, sizeof(core), content, sizeof(content)))
+        {
+            content_ctx_info_t info{};
+            pushed = task_push_load_content_with_new_core_from_menu(
+                core, content, &info, CORE_TYPE_PLAIN, nullptr, nullptr);
+        }
+#else
+        (void)core;
+        (void)content;
+#endif
+        char note[160];
+        std::snprintf(note, sizeof(note), "input: pad script RELOAD at %.2f s: %d", seconds,
+                      pushed ? 1 : 0);
+        ps5_input_trace(note);
+    }
+}
+
 void joypad_poll() noexcept
 {
+    run_script_actions();
     poll_pad(active_pad);
     if (!active_pad)
         return;

@@ -2878,6 +2878,42 @@ EDITS = [
         "            * (uint32_t)swap_interval + 1;\n",
         "patches/series, 0091): an emulated swap",
     ),
+    (
+        # 0092: 0021 created its wide textures after upstream's 1x1 default and 4x4
+        # blank textures and stored them in the same slots, so the small ones were
+        # never destroyed: an image, its memory and its view leaked every time the
+        # textures were initialised -- each swapchain change (the menu, a core
+        # reload) for the default, each video driver init for the blank. The
+        # driver's direct-memory count grew by 13 mappings a reload in Profile 9
+        # (2026-09-25). Each small texture is released before its slot is reused.
+        "gfx/drivers/vulkan.c",
+        "   /* Added by this port (patches/series, 0021): whole rows, all zero. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_zero[64] = {0};\n",
+        "   /* Added by this port (patches/series, 0021): whole rows, all zero. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_zero[64] = {0};\n"
+        "      /* Changed by this port (patches/series, 0092): the 1x1 texture created above\n"
+        "       * is released before its slot takes the wide one. */\n"
+        "      if (vk->default_texture.memory != VK_NULL_HANDLE)\n"
+        "         vulkan_destroy_texture(vk->context->device, &vk->default_texture);\n",
+        "patches/series, 0092): the 1x1 texture",
+    ),
+    (
+        # 0092 too: the blank texture.
+        "gfx/drivers/vulkan.c",
+        "   /* Added by this port (patches/series, 0021): whole rows, one colour. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_blank[64] = {[0 ... 63] = 0xffffffffu};\n",
+        "   /* Added by this port (patches/series, 0021): whole rows, one colour. */\n"
+        "   {\n"
+        "      static const uint32_t ps5_wide_blank[64] = {[0 ... 63] = 0xffffffffu};\n"
+        "      /* Changed by this port (patches/series, 0092): the 4x4 texture created above\n"
+        "       * is released before its slot takes the wide one. */\n"
+        "      if (vk->display.blank_texture.memory != VK_NULL_HANDLE)\n"
+        "         vulkan_destroy_texture(vk->context->device, &vk->display.blank_texture);\n",
+        "patches/series, 0092): the 4x4 texture",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

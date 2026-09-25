@@ -163,3 +163,8 @@
 #       the setting's frames of lookahead hold at 120 Hz as at 60 Hz
 #       gfx/common/vulkan_common.c
 0091-swap-interval-images
+
+# 0092  release 0021's replaced textures: the 1x1 default and 4x4 blank textures
+#       were overwritten by the wide ones and leaked on every re-initialisation
+#       gfx/drivers/vulkan.c
+0092-release-replaced-textures

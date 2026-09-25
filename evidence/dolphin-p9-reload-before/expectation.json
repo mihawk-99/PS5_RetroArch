@@ -1,0 +1,13 @@
+{
+  "step": "dolphin-p9-reload-before",
+  "note": "Before: each reload keeps 13 more direct-memory mappings (211, 224, 237, 250 at the reloads' first state loads) and the bytes creep from 592 to 593 MiB; four reloads, no crash.",
+  "must_contain": [
+    "input: pad script RELOAD at",
+    "direct_live=211/592MiB",
+    "direct_live=250/593MiB"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}
