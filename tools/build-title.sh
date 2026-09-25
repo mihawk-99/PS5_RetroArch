@@ -222,6 +222,9 @@ PY
 # export; src/ps5_directory.cpp implements all of them (a core's own imports of
 # the directory calls are bound to the same functions by tools/core-imports.py).
 directory_wrap_flags="--wrap=opendir --wrap=readdir --wrap=closedir --wrap=fdopendir --wrap=openat --wrap=unlinkat --wrap=fchmodat"
+# Folders the title or a core creates are 0777 and files at least 0666, so FTP,
+# which runs as another user, can reach them (src/permissions_ps5.cpp).
+directory_wrap_flags+=" --wrap=mkdir --wrap=open --wrap=fopen"
 echo "==> [title] step 2/3: the title"
 # Large frontend/core buffers use mapped memory; wrap all ownership operations.
 PS5_PAYLOAD_SDK="$sdk" \

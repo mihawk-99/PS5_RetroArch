@@ -3395,3 +3395,27 @@ content history and runtime logs recorded the test loads, and the FTP account
 may not change `playlists/` or the core's state directory, so I cannot clean
 them from here. Every run now turns history and runtime logging off in its
 configuration, and Profile 10 keeps its states in a directory of its own.
+
+## 2026-09-25 — The title's folders and files are reachable over FTP
+
+FTP answered `550 Permission denied` for `savestates/dolphin-emu`, so my save
+states could not be copied off the console. The title runs as its own user and
+the FTP server as another, so only the bits for everyone else count. The
+frontend gave its seven top-level folders 0777, but RetroArch creates every
+folder below them 0750 (libretro-common's `retro_vfs_mkdir_impl`), its
+unbuffered files with mode 0, and the rest under the process umask.
+
+`src/permissions_ps5.cpp` wraps `mkdir`, `open` and `fopen` at link time (a
+core's imports of them bind to the same wrappers), and each wrapper gives what
+it creates 0777 for a folder and at least 0666 for a file. A first build that
+cleared the umask instead jumped to address 0 at start: the console's libraries
+do not resolve `umask`. At each start a thread walks /app0 and gives every
+folder and file the bits it lacks. Only modes change; no contents are touched.
+From inside the title every entry's owner reads as uid 0, so the walk cannot
+skip what FTP uploaded and covers all 17,551 entries: 389 ms, which is why it
+runs beside the frontend's start, not before it (141 ms on a warm cache).
+
+The first start repaired 42 folders and files, none refused. FTP now lists
+`savestates/dolphin-emu` (`drwxrwxrwx`) and its states (`-rw-rw-rw-`); the next
+start, after a full Profile 10 run that wrote states, screenshots and logs,
+found nothing to repair.

@@ -58,6 +58,7 @@ extern "C" int sceKernelAvailableFlexibleMemorySize(std::size_t *size);
 extern "C" void ps5_crash_report_install();
 extern "C" void ps5_core_threads_start();
 extern "C" void ps5_sampler_start();
+extern "C" void ps5_open_permissions();
 /* ../PS5_Vulkan's driver/ps5vk_debug.h: whether VideoOut outlives a swapchain.
  * Weak, so a build without the driver links. */
 extern "C" void ps5vk_display_retain(bool retain) __attribute__((weak));
@@ -243,6 +244,11 @@ int main()
     }
 
     ps5::debug::mark("main() entered; static constructors have already run");
+
+    /* What an earlier build made is made reachable over FTP again before the
+     * frontend starts (src/permissions_ps5.cpp); what this run creates is,
+     * through the link-time wrappers. */
+    ps5_open_permissions();
 
     /* Everything the libraries say goes to stderr, and a title's stderr reaches
      * nothing on this console: not the kernel log, not RetroArch's log file, not
