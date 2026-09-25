@@ -53,10 +53,12 @@ measured through the profiles in `tooling/dolphin-profiles/` (docs/PHASE_LOG.md)
    218 ms copy in RE4's load, and Wind Waker's 40-90 read-backs a second, each
    done by the CPU after a wait for the GPU; Profile 5's EFB copies to RAM
    depend on it.
-3. Profiles 3-9 pass on all three games; the maximum MSAA torture is correct
+3. Profiles 3-10 pass on all three games; the maximum MSAA torture is correct
    and GPU-bound at 60-97% (uncompressed multisampled surfaces). Profile 9
-   leaves 2 small direct mappings a reload (unidentified). Profiles 10 (state
-   stress) and 11 (30-minute and hour soaks) are next.
+   leaves 2 small direct mappings a reload (unidentified); a state load stalls
+   250-400 ms while Dolphin recompiles its cleared JIT cache. Profile 11 (the
+   30-minute and hour soaks) is next, and decides whether Melee's direct
+   mappings, still rising at the end of Profile 10, level off.
 4. The dual-core FIFO playback stall (single core plays).
 
 ## Accepted baselines

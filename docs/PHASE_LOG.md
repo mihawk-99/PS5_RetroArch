@@ -3419,3 +3419,32 @@ The first start repaired 42 folders and files, none refused. FTP now lists
 `savestates/dolphin-emu` (`drwxrwxrwx`) and its states (`-rw-rw-rw-`); the next
 start, after a full Profile 10 run that wrote states, screenshots and logs,
 found nothing to repair.
+
+## 2026-09-25 — Profile 10: save-state stress
+
+Each game from a copy of my entry state in a test directory, `/app0/p10-states`
+(the title makes the copy, `/app0/state-copy.txt`, because FTP could not read my
+states then): 15 saves and 15 loads three seconds apart, then 6 of each 0.6 s
+apart, and screenshots between them. RetroArch saved into the entry slot, so the
+test states replaced only the copy; my own states were read and never written.
+The test directory was emptied afterwards.
+
+Title 718b41d7 (`evidence/dolphin-p10-state-stress`): Melee, RE4 and Wind Waker
+each save 21 times and load 22 times with no error and no crash, and every
+screenshot after a load shows the loaded scene correctly. Windows with no state
+operation run at 100%. Windows with three or four operations run at 96-100%
+(Melee), 97-100% (RE4) and 94-98% (Wind Waker), because each load stalls the game.
+Flexible memory holds at 243,712 KiB throughout. The driver's direct mappings level
+off in RE4 (256 to 265) and Wind Waker (346 to 382). In Melee they rise from 266
+to 333 and were still rising when the run ended, so Profile 11's soak is where that
+is decided.
+
+Where a load's stall goes (Wind Waker, a bounded timing capture in the core,
+removed since): RetroArch's serialize takes 13-20 ms and unserialize 25-76 ms.
+The two fields after a load then take 130-245 ms and 80-170 ms, because Dolphin
+clears its JIT cache on every load and recompiles what runs: 6,000-9,400 blocks,
+about 20 µs each, 124-219 ms of the first field. The driver's part of those
+frames is a few milliseconds. So a load costs 250-400 ms and a save about 20 ms,
+the same cause desktop Dolphin has. The CPU sampler first pointed at an INI file
+written on the main thread; that was Dolphin's configuration saved at boot,
+outside the stress.

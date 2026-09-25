@@ -1,0 +1,14 @@
+{
+  "step": "dolphin-p10-state-stress",
+  "note": "Every save and load succeeds with no error and no crash; windows with three or four state operations run at 94-98% (each load stalls while Dolphin recompiles its cleared JIT cache), the windows around them at 100%.",
+  "must_contain": [
+    "test state copy bytes = 22579764",
+    "Saving state \"/app0/p10-states/",
+    "Loading state \"/app0/p10-states/",
+    "audio ps5: window played=480000 silence=0"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}
