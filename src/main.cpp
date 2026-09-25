@@ -75,21 +75,6 @@ namespace
  * /app0 and this is where a title may keep its configuration. */
 constexpr const char *config_path = "/app0/config/retroarch.cfg";
 
-/* Why a terminate handler exists.
- *
- * The driver's shader compiler is C++ and aborts the process from deep inside
- * itself: the console reports `reason: abort is called(system)` with a backtrace
- * through aco::visit_alu_instr, and nothing says what went wrong. The two abort
- * sites in that function are clang's throw helpers for std::vector's length error
- * and for a bad array length (`call __throw_length_error` followed by `ud2`), so
- * something threw and the exception never came back as an error.
- *
- * An abort is also the one failure with no message anywhere: the title's trace
- * says how far it got, and the frontend's log is a buffer that dies with the
- * process. libc++abi still knows the exception while terminate runs, so the type
- * and its what() are written to the trace here - the difference between "the
- * compiler refused this shader" and "a wild size reached a container", which are
- * not the same bug and were not distinguishable from the outside. */
 /* A profiled test run (the driver's /app0/ps5vk-profile.txt survived the stale
  * test file sweep) also reports the flexible memory left every ten seconds:
  * with the driver's direct_live, a soak's leak is a line that only moves one
@@ -122,6 +107,71 @@ void start_log_flusher()
         pthread_detach(thread);
 }
 
+/* Profile 10's entry state (docs/PHASE_LOG.md): /app0/state-copy.txt names a
+ * source and a destination, a line each, and a test run copies the one to the
+ * other before RetroArch starts. The save-state stress keeps its states in a
+ * directory of its own, so my entry state has to be there too, and the FTP
+ * account may not read mine. The copy only reads my files: it never replaces a
+ * file and never writes under /app0/savestates or /app0/savefiles. Testing
+ * only: the file is never shipped. */
+void copy_test_file()
+{
+    std::FILE *const list = std::fopen("/app0/state-copy.txt", "r");
+    if (list == nullptr)
+        return;
+    char source[512] = {};
+    char destination[512] = {};
+    const bool named = std::fgets(source, sizeof(source), list) != nullptr &&
+                       std::fgets(destination, sizeof(destination), list) != nullptr;
+    std::fclose(list);
+    source[std::strcspn(source, "\r\n")] = '\0';
+    destination[std::strcspn(destination, "\r\n")] = '\0';
+    const bool mine = std::strncmp(destination, "/app0/savestates", 16) == 0 ||
+                      std::strncmp(destination, "/app0/savefiles", 15) == 0;
+    bool exists = false;
+    if (std::FILE *const existing = std::fopen(destination, "rb"))
+    {
+        exists = true;
+        std::fclose(existing);
+    }
+    long long copied = -1;
+    std::FILE *const in = named && !mine && !exists ? std::fopen(source, "rb") : nullptr;
+    std::FILE *const out = in != nullptr ? std::fopen(destination, "wb") : nullptr;
+    constexpr std::size_t chunk = std::size_t{1} << 20;
+    char *const buffer = out != nullptr ? static_cast<char *>(std::malloc(chunk)) : nullptr;
+    if (buffer != nullptr)
+    {
+        copied = 0;
+        std::size_t got = 0;
+        while (copied >= 0 && (got = std::fread(buffer, 1, chunk, in)) > 0)
+        {
+            const bool written = std::fwrite(buffer, 1, got, out) == got;
+            copied = written ? copied + static_cast<long long>(got) : -1;
+        }
+        std::free(buffer);
+    }
+    if (out != nullptr && std::fclose(out) != 0)
+        copied = -1;
+    if (in != nullptr)
+        std::fclose(in);
+    ps5::debug::mark_value("test state copy bytes", copied);
+}
+
+/* Why a terminate handler exists.
+ *
+ * The driver's shader compiler is C++ and aborts the process from deep inside
+ * itself: the console reports `reason: abort is called(system)` with a backtrace
+ * through aco::visit_alu_instr, and nothing says what went wrong. The two abort
+ * sites in that function are clang's throw helpers for std::vector's length error
+ * and for a bad array length (`call __throw_length_error` followed by `ud2`), so
+ * something threw and the exception never came back as an error.
+ *
+ * An abort is also the one failure with no message anywhere: the title's trace
+ * says how far it got, and the frontend's log is a buffer that dies with the
+ * process. libc++abi still knows the exception while terminate runs, so the type
+ * and its what() are written to the trace here - the difference between "the
+ * compiler refused this shader" and "a wild size reached a container", which are
+ * not the same bug and were not distinguishable from the outside. */
 void on_terminate()
 {
     const std::type_info *type = abi::__cxa_current_exception_type();
@@ -276,6 +326,7 @@ int main()
             "/app0/ps5vk-shader-cache-dir.txt",
             "/app0/dolphin-options.txt",
             "/app0/dolphin-debug.txt",
+            "/app0/state-copy.txt",
         };
         unsigned removed = 0;
         for (const char *const path : test_files)
@@ -283,6 +334,8 @@ int main()
         if (removed != 0)
             ps5::debug::mark_value("stale test files removed", static_cast<int>(removed));
     }
+    copy_test_file();
+    std::remove("/app0/state-copy.txt");
     if (std::FILE *profile = std::fopen("/app0/ps5vk-profile.txt", "rb"))
     {
         std::fclose(profile);
