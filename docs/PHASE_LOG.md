@@ -3448,3 +3448,21 @@ frames is a few milliseconds. So a load costs 250-400 ms and a save about 20 ms,
 the same cause desktop Dolphin has. The CPU sampler first pointed at an INI file
 written on the main thread; that was Dolphin's configuration saved at boot,
 outside the stress.
+
+## 2026-09-25 — Profile 11 so far: Melee 30 minutes, RE4 18
+
+Title 718b41d7, the accurate profile, from my entry states, a screenshot every
+five minutes, driver profile armed:
+
+- **Melee, 30 minutes:** no crash; 184 of 185 windows at 99% or better, the
+  exception being the first (boot and the entry state). The driver's direct
+  mappings reach 356 within the first seven minutes and hold there to the end,
+  so Melee's rise in Profile 10 was a plateau being reached, not a leak.
+  Flexible memory holds at 243,712 KiB. Each screenshot costs its 55 ms read
+  of the 4K frame; three stalls in Dolphin (129, 86 and 87 ms) took their windows
+  to 99.0-99.1%.
+- **RE4, 18 minutes** (stopped to free the console for other testing): no crash,
+  every window after the first at 99.6% or better, direct mappings 261-262 and
+  flexible memory flat.
+
+Still to run: RE4 and Wind Waker for 30 minutes and one game for an hour.
