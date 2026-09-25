@@ -1,0 +1,13 @@
+{
+  "step": "dolphin-restart-strips",
+  "note": "Wind Waker's 3D scene drew a huge corrupt surface (R64: the driver turned primitive restart off right after each restart draw, and the write landed mid-draw) and, after that fix, thin triangles to the screen corner and a minimap panel spill (R65: every submission a copy splits off starts with restart off). Both fixed in ../PS5_Vulkan; the FIFO log now matches desktop Dolphin to resampling (mean 1.13-1.16) and the save state on Outset Island draws cleanly.",
+  "must_contain": [
+    "after R65 (dolfull2, driver 75f33eb): 1.13 1.15 1.16",
+    "Loading entry state from <state> succeeded.",
+    "rarch_main returned = 0"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}

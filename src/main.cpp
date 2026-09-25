@@ -259,7 +259,9 @@ int main()
             "/app0/ps5vk-log.txt",
             "/app0/ps5vk-vblank-probe.txt",
             "/app0/ps5vk-spirv-dump.txt",
+            "/app0/ps5vk-shader-cache-dir.txt",
             "/app0/dolphin-options.txt",
+            "/app0/dolphin-debug.txt",
         };
         unsigned removed = 0;
         for (const char *const path : test_files)

@@ -1,0 +1,24 @@
+{
+  "step": "dolphin-restart-strips",
+  "recorded": "2026-09-25T00:37:04Z",
+  "console_run": "dolplay3, dolfull1, dolfull2, dolbis-310-319 (control, restart-every, norestart), dolww1-3",
+  "revision": "port (this commit), patch ps5-port.patch; driver ../PS5_Vulkan 75f33eb (R64 34ca3ad, R65 75f33eb)",
+  "command": "FIFO: args -L dolphin_libretro.so /app0/savefiles/ps5-play.dff --max-frames=2400, dolphin_main_cpu_thread=disabled, screenshots on R2; host reference build/host-dolphin dolphin-emu-nogui -e the same .dff; save state: --entryslot=0 --max-frames=3600",
+  "raw_capture": "klog/dolrestart-evidence.txt",
+  "raw_lines": 12,
+  "raw_bytes": 939,
+  "lines": [
+    "== FIFO log dolfifo1 (10 frames, Link on the ship deck), full frame, single core, against desktop Dolphin: mean absolute difference per channel to the best-matching host frame",
+    "before R64 (dolplay3): 68.77 64.44 71.36 67.44",
+    "after R64 (dolfull1, driver 34ca3ad): 1.36 1.53 1.23",
+    "after R65 (dolfull2, driver 75f33eb): 1.13 1.15 1.16",
+    "== FIFO objects 310-319 (the minimap), native resolution, 15 screenshots each",
+    "driver 34ca3ad (R64): 0.43-0.52, corner triangles and a panel spill in the screenshots",
+    "Dolphin drawing lists instead of restart strips: 0.12-0.20",
+    "driver A/B writing restart before every indexed draw: 0.12-0.20",
+    "== save state slot 0 (Outset Island), --entryslot=0, --max-frames=3600, driver 75f33eb",
+    "[INFO] [State] Loading entry state from <state> succeeded.",
+    "rarch_main returned = 0",
+    "audio ps5: closed accepted=5692056 played=5692056 discarded=0 silence=122216 calls=22712 errors=0 peak=3072 capacity=3072 drain=00000100 close=00000000"
+  ]
+}

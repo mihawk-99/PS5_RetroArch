@@ -348,6 +348,107 @@ index f0cc8511b7..ffbcace60a 100644
  const Info<bool> MAIN_ACCURATE_CPU_CACHE{{System::Main, "Core", "AccurateCPUCache"}, false};
  const Info<bool> MAIN_DSP_HLE{{System::Main, "Core", "DSPHLE"}, true};
  const Info<int> MAIN_MAX_FALLBACK{{System::Main, "Core", "MaxFallback"}, 100};
+diff --git a/Source/Core/Core/Core.cpp b/Source/Core/Core/Core.cpp
+index cda66bffd1..627791a960 100644
+--- a/Source/Core/Core/Core.cpp
++++ b/Source/Core/Core/Core.cpp
+@@ -97,6 +97,8 @@ static bool s_wants_determinism;
+ 
+ #ifdef __LIBRETRO__
+ static std::vector<Common::ScopeGuard<Common::MoveOnlyFunction<void()>>> s_emu_thread_scope_guards;
++// A single-core FIFO playback's injected CPU core; removed first in Shutdown.
++static std::optional<Common::ScopeGuard<Common::MoveOnlyFunction<void()>>> s_fifo_player_guard;
+ std::unique_ptr<BootParameters> g_boot_params;
+ #endif
+ // Declarations and definitions
+@@ -456,6 +458,23 @@ static void FifoPlayerThread(Core::System& system, const std::optional<std::stri
+ 
+     CPUSetInitialExecutionState(system);
+ 
++#ifdef __LIBRETRO__
++    // Single core: like CpuThread, return to retro_run, whose RunSingleFrame runs the
++    // injected core up to the next field. The core stays injected until Shutdown,
++    // ahead of the guards that tear the hardware down. Running CPU::Run() here
++    // instead, as the dual-core path does, never returns in single-core libretro
++    // mode: playback of a FIFO log (.dff) hung before its first frame.
++    if (!system.IsDualCoreMode())
++    {
++      std::shared_ptr<CPUCoreBase> core(std::move(cpu_core));
++      s_fifo_player_guard.emplace(Common::MoveOnlyFunction<void()>([&system, core] {
++        system.GetPowerPC().InjectExternalCPUCore(nullptr);
++        system.GetFifoPlayer().Close();
++      }));
++      return;
++    }
++#endif
++
+     system.GetCPU().Run();
+ 
+     system.GetPowerPC().InjectExternalCPUCore(nullptr);
+@@ -1036,6 +1055,7 @@ void Shutdown(Core::System& system)
+   if (s_emu_thread.joinable())
+     s_emu_thread.join();
+ #ifdef __LIBRETRO__
++  s_fifo_player_guard.reset();
+   for (auto& g : s_emu_thread_scope_guards)
+     g.Exit();
+   s_emu_thread_scope_guards.clear();
+diff --git a/Source/Core/Core/FifoPlayer/FifoPlayer.cpp b/Source/Core/Core/FifoPlayer/FifoPlayer.cpp
+index f0c62d4e3f..bbb4cb7791 100644
+--- a/Source/Core/Core/FifoPlayer/FifoPlayer.cpp
++++ b/Source/Core/Core/FifoPlayer/FifoPlayer.cpp
+@@ -4,11 +4,14 @@
+ #include "Core/FifoPlayer/FifoPlayer.h"
+ 
+ #include <algorithm>
++#include <cstdio>
++#include <cstdlib>
+ #include <cstring>
+ #include <type_traits>
+ 
+ #include "Common/Assert.h"
+ #include "Common/CommonTypes.h"
++#include "Common/Logging/Log.h"
+ #include "Common/MsgHandler.h"
+ #include "Core/Config/MainSettings.h"
+ #include "Core/Core.h"
+@@ -32,6 +35,10 @@
+ // TODO: Move texMem somewhere else so this isn't an issue.
+ #include "VideoCommon/TextureDecoder.h"
+ 
++#ifdef __PROSPERO__
++bool Ps5DolphinObjectRange(unsigned* first, unsigned* last);  // VideoCommon/PixelShaderGen.cpp
++#endif
++
+ namespace
+ {
+ class FifoPlaybackAnalyzer : public OpcodeDecoder::Callback
+@@ -188,6 +195,25 @@ bool FifoPlayer::Open(const std::string& filename)
+     FifoPlaybackAnalyzer::AnalyzeFrames(m_File.get(), m_FrameInfo);
+ 
+     m_FrameRangeEnd = m_File->GetFrameCount() - 1;
++
++    // PS5 bring-up aid: play only objects "first last" of each frame, to bisect a
++    // frame against desktop Dolphin playing the same log -- the console's debug
++    // mode "objects A B" (VideoCommon/PixelShaderGen.cpp), $FIFO_OBJECTS on the host.
++    unsigned first = 0, last = 0;
++#ifdef __PROSPERO__
++    const bool ranged = Ps5DolphinObjectRange(&first, &last);
++#else
++    const char* const range = std::getenv("FIFO_OBJECTS");
++    const bool ranged = range && std::sscanf(range, "%u %u", &first, &last) == 2;
++#endif
++    if (ranged)
++    {
++      m_ObjectRangeStart = first;
++      m_ObjectRangeEnd = last;
++      for (u32 frame = 0; frame < m_FrameInfo.size(); ++frame)
++        NOTICE_LOG_FMT(BOOT, "FIFO frame {}: {} objects; playing {}-{}", frame,
++                       GetFrameObjectCount(frame), m_ObjectRangeStart, m_ObjectRangeEnd);
++    }
+   }
+ 
+   if (m_FileLoadedCb)
 diff --git a/Source/Core/Core/MemTools.cpp b/Source/Core/Core/MemTools.cpp
 index 871bb3f615..ae7a6c16ab 100644
 --- a/Source/Core/Core/MemTools.cpp
@@ -446,7 +547,7 @@ index 39e16c7eea..0ed09e9550 100644
  constexpr size_t CODE_SIZE = 1024 * 1024 * 128;
 +#endif
 diff --git a/Source/Core/DolphinLibretro/Boot.cpp b/Source/Core/DolphinLibretro/Boot.cpp
-index c53281053f..17d913ff6c 100644
+index c53281053f..146711937d 100644
 --- a/Source/Core/DolphinLibretro/Boot.cpp
 +++ b/Source/Core/DolphinLibretro/Boot.cpp
 @@ -280,6 +280,8 @@ bool retro_load_game(const struct retro_game_info* game)
@@ -458,19 +559,55 @@ index c53281053f..17d913ff6c 100644
    if (Libretro::GBPlayer_active)
    {
      Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], Libretro::GBPlayer_rom_path);
-@@ -294,6 +296,7 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -294,7 +296,31 @@ bool retro_load_game(const struct retro_game_info* game)
    {
      Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], std::string{});
    }
 +#endif
  
++#ifdef __PROSPERO__
++  // The fog debug mode (VideoCommon/PixelShaderGen.cpp) changes shader code
++  // without changing a shader's key, so the disk cache would hand back the
++  // ordinary shaders: it is off for such a run.
++  {
++    extern int Ps5DolphinDebugMode();
++    if (Ps5DolphinDebugMode() != 0)
++      Config::SetBase(Config::GFX_SHADER_CACHE, false);
++    // "dump": every frame as an image in the user directory's Dump/Frames, to
++    // compare with desktop Dolphin playing the same FIFO log.
++    // "swloader": Dolphin's software vertex loader instead of the x86-64 JIT one.
++    if (Ps5DolphinDebugMode() == 4)
++      Config::SetBase(Config::GFX_VERTEX_LOADER_TYPE, VertexLoaderType::Software);
++    // "cmploader": both loaders, every mismatch logged (VertexLoaderTester).
++    if (Ps5DolphinDebugMode() == 5)
++      Config::SetBase(Config::GFX_VERTEX_LOADER_TYPE, VertexLoaderType::Compare);
++    if (Ps5DolphinDebugMode() == 3)
++    {
++      Config::SetBase(Config::MAIN_MOVIE_DUMP_FRAMES, true);
++      Config::SetBase(Config::GFX_DUMP_FRAMES_AS_IMAGES, true);
++    }
++  }
++#endif
    Discord::SetDiscordPresenceEnabled(false);
    Common::SetEnableAlert(false);
+   Common::SetAbortOnPanicAlert(false);
 diff --git a/Source/Core/DolphinLibretro/Main.cpp b/Source/Core/DolphinLibretro/Main.cpp
-index cd8753b666..d0f5a0bac5 100644
+index cd8753b666..25fa130623 100644
 --- a/Source/Core/DolphinLibretro/Main.cpp
 +++ b/Source/Core/DolphinLibretro/Main.cpp
-@@ -82,10 +82,61 @@ extern void reload_cheats_from_ini();
+@@ -35,6 +35,11 @@
+ #include "Core/PatchEngine.h"
+ #include "Core/State.h"
+ #include "Core/System.h"
++#include "Core/FifoPlayer/FifoDataFile.h"
++#include "Core/FifoPlayer/FifoRecorder.h"
++#ifdef __PROSPERO__
++int Ps5DolphinDebugMode();  // VideoCommon/PixelShaderGen.cpp
++#endif
+ #include "DolphinLibretro/Audio.h"
+ #include "DolphinLibretro/Input.h"
+ #include "DolphinLibretro/Common/Options.h"
+@@ -82,10 +87,61 @@ extern void reload_cheats_from_ini();
  extern unsigned msg_interface_version;
  }  // namespace Libretro
  
@@ -532,6 +669,45 @@ index cd8753b666..d0f5a0bac5 100644
    Libretro::environ_cb = cb;
  #ifdef PERF_TEST
    environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb);
+@@ -203,8 +259,38 @@ void retro_reset(void)
+   Core::System::GetInstance().GetProcessorInterface().ResetButton_Tap();
+ }
+ 
++#ifdef __PROSPERO__
++// The FIFO-log debug mode (VideoCommon/PixelShaderGen.cpp, "fifo"): 300 frames
++// after launch, ten frames of GPU commands are recorded and saved as
++// /app0/savefiles/ps5-fifo.dff, which desktop Dolphin plays back as a reference
++// for the same frames. Test runs only.
++static void Ps5FifoRecording()
++{
++  static unsigned frame = 0;
++  if (Ps5DolphinDebugMode() != 2)
++    return;
++  ++frame;
++  // The same frames dumped as images on the console, to compare with desktop
++  // Dolphin's playback of the log (a couple of frames either side).
++  if (frame >= 298 && frame < 312)
++    Core::SaveScreenShot(fmt::format("ps5-frame-{}", frame));
++  if (frame != 300)
++    return;
++  auto& recorder = Core::System::GetInstance().GetFifoRecorder();
++  recorder.StartRecording(10, [&recorder] {
++    FifoDataFile* const file = recorder.GetRecordedFile();
++    const bool saved = file != nullptr && file->Save("/app0/savefiles/ps5-fifo.dff");
++    fprintf(stderr, "dolphin ps5: FIFO log of 10 frames %s\n", saved ? "saved" : "NOT saved");
++  });
++  fprintf(stderr, "dolphin ps5: FIFO recording started at frame 300\n");
++}
++#endif
++
+ void retro_run(void)
+ {
++#ifdef __PROSPERO__
++  Ps5FifoRecording();
++#endif
+   Libretro::Input::InitSensors();
+   Libretro::Options::CheckForUpdatedVariables();
+   Libretro::FrameTiming::CheckForFastForwarding();
 diff --git a/Source/Core/VideoBackends/Vulkan/VKMain.cpp b/Source/Core/VideoBackends/Vulkan/VKMain.cpp
 index 6338e52e3d..10539c661e 100644
 --- a/Source/Core/VideoBackends/Vulkan/VKMain.cpp
@@ -552,3 +728,112 @@ index 6338e52e3d..10539c661e 100644
    }
  }
  
+diff --git a/Source/Core/VideoCommon/PixelShaderGen.cpp b/Source/Core/VideoCommon/PixelShaderGen.cpp
+index 5ce120e9ff..603ebbb51e 100644
+--- a/Source/Core/VideoCommon/PixelShaderGen.cpp
++++ b/Source/Core/VideoCommon/PixelShaderGen.cpp
+@@ -3,6 +3,57 @@
+ 
+ #include "VideoCommon/PixelShaderGen.h"
+ 
++#ifdef __PROSPERO__
++#include <cstdio>
++#include <cstring>
++// PS5 test aid: /app0/dolphin-debug.txt naming "fifo" records a FIFO log
++// (DolphinLibretro/Main.cpp), naming "dump" dumps every frame as an image
++// (DolphinLibretro/Boot.cpp); naming "fog" makes every fogged pixel
++// show its fog intermediates as its colour -- red gl_FragCoord.z, green the top
++// byte of zCoord, blue the fog factor -- so a console run
++// can compare the GPU's values with the constants the CPU uploaded (logged by
++// PixelShaderManager); naming "objects A B" plays only objects A to B of each
++// frame of a FIFO log (Core/FifoPlayer/FifoPlayer.cpp), to bisect a frame. Never
++// shipped; the title deletes the file on any launch that is not a test run.
++static unsigned s_ps5_first_object, s_ps5_last_object;
++int Ps5DolphinDebugMode()
++{
++  static int mode = -1;
++  if (mode < 0)
++  {
++    mode = 0;
++    if (FILE* file = std::fopen("/app0/dolphin-debug.txt", "rb"))
++    {
++      char word[32] = {};
++      if (std::fscanf(file, "%31s", word) == 1 && std::strcmp(word, "fog") == 0)
++        mode = 1;
++      else if (std::strcmp(word, "fifo") == 0)
++        mode = 2;
++      else if (std::strcmp(word, "dump") == 0)
++        mode = 3;
++      else if (std::strcmp(word, "swloader") == 0)
++        mode = 4;
++      else if (std::strcmp(word, "cmploader") == 0)
++        mode = 5;
++      else if (std::strcmp(word, "objects") == 0 &&
++               std::fscanf(file, "%u %u", &s_ps5_first_object, &s_ps5_last_object) == 2)
++        mode = 6;
++      std::fclose(file);
++    }
++  }
++  return mode;
++}
++
++bool Ps5DolphinObjectRange(unsigned* first, unsigned* last)
++{
++  if (Ps5DolphinDebugMode() != 6)
++    return false;
++  *first = s_ps5_first_object;
++  *last = s_ps5_last_object;
++  return true;
++}
++#endif
++
+ #include "Common/Assert.h"
+ #include "Common/CommonTypes.h"
+ #include "Common/EnumMap.h"
+@@ -1732,6 +1783,14 @@ static void WriteFog(ShaderCode& out, const pixel_shader_uid_data* uid_data)
+       WARN_LOG_FMT(VIDEO, "Unknown Fog Type! {}", uid_data->fog_fsel);
+   }
+ 
++#ifdef __PROSPERO__
++  if (Ps5DolphinDebugMode() == 1)
++  {
++    out.Write("\tprev.rgb = int3(iround(clamp(rawpos.z, 0.0, 1.0) * 255.0), (zCoord >> 16) & 255, "
++              "iround(fog * 255.0));\n");
++    return;
++  }
++#endif
+   out.Write("\tint ifog = iround(fog * 256.0);\n");
+   out.Write("\tprev.rgb = (prev.rgb * (256 - ifog) + " I_FOGCOLOR ".rgb * ifog) >> 8;\n");
+ }
+diff --git a/Source/Core/VideoCommon/PixelShaderManager.cpp b/Source/Core/VideoCommon/PixelShaderManager.cpp
+index d2bdadb9c8..eb084b4c8c 100644
+--- a/Source/Core/VideoCommon/PixelShaderManager.cpp
++++ b/Source/Core/VideoCommon/PixelShaderManager.cpp
+@@ -3,6 +3,7 @@
+ 
+ #include "VideoCommon/PixelShaderManager.h"
+ 
++#include <cstdio>
+ #include <iterator>
+ 
+ #include "Common/ChunkFile.h"
+@@ -406,6 +407,19 @@ void PixelShaderManager::SetFogParamChanged()
+     constants.fogi[1] = bpmem.fog.b_magnitude;
+     constants.fogi[3] = bpmem.fog.b_shift;
+     constants.fogParam3 = bpmem.fog.c_proj_fsel.hex;
++#ifdef __PROSPERO__
++    // The debug mode's CPU half (PixelShaderGen.cpp): the constants the fog
++    // shader is given, on each change, up to twenty lines.
++    extern int Ps5DolphinDebugMode();
++    static int logged = 0;
++    if (Ps5DolphinDebugMode() == 1 && logged < 20)
++    {
++      ++logged;
++      fprintf(stderr, "dolphin ps5 fog: A=%g C=%g b_magnitude=%d b_shift=%d fsel/proj=0x%x\n",
++              constants.fogf[0], constants.fogf[1], constants.fogi[1], constants.fogi[3],
++              constants.fogParam3);
++    }
++#endif
+   }
+   else
+   {

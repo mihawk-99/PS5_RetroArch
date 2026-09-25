@@ -10,42 +10,39 @@ needs goes into ../PS5_Vulkan as general fixes with their own probes.
 
 **Where it is.** The core (libretro/dolphin `c6630001e0`, Dolphin 2609) builds
 with `tools/build-dolphin.sh` and one patch, `patches/dolphin/ps5-port.patch`,
-and ships in the title. Wind Waker boots to its title screen and plays its
-intro with JIT64 and fastmem, zero driver refusals and clean audio
-(`evidence/dolphin-wind-waker-boot`); save states save and load
-(`evidence/dolphin-save-states`).
+and ships in the title. Wind Waker boots with JIT64 and fastmem, save states
+save and load, and from my save state on Outset Island the 3D scene, Link and
+the HUD draw correctly (`evidence/dolphin-restart-strips`): a ten-frame FIFO
+log of Link on the ship deck matches desktop Dolphin to resampling (mean
+difference 1.13-1.16, from 64-71).
 
-What the bring-up needed, by layer:
+What the bring-up needed, by layer (details in `docs/PHASE_LOG.md`):
 
-- **Platform (core patch):** guest RAM is one direct-memory allocation mapped
-  at every mirror (a shared-memory object's views were charged to flexible
-  memory and ran out); the fastmem arena is a kernel range reservation away
-  from the GPU window; JIT code is mapped RW, made RWX, at a hint of
-  0x3_0000_0000 (the console refuses an unplaceable hint); the fault handler
-  reads the console's shifted mcontext and takes SIGBUS; a 32 MiB code cache;
-  thread naming skipped; the large entry-point map off. libc entry points the
-  console lacks are in `tooling/dolphin/ps5-libc-shims.cpp`.
-- **Title:** `openat`/`fdopendir`/`unlinkat`/`fchmodat` and libc's `opendir`
-  family are implemented or rerouted for the title's libc++
-  (`src/ps5_directory.cpp`, `--wrap`); `utimensat` over `utimes`; small
-  allocations go to direct memory first, and a refused libc realloc moves the
-  block there (`src/memory_ps5.cpp`).
-- **Frontend patches:** 0089 enables VK_KHR_get_physical_device_properties2 on
-  the instance; 0090 keeps the synchronous readback inside the caller's
-  viewport (the save-state thumbnail overran and crashed).
-- **Driver (../PS5_Vulkan):** R57 clamp-to-border samplers, R58 primitive
-  restart, one-layer array depth views, an opt-in SPIR-V dump.
+- **Platform (core patch):** guest RAM as one direct-memory allocation mapped at
+  every mirror, the fastmem arena away from the GPU window, JIT code at
+  0x3_0000_0000, the console's fault context, a 32 MiB code cache. Single-core
+  FIFO playback (`Core/Core.cpp`) returns to retro_run like the CPU thread
+  does; it hung before.
+- **Title and frontend:** the `*at` directory family, direct-memory
+  allocations, patches 0089 and 0090.
+- **Driver (../PS5_Vulkan):** R57 border colours, R58 primitive restart, R59
+  inverted depth, R60 large stages, R62 uniform buffers as byte ranges (fog and
+  matrices), R64 restart state behind SQ_NON_EVENT (the corrupt 3D scene), R65
+  restart off after a copy's split (stray triangles, minimap).
 
-**Open:** the mountain on the title screen is missing (a texture path, not yet
-located); performance and long-play stability are unmeasured; the torture
-profiles have not started. Test runs: `/app0/dolphin-options.txt` overrides
-core options for one run (test file, removed on any other launch).
+**Test aids** (never shipped; the title deletes their files on any launch that
+is not a test run): `/app0/dolphin-options.txt` overrides core options for one
+run; `/app0/dolphin-debug.txt` names a debug mode: `fog`, `fifo` (records a
+FIFO log at frame 300), `dump`, `swloader`, `cmploader`, or `objects A B`
+(plays only objects A to B of each FIFO frame, to bisect against desktop
+Dolphin).
 
 ## Next
 
-1. Find the missing mountain: A/B the driver's mip, EFB-copy and texture paths
-   against a saved in-game state.
-2. Measure speed at 1x with JIT64 and fastmem; then long play.
+1. Speed at 1x with JIT64 and fastmem, then long play from the save state.
+2. The dual-core FIFO playback stall (single core plays).
+3. The torture profiles: 6x IR, ubershaders, 16x AF, safe texture cache, GPU
+   texture decoding, EFB to RAM, MSAA (needs render pass 2 and depth resolve).
 
 ## Accepted baselines
 

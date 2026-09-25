@@ -156,7 +156,7 @@ in this port, even if upstream RetroArch already offers the feature.**
 | ❌ | Nintendo 64 — evaluate Mupen64Plus-Next / ParaLLEl-N64 with ParaLLEl-RDP |
 | ✅ | PPSSPP — PSP, Vulkan rendering and JIT; tested games only |
 | ❌ | PPSSPP MSAA — needs render pass 2 and depth/stencil resolve in PS5_Vulkan |
-| ❌ | Dolphin — later GameCube / Wii milestone |
+| 🚧 | Dolphin — GameCube: Wind Waker boots and plays with correct 3D and HUD; speed, long play and the enhancement profiles are not yet measured |
 
 Future entries are development targets, not a promised release order. Hardware
 rendering introduces new Vulkan requirements beyond presenting software frames;

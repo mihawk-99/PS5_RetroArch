@@ -3176,3 +3176,39 @@ load Vulkan library" was Dolphin probing a host library a libretro core does
 not use; it is an info line now.
 
 tools/verify.sh PASS (patch count 199), 39 captures replay.
+
+## 2026-09-24 — Wind Waker's 3D scene: two primitive-restart faults in the driver
+
+Wind Waker drew its 3D scenes as a huge near-camera surface whose colours
+changed every frame. The method was a FIFO log recorded on the console (debug
+mode `fifo`, ten frames of Link on the ship deck) played both by the core
+(single core: FIFO playback hung in `CPU::Run()` before `Core/Core.cpp`'s fix)
+and by desktop Dolphin built from the same tree, then bisected by object range
+(debug mode `objects A B`).
+
+1. Objects 0-89 matched desktop Dolphin and object 90 added the surface: the
+   first draw past 2048 indices, 398 short restart strips. With Dolphin drawing
+   lists instead of restart strips it matched. ../PS5_Vulkan R64 reduced it to a
+   probe: the driver turned restart off with a bare register write right after
+   each restart draw, and the write landed while the draw was still fetching
+   indices. The enable is now state, each change behind an SQ_NON_EVENT (as
+   RADV writes it).
+2. After R64, thin triangles ran from the screen's corner to the minimap, and
+   the minimap's panel spilled to the left. Objects 310-319 (the minimap)
+   isolated them; neither the software vertex loader nor skipping line and
+   point draws changed anything, and lists instead of restart strips fixed
+   them. ../PS5_Vulkan R65: every submission a copy splits off starts with
+   restart off on the GPU, while the recording still held it on.
+
+Evidence (`evidence/dolphin-restart-strips`): the FIFO log's screenshots
+against desktop Dolphin, mean difference per channel 64-71 before, 1.23-1.53
+after R64, 1.13-1.16 after R65 (resampling between the console's and the host's
+resolutions). My save state on Outset Island loads and draws cleanly, with no
+audio errors.
+
+Also: the title's stale-test-file list now covers `/app0/dolphin-debug.txt` and
+`/app0/ps5vk-shader-cache-dir.txt` (a test hook a previous run had left on the
+console, which redirected the driver's shader cache). The core patch keeps the
+debug modes, the options override, the FIFO recorder, the object-range bisect
+(debug mode only) and the single-core FIFO playback fix; the temporary host A/B
+hooks are gone.
