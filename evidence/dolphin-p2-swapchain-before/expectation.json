@@ -1,0 +1,11 @@
+{
+  "step": "dolphin-p2-swapchain-before",
+  "note": "Before: Wind Waker under synchronous ubershaders ran at 89-99% (a window as short as 427837 of 480000 audio frames) with the GPU busy 0.7 ms a present. RetroArch presented every frame twice into three images, and the second present waited for a vblank on the thread that runs the frame-stepped core.",
+  "must_contain": [
+    "Got 3 swapchain images",
+    "[ps5vk] output: 119.88 Hz selected",
+    "audio ps5: window played=427837 silence=52163"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

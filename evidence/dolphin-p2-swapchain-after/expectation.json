@@ -1,0 +1,13 @@
+{
+  "step": "dolphin-p2-swapchain-after",
+  "note": "After: RetroArch asks for (3 - 1) * 2 + 1 = 5 images for its emulated swap interval of 2 and the driver gives them; the same run is 100% in every steady window, 1,200 presents per 10 s.",
+  "must_contain": [
+    "Got 5 swapchain images",
+    "[ps5vk] output: 119.88 Hz selected",
+    "audio ps5: window played=480000 silence=0"
+  ],
+  "must_not_contain": [
+    "Got 3 swapchain images"
+  ],
+  "human_check": ""
+}

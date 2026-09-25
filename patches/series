@@ -157,3 +157,9 @@
 #       viewport, and a save-state thumbnail of Dolphin's frame overran by ~1 MB
 #       gfx/drivers/vulkan.c
 0090-readback-within-caller-viewport
+
+# 0091  an emulated swap interval (each frame presented swap_interval times)
+#       asks for (video_max_swapchain_images - 1) * interval + 1 images, so
+#       the setting's frames of lookahead hold at 120 Hz as at 60 Hz
+#       gfx/common/vulkan_common.c
+0091-swap-interval-images

@@ -2856,6 +2856,28 @@ EDITS = [
         "            vp_height = caller_height;\n",
         "patches/series, 0090): never more than the",
     ),
+    (
+        # 0091: a swap interval above 1 is emulated by presenting each frame
+        # that many times (vulkan.c), so each frame takes that many of the
+        # queue's images, and video_max_swapchain_images' lookahead in frames
+        # shrinks by the interval. At 120 Hz with an automatic interval of 2,
+        # three images held one frame (16.7 ms) where they hold two (33 ms) at
+        # 60 Hz; the second present of every frame then waited on the thread
+        # that runs the core, and Dolphin's frame-stepped emulation lost 4-12%
+        # of Wind Waker's speed under ubershaders (2026-09-25, ../PS5_Vulkan
+        # R74). (images - 1) * interval + 1 keeps the frames of lookahead the
+        # setting names, within the surface's maxImageCount (clamped below).
+        "gfx/common/vulkan_common.c",
+        "   desired_swapchain_images    = settings->uints.video_max_swapchain_images;\n",
+        "   desired_swapchain_images    = settings->uints.video_max_swapchain_images;\n"
+        "   /* Changed by this port (patches/series, 0091): an emulated swap\n"
+        "    * interval presents each frame swap_interval times, so the frames of\n"
+        "    * lookahead the setting names need that many images each. */\n"
+        "   if (swap_interval > 1 && desired_swapchain_images > 1)\n"
+        "      desired_swapchain_images = (desired_swapchain_images - 1)\n"
+        "            * (uint32_t)swap_interval + 1;\n",
+        "patches/series, 0091): an emulated swap",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

@@ -45,14 +45,18 @@ The acceptance goal (2026-09-25): Resident Evil 4, Super Smash Bros. Melee and
 Wind Waker correct, full speed, with audio, input and states, then stable and
 measured through the profiles in `tooling/dolphin-profiles/` (docs/PHASE_LOG.md).
 
-1. Profiles 0 and 1 pass on all three games: correct pictures, full speed,
-   display-paced frames (docs/PHASE_LOG.md, 2026-09-25). Tolerated: a
-   screenshot's 55 ms read-back leaves its audio window ~0.4% short.
-2. The driver's copy throughput: the 55 ms read-back of the 4K output and a
-   218 ms copy in RE4's load; Profile 5's EFB copies to RAM depend on it.
-3. Profiles 2-11 on all three games: ubershaders, 6x torture, GPU and RAM EFB,
-   the scaling ladder, MSAA, cold/warm shader cache, reloads, state stress,
-   long soak.
+1. Profiles 0, 1 and 2 (1x and 6x) pass on all three games: correct
+   pictures, full speed, display-paced frames, five swapchain images at 120 Hz
+   (docs/PHASE_LOG.md, 2026-09-25). Tolerated: a screenshot's 55 ms read-back
+   leaves its audio window ~0.4% short.
+2. The driver's copy throughput: the 55 ms read-back of the 4K output, a
+   218 ms copy in RE4's load, and Wind Waker's 40-90 read-backs a second, each
+   done by the CPU after a wait for the GPU; Profile 5's EFB copies to RAM
+   depend on it.
+3. Profiles 3-11 on all three games: 6x torture, GPU and RAM EFB, the scaling
+   ladder, MSAA, cold/warm shader cache (a new build's first pipelines cost
+   30-95 ms each), reloads with the menu's three-image swapchain and the game's
+   five, state stress, long soak.
 3. The dual-core FIFO playback stall (single core plays).
 
 ## Accepted baselines

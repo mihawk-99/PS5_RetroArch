@@ -3287,3 +3287,40 @@ that long now empties it; before, a screenshot window was ~750 frames short in
 RE4 and Wind Waker and 2000-3800 in Melee. The driver's copy throughput (the
 55 ms read-back, a 218 ms copy in RE4's load) is the next lead, and matters
 most for Profile 5's EFB copies to RAM.
+
+## 2026-09-25 — Profile 2: five swapchain images at 120 Hz
+
+Profile 2 (synchronous ubershaders, 1x and 6x) ran RE4 and Melee at full speed
+at both resolutions, and Wind Waker at 89-99% at 1x and 80-84% at 6x with the
+GPU busy 0.7 and 2.2 ms a present: slow at 1x, so CPU or presentation, not GPU
+throughput.
+
+- The driver's new `cpu_copies` profile field showed Wind Waker reading back
+  40-90 images a second (EFB copies encoded to RAM, and the EFB peeks its game
+  settings enable), each a wait for the GPU; ubershaders lengthen what each
+  wait covers.
+- The CPU sampler at a 1 ms threshold found neither thread busy: the main
+  thread waited in vkAcquireNextImageKHR and the CPU thread between frame
+  steps.
+- A one-shot timeline of retro_run (removed since) showed why. RetroArch
+  emulates a swap interval of 2 at 119.88 Hz by presenting each frame twice,
+  and three images leave room for two queued flips: one frame. A new frame's
+  run took 7 ms and queued both presents at once; the repeated field's run
+  then waited 13-14 ms for two vblanks inside its present, and Dolphin's GPU
+  thread -- the thread that waits -- cannot drain the FIFO while it does, so
+  the CPU thread stalled behind it. The pair of runs crossed 33.4 ms often
+  enough to lose 4-12%.
+- A temporary driver with five images and `video_max_swapchain_images = 5`
+  ran the same state at 100%.
+
+../PS5_Vulkan R74 gives a swapchain the images it asks for, three to five, and
+patch 0091 has RetroArch ask for (video_max_swapchain_images - 1) * interval + 1
+when it emulates an interval. The default of three becomes five at 120 Hz with an
+interval of 2: two frames of lookahead, the same frames and the same 33 ms as three
+images at 60 Hz, so the latency is what a 60 Hz display has.
+
+Title 5beca7cc (`evidence/dolphin-p2-swapchain-before`, `-after`): Profile 1 and
+Profile 2 at 1x and 6x on all three games, 1,200 presents per 10 s and every
+steady window at 100% (99% in one screenshot window). Melee's first run on a new
+build still stalls 30-95 ms on each pipeline it compiles for the first time: the
+driver's shader cache is per build, and Profile 8 is where that is measured.
