@@ -1,0 +1,12 @@
+{
+  "step": "dolphin-p11-soak60-ww",
+  "note": "365 windows, every one after the first at 99.6% or better; no crash; direct mappings 349 (680 MiB) from start to end; flexible memory 243,712 KiB throughout. The hitches after boot are the six screenshots' reads (57-64 ms) and one of 40 ms.",
+  "must_contain": [
+    "audio ps5: window played=480000 silence=0",
+    "memory: flexible_free=243712 KiB"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}

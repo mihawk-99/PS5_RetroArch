@@ -3520,3 +3520,59 @@ support flag that creates them. Title 9a84b116, the same four-reload Melee run
 and `memory:152`, the count the first boot held. Before 0093, memory grew 152,
 154, 156, 158, 160. The stage and table mappings return to the same counts each
 cycle. There were no crashes, and each steady window ran at 97-100%.
+
+## 2026-09-25 — Rogue Leader's slow attract sequence: which layer owns it
+
+A tester reported Rogue Leader stuttering at first and then lagging in video and
+audio. From my save state (Death Star Attack) it runs at 100% once the shaders
+it needs are compiled. From boot, the attract sequence's in-engine fly-bys drop
+to between 52% and 81% for a minute at a time. I profiled two runs from boot
+with the title's sampler on the main thread (Dolphin's GPU loop and the driver)
+and Dolphin's CPU thread, both on title 9a84b116 (klog/rl-prof-*, klog/rl-prof-warm-*).
+
+- **Cold** (the first run after a driver build; the driver's shader cache is
+  one directory per driver build, so every rebuild starts empty): 392 shader
+  compiles land in the hitch reports, 4.6 s in all. In the worst window (52%)
+  the main thread spends 45% of its samples compiling and 9% opening cache
+  files that are not there yet.
+- **Warm** (the same sequence straight after, the cache filled): 20 compiles
+  and 0.25 s, but the same stretch still runs at 65-81%. Dolphin's CPU thread
+  is idle 97% of the time, waiting for its next frame. The main thread is the
+  limit: about 30% of it is the driver's `ps5vk_queue_run_step` spinning until
+  the GPU finishes a step, so that a copy the driver still performs on the CPU
+  can run; 11-14% is `ps5vk_flush_cpu_cache`, the driver flushing the CPU's
+  cache lines for every draw's descriptor tables, registers and constants.
+
+So the owning layer is the driver. The first run's stutter is shader compilation
+(inherent, and cached from the second run). The lasting slowdown is the
+driver's CPU cost on the thread that runs Dolphin's GPU emulation: CPU-side
+copies that split a submission and wait for the GPU, and a cache flush per
+draw. Neither is Dolphin's, and both will cost PS2 workloads more, so they are
+in ../PS5_Vulkan's round plan for the LRPS2 port (docs/LRPS2_GAPS.md) and not
+fixed here.
+
+The warm run is itself an interrupted test. I stopped its harness mid-launch,
+the title ran by itself until its frame limit, and I fetched its trace and
+screenshots afterwards and removed its test inputs from the console.
+
+## 2026-09-25 — Profile 11 complete: RE4 and Wind Waker 30 minutes, Wind Waker an hour
+
+Title 9a84b116 (driver 2f1e447, patch 0093), the accurate profile, from my
+entry states with no input, the driver profile armed, a screenshot every five
+minutes (every ten in the hour-long run):
+
+| Run | Windows | After the first | Direct mappings | Flexible memory |
+|---|---|---|---|---|
+| RE4, 30 min | 185 | all at 99.5% or better | 256 → 264 (666-668 MiB), flat after the first quarter | 245,760 KiB throughout |
+| Wind Waker, 30 min | 185 | all at 99.6% or better | 349 (680 MiB) start to end | 245,760 KiB throughout |
+| Wind Waker, 60 min | 365 | all at 99.6% or better | 349 (680 MiB) start to end | 243,712 KiB throughout |
+
+None crashed. The first window of each is the boot and the state load (72-83%):
+its hitches are the state load (1.0-1.1 s) and, in Wind Waker, the first
+shader compiles (116 in 1.5 s at 30 minutes; 408 ms at 60, the cache warmer).
+Every later hitch is a screenshot's read of the 4K frame (55-64 ms), which
+leaves its window 0.4% short, and one 40 ms stall in the hour. The last frame
+of the hour shows Outset Island correctly. With Melee's 30 minutes (above),
+Profile 11 passes for all three games, and nothing grows: the mappings each
+game holds level off within minutes and flexible memory does not move
+(`evidence/dolphin-p11-soak30-re4`, `-soak30-ww`, `-soak60-ww`).

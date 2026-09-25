@@ -1,0 +1,12 @@
+{
+  "step": "dolphin-p11-soak30-re4",
+  "note": "185 ten-second windows, every one after the first (boot and the state load) at 99.5% or better; no crash; the driver's direct mappings 256-264 (666-668 MiB), flat from the first quarter; flexible memory 245,760 KiB throughout. The hitches after boot are the screenshots' 55 ms reads of the 4K frame.",
+  "must_contain": [
+    "audio ps5: window played=480000 silence=0",
+    "memory: flexible_free=245760 KiB"
+  ],
+  "must_not_contain": [
+    "crash:"
+  ],
+  "human_check": ""
+}
