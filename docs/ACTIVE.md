@@ -39,10 +39,17 @@ Dolphin).
 
 ## Next
 
-1. Speed at 1x with JIT64 and fastmem, then long play from the save state.
-2. The dual-core FIFO playback stall (single core plays).
-3. The torture profiles: 6x IR, ubershaders, 16x AF, safe texture cache, GPU
-   texture decoding, EFB to RAM, MSAA (needs render pass 2 and depth resolve).
+The acceptance goal (2026-09-25): Resident Evil 4, Super Smash Bros. Melee and
+Wind Waker correct, full speed, with audio, input and states, then stable and
+measured through the profiles in `tooling/dolphin-profiles/` (docs/PHASE_LOG.md).
+
+1. Profile 0: RE4 and Wind Waker pass; Melee's remaining sub-100% windows
+   (shader-compile hitches) and the grey band in one Melee shot (a FIFO log
+   against desktop Dolphin decides whether it is scenery).
+2. Profiles 1-11 on all three games: accurate, ubershaders, 6x torture, GPU and
+   RAM EFB, the scaling ladder, MSAA, cold/warm shader cache, reloads, state
+   stress, long soak.
+3. The dual-core FIFO playback stall (single core plays).
 
 ## Accepted baselines
 

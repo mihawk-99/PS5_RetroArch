@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -27,17 +28,25 @@ extern "C"
     {
         return refuse_native_realloc ? nullptr : std::realloc(p, n);
     }
-    // A stand-in overflow heap: libc-backed, tagged so ownership is testable.
+    // A stand-in overflow heap: libc-backed, tagged so ownership is testable,
+    // and locked as the real one is (the worker threads below reach it).
     std::vector<void *> overflow_blocks;
+    std::recursive_mutex overflow_lock;
     int ps5_overflow_owns(const void *p)
     {
+        std::lock_guard<std::recursive_mutex> hold(overflow_lock);
         for (void *block : overflow_blocks)
             if (block == p)
                 return 1;
         return 0;
     }
+    // Direct memory that can be told to refuse, for the flexible fallback.
+    bool refuse_overflow = false;
     void *ps5_overflow_malloc(size_t n)
     {
+        std::lock_guard<std::recursive_mutex> hold(overflow_lock);
+        if (refuse_overflow)
+            return nullptr;
         void *p = std::malloc(n);
         if (p)
             overflow_blocks.push_back(p);
@@ -45,14 +54,21 @@ extern "C"
     }
     void *ps5_overflow_calloc(size_t c, size_t n)
     {
+        std::lock_guard<std::recursive_mutex> hold(overflow_lock);
         void *p = std::calloc(c, n);
         if (p)
             overflow_blocks.push_back(p);
         return p;
     }
-    void *ps5_overflow_realloc(void *, size_t)
+    void *ps5_overflow_realloc(void *p, size_t n)
     {
-        return nullptr;
+        std::lock_guard<std::recursive_mutex> hold(overflow_lock);
+        void *grown = n == SIZE_MAX ? nullptr : std::realloc(p, n);
+        if (grown)
+            for (auto &block : overflow_blocks)
+                if (block == p)
+                    block = grown;
+        return grown;
     }
     void *ps5_overflow_memalign(size_t, size_t)
     {
@@ -60,6 +76,7 @@ extern "C"
     }
     void ps5_overflow_free(void *p)
     {
+        std::lock_guard<std::recursive_mutex> hold(overflow_lock);
         for (auto &block : overflow_blocks)
             if (block == p)
                 block = nullptr;
@@ -75,6 +92,9 @@ int main()
     constexpr size_t large = 16 * 1024 * 1024;
     auto *p = static_cast<unsigned char *>(__wrap_malloc(large));
     assert(p && uintptr_t(p) % alignof(std::max_align_t) == 0);
+    // A large buffer takes direct memory first: flexible memory is kept for
+    // what only it can hold (a core's JIT code, thread stacks).
+    assert(ps5_overflow_owns(p));
     std::memset(p, 0xA5, large);
     assert(!__wrap_realloc(p, SIZE_MAX));
     assert(p[0] == 0xA5 && p[large - 1] == 0xA5);
@@ -109,6 +129,16 @@ int main()
         assert(moved[i] == 0x5A);
     __wrap_free(moved);
     assert(!ps5_overflow_owns(moved));
+    // With direct memory refusing, a large buffer is still served, from an
+    // anonymous mapping (flexible memory), and grows and frees there.
+    refuse_overflow = true;
+    auto *flexible = static_cast<unsigned char *>(__wrap_malloc(large));
+    assert(flexible && !ps5_overflow_owns(flexible));
+    std::memset(flexible, 0x3C, large);
+    flexible = static_cast<unsigned char *>(__wrap_realloc(flexible, large * 2));
+    assert(flexible && flexible[large - 1] == 0x3C);
+    __wrap_free(flexible);
+    refuse_overflow = false;
     void *empty = __wrap_calloc(0, SIZE_MAX);
     assert(empty);
     __wrap_free(empty);

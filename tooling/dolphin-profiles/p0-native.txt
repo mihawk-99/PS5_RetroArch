@@ -1,0 +1,15 @@
+# Profile 0, native correctness baseline: 1x, no MSAA, JIT64, fastmem, 100% clock,
+# no frameskip, synchronous shaders, EFB copies on the GPU, default texture cache.
+dolphin_renderer=Hardware
+dolphin_cpu_core=1
+dolphin_fastmem=enabled
+dolphin_cpu_clock_rate=1.00
+dolphin_vi_skip=disabled
+dolphin_wait_for_shaders=disabled
+dolphin_efb_scale=1
+dolphin_anti_aliasing=0
+dolphin_shader_compilation_mode=0
+dolphin_efb_to_texture=enabled
+dolphin_texture_cache_accuracy=128
+dolphin_max_anisotropy=0
+dolphin_force_texture_filtering_mode=0

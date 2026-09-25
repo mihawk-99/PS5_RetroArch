@@ -173,10 +173,19 @@ void *allocate(size_t size)
         errno = ENOMEM;
         return nullptr;
     }
+    /* A large buffer takes direct memory first too. Flexible memory is about
+     * 450 MB for the whole title, and it is the only pool for what nothing else
+     * can hold: a core's JIT code and the threads' stacks. RetroArch reads a
+     * save state whole, and loading Resident Evil 4's 260 MB entry state while
+     * Dolphin booted left its JIT 45 MB of the 56 it maps, and the core wrote
+     * its code through the null it got (2026-09-25). Direct memory is several
+     * GiB. */
+    if (void *direct = overflow_malloc(size))
+        return direct;
     const size_t span = (sizeof(Mapping) + size + page - 1) & ~(page - 1);
     void *memory = mmap(nullptr, span, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    if (memory == MAP_FAILED) /* flexible memory is small too */
-        return overflow_malloc(size);
+    if (memory == MAP_FAILED)
+        return nullptr;
     auto *entry = static_cast<Mapping *>(memory);
     entry->requested = size;
     entry->span = span;

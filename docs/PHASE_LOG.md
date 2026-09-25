@@ -3212,3 +3212,35 @@ console, which redirected the driver's shader cache). The core patch keeps the
 debug modes, the options override, the FIFO recorder, the object-range bisect
 (debug mode only) and the single-core FIFO playback fix; the temporary host A/B
 hooks are gone.
+
+## 2026-09-25 — Dolphin acceptance: the three games, Profile 0
+
+The acceptance targets are Resident Evil 4, Super Smash Bros. Melee and Wind
+Waker, each from my save state, through the profiles in
+`tooling/dolphin-profiles/`. A run is summarised from its trace: audio windows
+(played against silence, which is what full speed reads as), the driver's
+presents and GPU time a present, hitches, errors and screenshots on SELECT,
+which the GameCube pad ignores.
+
+1. **RE4 crashed at boot** (SIGSEGV writing JIT code at 0x3808000). Dolphin's
+   JIT maps 56 MB of executable memory from the title's flexible memory (about
+   450 MB), and found 45 MB: RetroArch's state-load task had just read RE4's
+   260 MB entry state into one buffer, and the frontend's `malloc` gave buffers
+   that large an anonymous mapping -- flexible memory -- before direct memory.
+   Large frontend buffers now take direct memory first (`src/memory_ps5.cpp`),
+   leaving flexible memory for what only it can hold: executable code and
+   thread stacks. The host test asserts the order and the fallback; its stand-in
+   direct heap is now locked like the real one. The core's allocator reports the
+   flexible memory free when an executable mapping fails.
+2. **RE4 drew its frame in its haze colour.** A FIFO log of the scene plays
+   correctly in desktop Dolphin; desktop Dolphin reproduces the console's frame
+   with dual-source blending forced off. ../PS5_Vulkan R71 added dual-source
+   blending (the compiler already exported the second source); RE4 now draws
+   Leon, the car and the forest as desktop Dolphin does.
+3. **Melee ran at 95-99%.** Its EFB copies split every frame into ~105
+   submission steps, each a CPU wait; ../PS5_Vulkan R70 made them GPU barriers
+   (0.07 steps a present). Melee still shows up to 1% audio silence in some
+   windows, with shader-compile hitches during play; that is the next lead.
+
+Profile 0 on the R71 build: RE4 and Wind Waker 100% in every steady window,
+correct pictures; Melee 96-100%.

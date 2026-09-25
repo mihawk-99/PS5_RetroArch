@@ -1,0 +1,20 @@
+# Profile 3, main GPU torture: 6x (3840x3168), synchronous ubershaders, 16x AF,
+# forced linear filtering, scaled EFB copies stored on the GPU, GPU texture
+# decoding, safe texture cache, exact depth, every frame presented.
+dolphin_renderer=Hardware
+dolphin_cpu_core=1
+dolphin_fastmem=enabled
+dolphin_cpu_clock_rate=1.00
+dolphin_vi_skip=disabled
+dolphin_wait_for_shaders=disabled
+dolphin_efb_scale=6
+dolphin_anti_aliasing=0
+dolphin_shader_compilation_mode=1
+dolphin_max_anisotropy=4
+dolphin_force_texture_filtering_mode=2
+dolphin_efb_scaled_copy=enabled
+dolphin_efb_to_texture=enabled
+dolphin_gpu_texture_decoding=enabled
+dolphin_texture_cache_accuracy=0
+dolphin_fast_depth_calculation=disabled
+dolphin_skip_dupe_frames=disabled

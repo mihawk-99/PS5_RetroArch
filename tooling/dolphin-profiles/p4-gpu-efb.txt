@@ -1,0 +1,16 @@
+# Profile 4, GPU EFB torture: 6x, synchronous ubershaders, safe texture cache,
+# scaled EFB copies stored on the GPU, GPU texture decoding, exact depth.
+dolphin_renderer=Hardware
+dolphin_cpu_core=1
+dolphin_fastmem=enabled
+dolphin_cpu_clock_rate=1.00
+dolphin_vi_skip=disabled
+dolphin_wait_for_shaders=disabled
+dolphin_efb_scale=6
+dolphin_anti_aliasing=0
+dolphin_shader_compilation_mode=1
+dolphin_texture_cache_accuracy=0
+dolphin_efb_scaled_copy=enabled
+dolphin_gpu_texture_decoding=enabled
+dolphin_fast_depth_calculation=disabled
+dolphin_efb_to_texture=enabled

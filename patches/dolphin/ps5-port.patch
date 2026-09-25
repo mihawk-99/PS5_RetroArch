@@ -258,7 +258,7 @@ index 26a123c081..7410b63117 100644
  
  size_t MemArena::GetPageSize() const
 diff --git a/Source/Core/Common/MemoryUtil.cpp b/Source/Core/Common/MemoryUtil.cpp
-index 5d5085aa09..09d86eb3f1 100644
+index 5d5085aa09..28533fea76 100644
 --- a/Source/Core/Common/MemoryUtil.cpp
 +++ b/Source/Core/Common/MemoryUtil.cpp
 @@ -3,6 +3,8 @@
@@ -270,7 +270,18 @@ index 5d5085aa09..09d86eb3f1 100644
  #include <cstddef>
  #include <cstdlib>
  
-@@ -103,7 +105,42 @@ void* AllocateExecutableMemory(size_t size)
+@@ -68,6 +70,10 @@ namespace Common
+ static JITMemoryTracker g_jit_memory_tracker;
+ #endif
+ 
++#ifdef __PROSPERO__
++extern "C" int sceKernelAvailableFlexibleMemorySize(size_t* size);
++#endif
++
+ void* AllocateExecutableMemory(size_t size)
+ {
+ #if defined(IPHONEOS) && defined(__LIBRETRO__)
+@@ -103,7 +109,50 @@ void* AllocateExecutableMemory(size_t size)
  
    int map_prot = PROT_READ | PROT_WRITE | PROT_EXEC;
  
@@ -285,6 +296,8 @@ index 5d5085aa09..09d86eb3f1 100644
 +  // The console refuses a hint it cannot place (ENOMEM for 0x7_0000_0000) rather
 +  // than choosing elsewhere; 0x3_0000_0000, just above the GPU window, is
 +  // accepted, and the others are fallbacks.
++  size_t flexible_before = 0;
++  sceKernelAvailableFlexibleMemorySize(&flexible_before);
 +  void* ptr = MAP_FAILED;
 +  for (const uintptr_t hint : {uintptr_t{0x3'0000'0000}, uintptr_t{0x4'8000'0000},
 +                               uintptr_t{0x5'0000'0000}})
@@ -305,8 +318,14 @@ index 5d5085aa09..09d86eb3f1 100644
 +    munmap(ptr, size);
 +    ptr = MAP_FAILED;
 +  }
++  // Code comes out of the title's flexible memory, which a large buffer can
++  // hold (a 260 MB save state being read did, 2026-09-25): say how much there
++  // was, since what fails next is the first write to the code.
 +  if (ptr == MAP_FAILED)
-+    fprintf(stderr, "dolphin ps5: no executable memory for %zu bytes (errno %d)\n", size, errno);
++    fprintf(stderr,
++            "dolphin ps5: no executable memory for %zu bytes (errno %d, %zu bytes of flexible "
++            "memory free)\n",
++            size, errno, flexible_before);
 +#else
    void* ptr = mmap(nullptr, size, map_prot, map_flags, -1, 0);
 +#endif
