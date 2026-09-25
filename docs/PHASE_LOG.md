@@ -3466,3 +3466,38 @@ five minutes, driver profile armed:
   flexible memory flat.
 
 Still to run: RE4 and Wind Waker for 30 minutes and one game for an hour.
+
+## 2026-09-25 — Mario Kart Wii's black scenery; Rogue Leader's FIFO desync
+
+**Mario Kart Wii** (my save state, Luigi Circuit): the grass bank and palm tree
+left of the track drew black. Dolphin asks for samplers biased -2.1875 to
+-3.1875; the driver reported a limit of 2 and refused them (three refusals in
+100 s, title ad98b960). ../PS5_Vulkan R79 reports the +/-16 its sampler word
+holds, proved by a console probe; the scenery draws (klog/mkw-base-*, mkw-r79-*).
+
+**Rogue Leader** crashed for a tester after about three minutes. From my save
+state (Death Star Attack) it plays without error; from boot, the attract
+sequence fails at the same point every run: a burst of "Negative
+fifo.CPReadWriteDistance" alerts -- 221,472 in one run -- then commands decoded
+from stale FIFO words, then a fault in LoadIndexedXF, the tester's crash. It
+needs dual core: single core runs past that point with no alert, and without
+fastmem the desync still happens, earlier and milder.
+
+A bounded one-shot capture (removed since) recorded the FIFO register writes and
+the GPU loop's starts and stops, dumped at the first negative distance: the GPU
+loop resumed at a field with one chunk still queued, the game -- resuming at the
+same moment -- switched GP reads off and wrote 0 to the distance, and the loop,
+already inside that chunk, subtracted 32 from the zero. A negative distance
+reads as more to fetch, so the loop fetched the FIFO's old words as commands.
+Standalone Dolphin has the same unguarded window, but its GPU thread is almost
+always idle when a game resets its FIFO; the libretro core restarts the loop
+with a backlog at every field, exactly when the game runs again.
+
+The fix (patches/dolphin/ps5-port.patch): the CPU's writes to the read pointer
+and the distance are counted before they land, and the dual-core GPU loop
+commits a chunk -- read pointer past it, distance a chunk shorter -- by
+compare-and-swap, only if no such write came while the chunk was in flight. The
+CPU's values win, as a CPU write does on the hardware; a gather-pipe burst, which
+only adds, is retried. Title 08e8ed4c, twice from boot for seven minutes (368
+emulated seconds, past the old failure and through a second attract loop): no
+alert, no unknown opcode, no crash.

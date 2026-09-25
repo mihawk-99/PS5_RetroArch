@@ -873,6 +873,180 @@ index 6338e52e3d..10539c661e 100644
    }
  }
  
+diff --git a/Source/Core/VideoCommon/CommandProcessor.cpp b/Source/Core/VideoCommon/CommandProcessor.cpp
+index 1dbf466f1c..bae595786b 100644
+--- a/Source/Core/VideoCommon/CommandProcessor.cpp
++++ b/Source/Core/VideoCommon/CommandProcessor.cpp
+@@ -252,9 +252,18 @@ void CommandProcessorManager::RegisterMMIO(MMIO::Mapping* mmio, u32 base)
+     fifo_rw_distance_lo_r =
+         MMIO::DirectRead<u16>(MMIO::Utils::LowPart(&m_fifo.CPReadWriteDistance));
+   }
++#ifdef __LIBRETRO__
++  mmio->Register(base | FIFO_RW_DISTANCE_LO, fifo_rw_distance_lo_r,
++                 MMIO::ComplexWrite<u16>([WMASK_LO_ALIGN_32BIT](Core::System& system_, u32, u16 val) {
++                   auto& fifo_ = system_.GetCommandProcessor().GetFifo();
++                   fifo_.register_writes.fetch_add(1, std::memory_order_seq_cst);
++                   *MMIO::Utils::LowPart(&fifo_.CPReadWriteDistance) = val & WMASK_LO_ALIGN_32BIT;
++                 }));
++#else
+   mmio->Register(base | FIFO_RW_DISTANCE_LO, fifo_rw_distance_lo_r,
+                  MMIO::DirectWrite<u16>(MMIO::Utils::LowPart(&m_fifo.CPReadWriteDistance),
+                                         WMASK_LO_ALIGN_32BIT));
++#endif
+ 
+   MMIO::ReadHandlingMethod<u16>* fifo_rw_distance_hi_r;
+   if (is_on_thread)
+@@ -291,6 +300,9 @@ void CommandProcessorManager::RegisterMMIO(MMIO::Mapping* mmio, u32 base)
+                  MMIO::ComplexWrite<u16>([WMASK_HI_RESTRICT](Core::System& system_, u32, u16 val) {
+                    auto& fifo_ = system_.GetCommandProcessor().GetFifo();
+                    system_.GetFifo().SyncGPUForRegisterAccess();
++#ifdef __LIBRETRO__
++                   fifo_.register_writes.fetch_add(1, std::memory_order_seq_cst);
++#endif
+                    WriteHigh(fifo_.CPReadWriteDistance, val & WMASK_HI_RESTRICT);
+                    system_.GetFifo().RunGpu();
+                  }));
+@@ -299,7 +311,15 @@ void CommandProcessorManager::RegisterMMIO(MMIO::Mapping* mmio, u32 base)
+       base | FIFO_READ_POINTER_LO,
+       is_on_thread ? MMIO::DirectRead<u16>(MMIO::Utils::LowPart(&m_fifo.SafeCPReadPointer)) :
+                      MMIO::DirectRead<u16>(MMIO::Utils::LowPart(&m_fifo.CPReadPointer)),
++#ifdef __LIBRETRO__
++      MMIO::ComplexWrite<u16>([WMASK_LO_ALIGN_32BIT](Core::System& system_, u32, u16 val) {
++        auto& fifo_ = system_.GetCommandProcessor().GetFifo();
++        fifo_.register_writes.fetch_add(1, std::memory_order_seq_cst);
++        *MMIO::Utils::LowPart(&fifo_.CPReadPointer) = val & WMASK_LO_ALIGN_32BIT;
++      }));
++#else
+       MMIO::DirectWrite<u16>(MMIO::Utils::LowPart(&m_fifo.CPReadPointer), WMASK_LO_ALIGN_32BIT));
++#endif
+ 
+   MMIO::ReadHandlingMethod<u16>* fifo_read_hi_r;
+   MMIO::WriteHandlingMethod<u16>* fifo_read_hi_w;
+@@ -314,6 +334,9 @@ void CommandProcessorManager::RegisterMMIO(MMIO::Mapping* mmio, u32 base)
+         MMIO::ComplexWrite<u16>([WMASK_HI_RESTRICT](Core::System& system_, u32, u16 val) {
+           auto& fifo_ = system_.GetCommandProcessor().GetFifo();
+           system_.GetFifo().SyncGPUForRegisterAccess();
++#ifdef __LIBRETRO__
++          fifo_.register_writes.fetch_add(1, std::memory_order_seq_cst);
++#endif
+           WriteHigh(fifo_.CPReadPointer, val & WMASK_HI_RESTRICT);
+           fifo_.SafeCPReadPointer.store(fifo_.CPReadPointer.load(std::memory_order_relaxed),
+                                         std::memory_order_relaxed);
+@@ -330,6 +353,9 @@ void CommandProcessorManager::RegisterMMIO(MMIO::Mapping* mmio, u32 base)
+         MMIO::ComplexWrite<u16>([WMASK_HI_RESTRICT](Core::System& system_, u32, u16 val) {
+           auto& fifo_ = system_.GetCommandProcessor().GetFifo();
+           system_.GetFifo().SyncGPUForRegisterAccess();
++#ifdef __LIBRETRO__
++          fifo_.register_writes.fetch_add(1, std::memory_order_seq_cst);
++#endif
+           WriteHigh(fifo_.CPReadPointer, val & WMASK_HI_RESTRICT);
+         });
+   }
+diff --git a/Source/Core/VideoCommon/CommandProcessor.h b/Source/Core/VideoCommon/CommandProcessor.h
+index 976592c829..8684ae12e7 100644
+--- a/Source/Core/VideoCommon/CommandProcessor.h
++++ b/Source/Core/VideoCommon/CommandProcessor.h
+@@ -49,6 +49,15 @@ struct SCPFifoStruct
+   std::atomic<u32> bFF_LoWatermark = 0;
+   std::atomic<u32> bFF_HiWatermark = 0;
+ 
++#ifdef __LIBRETRO__
++  // The CPU's writes to the read pointer and the read/write distance, counted
++  // before each write lands. The dual-core GPU loop commits a chunk's read
++  // pointer and distance only if none came while the chunk was in flight: the
++  // CPU's values win, as they do on the hardware (Fifo.cpp, CommitChunk). Not
++  // saved; it only orders the two threads.
++  std::atomic<u32> register_writes = 0;
++#endif
++
+   void Init();
+   void DoState(PointerWrap& p);
+ };
+diff --git a/Source/Core/VideoCommon/Fifo.cpp b/Source/Core/VideoCommon/Fifo.cpp
+index d40bd0e8db..d5d588054d 100644
+--- a/Source/Core/VideoCommon/Fifo.cpp
++++ b/Source/Core/VideoCommon/Fifo.cpp
+@@ -288,6 +288,42 @@ void FifoManager::ResetVideoBuffer()
+   m_fifo_aux_read_ptr = m_fifo_aux_data;
+ }
+ 
++#ifdef __LIBRETRO__
++// A chunk the dual-core GPU loop has run advances the read pointer past it and
++// shortens the read/write distance by it -- unless the CPU rewrote either
++// register while the chunk was in flight, in which case the CPU's values stand,
++// as a CPU write replaces the hardware's own. The game can reset its FIFO (read
++// enable off, the distance to 0, a new read pointer) the moment it runs again,
++// and here the GPU loop resumes with it at every field, with a chunk or more
++// still queued: the loop's unconditional subtraction then took a zeroed distance
++// to -32, which the loop reads as more to fetch, and it fetched the FIFO's stale
++// words as commands until one faulted (Rogue Leader's attract sequence, every
++// run at the same point). A gather-pipe burst only adds to the distance and is
++// retried; a register write is not.
++static void CommitChunk(CommandProcessor::SCPFifoStruct& fifo, u32 writes, u32 fetched, u32 next)
++{
++  if (fifo.register_writes.load(std::memory_order_seq_cst) != writes)
++    return;
++  u32 expected = fetched;
++  if (!fifo.CPReadPointer.compare_exchange_strong(expected, next, std::memory_order_seq_cst))
++    return;
++  u32 distance = fifo.CPReadWriteDistance.load(std::memory_order_seq_cst);
++  for (;;)
++  {
++    if (fifo.register_writes.load(std::memory_order_seq_cst) != writes)
++      return;
++    ASSERT_MSG(COMMANDPROCESSOR, distance >= GPFifo::GATHER_PIPE_SIZE,
++               "fifo.CPReadWriteDistance = {} is shorter than the chunk the FIFO loop ran",
++               distance);
++    if (distance < GPFifo::GATHER_PIPE_SIZE)
++      return;
++    if (fifo.CPReadWriteDistance.compare_exchange_weak(
++            distance, distance - GPFifo::GATHER_PIPE_SIZE, std::memory_order_seq_cst))
++      return;
++  }
++}
++#endif
++
+ // Description: Main FIFO update loop
+ // Purpose: Keep the Core HW updated about the CPU-GPU distance
+ void FifoManager::RunGpuLoop()
+@@ -330,6 +366,10 @@ void FifoManager::RunGpuLoop()
+               break;
+ 
+             u32 cyclesExecuted = 0;
++#ifdef __LIBRETRO__
++            const u32 writes = fifo.register_writes.load(std::memory_order_seq_cst);
++            const u32 fetchedPtr = fifo.CPReadPointer.load(std::memory_order_relaxed);
++#endif
+             u32 readPtr = fifo.CPReadPointer.load(std::memory_order_relaxed);
+             ReadDataFromFifo(readPtr);
+ 
+@@ -338,6 +378,7 @@ void FifoManager::RunGpuLoop()
+             else
+               readPtr += GPFifo::GATHER_PIPE_SIZE;
+ 
++#ifndef __LIBRETRO__
+             const s32 distance =
+                 static_cast<s32>(fifo.CPReadWriteDistance.load(std::memory_order_relaxed)) -
+                 GPFifo::GATHER_PIPE_SIZE;
+@@ -345,13 +386,18 @@ void FifoManager::RunGpuLoop()
+                        "Negative fifo.CPReadWriteDistance = {} in FIFO Loop !\nThat can produce "
+                        "instability in the game. Please report it.",
+                        distance);
++#endif
+ 
+             u8* write_ptr = m_video_buffer_write_ptr;
+             m_video_buffer_read_ptr = OpcodeDecoder::RunFifo(
+                 DataReader(m_video_buffer_read_ptr, write_ptr), &cyclesExecuted);
+ 
++#ifdef __LIBRETRO__
++            CommitChunk(fifo, writes, fetchedPtr, readPtr);
++#else
+             fifo.CPReadPointer.store(readPtr, std::memory_order_relaxed);
+             fifo.CPReadWriteDistance.fetch_sub(GPFifo::GATHER_PIPE_SIZE, std::memory_order_seq_cst);
++#endif
+             if ((write_ptr - m_video_buffer_read_ptr) == 0)
+             {
+               fifo.SafeCPReadPointer.store(fifo.CPReadPointer.load(std::memory_order_relaxed),
 diff --git a/Source/Core/VideoCommon/PixelShaderGen.cpp b/Source/Core/VideoCommon/PixelShaderGen.cpp
 index 5ce120e9ff..8b3e4f4540 100644
 --- a/Source/Core/VideoCommon/PixelShaderGen.cpp
