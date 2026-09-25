@@ -168,3 +168,8 @@
 #       were overwritten by the wide ones and leaked on every re-initialisation
 #       gfx/drivers/vulkan.c
 0092-release-replaced-textures
+
+# 0093  release the HDR uniform buffer whenever vulkan_init created it, not only
+#       when the context reports HDR support: it leaked on every video init
+#       gfx/drivers/vulkan.c
+0093-release-hdr-uniform-buffer

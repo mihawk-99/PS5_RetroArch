@@ -3501,3 +3501,22 @@ CPU's values win, as a CPU write does on the hardware; a gather-pipe burst, whic
 only adds, is retried. Title 08e8ed4c, twice from boot for seven minutes (368
 emulated seconds, past the old failure and through a second attract loop): no
 alert, no unknown opcode, no crash.
+
+## 2026-09-25 — Profile 9's last two mappings: the HDR uniform buffer
+
+Profile 9 left two direct-memory mappings a reload unidentified. A bounded
+one-shot registry in ../PS5_Vulkan's allocator (removed since; title 1ecbfd3a)
+recorded the caller of every live VkDeviceMemory. After each reload, one entry grew
+by 2 (1, 3, 5, 7, 9 over four reloads): 256 bytes of host-visible memory from
+`vulkan_create_buffer`, called by `vulkan_init` for `vk->hdr.ubo`. RetroArch
+creates that uniform buffer whenever the build has `VULKAN_HDR_SWAPCHAIN`, but
+`vulkan_free` destroyed it only when the context has HDR support, which this
+console's surface never reports. The video driver is initialised twice a reload,
+so two buffers leaked each time.
+
+Patch 0093 releases the buffer whenever it exists; the HDR images stay with the
+support flag that creates them. Title 9a84b116, the same four-reload Melee run
+(`evidence/dolphin-p9-reload-flat`): every reload returns to `direct_live=180`
+and `memory:152`, the count the first boot held. Before 0093, memory grew 152,
+154, 156, 158, 160. The stage and table mappings return to the same counts each
+cycle. There were no crashes, and each steady window ran at 97-100%.

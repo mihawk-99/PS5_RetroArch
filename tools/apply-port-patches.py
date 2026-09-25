@@ -2914,6 +2914,32 @@ EDITS = [
         "         vulkan_destroy_texture(vk->context->device, &vk->display.blank_texture);\n",
         "patches/series, 0092): the 4x4 texture",
     ),
+    (
+        # 0093: vulkan_init creates the HDR uniform buffer whenever the build
+        # has VULKAN_HDR_SWAPCHAIN, but vulkan_free released it only when the
+        # context had HDR support, which this console's surface never reports.
+        # One 256-byte host-visible buffer and its memory leaked on every video
+        # driver init: two a core reload, seen as caller vulkan_create_buffer
+        # in the driver's allocation registry after 0092 (2026-09-25). The
+        # buffer is released whenever it exists; the HDR images stay with the
+        # support flag that created them.
+        "gfx/drivers/vulkan.c",
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "      if (vk->context->flags & VK_CTX_FLAG_HDR_SUPPORT)\n"
+        "      {\n"
+        "         vulkan_destroy_buffer(vk->context->device, &vk->hdr.ubo);\n"
+        "         vulkan_destroy_hdr_buffer(vk->context->device, &vk->main_buffer);\n",
+        "#ifdef VULKAN_HDR_SWAPCHAIN\n"
+        "      /* Changed by this port (patches/series, 0093): vulkan_init creates the\n"
+        "       * uniform buffer with or without HDR support, so it is released the\n"
+        "       * same way. */\n"
+        "      if (vk->hdr.ubo.memory != VK_NULL_HANDLE)\n"
+        "         vulkan_destroy_buffer(vk->context->device, &vk->hdr.ubo);\n"
+        "      if (vk->context->flags & VK_CTX_FLAG_HDR_SUPPORT)\n"
+        "      {\n"
+        "         vulkan_destroy_hdr_buffer(vk->context->device, &vk->main_buffer);\n",
+        "patches/series, 0093): vulkan_init creates the",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

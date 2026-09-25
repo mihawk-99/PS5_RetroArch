@@ -1,0 +1,14 @@
+{
+  "step": "dolphin-p9-reload-flat",
+  "note": "After 0093: every reload returns to direct_live=180 and memory:152, the same count the first boot held; the stage and table mappings return to 10/12/70 each cycle. Before it, memory grew 152, 154, 156, 158, 160 (two per reload, the HDR uniform buffer). Four reloads, no crash.",
+  "must_contain": [
+    "input: pad script RELOAD at 234.68 s: 1",
+    "direct_kinds=memory:152,stage:10"
+  ],
+  "must_not_contain": [
+    "crash:",
+    "direct_kinds=memory:154",
+    "direct_kinds=memory:160"
+  ],
+  "human_check": ""
+}
