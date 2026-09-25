@@ -20,6 +20,11 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 source "$root/tools/core-stamp.sh"
+# A DOLPHIN_DEV build stages whatever the tree holds, a temporary capture included,
+# so it withdraws the stamp: the next ordinary build rebuilds from the pinned
+# revision and the committed patch rather than keeping that output
+# (2026-09-25: an instrumented Dolphin survived a gate build this way).
+[[ -z ${DOLPHIN_DEV:-} ]] || rm -f -- "$core_stamp_dir/dolphin"
 [[ -n ${DOLPHIN_DEV:-} ]] || core_stamp_skip dolphin \
     "$root/build/cores/stage/cores/dolphin_libretro.so" \
     "$root/build/cores/stage/info/dolphin_libretro.info" \

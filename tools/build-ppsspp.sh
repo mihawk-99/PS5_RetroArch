@@ -23,6 +23,11 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 # Skip the whole build when nothing it reads has changed (tools/core-stamp.sh).
 source "$root/tools/core-stamp.sh"
+# A PPSSPP_DEV build stages whatever the tree holds, a temporary capture included,
+# so it withdraws the stamp: the next ordinary build rebuilds from the pinned
+# revision and the committed patch rather than keeping that output
+# (2026-09-25: an instrumented Dolphin survived a gate build this way).
+[[ -z ${PPSSPP_DEV:-} ]] || rm -f -- "$core_stamp_dir/ppsspp"
 [[ -n ${PPSSPP_DEV:-} ]] || core_stamp_skip ppsspp \
     "$root/build/cores/stage/cores/ppsspp_libretro.so" \
     "$root/build/cores/stage/info/ppsspp_libretro.info" \
