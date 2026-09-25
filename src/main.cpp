@@ -29,6 +29,7 @@
  * says how far it got. See src/trace.hpp.
  */
 
+#include <atomic>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -53,6 +54,7 @@ extern "C" int rarch_main(int argc, char *argv[], void *data);
 extern "C" int sceSystemServiceHideSplashScreen();
 
 extern "C" void ps5_vulkan_profile_init();
+extern "C" int sceKernelAvailableFlexibleMemorySize(std::size_t *size);
 extern "C" void ps5_crash_report_install();
 extern "C" void ps5_core_threads_start();
 extern "C" void ps5_sampler_start();
@@ -88,14 +90,26 @@ constexpr const char *config_path = "/app0/config/retroarch.cfg";
  * and its what() are written to the trace here - the difference between "the
  * compiler refused this shader" and "a wild size reached a container", which are
  * not the same bug and were not distinguishable from the outside. */
+/* A profiled test run (the driver's /app0/ps5vk-profile.txt survived the stale
+ * test file sweep) also reports the flexible memory left every ten seconds:
+ * with the driver's direct_live, a soak's leak is a line that only moves one
+ * way. Set once main has swept. */
+std::atomic<bool> g_memory_report{false};
+
 /* Writes every buffered output stream out -- the trace file and RetroArch's
  * log among them -- four times a second, off the threads that log. */
 void *log_flusher(void *)
 {
     const timespec interval = {0, 250 * 1000 * 1000};
-    for (;;)
+    for (unsigned tick = 1;; ++tick)
     {
         nanosleep(&interval, nullptr);
+        if (tick % 40 == 0 && g_memory_report.load(std::memory_order_relaxed))
+        {
+            std::size_t flexible = 0;
+            sceKernelAvailableFlexibleMemorySize(&flexible);
+            std::fprintf(stderr, "memory: flexible_free=%zu KiB\n", flexible >> 10);
+        }
         std::fflush(nullptr);
     }
     return nullptr;
@@ -268,6 +282,11 @@ int main()
             removed += std::remove(path) == 0 ? 1u : 0u;
         if (removed != 0)
             ps5::debug::mark_value("stale test files removed", static_cast<int>(removed));
+    }
+    if (std::FILE *profile = std::fopen("/app0/ps5vk-profile.txt", "rb"))
+    {
+        std::fclose(profile);
+        g_memory_report.store(true, std::memory_order_relaxed);
     }
 
     /* Extra arguments, one per line, from /app0/args.txt when that file is there.

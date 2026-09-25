@@ -3324,3 +3324,27 @@ Profile 2 at 1x and 6x on all three games, 1,200 presents per 10 s and every
 steady window at 100% (99% in one screenshot window). Melee's first run on a new
 build still stalls 30-95 ms on each pipeline it compiles for the first time: the
 driver's shader cache is per build, and Profile 8 is where that is measured.
+
+## 2026-09-25 — Profiles 3-7: torture, EFB, the scaling ladder and MSAA
+
+On title 5beca7cc (../PS5_Vulkan R74) and, for MSAA, its successors:
+
+- **Profile 3** (6x, ubershaders, 16x AF, forced filtering, every frame
+  presented), **4** (6x GPU EFB copies) and **5** (6x EFB copies to RAM):
+  RE4, Melee and Wind Waker at 100% in every steady window, correct pictures.
+  RAM EFB copies read back 270 images a second in RE4 at full speed; Wind
+  Waker's game settings already send its EFB copies to RAM, so its Profiles 4
+  and 5 are the same run.
+- **Profile 6**, 1x to 6x at the accurate baseline: all eighteen runs at 100%,
+  1,200 presents per 10 s; Wind Waker's GPU time grows from 0.21 to 1.37 ms a
+  present, Melee's and RE4's stay under 0.2 ms.
+- **Profile 7**: 4x MSAA first stopped every game at its first resolve. The
+  driver refused to sample a four-sample image and could not resolve into
+  Dolphin's resolve texture, which it stores in rows; ../PS5_Vulkan R75-R77 added
+  multisampled sampling, GPU resolves and rendering into rows. R78 added 2x and
+  8x and moved the sample locations to the registers of every pixel of the 2x2
+  quad (C8 had left the lower two at AGC's defaults). 2x, 4x and 8x at 1x: all
+  three games at 100%, antialiased. The maximum torture (6x, 8x MSAA,
+  ubershaders, 16x AF): correct and stable at 92-97% (RE4), 72-77% (Melee) and
+  60-64% (Wind Waker), GPU-bound -- the uncompressed 8x surfaces at 6x
+  quadruple the GPU work of Profile 3.
