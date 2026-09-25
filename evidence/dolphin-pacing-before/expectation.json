@@ -1,0 +1,11 @@
+{
+  "step": "dolphin-pacing-before",
+  "note": "Before: with bSkipPresentingDuplicateXFBs (the default) a 30 FPS game's repeated fields hand RetroArch no frame, so every other retro_run returns without presenting and is paced by the audio writes alone. At 119.88 Hz (swap interval 2) Wind Waker's present periods cross 40 ms 14-17 times in 130 s, at full speed.",
+  "must_contain": [
+    "[ps5vk] output: 119.88 Hz selected",
+    "hitch period_ms=4",
+    "audio ps5: window played=480000 silence=0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

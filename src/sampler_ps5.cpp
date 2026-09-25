@@ -11,7 +11,9 @@
  * and the driver on) about every millisecond with a signal, whose handler
  * records the interrupted instruction pointer. A sample taken while no frame
  * has been presented for over 50 ms (the driver's own present clock,
- * ps5vk_debug_last_present_ns) counts as a stall sample.
+ * ps5vk_debug_last_present_ns) counts as a stall sample; the flag file's
+ * "stall-ms N" line sets the threshold, since one just above a game's own
+ * frame period is what separates its late frames from its ordinary ones.
  *
  * Every ten seconds the window's stall samples are summarised as their most
  * frequent addresses, one line each, which tools resolve against the title's
@@ -46,7 +48,9 @@ constexpr unsigned kMaxThreads = 64;
 /* Per sample: the flags word (bit 0: a stall), rip, the return address on top
  * of the stack and the frame-pointer chain's return addresses. */
 constexpr unsigned kFrames = 10;
-constexpr std::uint64_t kStallNs = 50ull * 1000 * 1000;
+/* A sample counts toward a stall when no frame was presented for this long:
+ * 50 ms, or the flag file's "stall-ms N" line. */
+std::uint64_t g_stall_ns = 50ull * 1000 * 1000;
 constexpr std::uint64_t kWindowNs = 10ull * 1000 * 1000 * 1000;
 constexpr int kSampleSignal = SIGUSR2;
 constexpr unsigned kTop = 60;
@@ -192,7 +196,7 @@ void *sampler(void *)
         nanosleep(&interval, nullptr);
         const std::uint64_t now = ps5vk_debug_now_ns();
         const std::uint64_t last = ps5vk_debug_last_present_ns();
-        const bool stall = last != 0 && now > last && now - last > kStallNs;
+        const bool stall = last != 0 && now > last && now - last > g_stall_ns;
         g_stall.store(stall, std::memory_order_relaxed);
         stall_samples += stall ? 1u : 0u;
         const unsigned count = g_thread_count.load(std::memory_order_acquire);
@@ -223,6 +227,13 @@ extern "C" void ps5_sampler_start()
     char line[64];
     while (g_start_count < kMaxStarts && std::fgets(line, sizeof(line), flag) != nullptr)
     {
+        if (std::strncmp(line, "stall-ms", 8) == 0)
+        {
+            const unsigned long long ms = std::strtoull(line + 8, nullptr, 10);
+            if (ms != 0)
+                g_stall_ns = ms * 1000ull * 1000ull;
+            continue;
+        }
         char *end = nullptr;
         const unsigned long long start = std::strtoull(line, &end, 16);
         if (end != line && start != 0)

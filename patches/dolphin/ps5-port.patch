@@ -566,7 +566,7 @@ index 39e16c7eea..0ed09e9550 100644
  constexpr size_t CODE_SIZE = 1024 * 1024 * 128;
 +#endif
 diff --git a/Source/Core/DolphinLibretro/Boot.cpp b/Source/Core/DolphinLibretro/Boot.cpp
-index c53281053f..146711937d 100644
+index c53281053f..885cdfac84 100644
 --- a/Source/Core/DolphinLibretro/Boot.cpp
 +++ b/Source/Core/DolphinLibretro/Boot.cpp
 @@ -280,6 +280,8 @@ bool retro_load_game(const struct retro_game_info* game)
@@ -610,11 +610,30 @@ index c53281053f..146711937d 100644
    Discord::SetDiscordPresenceEnabled(false);
    Common::SetEnableAlert(false);
    Common::SetAbortOnPanicAlert(false);
+@@ -303,6 +329,18 @@ bool retro_load_game(const struct retro_game_info* game)
+   {
+     // Log the message instead of showing a popup
+     WARN_LOG_FMT(COMMON, "Suppressed popup: {} - {}", caption, text);
++#ifdef __PROSPERO__
++    // The title's trace carries the first alerts too: on screen they last two
++    // seconds, and a run is judged from its trace. Bounded, since an alert a
++    // frame would otherwise be a line a frame.
++    static int ps5_alerts;
++    if (ps5_alerts < 32)
++    {
++      ++ps5_alerts;
++      std::fprintf(stderr, "dolphin alert: %s - %s\n", caption ? caption : "",
++                   text ? text : "");
++    }
++#endif
+     Libretro::Log::LogFrontEnd(style, caption, text, 2000);
+     return true; // Always "continue"
+   });
 diff --git a/Source/Core/DolphinLibretro/Main.cpp b/Source/Core/DolphinLibretro/Main.cpp
-index cd8753b666..25fa130623 100644
+index cd8753b666..85271453ba 100644
 --- a/Source/Core/DolphinLibretro/Main.cpp
 +++ b/Source/Core/DolphinLibretro/Main.cpp
-@@ -35,6 +35,11 @@
+@@ -35,6 +35,12 @@
  #include "Core/PatchEngine.h"
  #include "Core/State.h"
  #include "Core/System.h"
@@ -622,11 +641,12 @@ index cd8753b666..25fa130623 100644
 +#include "Core/FifoPlayer/FifoRecorder.h"
 +#ifdef __PROSPERO__
 +int Ps5DolphinDebugMode();  // VideoCommon/PixelShaderGen.cpp
++unsigned Ps5DolphinFifoFrame();  // VideoCommon/PixelShaderGen.cpp
 +#endif
  #include "DolphinLibretro/Audio.h"
  #include "DolphinLibretro/Input.h"
  #include "DolphinLibretro/Common/Options.h"
-@@ -82,10 +87,61 @@ extern void reload_cheats_from_ini();
+@@ -82,10 +88,61 @@ extern void reload_cheats_from_ini();
  extern unsigned msg_interface_version;
  }  // namespace Libretro
  
@@ -688,13 +708,13 @@ index cd8753b666..25fa130623 100644
    Libretro::environ_cb = cb;
  #ifdef PERF_TEST
    environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb);
-@@ -203,8 +259,38 @@ void retro_reset(void)
+@@ -203,8 +260,39 @@ void retro_reset(void)
    Core::System::GetInstance().GetProcessorInterface().ResetButton_Tap();
  }
  
 +#ifdef __PROSPERO__
-+// The FIFO-log debug mode (VideoCommon/PixelShaderGen.cpp, "fifo"): 300 frames
-+// after launch, ten frames of GPU commands are recorded and saved as
++// The FIFO-log debug mode (VideoCommon/PixelShaderGen.cpp, "fifo" or "fifo N"):
++// 300 frames (or N) after launch, ten frames of GPU commands are recorded and saved as
 +// /app0/savefiles/ps5-fifo.dff, which desktop Dolphin plays back as a reference
 +// for the same frames. Test runs only.
 +static void Ps5FifoRecording()
@@ -705,9 +725,10 @@ index cd8753b666..25fa130623 100644
 +  ++frame;
 +  // The same frames dumped as images on the console, to compare with desktop
 +  // Dolphin's playback of the log (a couple of frames either side).
-+  if (frame >= 298 && frame < 312)
++  const unsigned start = Ps5DolphinFifoFrame();
++  if (frame + 2 >= start && frame < start + 12)
 +    Core::SaveScreenShot(fmt::format("ps5-frame-{}", frame));
-+  if (frame != 300)
++  if (frame != start)
 +    return;
 +  auto& recorder = Core::System::GetInstance().GetFifoRecorder();
 +  recorder.StartRecording(10, [&recorder] {
@@ -715,7 +736,7 @@ index cd8753b666..25fa130623 100644
 +    const bool saved = file != nullptr && file->Save("/app0/savefiles/ps5-fifo.dff");
 +    fprintf(stderr, "dolphin ps5: FIFO log of 10 frames %s\n", saved ? "saved" : "NOT saved");
 +  });
-+  fprintf(stderr, "dolphin ps5: FIFO recording started at frame 300\n");
++  fprintf(stderr, "dolphin ps5: FIFO recording started at frame %u\n", start);
 +}
 +#endif
 +
@@ -727,6 +748,111 @@ index cd8753b666..25fa130623 100644
    Libretro::Input::InitSensors();
    Libretro::Options::CheckForUpdatedVariables();
    Libretro::FrameTiming::CheckForFastForwarding();
+@@ -482,6 +570,7 @@ void retro_run(void)
+   RETRO_PERFORMANCE_INIT(dolphin_main_func);
+   RETRO_PERFORMANCE_START(dolphin_main_func);
+ 
++  Libretro::Video::BeginRun();
+   if (system.IsDualCoreMode())
+   {
+     Core::DoFrameStep(system);
+@@ -491,6 +580,7 @@ void retro_run(void)
+   {
+     system.GetCPU().RunSingleFrame();
+   }
++  Libretro::Video::EndRun();
+ 
+   RETRO_PERFORMANCE_STOP(dolphin_main_func);
+ 
+diff --git a/Source/Core/DolphinLibretro/Video.cpp b/Source/Core/DolphinLibretro/Video.cpp
+index b4003b25b1..0275157ec2 100644
+--- a/Source/Core/DolphinLibretro/Video.cpp
++++ b/Source/Core/DolphinLibretro/Video.cpp
+@@ -71,6 +71,52 @@ static Common::DynamicLibrary d3d11_library;
+ static Common::DynamicLibrary d3d12_library;
+ #endif
+ 
++// libretro asks for one video_cb per retro_run, NULL for a frame that repeats
++// the last: the frontend presents it again, and presenting is what paces
++// retro_run to the display. Dolphin's presenters call video_cb only for a frame
++// they draw, and with bSkipPresentingDuplicateXFBs (the default) a field that
++// repeats its XFB draws none, so a 30 FPS game's every other run returned
++// without one: nothing waited for the display, and those runs were paced by the
++// audio writes alone. On the PS5 at 119.88 Hz with a swap interval of 2, Wind
++// Waker's present periods then crossed 40 ms 14-17 times in 130 seconds.
++//
++// The duplicate goes out where Dolphin would have presented the field
++// (Presenter::ViSwap), inside the GPU loop while the CPU thread emulates on. At
++// the end of the run instead, the frontend's present waited on the display
++// after the frame step had stopped the CPU thread, and the time it lost there
++// left the audio short (Wind Waker: 37-7268 silent frames a ten-second window).
++// EndRun covers a run in which no field was output at all.
++static retro_video_refresh_t s_frontend_video_cb;
++static bool s_frame_sent;
++static unsigned s_frame_width;
++static unsigned s_frame_height;
++
++static void SendFrame(const void* data, unsigned width, unsigned height, size_t pitch)
++{
++  s_frame_sent = true;
++  s_frame_width = width;
++  s_frame_height = height;
++  s_frontend_video_cb(data, width, height, pitch);
++}
++
++void SendDuplicate()
++{
++  // Before the first frame there is nothing to repeat.
++  if (s_frontend_video_cb && s_frame_width != 0)
++    SendFrame(nullptr, s_frame_width, s_frame_height, 0);
++}
++
++void BeginRun()
++{
++  s_frame_sent = false;
++}
++
++void EndRun()
++{
++  if (!s_frame_sent)
++    SendDuplicate();
++}
++
+ int GetAdjustedBaseHeight()
+ {
+   const bool crop_overscan = Libretro::Options::GetCached<bool>(
+@@ -556,6 +602,8 @@ void ContextDestroy(void)
+   DEBUG_LOG_FMT(VIDEO, "Video - ContextDestroy!");
+ 
+   g_context_status.MarkDestroyed();
++  // The frame a duplicate would repeat belonged to this context.
++  s_frame_width = 0;
+ 
+ #ifdef HAS_OPENGL
+   if (g_gfx &&
+@@ -724,5 +772,6 @@ bool CreateDevice(retro_vulkan_context* context, VkInstance instance, VkPhysical
+ 
+ void retro_set_video_refresh(retro_video_refresh_t cb)
+ {
+-  Libretro::Video::video_cb = cb;
++  Libretro::Video::s_frontend_video_cb = cb;
++  Libretro::Video::video_cb = cb ? &Libretro::Video::SendFrame : nullptr;
+ }
+diff --git a/Source/Core/DolphinLibretro/Video.h b/Source/Core/DolphinLibretro/Video.h
+index 8df1a7e320..2892601cf7 100644
+--- a/Source/Core/DolphinLibretro/Video.h
++++ b/Source/Core/DolphinLibretro/Video.h
+@@ -42,6 +42,10 @@ bool Video_InitializeBackend();
+ bool SetHWRender(retro_hw_context_type type, const int version_major = -1, const int version_minor = -1);
+ void ContextReset(void);
+ void ContextDestroy(void);
++// retro_run brackets its frame with these: a run that handed the frontend no
++// frame passes a duplicate (NULL), so the frontend presents -- and paces -- it.
++void BeginRun();
++void EndRun();
+ 
+ class SWGfx : public SW::SWGfx
+ {
 diff --git a/Source/Core/VideoBackends/Vulkan/VKMain.cpp b/Source/Core/VideoBackends/Vulkan/VKMain.cpp
 index 6338e52e3d..10539c661e 100644
 --- a/Source/Core/VideoBackends/Vulkan/VKMain.cpp
@@ -748,10 +874,10 @@ index 6338e52e3d..10539c661e 100644
  }
  
 diff --git a/Source/Core/VideoCommon/PixelShaderGen.cpp b/Source/Core/VideoCommon/PixelShaderGen.cpp
-index 5ce120e9ff..603ebbb51e 100644
+index 5ce120e9ff..8b3e4f4540 100644
 --- a/Source/Core/VideoCommon/PixelShaderGen.cpp
 +++ b/Source/Core/VideoCommon/PixelShaderGen.cpp
-@@ -3,6 +3,57 @@
+@@ -3,6 +3,70 @@
  
  #include "VideoCommon/PixelShaderGen.h"
  
@@ -768,6 +894,7 @@ index 5ce120e9ff..603ebbb51e 100644
 +// frame of a FIFO log (Core/FifoPlayer/FifoPlayer.cpp), to bisect a frame. Never
 +// shipped; the title deletes the file on any launch that is not a test run.
 +static unsigned s_ps5_first_object, s_ps5_last_object;
++static unsigned s_ps5_fifo_frame = 300;
 +int Ps5DolphinDebugMode()
 +{
 +  static int mode = -1;
@@ -780,7 +907,13 @@ index 5ce120e9ff..603ebbb51e 100644
 +      if (std::fscanf(file, "%31s", word) == 1 && std::strcmp(word, "fog") == 0)
 +        mode = 1;
 +      else if (std::strcmp(word, "fifo") == 0)
++      {
++        // "fifo N" starts the log at frame N rather than 300.
 +        mode = 2;
++        unsigned frame = 0;
++        if (std::fscanf(file, "%u", &frame) == 1 && frame != 0)
++          s_ps5_fifo_frame = frame;
++      }
 +      else if (std::strcmp(word, "dump") == 0)
 +        mode = 3;
 +      else if (std::strcmp(word, "swloader") == 0)
@@ -796,6 +929,12 @@ index 5ce120e9ff..603ebbb51e 100644
 +  return mode;
 +}
 +
++unsigned Ps5DolphinFifoFrame()
++{
++  Ps5DolphinDebugMode();
++  return s_ps5_fifo_frame;
++}
++
 +bool Ps5DolphinObjectRange(unsigned* first, unsigned* last)
 +{
 +  if (Ps5DolphinDebugMode() != 6)
@@ -809,7 +948,7 @@ index 5ce120e9ff..603ebbb51e 100644
  #include "Common/Assert.h"
  #include "Common/CommonTypes.h"
  #include "Common/EnumMap.h"
-@@ -1732,6 +1783,14 @@ static void WriteFog(ShaderCode& out, const pixel_shader_uid_data* uid_data)
+@@ -1732,6 +1796,14 @@ static void WriteFog(ShaderCode& out, const pixel_shader_uid_data* uid_data)
        WARN_LOG_FMT(VIDEO, "Unknown Fog Type! {}", uid_data->fog_fsel);
    }
  
@@ -856,3 +995,33 @@ index d2bdadb9c8..eb084b4c8c 100644
    }
    else
    {
+diff --git a/Source/Core/VideoCommon/Present.cpp b/Source/Core/VideoCommon/Present.cpp
+index 95c2e83755..18ab44f05e 100644
+--- a/Source/Core/VideoCommon/Present.cpp
++++ b/Source/Core/VideoCommon/Present.cpp
+@@ -26,6 +26,11 @@
+ #ifdef __LIBRETRO__
+ #include "Core/Config/MainSettings.h"
+ #include "VideoCommon/VideoBackendBase.h"
++
++namespace Libretro::Video
++{
++void SendDuplicate();  // DolphinLibretro/Video.cpp
++}
+ #endif
+ 
+ std::unique_ptr<VideoCommon::Presenter> g_presenter;
+@@ -244,6 +249,13 @@ void Presenter::ViSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
+ 
+     video_events.after_present_event.Trigger(present_info);
+   }
++#ifdef __LIBRETRO__
++  else
++  {
++    // The frontend repeats the last frame where Dolphin would have drawn it.
++    Libretro::Video::SendDuplicate();
++  }
++#endif
+ }
+ 
+ void Presenter::ImmediateSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height)

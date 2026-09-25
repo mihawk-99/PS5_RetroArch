@@ -1,0 +1,32 @@
+{
+  "step": "dolphin-pacing-end-of-run",
+  "note": "A failed variant, kept for what it shows: a NULL frame sent after the run, when the frame step has stopped the CPU thread, removes the hitches but the frontend's present then waits on the display with the CPU thread idle, and the audio runs short (37-7268 silent frames in four of five steady windows).",
+  "must_contain": [
+    "[ps5vk] output: 119.88 Hz selected",
+    "silence=2931",
+    "silence=7268"
+  ],
+  "must_not_contain": [
+    "period_ms=40.",
+    "period_ms=41.",
+    "period_ms=42.",
+    "period_ms=43.",
+    "period_ms=44.",
+    "period_ms=45.",
+    "period_ms=46.",
+    "period_ms=47.",
+    "period_ms=48.",
+    "period_ms=49.",
+    "period_ms=50.",
+    "period_ms=51.",
+    "period_ms=52.",
+    "period_ms=53.",
+    "period_ms=54.",
+    "period_ms=55.",
+    "period_ms=56.",
+    "period_ms=57.",
+    "period_ms=58.",
+    "period_ms=59."
+  ],
+  "human_check": ""
+}

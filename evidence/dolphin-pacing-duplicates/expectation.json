@@ -1,0 +1,32 @@
+{
+  "step": "dolphin-pacing-duplicates",
+  "note": "After: a repeated field hands RetroArch NULL where Dolphin would have presented it, so every retro_run presents and is paced by the display. No present period between 40 and 60 ms after the load, 1,200 presents per 10 s, every steady window 480000 played and 0 silent.",
+  "must_contain": [
+    "[ps5vk] output: 119.88 Hz selected",
+    "presents=400/400",
+    "audio ps5: window played=480000 silence=0"
+  ],
+  "must_not_contain": [
+    "period_ms=40.",
+    "period_ms=41.",
+    "period_ms=42.",
+    "period_ms=43.",
+    "period_ms=44.",
+    "period_ms=45.",
+    "period_ms=46.",
+    "period_ms=47.",
+    "period_ms=48.",
+    "period_ms=49.",
+    "period_ms=50.",
+    "period_ms=51.",
+    "period_ms=52.",
+    "period_ms=53.",
+    "period_ms=54.",
+    "period_ms=55.",
+    "period_ms=56.",
+    "period_ms=57.",
+    "period_ms=58.",
+    "period_ms=59."
+  ],
+  "human_check": ""
+}

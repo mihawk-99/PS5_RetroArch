@@ -1,6 +1,6 @@
 # Active work
 
-_Updated: 2026-09-24_
+_Updated: 2026-09-25_
 
 ## Now: Dolphin (GameCube) with Wind Waker
 
@@ -32,10 +32,12 @@ What the bring-up needed, by layer (details in `docs/PHASE_LOG.md`):
 
 **Test aids** (never shipped; the title deletes their files on any launch that
 is not a test run): `/app0/dolphin-options.txt` overrides core options for one
-run; `/app0/dolphin-debug.txt` names a debug mode: `fog`, `fifo` (records a
-FIFO log at frame 300), `dump`, `swloader`, `cmploader`, or `objects A B`
-(plays only objects A to B of each FIFO frame, to bisect against desktop
-Dolphin).
+run; `/app0/dolphin-debug.txt` names a debug mode: `fog`, `fifo` or `fifo N`
+(records a FIFO log at frame 300, or N), `dump`, `swloader`, `cmploader`, or
+`objects A B` (plays only objects A to B of each FIFO frame, to bisect against
+desktop Dolphin). The core also copies its first 32 alerts to the trace
+(`dolphin alert:`). `/app0/ps5-sampler.txt` arms the CPU sampler
+(`src/sampler_ps5.cpp`); its `stall-ms N` line sets the late-frame threshold.
 
 ## Next
 
@@ -43,12 +45,14 @@ The acceptance goal (2026-09-25): Resident Evil 4, Super Smash Bros. Melee and
 Wind Waker correct, full speed, with audio, input and states, then stable and
 measured through the profiles in `tooling/dolphin-profiles/` (docs/PHASE_LOG.md).
 
-1. Profile 0: RE4 and Wind Waker pass; Melee's remaining sub-100% windows
-   (shader-compile hitches) and the grey band in one Melee shot (a FIFO log
-   against desktop Dolphin decides whether it is scenery).
-2. Profiles 1-11 on all three games: accurate, ubershaders, 6x torture, GPU and
-   RAM EFB, the scaling ladder, MSAA, cold/warm shader cache, reloads, state
-   stress, long soak.
+1. Profiles 0 and 1 pass on all three games: correct pictures, full speed,
+   display-paced frames (docs/PHASE_LOG.md, 2026-09-25). Tolerated: a
+   screenshot's 55 ms read-back leaves its audio window ~0.4% short.
+2. The driver's copy throughput: the 55 ms read-back of the 4K output and a
+   218 ms copy in RE4's load; Profile 5's EFB copies to RAM depend on it.
+3. Profiles 2-11 on all three games: ubershaders, 6x torture, GPU and RAM EFB,
+   the scaling ladder, MSAA, cold/warm shader cache, reloads, state stress,
+   long soak.
 3. The dual-core FIFO playback stall (single core plays).
 
 ## Accepted baselines

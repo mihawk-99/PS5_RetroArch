@@ -3244,3 +3244,46 @@ which the GameCube pad ignores.
 
 Profile 0 on the R71 build: RE4 and Wind Waker 100% in every steady window,
 correct pictures; Melee 96-100%.
+
+## 2026-09-25 — Profile 1; one frame per retro_run, so the display paces Dolphin
+
+Profile 1 (the accurate baseline: safe texture cache, scaled EFB copies, GPU
+texture decoding, exact depth) needed two driver rounds and one fix in the
+core's libretro glue.
+
+1. **RE4: "Failed to allocate 65536 bytes from texel buffer".** GPU texture
+   decoding streams through a texel buffer Dolphin sizes by
+   maxTexelBufferElements, which the driver reported as Vulkan 1.0's minimum.
+   ../PS5_Vulkan R72 reports the descriptor's 32-bit record count, as RADV does.
+2. **Wind Waker: 32 frame periods over 40 ms in 130 s**, at full speed. The
+   title's CPU sampler found the driver re-reading AGC's colour-target
+   defaults for every target of every rendering; ../PS5_Vulkan R73 reads them
+   once (32 → 14).
+3. **The other 14 were pacing, not work.** With the sampler's threshold just
+   above the game's 33 ms frame, every late frame had the CPU thread blocked in
+   the audio driver's write and the main thread waiting for it. libretro asks
+   for one video_cb per retro_run, NULL for a repeated frame; Dolphin's
+   presenters call it only for a frame they draw, and with duplicate XFBs
+   skipped (the default) a 30 FPS game's every other field drew none. Those
+   runs returned without presenting, so nothing waited for the display and the
+   audio writes alone paced them. Presenting every field (`dolphin_skip_dupe_frames`
+   off) left no late frame, which confirmed it. The core now hands RetroArch
+   NULL for a skipped duplicate at the point Dolphin would have presented it
+   (`Presenter::ViSwap`), and at the end of a run that output no field.
+   A first version sent it only at the end of the run: no late frames, but the
+   frontend's present then waited on the display after the frame step had
+   stopped the CPU thread, and the audio ran 37-7268 frames short in four of
+   five windows. Both are kept: `evidence/dolphin-pacing-before`,
+   `evidence/dolphin-pacing-end-of-run`, `evidence/dolphin-pacing-duplicates`.
+
+Profile 1 on title f2585b8f (`tooling/dolphin-profiles/p1-accurate.txt`,
+screenshots on SELECT): RE4, Melee and Wind Waker draw as before, 1,200
+presents per 10 s, every window without a screenshot 480000 played and 0
+silent. Every late frame left is either the state load (the first 1-4) or a
+screenshot: RetroArch's read-back of the 4K output costs 55 ms in the driver's
+copy path, and a window with one runs ~2000 frames (0.4%) short. Under display
+pacing the audio buffer is kept half full (32 ms) rather than full, so a stall
+that long now empties it; before, a screenshot window was ~750 frames short in
+RE4 and Wind Waker and 2000-3800 in Melee. The driver's copy throughput (the
+55 ms read-back, a 218 ms copy in RE4's load) is the next lead, and matters
+most for Profile 5's EFB copies to RAM.
