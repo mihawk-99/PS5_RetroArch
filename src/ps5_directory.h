@@ -9,6 +9,7 @@ extern "C"
     DIR *ps5_fdopendir(int fd);
     struct dirent *ps5_readdir(DIR *directory);
     void ps5_rewinddir(DIR *directory);
+    int ps5_dirfd(DIR *directory);
     int ps5_closedir(DIR *directory);
 #ifdef __cplusplus
 }

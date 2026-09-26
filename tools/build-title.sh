@@ -56,10 +56,13 @@ sdk="$root/.deps/native/ps5-payload-sdk"
 
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
-core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp dolphin)
+core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp dolphin pcsx2)
 core_files=()
 for core_name in "${core_names[@]}"; do
-    bash "$root/tools/build-${core_name//_/-}.sh"
+    # LRPS2's library keeps PCSX2's name; its build script is the port's.
+    script=${core_name//_/-}
+    [[ $core_name != pcsx2 ]] || script=lrps2
+    bash "$root/tools/build-$script.sh"
     core_files+=("$root/build/cores/stage/cores/${core_name}_libretro.so")
 done
 python3 "$root/tools/core-imports.py" "${core_files[@]}"
@@ -204,6 +207,7 @@ inputs += [root / name for name in (
     "build/cores/stage/cores/genesis_plus_gx_libretro.so",
     "build/cores/stage/cores/ppsspp_libretro.so",
     "build/cores/stage/cores/dolphin_libretro.so",
+    "build/cores/stage/cores/pcsx2_libretro.so",
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += [pathlib.Path(name) for name in sys.argv[3:]]
 digest = hashlib.sha256()

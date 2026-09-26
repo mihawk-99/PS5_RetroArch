@@ -1,0 +1,943 @@
+diff --git a/cmake/FindLibc.cmake b/cmake/FindLibc.cmake
+index 1fae6366c..b1aa703d1 100644
+--- a/cmake/FindLibc.cmake
++++ b/cmake/FindLibc.cmake
+@@ -31,9 +31,16 @@ elseif(ANDROID)
+ 	# "variables are used in this project, but they are set to NOTFOUND".
+ 	set(LIBC_LIBRARIES ${libm})
+ else()
+-	# FreeBSD doesn't have libdl
++	# FreeBSD doesn't have libdl, and a libc that carries the realtime and
++	# math entry points itself (the PS5's) has neither librt nor libm: link
++	# only what was found, never a literal NOTFOUND.
+ 	find_library(librt NAMES rt)
+-	set(LIBC_LIBRARIES ${librt} ${libm})
++	set(LIBC_LIBRARIES)
++	foreach(lib IN ITEMS ${librt} ${libm})
++		if(lib)
++			list(APPEND LIBC_LIBRARIES ${lib})
++		endif()
++	endforeach()
+ endif()
+ 
+ # handle the QUIETLY and REQUIRED arguments and set LIBC_FOUND to TRUE if
+diff --git a/common/Pcsx2Defs.h b/common/Pcsx2Defs.h
+index d5cb9dcde..d32793189 100644
+--- a/common/Pcsx2Defs.h
++++ b/common/Pcsx2Defs.h
+@@ -68,6 +68,14 @@
+ #define __pagesize 0x1000
+ #define __pageshift 12
+ #define __cachelinesize 128
++#elif defined(__PROSPERO__)
++/* The PS5 is x86-64 with 16KB kernel pages: mmap, mprotect and every mapping
++   of direct memory work in 16KB units, so page protection and the fastmem
++   window use the vtlb's coalescing path (four 4KB guest pages to a host page),
++   as on Apple Silicon. Zen 2's cache lines are 64 bytes. */
++#define __pagesize 0x4000
++#define __pageshift 14
++#define __cachelinesize 64
+ #else
+ // X86 uses a 4KB granularity and 64 byte cache lines.
+ #define __pagesize 0x1000
+diff --git a/common/VectorIntrin.h b/common/VectorIntrin.h
+index 614ffb9f2..01ccd70c8 100644
+--- a/common/VectorIntrin.h
++++ b/common/VectorIntrin.h
+@@ -66,7 +66,7 @@
+ #endif
+ #endif
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__FreeBSD__)
+ #include <stdlib.h> // alloca
+ #else
+ #include <malloc.h> // alloca
+diff --git a/libretro/libretro-common/faulthandler/faulthandler.c b/libretro/libretro-common/faulthandler/faulthandler.c
+index e4b25206d..70ffc2a64 100644
+--- a/libretro/libretro-common/faulthandler/faulthandler.c
++++ b/libretro/libretro-common/faulthandler/faulthandler.c
+@@ -23,6 +23,8 @@
+ #define _GNU_SOURCE 1   /* REG_RIP in <ucontext.h> */
+ #endif
+ 
++#include <stddef.h>
++#include <stdint.h>
+ #include <string.h>
+ #include <faulthandler.h>
+ #include <retro_atomic.h>
+@@ -83,7 +85,7 @@ static retro_atomic_int_t s_slot_inhandler[RETRO_FAULT_MAX_THREADS];
+ #if defined(_WIN32)
+ static void *s_veh_handle;
+ #else
+-#if defined(__APPLE__) || defined(__aarch64__)
++#if defined(__APPLE__) || defined(__aarch64__) || defined(__PROSPERO__)
+ static struct sigaction s_old_sigbus;
+ #endif
+ #if !defined(__APPLE__) || defined(__aarch64__)
+@@ -214,7 +216,7 @@ static LONG __stdcall fault_veh(EXCEPTION_POINTERS *eps)
+ /* Chain to whatever handled this signal before us. */
+ static void fault_chain(int sig, siginfo_t *si, void *ctx)
+ {
+-#if defined(__APPLE__) || defined(__aarch64__)
++#if defined(__APPLE__) || defined(__aarch64__) || defined(__PROSPERO__)
+ #if !defined(__APPLE__) || defined(__aarch64__)
+    const struct sigaction *sa = (sig == SIGBUS) ? &s_old_sigbus : &s_old_sigsegv;
+ #else
+@@ -263,6 +265,12 @@ static void fault_filter(int sig, siginfo_t *si, void *ctx)
+    pc = (void*)((ucontext_t*)ctx)->uc_mcontext->__ss.__rip;
+ #elif defined(__APPLE__) && defined(__aarch64__)
+    pc = (void*)((ucontext_t*)ctx)->uc_mcontext->__ss.__pc;
++#elif defined(__PROSPERO__)
++   /* The PS5's machine context is FreeBSD's, six words further on than the
++    * SDK's header places it: rip, cs, rflags, rsp and ss were measured at
++    * words 26-30 (the PS5 RetroArch title's Dolphin and PPSSPP ports). */
++   pc = (void*)((const uint64_t*)&((ucontext_t*)ctx)->uc_mcontext)
++         [offsetof(mcontext_t, mc_rip) / sizeof(uint64_t) + 6];
+ #elif defined(__FreeBSD__) && defined(__x86_64__)
+    pc = (void*)((ucontext_t*)ctx)->uc_mcontext.mc_rip;
+ #elif defined(__x86_64__)
+@@ -318,9 +326,10 @@ bool retro_faulthandler_install(retro_fault_handler_t handler)
+        * old one must be able to raise it again. */
+       sa.sa_flags    |= SA_NODEFER;
+ #endif
+-#if defined(__APPLE__) || defined(__aarch64__)
++#if defined(__APPLE__) || defined(__aarch64__) || defined(__PROSPERO__)
+       /* Darwin reports a permission violation as SIGBUS, and so does
+-       * ARM64. */
++       * ARM64; the PS5 can report a fault on a reserved, unmapped page
++       * as SIGBUS as well. */
+       if (sigaction(SIGBUS, &sa, &s_old_sigbus) != 0)
+          ok = false;
+ #endif
+@@ -375,7 +384,7 @@ void retro_faulthandler_remove(retro_fault_handler_t handler)
+ #else
+    {
+       struct sigaction sa;
+-#if defined(__APPLE__) || defined(__aarch64__)
++#if defined(__APPLE__) || defined(__aarch64__) || defined(__PROSPERO__)
+       sigaction(SIGBUS, &s_old_sigbus, &sa);
+ #endif
+ #if !defined(__APPLE__) || defined(__aarch64__)
+diff --git a/libretro/libretro-common/memmap/memmap.c b/libretro/libretro-common/memmap/memmap.c
+index f67ff39df..b7390cac0 100644
+--- a/libretro/libretro-common/memmap/memmap.c
++++ b/libretro/libretro-common/memmap/memmap.c
+@@ -25,6 +25,50 @@
+ #include <string.h>   /* strlen, memcpy, memset */
+ #include <memmap.h>
+ 
++#if defined(__PROSPERO__)
++/* PS5: shared memory is libkernel's direct memory. Every mapping of an
++ * anonymous or shared-memory object is charged to the title's small
++ * flexible-memory budget, while direct memory is a separate pool of
++ * several GiB, one allocation of which can be mapped at any number of
++ * addresses -- which is what a shared-memory object is for here (the
++ * PS5 RetroArch title's Dolphin port measured both). A reservation is
++ * the kernel's virtual-range reservation, which holds addresses without
++ * backing them. Views and reservations are placed above the GPU-visible
++ * window at 0x2_0000_0000 - 0x2_FFFF_FFFF, which the console's Vulkan
++ * driver needs, and below libkernel's modules at 0x8_0000_0000. */
++#include <sys/mman.h>
++int64_t sceKernelGetDirectMemorySize(void);
++int32_t sceKernelAllocateDirectMemory(int64_t search_start, int64_t search_end,
++      size_t bytes, size_t alignment, int type, int64_t *start);
++int32_t sceKernelMapDirectMemory(void **address, size_t bytes, int protection,
++      int flags, int64_t start, size_t alignment);
++int32_t sceKernelReleaseDirectMemory(int64_t start, size_t bytes);
++int32_t sceKernelReserveVirtualRange(void **address, size_t bytes, int flags,
++      size_t alignment);
++#define MEMMAP_PS5_ALIGN     ((size_t)0x10000)
++#define MEMMAP_PS5_PAGE      ((size_t)0x4000)
++/* CPU read and write: the type the title's own direct-memory heap uses. */
++#define MEMMAP_PS5_TYPE      12
++/* The kernel's fixed-address flag (FreeBSD's MAP_FIXED value). */
++#define MEMMAP_PS5_FIXED     0x10
++#define MEMMAP_PS5_VIEW_HINT ((uintptr_t)0x400000000ull)
++#define MEMMAP_PS5_AREA_HINT ((uintptr_t)0x1400000000ull)
++#define MEMMAP_PS5_GPU_LOW   ((uintptr_t)0x200000000ull)
++#define MEMMAP_PS5_GPU_HIGH  ((uintptr_t)0x300000000ull)
++
++typedef struct
++{
++   int64_t start;
++   size_t  len;
++} memshm_ps5_t;
++
++/* Direct memory maps for the CPU with read and write only. */
++static int memshm_ps5_prot(int prot)
++{
++   return prot & (PROT_READ | PROT_WRITE);
++}
++#endif
++
+ #ifndef PROT_READ
+ #define PROT_READ         0x1  /* Page can be read */
+ #endif
+@@ -483,6 +527,59 @@ void memshm_unmap(void *addr, size_t len)
+ /* Gated on MAP_SHARED, as reserve/commit gates on its constants: DJGPP
+  * defines __unix__ and HAVE_MMAN but ships a stub <sys/mman.h> with no
+  * MAP_SHARED and no shm_open, and falls through to the stubs below. */
++#elif defined(__PROSPERO__)
++
++void *memshm_create(const char *name, size_t len)
++{
++   memshm_ps5_t *h;
++   int64_t start   = -1;
++   size_t  bytes   = (len + MEMMAP_PS5_ALIGN - 1) & ~(MEMMAP_PS5_ALIGN - 1);
++   (void)name;
++   if (!bytes || sceKernelAllocateDirectMemory(0, sceKernelGetDirectMemorySize(),
++            bytes, MEMMAP_PS5_ALIGN, MEMMAP_PS5_TYPE, &start) != 0)
++      return NULL;
++   h = (memshm_ps5_t*)malloc(sizeof(*h));
++   if (!h)
++   {
++      sceKernelReleaseDirectMemory(start, bytes);
++      return NULL;
++   }
++   h->start = start;
++   h->len   = bytes;
++   return h;
++}
++
++void memshm_destroy(void *handle)
++{
++   memshm_ps5_t *h = (memshm_ps5_t*)handle;
++   if (!h)
++      return;
++   sceKernelReleaseDirectMemory(h->start, h->len);
++   free(h);
++}
++
++/* A hint is where the kernel starts looking, as mmap's is: the caller
++ * compares what it got, as on the other platforms. No hint means above
++ * the GPU window. */
++void *memshm_map(void *handle, size_t offset, void *hint, size_t len, int prot)
++{
++   memshm_ps5_t *h = (memshm_ps5_t*)handle;
++   void *addr;
++   if (!h || !len || offset > h->len || len > h->len - offset)
++      return NULL;
++   addr = hint ? hint : (void*)MEMMAP_PS5_VIEW_HINT;
++   if (sceKernelMapDirectMemory(&addr, len, memshm_ps5_prot(prot), 0,
++            h->start + (int64_t)offset, MEMMAP_PS5_PAGE) != 0)
++      return NULL;
++   return addr;
++}
++
++void memshm_unmap(void *addr, size_t len)
++{
++   if (addr)
++      munmap(addr, len);
++}
++
+ #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_SHARED)
+ 
+ #include <unistd.h>
+@@ -859,6 +956,30 @@ static void memshm_legacy_release(memshm_area_t *a, size_t first, size_t count)
+ 
+ memshm_area_t *memshm_area_create(size_t len)
+ {
++#if defined(__PROSPERO__)
++   /* A virtual-range reservation: addresses without backing, which an
++    * anonymous PROT_NONE mapping would charge in full to flexible memory.
++    * At the hint first, anywhere else if it is taken, never in the GPU
++    * window. */
++   memshm_area_t *a;
++   void *addr = (void*)MEMMAP_PS5_AREA_HINT;
++   if (sceKernelReserveVirtualRange(&addr, len, 0, MEMMAP_PS5_ALIGN) != 0)
++      return NULL;
++   if ((uintptr_t)addr < MEMMAP_PS5_GPU_HIGH && (uintptr_t)addr + len > MEMMAP_PS5_GPU_LOW)
++   {
++      munmap(addr, len);
++      return NULL;
++   }
++   a = (memshm_area_t*)calloc(1, sizeof(*a));
++   if (!a)
++   {
++      munmap(addr, len);
++      return NULL;
++   }
++   a->base = (unsigned char*)addr;
++   a->len  = len;
++   return a;
++#else
+ #if (defined(_WIN32) && !defined(_XBOX)) || (defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_ANONYMOUS))
+    memshm_area_t *a;
+ #endif
+@@ -994,6 +1115,7 @@ memshm_area_t *memshm_area_create(size_t len)
+    (void)len;
+    return NULL;
+ #endif
++#endif
+ }
+ 
+ void memshm_area_free(memshm_area_t *area)
+@@ -1019,6 +1141,9 @@ void memshm_area_free(memshm_area_t *area)
+    }
+    /* Every placeholder and every mapping goes with the reservation. */
+    VirtualFree(area->base, 0, MEM_RELEASE);
++#elif defined(__PROSPERO__)
++   /* The reservation and every mapping made into it. */
++   munmap(area->base, area->len);
+ #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
+    munmap(area->base, area->len);
+ #endif
+@@ -1134,6 +1259,17 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
+ #else
+    return NULL;
+ #endif
++#elif defined(__PROSPERO__)
++   memshm_ps5_t *h = (memshm_ps5_t*)handle;
++   void *addr      = at;
++   if (!area || !h || !at || !len || offset > h->len || len > h->len - offset)
++      return NULL;
++   /* Fixed, over the reservation or a hole memshm_area_unmap reserved again. */
++   if (sceKernelMapDirectMemory(&addr, len, memshm_ps5_prot(prot), MEMMAP_PS5_FIXED,
++            h->start + (int64_t)offset, MEMMAP_PS5_PAGE) != 0 || addr != at)
++      return NULL;
++   area->mappings++;
++   return (unsigned char*)addr;
+ #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
+    void *p;
+    if (!area || !at || !len)
+@@ -1226,6 +1362,17 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
+ #else
+    return false;
+ #endif
++#elif defined(__PROSPERO__)
++   void *addr = at;
++   if (!area || !at || !len)
++      return false;
++   /* The mapping goes and the hole is reserved again, so nothing else is
++    * placed inside the area. */
++   munmap(at, len);
++   if (sceKernelReserveVirtualRange(&addr, len, MEMMAP_PS5_FIXED, 0) != 0)
++      return false;
++   area->mappings--;
++   return true;
+ #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
+    if (!area || !at || !len)
+       return false;
+diff --git a/libretro/libretro-common/rthreads/retro_procbarrier.c b/libretro/libretro-common/rthreads/retro_procbarrier.c
+index 4a249f291..28935efe7 100644
+--- a/libretro/libretro-common/rthreads/retro_procbarrier.c
++++ b/libretro/libretro-common/rthreads/retro_procbarrier.c
+@@ -65,11 +65,13 @@
+ #define PB_DARWIN 1
+ #elif defined(__linux__) || defined(__ANDROID__)
+ #define PB_LINUX 1
+-#elif defined(__FreeBSD__) && !defined(__ORBIS__) && !defined(ORBIS)
++#elif defined(__FreeBSD__) && !defined(__ORBIS__) && !defined(ORBIS) \
++   && !defined(__PROSPERO__)
+ /* The PS4 is FreeBSD underneath and its toolchain defines __FreeBSD__,
+  * but Sony's kernel is a 9-era fork with none of the 14.1 membarrier
+  * and no process-barrier API of its own. It is a multi-core console and
+- * resolves to NONE like the others. */
++ * resolves to NONE like the others. So is the PS5, whose x86 page flip
++ * faulted on the write after its mprotect (SIGSEGV at the page). */
+ #define PB_FREEBSD 1
+ #endif
+ 
+@@ -81,7 +83,9 @@
+ #include <windows.h>
+ #endif
+ 
+-#if defined(PB_LINUX) || defined(PB_FREEBSD_MEMBARRIER) || defined(PB_DARWIN)
++/* PB_FREEBSD, not PB_FREEBSD_MEMBARRIER: that is only decided below, and a
++ * FreeBSD without membarrier(2) still needs these for the x86 page flip. */
++#if defined(PB_LINUX) || defined(PB_FREEBSD) || defined(PB_DARWIN)
+ #include <unistd.h>
+ #include <signal.h>
+ #include <errno.h>
+diff --git a/libretro/libretro-common/rthreads/rthreads.c b/libretro/libretro-common/rthreads/rthreads.c
+index c354e0328..0a7716a69 100644
+--- a/libretro/libretro-common/rthreads/rthreads.c
++++ b/libretro/libretro-common/rthreads/rthreads.c
+@@ -22,7 +22,9 @@
+ 
+ #ifdef __unix__
+ #ifndef __sun__
+-#ifndef _POSIX_C_SOURCE
++/* Not on FreeBSD: it exposes everything by default, and 199309 hides
++ * CLOCK_REALTIME (visible from 200112) and the BSD extensions below. */
++#if !defined(_POSIX_C_SOURCE) && !defined(__FreeBSD__)
+ #define _POSIX_C_SOURCE 199309
+ #endif
+ #endif
+@@ -138,6 +140,9 @@
+ #else
+ #include <pthread.h>
+ #include <time.h>
++#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
++#include <pthread_np.h> /* pthread_set_name_np */
++#endif
+ #endif
+ 
+ #if defined(USE_CTR_THREADS) && !defined(USE_CTRULIB_2)
+diff --git a/libretro/libretro-common/vfs/vfs_implementation.c b/libretro/libretro-common/vfs/vfs_implementation.c
+index 6039ad6de..55f78f07c 100644
+--- a/libretro/libretro-common/vfs/vfs_implementation.c
++++ b/libretro/libretro-common/vfs/vfs_implementation.c
+@@ -221,10 +221,13 @@
+ #endif
+ 
+ /* fstatat(): POSIX.1-2008.  glibc, musl, bionic, the BSDs and Haiku have
+- * it; QNX 6.5 does not, ORBIS's FreeBSD-derived libc does not, and on
+- * Apple it arrived with the 10.10 SDK, which the PowerPC cross SDK
+- * predates.  Everyone else takes the join+stat path in dirent_stat. */
+-#if defined(VFS_HAVE_POSIX_METADATA) && !defined(__QNX__) && !defined(ORBIS)
++ * it; QNX 6.5 does not, ORBIS's FreeBSD-derived libc does not, neither
++ * does the PS5's runtime (its SDK links the symbol, the console resolves
++ * it to nothing), and on Apple it arrived with the 10.10 SDK, which the
++ * PowerPC cross SDK predates.  Everyone else takes the join+stat path in
++ * dirent_stat. */
++#if defined(VFS_HAVE_POSIX_METADATA) && !defined(__QNX__) && !defined(ORBIS) \
++      && !defined(__PROSPERO__)
+ #if defined(__APPLE__)
+ #include <AvailabilityMacros.h>
+ #if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+diff --git a/pcsx2/CMakeLists.txt b/pcsx2/CMakeLists.txt
+index 9589cd394..2c787324e 100644
+--- a/pcsx2/CMakeLists.txt
++++ b/pcsx2/CMakeLists.txt
+@@ -969,8 +969,9 @@ if(WIN32)
+ 		opengl32.lib
+ 		OneCore.lib
+ 	)
+-elseif(APPLE OR ANDROID OR WEBOS)
+-	# Nothing to link: these get their GL entry points from the frontend.
++elseif(APPLE OR ANDROID OR WEBOS OR NOT USE_OPENGL)
++	# Nothing to link: these get their GL entry points from the frontend,
++	# and a build without the OpenGL renderer calls none.
+ else()
+ 	target_link_libraries(PCSX2_FLAGS INTERFACE
+ 		OpenGL::GL
+diff --git a/pcsx2/GS/GS.cpp b/pcsx2/GS/GS.cpp
+index 40ea167a2..77f074ec1 100644
+--- a/pcsx2/GS/GS.cpp
++++ b/pcsx2/GS/GS.cpp
+@@ -680,6 +680,53 @@ void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
+ 	s_fh = NULL;
+ }
+ 
++#elif defined(__PROSPERO__)
++
++#include <sys/mman.h>
++#include <memmap.h>
++
++/* PS5: the same wrapped view through libretro-common's memmap, whose PS5
++ * backend is direct memory (a shared-memory object's every mapping would be
++ * charged to the title's small flexible-memory budget): one allocation of
++ * the size, and a reservation it is mapped into repeat times back to back. */
++static void* s_gs_shm;
++static memshm_area_t* s_gs_area;
++
++void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
++{
++	(void)ptr;
++	(void)size;
++	(void)repeat;
++	if (s_gs_area)
++		memshm_area_free(s_gs_area);
++	s_gs_area = nullptr;
++	if (s_gs_shm)
++		memshm_destroy(s_gs_shm);
++	s_gs_shm = nullptr;
++}
++
++void* GSAllocateWrappedMemory(size_t size, size_t repeat)
++{
++	s_gs_shm  = memshm_create("GS.mem", size);
++	s_gs_area = s_gs_shm ? memshm_area_create(size * repeat) : nullptr;
++	if (!s_gs_area)
++	{
++		GSFreeWrappedMemory(nullptr, size, repeat);
++		return nullptr;
++	}
++	u8* const base = memshm_area_base(s_gs_area);
++	for (size_t i = 0; i < repeat; i++)
++	{
++		if (!memshm_area_map(s_gs_area, s_gs_shm, 0, base + size * i, size, PROT_READ | PROT_WRITE))
++		{
++			fprintf(stderr, "Fail to map contiguous segment\n");
++			GSFreeWrappedMemory(nullptr, size, repeat);
++			return nullptr;
++		}
++	}
++	return base;
++}
++
+ #else
+ 
+ #include <sys/mman.h>
+diff --git a/pcsx2/GS/Renderers/HW/GSTextureCache.cpp b/pcsx2/GS/Renderers/HW/GSTextureCache.cpp
+index 6bf878579..f3135fb0a 100644
+--- a/pcsx2/GS/Renderers/HW/GSTextureCache.cpp
++++ b/pcsx2/GS/Renderers/HW/GSTextureCache.cpp
+@@ -7,7 +7,7 @@
+ #include <cmath>
+ #include <cstring>
+ #include <cinttypes>
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__FreeBSD__)
+ #include <stdlib.h>
+ #else
+ #include <malloc.h>
+diff --git a/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp b/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp
+index 10d9b02b6..d9ea896b6 100644
+--- a/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp
++++ b/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp
+@@ -105,6 +105,15 @@ bool create_device_vulkan(retro_vulkan_context *context, VkInstance instance, Vk
+ 	vk_init_info.required_features              = required_features;
+ 	vk_init_info.vkGetInstanceProcAddr          = get_instance_proc_addr;
+ 
++	/* No Vulkan library was loaded -- a frontend that links its Vulkan driver
++	 * has none to load -- so the entry point the frontend passes here, the one
++	 * a libretro core is given to use, is the one the wrapper forwards to. */
++	if (!vkGetInstanceProcAddr_org && get_instance_proc_addr)
++	{
++		vkGetInstanceProcAddr_org = get_instance_proc_addr;
++		Vulkan::UseFrontendVulkanEntryPoint();
++	}
++
+ 	if(gpu != VK_NULL_HANDLE) {
+ 		VkPhysicalDeviceProperties props = {};
+ 		vkGetPhysicalDeviceProperties    = (PFN_vkGetPhysicalDeviceProperties)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties");
+@@ -156,7 +165,24 @@ static VKAPI_ATTR VkResult VKAPI_CALL vkCreateDevice_libretro(VkPhysicalDevice p
+ 	for (unsigned i = 0; i < vk_init_info.num_required_device_extensions; i++)
+ 		add_name_unique(EnabledExtensionNames, vk_init_info.required_device_extensions[i]);
+ 
+-	add_name_unique(EnabledExtensionNames, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
++	// Only a device that lists the extension may be asked for it: requesting an
++	// absent one fails device creation with VK_ERROR_EXTENSION_NOT_PRESENT.
++	u32 extension_count = 0;
++	if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extension_count, nullptr) == VK_SUCCESS)
++	{
++		std::vector<VkExtensionProperties> available(extension_count);
++		if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extension_count, available.data()) == VK_SUCCESS)
++		{
++			for (u32 i = 0; i < extension_count; i++)
++			{
++				if (!strcmp(available[i].extensionName, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME))
++				{
++					add_name_unique(EnabledExtensionNames, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
++					break;
++				}
++			}
++		}
++	}
+ 	for (unsigned i = 0; i < sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32); i++)
+ 	{
+ 		if (((VkBool32 *)vk_init_info.required_features)[i])
+@@ -359,8 +385,9 @@ static void SafeDestroyDescriptorSetLayout(VkDevice dev, VkDescriptorSetLayout&
+ 			return false;
+ 		};
+ 
+-		// Required extensions.
+-		if (!SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, true))
++		// Push descriptors: nothing in this renderer pushes a descriptor set
++		// (no layout sets the push flag), so the extension is only reported.
++		if (!SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false))
+ 		{
+ 			log_cb(RETRO_LOG_INFO, "Does not support VK_KHR_push_descriptor extension\n");
+ 			//return false;
+@@ -562,8 +589,8 @@ static void SafeDestroyDescriptorSetLayout(VkDevice dev, VkDescriptorSetLayout&
+ 		// confirm we actually support push descriptor extension
+ 		if (push_descriptor_properties.maxPushDescriptors < 4 /*NUM_TFX_TEXTURES */)
+ 		{
+-			log_cb(RETRO_LOG_ERROR, "maxPushDescriptors (%u) is below required (%u)\n", push_descriptor_properties.maxPushDescriptors,
+-					NUM_TFX_TEXTURES);
++			log_cb(RETRO_LOG_INFO, "maxPushDescriptors (%u) is below %u; push descriptors are not used\n",
++					push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
+ 			log_cb(RETRO_LOG_INFO, "VK_KHR_push_descriptor is NOT supported\n");
+ 			//return false;
+ 		}
+diff --git a/pcsx2/GS/Renderers/Vulkan/VKLoader.cpp b/pcsx2/GS/Renderers/Vulkan/VKLoader.cpp
+index 1c1fecd95..3f1296e3b 100644
+--- a/pcsx2/GS/Renderers/Vulkan/VKLoader.cpp
++++ b/pcsx2/GS/Renderers/Vulkan/VKLoader.cpp
+@@ -45,6 +45,10 @@ extern "C" {
+ 
+ namespace Vulkan
+ {
++	// Whether the frontend supplies the entry point, so no library is needed
++	// (UseFrontendVulkanEntryPoint, below).
++	static bool s_frontend_entry_point;
++
+ 	void ResetVulkanLibraryFunctionPointers()
+ 	{
+ #define VULKAN_MODULE_ENTRY_POINT(name, required) pcsx2_##name = nullptr;
+@@ -64,7 +68,7 @@ namespace Vulkan
+ 	bool LoadVulkanLibrary()
+ 	{
+ 		// Not thread safe if a second thread calls the loader whilst the first is still in-progress.
+-		if (vulkan_module)
++		if (vulkan_module || s_frontend_entry_point)
+ 		{
+ 			retro_atomic_inc_int(&vulkan_module_ref_count);
+ 			return true;
+@@ -109,8 +113,10 @@ namespace Vulkan
+ 			return;
+ 
+ 		ResetVulkanLibraryFunctionPointers();
+-		FreeLibrary(vulkan_module);
++		if (vulkan_module)
++			FreeLibrary(vulkan_module);
+ 		vulkan_module = nullptr;
++		s_frontend_entry_point = false;
+ 	}
+ 
+ #else
+@@ -121,7 +127,7 @@ namespace Vulkan
+ 	bool LoadVulkanLibrary()
+ 	{
+ 		// Not thread safe if a second thread calls the loader whilst the first is still in-progress.
+-		if (vulkan_module)
++		if (vulkan_module || s_frontend_entry_point)
+ 		{
+ 			retro_atomic_inc_int(&vulkan_module_ref_count);
+ 			return true;
+@@ -216,10 +222,29 @@ namespace Vulkan
+ 			dlclose(vulkan_module);
+ 			vulkan_module = nullptr;
+ 		}
++		else if (s_frontend_entry_point)
++		{
++			if (retro_atomic_fetch_sub_int(&vulkan_module_ref_count, 1) - 1 > 0)
++				return;
++
++			ResetVulkanLibraryFunctionPointers();
++			s_frontend_entry_point = false;
++		}
+ 	}
+ 
+ #endif
+ 
++	// The frontend's entry point stands in for the library: it takes the
++	// reference the failed LoadVulkanLibrary at load did not, which the
++	// matching UnloadVulkanLibrary at unload gives back, so the last release
++	// resets the pointers as it does for a loaded library, and the next load
++	// starts from nothing.
++	void UseFrontendVulkanEntryPoint()
++	{
++		s_frontend_entry_point = true;
++		retro_atomic_inc_int(&vulkan_module_ref_count);
++	}
++
+ 	bool LoadVulkanInstanceFunctions(VkInstance instance)
+ 	{
+ 		bool required_functions_missing = false;
+diff --git a/pcsx2/GS/Renderers/Vulkan/VKLoader.h b/pcsx2/GS/Renderers/Vulkan/VKLoader.h
+index 28d87ab39..acba40079 100644
+--- a/pcsx2/GS/Renderers/Vulkan/VKLoader.h
++++ b/pcsx2/GS/Renderers/Vulkan/VKLoader.h
+@@ -28,5 +28,10 @@ namespace Vulkan
+ 	bool LoadVulkanInstanceFunctions(VkInstance instance);
+ 	bool LoadVulkanDeviceFunctions(VkDevice device);
+ 	void UnloadVulkanLibrary();
++
++	// The frontend supplies vkGetInstanceProcAddr itself (a libretro frontend
++	// hands it to the device-creation callback): LoadVulkanLibrary then
++	// succeeds without a library of its own to load.
++	void UseFrontendVulkanEntryPoint();
+ 	void ResetVulkanLibraryFunctionPointers();
+ } // namespace Vulkan
+diff --git a/pcsx2/GS/parallel-gs/Granite/util/CMakeLists.txt b/pcsx2/GS/parallel-gs/Granite/util/CMakeLists.txt
+index 68bf990fb..280519b42 100644
+--- a/pcsx2/GS/parallel-gs/Granite/util/CMakeLists.txt
++++ b/pcsx2/GS/parallel-gs/Granite/util/CMakeLists.txt
+@@ -42,7 +42,12 @@ if (NOT WIN32)
+     # unconditionally fails the NDK lanes at final link with
+     # "unable to find library -lrt".
+     if (NOT APPLE AND NOT ANDROID)
+-        target_link_libraries(granite-util PUBLIC rt)
++        # Only where it exists, as granite_setup_default_link_libraries
++        # does: a libc with the realtime entry points built in has none.
++        find_library(GRANITE_UTIL_LIBRT rt)
++        if (GRANITE_UTIL_LIBRT)
++            target_link_libraries(granite-util PUBLIC rt)
++        endif()
+     endif()
+ endif()
+ if (GRANITE_SHIPPING)
+diff --git a/pcsx2/HostMem.h b/pcsx2/HostMem.h
+index b57a0c8e3..166bdfa1c 100644
+--- a/pcsx2/HostMem.h
++++ b/pcsx2/HostMem.h
+@@ -85,7 +85,14 @@ static inline void* host_mmap(void* hint, size_t size, const PageProtectionMode&
+ 		if (m.m_read && m.m_exec)
+ 			flags |= MAP_JIT;
+ #endif
++#if defined(__PROSPERO__)
++		/* PS5: a mapping asked for with PROT_EXEC is returned but does not
++		 * execute; one mapped read-write and then made executable does (the
++		 * PS5 title's Dolphin and PPSSPP ports). */
++		p = mmap(hint, size, host_prot(m) & ~PROT_EXEC, flags, -1, 0);
++#else
+ 		p = mmap(hint, size, host_prot(m), flags, -1, 0);
++#endif
+ 		if (p == MAP_FAILED)
+ 			return NULL;
+ 		if (hint && p != hint)
+@@ -93,6 +100,13 @@ static inline void* host_mmap(void* hint, size_t size, const PageProtectionMode&
+ 			munmap(p, size);
+ 			return NULL;
+ 		}
++#if defined(__PROSPERO__)
++		if ((host_prot(m) & PROT_EXEC) && mprotect(p, size, host_prot(m)) != 0)
++		{
++			munmap(p, size);
++			return NULL;
++		}
++#endif
+ 		return p;
+ 	}
+ #endif
+diff --git a/pcsx2/Memory.cpp b/pcsx2/Memory.cpp
+index 1adeb1c31..f1f7159bc 100644
+--- a/pcsx2/Memory.cpp
++++ b/pcsx2/Memory.cpp
+@@ -55,6 +55,10 @@ namespace HostMemoryMap
+ } // namespace HostMemoryMap
+ 
+ /// Attempts to find a spot near static variables for the main memory
++#ifdef __PROSPERO__
++extern "C" int sceKernelAvailableFlexibleMemorySize(size_t* size);
++#endif
++
+ static VirtualMemoryManagerPtr AllocateVirtualMemory(const char* name, size_t size, size_t offset_from_base)
+ {
+ #if defined(_WIN32)
+@@ -80,6 +84,52 @@ static VirtualMemoryManagerPtr AllocateVirtualMemory(const char* name, size_t si
+ 		if (mgr->IsOk())
+ 			return mgr;
+ 	}
++#elif defined(__PROSPERO__)
++	/* PS5: the same rule -- main memory and the code area in reach of the
++	 * core's own code and data, which the recompilers address RIP-relative
++	 * or as 32-bit absolutes (common/emitter/c89emit.h, E_MODRM_ABS) -- with
++	 * two more constraints: nothing may land in the GPU-visible window at
++	 * 0x2_0000_0000 - 0x2_FFFF_FFFF, which the console's Vulkan driver
++	 * needs, or at libkernel's modules from 0x8_0000_0000; and the kernel
++	 * takes a hint as a hint, so a candidate it moved is refused (strict)
++	 * and the next one tried. Both blocks are asked for at the same
++	 * candidate, main memory at its start and the code area after it
++	 * (offset_from_base), so they sit side by side. Every attempt is
++	 * logged: which addresses the console gives out is what the first run
++	 * on it measured. */
++	const uptr anchor   = (uptr)(void*)AllocateVirtualMemory;
++	const uptr codeBase = anchor / (1 << 28) * (1 << 28);
++	const uptr span     = (uptr)HostMemoryMap::MainSize + HostMemoryMap::CodeSize;
++	static const int offsets[] = {1, 2, 3, 4, -1, -2, -3, -4, -5, -6};
++	for (int offset : offsets)
++	{
++		const uptr start = codeBase + (sptr)offset * (1 << 28);
++		const uptr base  = start + offset_from_base;
++		/* The far end of the whole block from the anchor, and the anchor
++		 * from its near end, both inside a signed 32-bit displacement with
++		 * room for the core's own image. */
++		const sptr reach_high = (sptr)(start + span) - (sptr)anchor;
++		const sptr reach_low  = (sptr)anchor - (sptr)start;
++		if (reach_high > 0x7c000000 || reach_low > 0x7c000000)
++			continue;
++		if (start < 0x100000000ull || start + span > 0x800000000ull ||
++				(start < 0x300000000ull && start + span > 0x200000000ull))
++			continue;
++		VirtualMemoryManagerPtr mgr = std::make_shared<VirtualMemoryManager>(name, base, size, /*upper_bounds=*/0, /*strict=*/true);
++		/* The code area is anonymous memory, which comes out of the title's
++		 * flexible memory (main memory is direct memory, memmap.c): what is
++		 * left of it is what the rest of the core allocates from. */
++		size_t flexible_free = 0;
++		sceKernelAvailableFlexibleMemorySize(&flexible_free);
++		log_cb(mgr->IsOk() ? RETRO_LOG_INFO : RETRO_LOG_WARN,
++				"PS5: %s %#zx bytes at %#llx (core at %#llx): %s, %zu KiB of flexible memory free\n",
++				name ? "main memory" : "code area", size, (unsigned long long)base,
++				(unsigned long long)anchor, mgr->IsOk() ? "placed" : "refused", flexible_free / 1024);
++		if (mgr->IsOk())
++			return mgr;
++	}
++	log_cb(RETRO_LOG_ERROR, "PS5: no place in reach of the core at %#llx for %s\n",
++			(unsigned long long)anchor, name ? "main memory" : "the code area");
+ #endif
+ 	return std::make_shared<VirtualMemoryManager>(name, 0, size);
+ }
+diff --git a/pcsx2/Memory.h b/pcsx2/Memory.h
+index 5b2f26275..8ba12740b 100644
+--- a/pcsx2/Memory.h
++++ b/pcsx2/Memory.h
+@@ -79,32 +79,57 @@ namespace HostMemoryMap
+ 	//////////////////////////////////////////////////////////////////////////
+ 	// Code
+ 	//////////////////////////////////////////////////////////////////////////
+-	static const u32 CodeSize = 0x13100000; // 305 mb
++	// Each recompiler's code cache, one after another. A cache that fills is
++	// cleared and refilled, so a smaller one costs the occasional reset and
++	// nothing else.
++#if defined(__PROSPERO__)
++	// PS5: the code area is anonymous memory, charged in full to the title's
++	// flexible-memory budget when it is mapped -- about 450MB for the whole
++	// title, RetroArch and the core image included -- where upstream's 305MB
++	// would not fit. VU0's microprograms are small; VU1's are what games run.
++	static const u32 EErecSize        = 0x02800000; // 40mb
++	static const u32 IOPrecSize       = 0x00C00000; // 12mb
++	static const u32 VIFrecSize       = 0x00600000; // 6mb each
++	static const u32 mVU0recSize      = 0x01000000; // 16mb
++	static const u32 mVU1recSize      = 0x03000000; // 48mb
++	static const u32 VIFUnpackRecSize = 0x00100000; // 1mb
++	static const u32 SWrecSize        = 0x02000000; // 32mb
++#else
++	static const u32 EErecSize        = 0x04000000; // 64mb
++	static const u32 IOPrecSize       = 0x02000000; // 32mb
++	static const u32 VIFrecSize       = 0x00800000; // 8mb each
++	static const u32 mVU0recSize      = 0x04000000; // 64mb
++	static const u32 mVU1recSize      = 0x04000000; // 64mb
++	static const u32 VIFUnpackRecSize = 0x00100000; // 1mb
++	static const u32 SWrecSize        = 0x04000000; // 64mb
++#endif
+ 
+-	// EE recompiler code cache area (64mb)
++	// EE recompiler code cache area
+ 	static const u32 EErecOffset   = 0x00000000;
+ 
+-	// IOP recompiler code cache area (32mb)
+-	static const u32 IOPrecOffset  = 0x04000000;
++	// IOP recompiler code cache area
++	static const u32 IOPrecOffset  = EErecOffset + EErecSize;
++
++	// newVif0 recompiler code cache area
++	static const u32 VIF0recOffset = IOPrecOffset + IOPrecSize;
+ 
+-	// newVif0 recompiler code cache area (8mb)
+-	static const u32 VIF0recOffset = 0x06000000;
++	// newVif1 recompiler code cache area
++	static const u32 VIF1recOffset = VIF0recOffset + VIFrecSize;
+ 
+-	// newVif1 recompiler code cache area (8mb)
+-	static const u32 VIF1recOffset = 0x06800000;
++	// microVU1 recompiler code cache area (upstream's names are swapped:
++	// microVU.cpp gives VU1 this one)
++	static const u32 mVU0recOffset = VIF1recOffset + VIFrecSize;
+ 
+-	// microVU1 recompiler code cache area (64mb)
+-	static const u32 mVU0recOffset = 0x07000000;
++	// microVU0 recompiler code cache area
++	static const u32 mVU1recOffset = mVU0recOffset + mVU1recSize;
+ 
+-	// microVU0 recompiler code cache area (64mb)
+-	static const u32 mVU1recOffset = 0x0B000000;
++	// SSE-optimized VIF unpack functions
++	static const u32 VIFUnpackRecOffset = mVU1recOffset + mVU0recSize;
+ 
+-	// SSE-optimized VIF unpack functions (1mb)
+-	static const u32 VIFUnpackRecOffset = 0x0F000000;
++	// Software Renderer JIT buffer
++	static const u32 SWrecOffset = VIFUnpackRecOffset + VIFUnpackRecSize;
+ 
+-	// Software Renderer JIT buffer (64mb)
+-	static const u32 SWrecOffset = 0x0F100000;
+-	static const u32 SWrecSize = 0x04000000;
++	static const u32 CodeSize = SWrecOffset + SWrecSize;
+ }
+ 
+ // --------------------------------------------------------------------------------------
+diff --git a/pcsx2/microVU/microVU_Structs.h b/pcsx2/microVU/microVU_Structs.h
+index 1f76f1128..191de2846 100644
+--- a/pcsx2/microVU/microVU_Structs.h
++++ b/pcsx2/microVU/microVU_Structs.h
+@@ -190,4 +190,3 @@ struct microProgManager
+ 
+ static const uint mVUdispCacheSize = __pagesize * 2; // Dispatcher Cache Size (in bytes; dispatchers + emitted helpers incl. the exact-multiply tree stub)
+ static const uint mVUcacheSafeZone =  3; // Safe-Zone for program recompilation (in megabytes)
+-static const uint mVUcacheReserve = 64; // mVU0, mVU1 Reserve Cache Size (in megabytes)
+diff --git a/pcsx2/x86/JitHash.cpp b/pcsx2/x86/JitHash.cpp
+index daa48cc72..ae9e82b41 100644
+--- a/pcsx2/x86/JitHash.cpp
++++ b/pcsx2/x86/JitHash.cpp
+@@ -47,13 +47,13 @@ namespace
+ 	// marks: unwritten arena pages read as zero, so hashing the full
+ 	// reserve is deterministic and needs no per-cache cursor plumbing.
+ 	const JitRegion s_regions[] = {
+-		{"EErec", HostMemoryMap::EErecOffset, 64 * _1mb},
+-		{"IOPrec", HostMemoryMap::IOPrecOffset, 32 * _1mb},
+-		{"VIF0rec", HostMemoryMap::VIF0recOffset, 8 * _1mb},
+-		{"VIF1rec", HostMemoryMap::VIF1recOffset, 8 * _1mb},
+-		{"mVU0rec", HostMemoryMap::mVU0recOffset, 64 * _1mb},
+-		{"mVU1rec", HostMemoryMap::mVU1recOffset, 64 * _1mb},
+-		{"VIFUnpackRec", HostMemoryMap::VIFUnpackRecOffset, _1mb},
++		{"EErec", HostMemoryMap::EErecOffset, HostMemoryMap::EErecSize},
++		{"IOPrec", HostMemoryMap::IOPrecOffset, HostMemoryMap::IOPrecSize},
++		{"VIF0rec", HostMemoryMap::VIF0recOffset, HostMemoryMap::VIFrecSize},
++		{"VIF1rec", HostMemoryMap::VIF1recOffset, HostMemoryMap::VIFrecSize},
++		{"mVU0rec", HostMemoryMap::mVU0recOffset, HostMemoryMap::mVU1recSize},
++		{"mVU1rec", HostMemoryMap::mVU1recOffset, HostMemoryMap::mVU0recSize},
++		{"VIFUnpackRec", HostMemoryMap::VIFUnpackRecOffset, HostMemoryMap::VIFUnpackRecSize},
+ 	};
+ } // namespace
+ 
+diff --git a/pcsx2/x86/iR3000A.cpp b/pcsx2/x86/iR3000A.cpp
+index 42a20b90a..800974918 100644
+--- a/pcsx2/x86/iR3000A.cpp
++++ b/pcsx2/x86/iR3000A.cpp
+@@ -784,7 +784,7 @@ static void recReserve(void)
+ 	/* R3000A Recompiler Cache */
+ 	code_reserve_init(&recMem);
+ 	recMemAssigned = 1;
+-	code_reserve_assign(&recMem, GetVmMemory().CodeMemory().get(), HostMemoryMap::IOPrecOffset, 32 * _1mb);
++	code_reserve_assign(&recMem, GetVmMemory().CodeMemory().get(), HostMemoryMap::IOPrecOffset, HostMemoryMap::IOPrecSize);
+ }
+ 
+ static void recAlloc(void)
+diff --git a/pcsx2/x86/ix86-32/iR5900-32.cpp b/pcsx2/x86/ix86-32/iR5900-32.cpp
+index 951cb2fd9..564d17f62 100644
+--- a/pcsx2/x86/ix86-32/iR5900-32.cpp
++++ b/pcsx2/x86/ix86-32/iR5900-32.cpp
+@@ -557,7 +557,7 @@ static void recReserve(void)
+ 	/* R5900 Recompiler Cache */
+ 	code_reserve_init(&recMem);
+ 	recMemAssigned = 1;
+-	code_reserve_assign(&recMem, GetVmMemory().CodeMemory().get(), HostMemoryMap::EErecOffset, 64 * _1mb);
++	code_reserve_assign(&recMem, GetVmMemory().CodeMemory().get(), HostMemoryMap::EErecOffset, HostMemoryMap::EErecSize);
+ }
+ 
+ static void recAlloc(void)
+diff --git a/pcsx2/x86/microVU.cpp b/pcsx2/x86/microVU.cpp
+index 117b58a07..eed245ccf 100644
+--- a/pcsx2/x86/microVU.cpp
++++ b/pcsx2/x86/microVU.cpp
+@@ -53,7 +53,8 @@ void mVUinit(microVU* mVU, uint vuIndex)
+ 	mVU->microMemSize = (mVU->index ? 0x4000 : 0x1000);
+ 	mVU->progSize     = (mVU->index ? 0x4000 : 0x1000) / 4;
+ 	mVU->progMemMask  =  mVU->progSize-1;
+-	mVU->cacheSize    =  mVUcacheReserve;
++	/* In megabytes; VU1 takes the block at mVU0recOffset (see mVUreserveCache). */
++	mVU->cacheSize    = (mVU->index ? HostMemoryMap::mVU1recSize : HostMemoryMap::mVU0recSize) / _1mb;
+ 	mVU->cache        = NULL;
+ 	mVU->dispCache    = NULL;
+ 	mVU->startFunct   = NULL;
+diff --git a/pcsx2/x86/newVif_Dynarec.cpp b/pcsx2/x86/newVif_Dynarec.cpp
+index 88ab24e2d..d569c893b 100644
+--- a/pcsx2/x86/newVif_Dynarec.cpp
++++ b/pcsx2/x86/newVif_Dynarec.cpp
+@@ -30,7 +30,7 @@ void dVifReserve(int idx)
+ 	const size_t offset = idx ? HostMemoryMap::VIF1recOffset : HostMemoryMap::VIF0recOffset;
+ 	/* VIF Unpack Recompiler Cache */
+ 	nVif[idx].recReserve = new RecompiledCodeReserve();
+-	nVif[idx].recReserve->Assign(GetVmMemory().CodeMemory(), offset, 8 * _1mb);
++	nVif[idx].recReserve->Assign(GetVmMemory().CodeMemory(), offset, HostMemoryMap::VIFrecSize);
+ }
+ 
+ void dVifReset(int idx)
+diff --git a/pcsx2/x86/newVif_UnpackSSE.cpp b/pcsx2/x86/newVif_UnpackSSE.cpp
+index a82519a75..8be615f6a 100644
+--- a/pcsx2/x86/newVif_UnpackSSE.cpp
++++ b/pcsx2/x86/newVif_UnpackSSE.cpp
+@@ -382,7 +382,7 @@ void VifUnpackSSE_Init(void)
+ 
+ 	code_reserve_init(&nVifUpkExec);
+ 	nVifUpkAssigned = 1;
+-	code_reserve_assign(&nVifUpkExec, GetVmMemory().CodeMemory().get(), HostMemoryMap::VIFUnpackRecOffset, _1mb);
++	code_reserve_assign(&nVifUpkExec, GetVmMemory().CodeMemory().get(), HostMemoryMap::VIFUnpackRecOffset, HostMemoryMap::VIFUnpackRecSize);
+ 	x86Ptr = (u8*)(nVifUpkExec.baseptr);
+ 
+ 	for (int a = 0; a < 2; a++)

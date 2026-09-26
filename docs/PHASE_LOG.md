@@ -3576,3 +3576,35 @@ of the hour shows Outset Island correctly. With Melee's 30 minutes (above),
 Profile 11 passes for all three games, and nothing grows: the mappings each
 game holds level off within minutes and flexible memory does not move
 (`evidence/dolphin-p11-soak30-re4`, `-soak30-ww`, `-soak60-ww`).
+
+## 2026-09-25 — LRPS2's first boots on the console
+
+LRPS2 (my fork, ../PS5_LRPS2, branch ps5-port) is built by tools/build-lrps2.sh
+at its pinned revision with patches/lrps2/ps5-port.patch and staged in the
+title. BIOS-only runs, from my test options and test folders
+(/app0/lrps2-test), BIOS 2.30 (USA):
+
+- **First load:** the core loader stopped on `fstatat`, which the SDK links
+  and the console resolves to nothing. The core's libretro-common now stats
+  directory entries by joined path on the PS5, as it does on the PS4.
+- **Second:** SIGSEGV in libretro-common's process barrier, whose x86 page
+  flip faulted on its write after mprotect. The PS5 now takes the barrier's
+  NONE tier, like the other multi-core consoles.
+- **Software renderer:** the BIOS reaches its main menu and runs 150 s with no
+  crash and every audio window at 99.6% or better. Sampled every 10 s, the
+  menu is right from 10 s to 100 s; at 110 s and 120 s the whole picture sits
+  lower in the frame. I have not yet established whether that is the BIOS's
+  own idle behaviour or an emulation fault: my BIOS never leaves the console,
+  so there is no desktop reference for this frame, and it is the first thing
+  the hardware renderer's run will be compared on.
+- **Vulkan renderer:** the core loaded libvulkan itself and ignored the
+  vkGetInstanceProcAddr the frontend passes it; it now uses the frontend's
+  when no library loads. With ../PS5_Vulkan R81-R84 it creates its 1.1
+  device and GS resources; its draws then met the driver's dynamic line width
+  refusal (R85, fixed) and then its refusal of a non-indexed draw with a
+  first vertex, the next driver round.
+
+Everything the runs created is reachable over FTP (0777/0666). The shared
+memory cards and empty per-core folders they left outside the test folder
+were removed afterwards; my own saves, cards and configurations were not
+touched.

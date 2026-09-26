@@ -139,6 +139,20 @@ extern "C" void ps5_rewinddir(DIR *opaque)
     directory->finished = false;
 }
 
+/* The descriptor under a directory stream: a core's libretro VFS stats entries
+ * with fstatat(dirfd(dir), ...), and libc's dirfd would read its own DIR layout
+ * from this one (tools/core-imports.py binds a core's dirfd here). */
+extern "C" int ps5_dirfd(DIR *opaque)
+{
+    auto *directory = reinterpret_cast<Directory *>(opaque);
+    if (!directory)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    return directory->fd;
+}
+
 extern "C" int ps5_closedir(DIR *opaque)
 {
     auto *directory = reinterpret_cast<Directory *>(opaque);
