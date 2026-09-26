@@ -335,6 +335,44 @@ index 6039ad6de..55f78f07c 100644
  #if defined(__APPLE__)
  #include <AvailabilityMacros.h>
  #if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+diff --git a/libretro/libretro_core_options.h b/libretro/libretro_core_options.h
+index 52d608271..e16e6ab59 100644
+--- a/libretro/libretro_core_options.h
++++ b/libretro/libretro_core_options.h
+@@ -278,7 +278,10 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+       {
+          { "1x Native (PS2)", NULL },
+          { "2x Native (~720p)", NULL },
++         { "3x Native (~1080p)", NULL },
+          { "4x Native (~1440p/2K)", NULL },
++         { "5x Native (~1800p)", NULL },
++         { "6x Native (~2160p/4K)", NULL },
+          { "8x Native (~2880p/5K)", NULL },
+          { NULL, NULL },
+       },
+@@ -758,11 +761,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+       "pcsx2_mtvu",
+       "Emulation > MTVU (Multi-Threaded VU1) (Restart)",
+       "MTVU (Multi-Threaded VU1) (Restart)",
+-      "Runs VU1 on its own thread. Large speedup on multi-core CPUs; a small number of games hang with it. The default matches the platform default (on arm64, MTVU is on whenever the native VU1 recompiler drives VU1).",
++      "Runs VU1 on its own thread. Large speedup on multi-core CPUs; a small number of games hang with it, and the game database turns it off for those. The default matches the platform default (on arm64, MTVU is on whenever the native VU1 recompiler drives VU1; on the PS5, whose eight cores leave VU1 a thread of its own, it is on).",
+       NULL,
+       "emulation",
+       {
+-#ifdef ARCH_ARM64
++#if defined(ARCH_ARM64) || defined(__PROSPERO__)
+          { "enabled", NULL },
+          { "disabled", NULL },
+ #else
+@@ -771,7 +774,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+ #endif
+          { NULL, NULL },
+       },
+-#ifdef ARCH_ARM64
++#if defined(ARCH_ARM64) || defined(__PROSPERO__)
+       "enabled"
+ #else
+       "disabled"
 diff --git a/pcsx2/CMakeLists.txt b/pcsx2/CMakeLists.txt
 index 9589cd394..2c787324e 100644
 --- a/pcsx2/CMakeLists.txt

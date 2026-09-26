@@ -96,17 +96,27 @@ driver rounds are in ../PS5_Vulkan/docs/LRPS2_GAPS.md.
    desktop LRPS2 at the same revision on the same states (GS dumps where a frame
    needs bisecting), then R85-R87 as the profiles make them matter.
 5. **Phase 4 — Profiles 0-12**, with any missing option exposed cleanly. The
-   upscale option lists 1x, 2x, 4x and 8x today, so the ladder needs 3x, 5x and
-   6x added. Sharpening, anti-aliasing and TV effects are the frontend's slang
-   shaders: LRPS2 has none of its own.
+   upscale option listed 1x, 2x, 4x and 8x; the fork adds 3x, 5x and 6x.
+   Sharpening, anti-aliasing and TV effects are the frontend's slang shaders:
+   LRPS2 has none of its own.
 
-## Status (2026-09-25)
+## Status (2026-09-26)
 
 Phase 1 is done: the core builds from the pinned revision and the committed
-patch, passes the ABI check and is staged in the title. Phase 2 has started:
-the BIOS boots on the software renderer (docs/PHASE_LOG.md), and the Vulkan
-renderer creates its device on the driver's R81-R85. The recompiler caches
-are cut to fit flexible memory for now (161 MiB of upstream's 305); the
-platform layer (executable code in direct memory) is what brings them back to
-upstream's sizes.
+patch, passes the ABI check and is staged in the title. Phase 2's platform work
+is done: the code area and guest memory come from my SDK fork's platform layer,
+and the recompilers have upstream's 305 MiB again (docs/PHASE_LOG.md, the SDK
+fork's adoption). The BIOS boots on both renderers.
 
+Phase 3 has started. The hardware renderer draws on the driver's R81-R91 and
+runs God of War II's demo, Final Fantasy X's demo and San Andreas at 6x
+(2880x2160) at full speed, with MTVU on by default on the PS5
+(docs/PHASE_LOG.md, "LRPS2's hardware renderer at 4K"). What is left of it:
+
+- the comparison with desktop LRPS2 at the same revision and settings, which is
+  where San Andreas' doubled radiosity haze at 6x is settled;
+- FFX's pacing on the 120 Hz output: a PAL game presents at 50 Hz;
+- the Ratchet & Clank demo, once its .7z is converted on the console's own
+  storage;
+- memory cards and save states in a test directory (Profile 10), then Phase 4's
+  profiles.

@@ -3675,3 +3675,69 @@ Measured on the console with this build, against the runs before it:
 
 Still to run on this build: Profile 10 (save-state stress), whose test harness
 I have to rebuild, and a second Rogue Leader run for its heavy section.
+
+## 2026-09-26 — LRPS2's hardware renderer at 4K: God of War II, FFX and San Andreas at full speed
+
+The Vulkan renderer now draws games on the console at 6x (2880x2160, 4:3 at
+4K height). What it took after the platform adoption:
+
+- **Driver R89** (../PS5_Vulkan): a non-indexed draw's first vertex and a first
+  instance, the refusal the renderer stopped at.
+- **The upscale ladder.** LRPS2's option listed 1x, 2x, 4x and 8x. The fork
+  adds 3x (~1080p), 5x (~1800p) and 6x (~2160p/4K) to the core option; the
+  renderer took any integer already.
+- **Driver R90**: vkCmdClearColorImage and vkCmdClearDepthStencilImage of an
+  attachment are a draw on the GPU instead of the CPU's write at a submission
+  split point, each of which drained the GPU. LRPS2 clears its render targets
+  and its D32_SFLOAT_S8_UINT depth that way every frame. R90 also ends every
+  submission step with the depth caches flushed, which a CPU copy after a
+  depth write needed (it read stale depth before), and R91 fixes the CPU's
+  eight-byte tile map and one-byte copies (../PS5_Vulkan, docs/M5_PHASE_C.md).
+- **MTVU.** VU1 on its own thread. The fork makes it the PS5's default, as the
+  arm64 build already does; the game database still turns it off for the games
+  it breaks (`mtvu: 0`, applied on the console as on the desktop).
+
+God of War II's combat at 6x, the same four-minute run each time:
+
+| | MTVU off | MTVU on |
+|---|---|---|
+| before R90 | 47-61% | 70-78% |
+| R90 | 65-70% | 99% (the fork's default, no option set) |
+
+The EE thread was the limit: VU1 on its own thread and the clears off the CPU
+each lift it, and together they reach full speed.
+
+Measured on the console with the title as committed (driver a1ad7c6, R91; the
+fork's f6bc86ecb, whose defaults turn MTVU on; 6x set, nothing else): runs from
+boot of four minutes (five for San Andreas), Cross pressed every 2.5 s, a
+screenshot every 10 s. Speed is the audio produced per 10-second window against
+real time.
+
+| Game | Windows | Speed | Driver per frame |
+|---|---|---|---|
+| God of War II demo (NTSC, 60 fps) | 23 | 99% in every window after the boot, combat included | 0.5 split steps, queue 0.13 ms |
+| Final Fantasy X demo (PAL, 50 fps) | 23 | 99% in every window: the opening FMV and the scenes after it | 1.0 split steps, queue 0.38 ms |
+| GTA San Andreas (NTSC, 60 fps) | 29 | 98-100% in every window after the boot: intros, loading, the first mission in Ganton | no split steps, queue 0.13 ms |
+
+No crash, no refusal, no device loss. The pictures are right: God of War II's
+colossus fight, FFX's opening, San Andreas' Grove Street alley with its HUD
+(the haze below aside). Memory is flat in every run: 323,584 KiB of flexible memory free,
+one 305 MiB code region, two shared-memory objects (324 MiB), 4 GiB of reserved
+ranges. Most hitches are the screenshots (a 4K frame read, 55-65 ms); the rest
+are pipeline compiles and loads at scene starts, none over 130 ms.
+
+Two things to look at, neither a stall:
+
+- **FFX presents at 50 Hz, not on the 120 Hz output's cadence.** A PAL game's
+  frames do not divide the refresh, so the pacer's plan for 50 fps on the
+  120 Hz output (docs/LRPS2_PORT.md, Content) is next.
+- **San Andreas' radiosity haze is doubled at 6x.** The game database's fix
+  (`halfPixelOffset: 4`, applied on the console) only "helps align radiosity
+  closer to native", so this may be upstream's own limit at high scales. Phase
+  3's comparison with desktop LRPS2 at the same settings is where it is
+  settled.
+
+The Wind Waker 30-minute soak on the adoption build (before this entry's
+changes, Profile 11's recipe) was flat: 185 windows, every one after the first
+at 99.6% or better, 349 direct mappings (680 MiB) start to end, 301,056 KiB of
+flexible memory free throughout (245,760 before the adoption), no crash.
