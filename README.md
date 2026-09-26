@@ -9,10 +9,13 @@ application foundation derived from
 [ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight).
 
 The current build launches as a homebrew title, presents XMB through RetroArch's
-Vulkan video driver, and runs five native libretro cores. Input, stereo audio,
+Vulkan video driver, and runs eight native libretro cores, three of them (PSP,
+GameCube/Wii and PlayStation 2) rendering on the PS5's GPU. Input, stereo audio,
 configuration persistence and content browsing have been verified on a console.
 This is an active development project; the tested paths below do not imply
 complete core compatibility or Vulkan conformance.
+
+**Latest release: v0.2.0-alpha.1** — see the [release notes](docs/releases/v0.2.0-alpha.1.md).
 
 ## Table of contents
 
@@ -41,9 +44,10 @@ complete core compatibility or Vulkan conformance.
 | Core loading | ✅ Native shared-core loader, official `.info` discovery and recovery from rejected loads |
 | Content loading | ✅ Tested games and archives with the cores below |
 | Colour and menu transitions | ✅ Corrected pixel uploads; Quick Menu/Close Content/next-game transitions I verified on the console |
-| Hardware-rendered cores | ✅ PPSSPP renders through PS5_Vulkan (Vulkan backend, JIT), tested at 10× internal resolution |
+| Hardware-rendered cores | ✅ PPSSPP, Dolphin and LRPS2 render through PS5_Vulkan (their Vulkan renderers, with JITs), tested at up to 10× internal resolution |
 | Save states and fast-forward | ✅ Save/load states (including `--entryslot`) and fast-forward, tested with PPSSPP and mGBA |
-| 120 Hz output | ✅ 120 Hz by default where the display offers it, 60 Hz fallback |
+| 120 Hz output | ✅ 120 Hz by default where the display offers it; the refresh is measured, and a display that stays at 60 Hz gets 60 Hz |
+| Stability | ✅ Every core through boot, menu and Quick Menu actions, with and without Threaded Video, and a 10-minute PPSSPP soak: no crash ([release checks](docs/PHASE_LOG.md)) |
 | CPU video fallback | ✅ `video_ps5` remains registered and selectable |
 | Development diagnostics | ✅ `retroarch.log`, startup/GPU trace, kernel captures and optional buffered frame timing |
 
@@ -57,8 +61,8 @@ test coverage and known exceptions.
 
 The title build includes these cores and their official metadata. Five of them
 **render emulated games in software**; RetroArch uploads their frames and presents
-them through Vulkan. PPSSPP **renders on the GPU** through PS5_Vulkan, with its
-Vulkan backend and its JIT.
+them through Vulkan. PPSSPP, Dolphin and LRPS2 **render on the GPU** through
+PS5_Vulkan, with their Vulkan renderers and their JITs.
 
 | Core | Systems covered by the core | Console verification in this port |
 | --- | --- | --- |
@@ -68,6 +72,8 @@ Vulkan backend and its JIT.
 | [FinalBurn Neo](https://github.com/libretro/FBNeo) | Supported arcade boards, including Neo Geo and Sega System 16/32 | ✅ Tested arcade games using both native 32-bit and converted 16-bit output; not every board or ROM set. [Evidence](evidence/fbneo-native/) |
 | [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | Mega Drive / Genesis, Master System, Game Gear, SG-1000, Sega CD | ✅ Genesis gameplay and clean transitions, which I confirmed on the console. Other Sega systems and disc/BIOS paths still need separate acceptance. [Evidence](evidence/genesis-plus-gx-native/) |
 | [PPSSPP](https://github.com/hrydgard/ppsspp) v1.20.4 | PlayStation Portable | ✅ God of War: Ghost of Sparta and Yu-Gi-Oh! GX Tag Force at 10× internal resolution (4800×2720), 16× anisotropy: correct picture, full speed at 120 Hz, save states, fast-forward, and closing and reopening games. MSAA is not yet available (see below). |
+| [Dolphin](https://github.com/libretro/dolphin) 2609 | GameCube, Wii | ✅ Wind Waker (an hour), Resident Evil 4 (30 minutes), Super Smash Bros. Melee, Mario Kart Wii and Rogue Leader, with the JIT and fast memory, save states and closing and reopening games. Rogue Leader's attract sequence still dips to 72–85% (see the release notes). |
+| [LRPS2](https://github.com/libretro/LRPS2) (PCSX2) | PlayStation 2 | ✅ The God of War II and Final Fantasy X demos and GTA San Andreas at 6× internal resolution on the Vulkan hardware renderer, full speed, with multi-threaded VU1 and save states. Needs your own BIOS in `system/pcsx2/bios/`. |
 
 Use **FBNeo for Sega System 16/32 arcade sets**, rather than Genesis Plus GX.
 FBNeo needs compatible arcade sets and receives its ZIP/7z archives intact.
@@ -83,7 +89,7 @@ compatible. No games or BIOS files are bundled.
 Software core → video callback → RetroArch Vulkan video driver
                                 → statically linked libps5vk → PS5 display
 XMB / RGUI ──────────────────────┘
-PPSSPP (hardware core) → Vulkan through RetroArch's HW context → libps5vk
+PPSSPP, Dolphin, LRPS2 (hardware cores) → Vulkan through RetroArch's HW context → libps5vk
 ```
 
 [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan), which I also maintain,
@@ -133,7 +139,8 @@ in this port, even if upstream RetroArch already offers the feature.**
 - ❌ BIOS/system-file coverage, disc swapping and multi-disc acceptance tests.
 - ❌ RetroAchievements and netplay; networking is disabled in the current frontend build.
 - ❌ User Slang shader presets and multipass effects validated on PS5_Vulkan.
-- ✅ 120 Hz output where the display offers it, with a 60 Hz fallback.
+- ✅ 120 Hz output where the display offers it, with a 60 Hz fallback chosen by measuring the refresh.
+- ❌ Asynchronous shader compilation, so no core stutters while a shader compiles: parallel pipeline compiles in PS5_Vulkan, asynchronous modes by default in the cores.
 - ✅ Save states and fast-forward, including PPSSPP.
 - ❌ 4K output/upscaling, VRR and HDR validated in this application.
 - ❌ Low-latency features, runahead and sustained per-core performance measurements.
@@ -156,7 +163,9 @@ in this port, even if upstream RetroArch already offers the feature.**
 | ❌ | Nintendo 64 — evaluate Mupen64Plus-Next / ParaLLEl-N64 with ParaLLEl-RDP |
 | ✅ | PPSSPP — PSP, Vulkan rendering and JIT; tested games only |
 | ❌ | PPSSPP MSAA — needs render pass 2 and depth/stencil resolve in PS5_Vulkan |
-| 🚧 | Dolphin — GameCube: Wind Waker boots and plays with correct 3D and HUD; speed, long play and the enhancement profiles are not yet measured |
+| ✅ | Dolphin — GameCube and Wii, Vulkan rendering and JIT; tested games, long play and the enhancement profiles |
+| ✅ | LRPS2 — PlayStation 2, Vulkan hardware renderer at 4K; tested games only |
+| 🚧 | LRPS2 — upstream PCSX2's newer renderer fixes, 8× internal resolution and texture replacement |
 
 Future entries are development targets, not a promised release order. Hardware
 rendering introduces new Vulkan requirements beyond presenting software frames;
@@ -198,7 +207,7 @@ bash tools/verify.sh
 
 The five gates are **format → unit → build → integration → evidence**. The build
 pins RetroArch 1.22.2, fetches core sources/metadata with checked hashes, builds the
-frontend and all five cores, and stages the native title in `dist/PPSA99169/`.
+frontend and all eight cores, and stages the native title in `dist/PPSA99169/`.
 The initial dependency/source fetch requires network access.
 
 For an already configured checkout:
@@ -207,6 +216,8 @@ For an already configured checkout:
 bash tools/build-title.sh     # Build/stage the frontend and all shipped cores
 make genesis-plus-gx         # Build and ABI-check one core only
 # Other core targets: fceumm, mgba, snes9x, fbneo
+bash tools/build-ppsspp.sh   # The hardware cores have scripts of their own:
+                             # build-ppsspp.sh, build-dolphin.sh, build-lrps2.sh
 ```
 
 When adding or updating a core, rebuild the title too: the frontend's native
@@ -230,6 +241,7 @@ title folder instead:
 | Core metadata | `info/`, with compatibility copies in `cores/` | `/app0/info/` |
 | Games | `content/` | `/app0/content/` |
 | BIOS/system data | `system/` | `/app0/system/` |
+| PS2 BIOS (your own dump) | `system/pcsx2/bios/` | `/app0/system/pcsx2/bios/` |
 | Live configuration | `config/retroarch.cfg` | `/app0/config/retroarch.cfg` |
 | Save RAM | `savefiles/` | `/app0/savefiles/` |
 | Save states | `savestates/` | `/app0/savestates/` |
@@ -253,8 +265,8 @@ includes native loading, gameplay, colour checks, audio/input, Quick Menu →
 Close Content, and loading another game. I record my own visual confirmation on
 the console alongside the logs; a camera can miss refresh-synchronous flicker.
 
-The current gameplay milestone passed all five host gates with 66 Python tests;
-23 recorded captures replay successfully. Exact results and limitations are in
+The v0.2.0-alpha.1 release passed all five host gates with 74 Python tests;
+52 recorded captures replay successfully. Exact results and limitations are in
 [ACTIVE](docs/ACTIVE.md), rather than implied by a core's upstream feature list.
 
 For reports, include the core, game-file format, relevant settings, reproduction
@@ -312,6 +324,9 @@ lists and original notices.
 | [Snes9x](https://github.com/libretro/snes9x) | Snes9x Team and contributors |
 | [FinalBurn Neo](https://github.com/libretro/FBNeo) | Team FBNeo and contributors |
 | [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | Charles MacDonald, Eke-Eke and contributors |
+| [PPSSPP](https://github.com/hrydgard/ppsspp) | Henrik Rydgård and contributors |
+| [Dolphin](https://github.com/dolphin-emu/dolphin), [libretro/dolphin](https://github.com/libretro/dolphin) | Dolphin Emulator Project and contributors; libretro core maintainers |
+| [PCSX2](https://github.com/PCSX2/pcsx2), [LRPS2](https://github.com/libretro/LRPS2) | PCSX2 Dev Team and contributors; libretro LRPS2 maintainers |
 | [libretro core-info](https://github.com/libretro/libretro-core-info) | Metadata maintainers and contributors |
 
 ## License and third-party terms
@@ -321,8 +336,9 @@ the source files. RetroArch and each dependency retain their own license and
 copyright notices. The locally generated runtime shim is described in
 [runtime/README.md](runtime/README.md).
 
-Emulator cores are not all GPL-3.0: FCEUmm uses GPLv2, mGBA uses MPL-2.0, and
-Snes9x, FBNeo and Genesis Plus GX include non-commercial terms. Consult each
+Emulator cores are not all GPL-3.0: FCEUmm uses GPLv2, PPSSPP and Dolphin use
+GPLv2-or-later, LRPS2 is GPLv3, mGBA uses MPL-2.0, and Snes9x, FBNeo and
+Genesis Plus GX include non-commercial terms. Consult each
 linked upstream repository for the complete applicable terms. Asset and font
 licenses are retained with their files.
 
