@@ -3048,6 +3048,84 @@ EDITS = [
         "         path, file_mode, file_hints /* patches/series, 0094 */)))\n",
         "file_hints /* patches/series, 0094 */",
     ),
+    (
+        # 0095: 0019's instance-extension list, on the heap. 0019 held 256
+        # extension records (66,560 bytes) on the stack beside upstream's 128
+        # layer records, a frame of about 133 KB, and a tester's title faulted
+        # reading the count inside that frame, 66 KB above the stack pointer,
+        # while the video driver was re-created after content closed (build
+        # ad98b960). The withdrawn 0019 block below is this one's old text.
+        "gfx/common/vulkan_common.c",
+        "      RARCH_ERR(\"[Vulkan] Instance does not support required extensions.\\n\");\n"
+        "      goto end;\n"
+        "   }\n",
+        "      RARCH_ERR(\"[Vulkan] Instance does not support required extensions.\\n\");\n"
+        "      goto end;\n"
+        "   }\n"
+        "\n"
+        "   /* Added by this port (patches/series, 0019, and 0095 for the list's\n"
+        "    * storage): the driver's VK_EXT_debug_utils, if it reports one, so the\n"
+        "    * messenger below can be created. The driver's extension list is\n"
+        "    * allocated: on the stack it was 66,560 bytes beside the layer list's,\n"
+        "    * more than a thread with a small stack has. The enabled list is\n"
+        "    * reallocated rather than appended in place: the buffer\n"
+        "    * vulkan_find_instance_extensions filled was sized for the extensions\n"
+        "    * it knows. */\n"
+        "   {\n"
+        "      uint32_t probe_count              = 0;\n"
+        "      VkExtensionProperties *probe_list = NULL;\n"
+        "      if (   vkEnumerateInstanceExtensionProperties(NULL, &probe_count, NULL) == VK_SUCCESS\n"
+        "          && probe_count > 0\n"
+        "          && (probe_list = (VkExtensionProperties*)calloc(probe_count, sizeof(*probe_list)))\n"
+        "          && vkEnumerateInstanceExtensionProperties(NULL, &probe_count, probe_list) == VK_SUCCESS)\n"
+        "      {\n"
+        "         uint32_t probe_index;\n"
+        "         for (probe_index = 0; probe_index < probe_count; probe_index++)\n"
+        "         {\n"
+        "            if (string_is_equal(probe_list[probe_index].extensionName, \"VK_EXT_debug_utils\"))\n"
+        "            {\n"
+        "               const char **bigger = (const char**)malloc((info.enabledExtensionCount + 1)\n"
+        "                     * sizeof(const char*));\n"
+        "               if (bigger)\n"
+        "               {\n"
+        "                  memcpy((void*)bigger, info.ppEnabledExtensionNames,\n"
+        "                        info.enabledExtensionCount * sizeof(const char*));\n"
+        "                  bigger[info.enabledExtensionCount++] = \"VK_EXT_debug_utils\";\n"
+        "                  free((void*)instance_extensions);\n"
+        "                  instance_extensions               = bigger;\n"
+        "                  info.ppEnabledExtensionNames      = instance_extensions;\n"
+        "               }\n"
+        "               break;\n"
+        "            }\n"
+        "         }\n"
+        "      }\n"
+        "      free(probe_list);\n"
+        "   }\n",
+        "0095 for the list's",
+    ),
+    (
+        # 0096: RetroArch's own threads -- threaded video, the task thread that
+        # scans content and writes save states -- are created with no stack
+        # size on this console, so they run on the console's default, which
+        # the payload SDK fork's thread probe measures. Upstream gives Apple's
+        # 2 MB "for PS2 disc scanning and other reasons"; the cores' threads
+        # already get 2 MiB here (src/core_threads_ps5.cpp).
+        "libretro-common/rthreads/rthreads.c",
+        "   pthread_attr_setstacksize(&thread_attr , 0x200000 );\n"
+        "   thread_attr_needed = true;\n"
+        "#endif\n",
+        "   pthread_attr_setstacksize(&thread_attr , 0x200000 );\n"
+        "   thread_attr_needed = true;\n"
+        "#elif defined(__PROSPERO__)\n"
+        "   /* Added by this port (patches/series, 0096): the console's default\n"
+        "    * thread stack is small, and a frontend thread runs the video driver's\n"
+        "    * initialisation with threaded video, content scanning and save\n"
+        "    * states; 2 MiB, as the cores' threads get. */\n"
+        "   pthread_attr_setstacksize(&thread_attr , 0x200000 );\n"
+        "   thread_attr_needed = true;\n"
+        "#endif\n",
+        "patches/series, 0096): the console's default",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.
@@ -3068,6 +3146,8 @@ EDITS = [
 # in the order they are decoded, and hands out its writable software framebuffer
 # instead of refusing it.
 WITHDRAWN = (
+    # 0019's debug-utils block, replaced by 0095's, which allocates its list.
+    'VK_EXT_debug_utils, when the',
     'patches/series, 0075: matching',
     'patches/series, 0075: libretro XRGB',
     'patches/series, 0077: decode menu images for sampled RGBA',

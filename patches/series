@@ -181,3 +181,15 @@
 #       libretro-common/vfs/vfs_implementation.c, tasks/task_save.c,
 #       libretro-common/streams/rzip_stream.c
 0094-write-states-without-stdio
+
+# 0095  0019's instance-extension list on the heap: 256 records on the stack
+#       made a 133 KB frame with upstream's layer list, which a tester's title
+#       overran while re-creating the video driver after content closed
+#       gfx/common/vulkan_common.c
+0095-debug-utils-list-on-heap
+
+# 0096  RetroArch's own threads get a 2 MiB stack on this console, as Apple's
+#       do upstream and the cores' threads do here; they ran on the console's
+#       small default
+#       libretro-common/rthreads/rthreads.c
+0096-frontend-thread-stacks

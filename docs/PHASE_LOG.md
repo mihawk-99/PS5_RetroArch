@@ -3828,3 +3828,59 @@ where each operation overlaps the last.
 
 The title also pins the fork at 66f658e, whose platform probe takes the word
 `files` (`/app0/platform-probe.txt`) to run the file probe in `/app0`.
+
+## 2026-09-26 — A tester's trace: half speed with V-Sync on, and two crashes
+
+A tester sent their trace.txt from build ad98b960 (2026-09-25): Zelda: A Link
+to the Past (snes9x), Pokemon Pinball: Ruby & Sapphire (mGBA) and Ratchet &
+Clank: Size Matters (PPSSPP), with V-Sync turned on. Three problems, all fixed
+here and in ../PS5_Vulkan R93.
+
+**Half speed with V-Sync on.** Every audio window of the V-Sync session played
+240,000 of its 480,000 frames, in all three cores; mGBA and PPSSPP played all of
+them with V-Sync off earlier in the same trace. Each swapchain handover came
+15-17 ms after the previous present, where mine mostly come within 8 ms. The
+console had accepted 119.88 Hz and the display went on refreshing at 60 Hz, so
+RetroArch, told 119.88 Hz, showed each frame twice at 60 Hz. The driver now
+times six vblanks after configuring 119.88 Hz and restores 59.94 Hz when they
+are more than 12.5 ms apart. Mine: `119.88 Hz selected, a vblank every 8.345
+ms`, and Zelda with V-Sync on plays 480,000 of 480,000. The fallback has not
+run on a display that stays at 60 Hz yet; the tester's next trace will say.
+
+**A crash on closing content.** The tester's eboot still holds its code, so I
+matched the bytes at each crash address against this build's symbolised ELF.
+The first crash is `vk_enumerate_instance_extension_properties` reading the
+count it was passed, from `vulkan_context_create_instance_wrapper` while the
+video driver was re-created after content closed: the count's address lay
+66 KB above the stack pointer and was not mapped. Patch 0019 held 256 extension
+records (66,560 bytes) on the stack beside upstream's 128 layer records, a
+133 KB frame. The payload SDK's new thread probe measured the stacks: 2 MiB for
+the main thread, 64 KiB for a thread created with no attributes -- which is how
+RetroArch creates its own -- and the tester's stack pointer was on a thread of
+the second kind, not the main thread: threaded video.
+
+To check it rather than infer it, I built this title with only 0096 (below)
+withdrawn and ran Zelda with threaded video and V-Sync on: twice it died at its
+first video init, before the trace's buffer reached the file. The kernel
+reported a write fault one page below a 64 KiB thread's stack in
+`vulkan_context_create_instance_wrapper`, called from `vulkan_init` in
+`video_thread_loop`: upstream's layer list alone is 66,560 bytes. Patch 0096
+gives RetroArch's own threads 2 MiB, as upstream does for Apple and this title
+does for the cores' threads; 0095 moves 0019's list to the heap. With both, the
+same run closes content through the Quick Menu at 25 s, re-creates the driver on
+the video thread and goes on presenting, with threaded video and without
+(klog/r93-zelda-threaded-fixed, r93-zelda-plain-fixed; the A/B run is
+klog/r93-zelda-threaded-no0096b).
+
+**Two crashes in PPSSPP.** Both in `vkDestroyBuffer`, one from XMB's font free,
+one from the core, each following a `next` field of 0x2 or 0x80 on the
+driver's list of live buffers. The driver changed that list, and two others,
+without a lock, while buffers may be created and destroyed from any thread.
+R93 locks them; its host test (four threads, 16,000 buffers) spun forever on
+the old driver.
+
+The title pins the payload SDK fork at a110320 (the thread probe, "threads" in
+platform-probe.txt) and links ../PS5_Vulkan 060c5ac. The unit gate's patch
+count moves 203 -> 212: 0094's seven blocks, which its commit (44d6fa5) left
+out of the pinned count, and 0095 and 0096; 0019's old block joins the
+withdrawn ones. tools/verify.sh PASS.
