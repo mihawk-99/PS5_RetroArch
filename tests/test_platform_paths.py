@@ -12,20 +12,19 @@ class PlatformPaths(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             binary = str(Path(td) / 'paths-test')
             functions = ['fopen', 'stat', 'mkdir', 'chmod', 'rename', 'remove']
+            # The platform layer's headers, alone: the SDK's FreeBSD tree is
+            # not a host compiler's.
+            platform = Path(td) / 'platform-include'
+            platform.mkdir()
+            (platform / 'ps5platform').symlink_to(
+                ROOT / '.deps/native/ps5-payload-sdk/target/include/ps5platform')
             subprocess.run(['c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-Ivendor/retroarch', '-Ivendor/retroarch/libretro-common/include',
+                            f'-I{platform}',
                             'tests/frontend_ps5_test.cpp', '-o', binary,
                             *[f'-Wl,--wrap={name}' for name in functions]], cwd=ROOT, check=True)
             subprocess.run([binary, str(Path(td) / 'filesystem')], cwd=ROOT,
                            check=True, timeout=10)
-
-    def test_native_directory_records(self):
-        with tempfile.TemporaryDirectory() as td:
-            binary = str(Path(td) / 'directory-test')
-            subprocess.run(['c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
-                            'tests/ps5_directory_test.cpp', '-o', binary,
-                            '-Wl,--wrap=open', '-Wl,--wrap=close'], cwd=ROOT, check=True)
-            subprocess.run([binary], cwd=ROOT, check=True, timeout=10)
 
     def test_application_path_avoids_procfs(self):
         import importlib.util

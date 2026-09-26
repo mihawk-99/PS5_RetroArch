@@ -49,6 +49,10 @@ case "${1:-}" in
 esac
 
 sdk="$root/.deps/native/ps5-payload-sdk"
+# The pinned SDK (my fork; tools/setup-native-dependencies.sh) is installed
+# before anything is compiled against it, and the cores' stamps include its
+# revision.
+bash "$root/tools/setup-native-dependencies.sh" >/dev/null
 [[ -x $sdk/bin/prospero-lld ]] || {
     echo "error: no SDK at $sdk; run this project's dependency bootstrap first" >&2
     exit 2
@@ -223,8 +227,9 @@ PY
 
 # The title's libc++ (std::filesystem) calls libc's opendir, which the console
 # refuses, and openat/fdopendir/unlinkat/fchmodat, which its libkernel does not
-# export; src/ps5_directory.cpp implements all of them (a core's own imports of
-# the directory calls are bound to the same functions by tools/core-imports.py).
+# export; the platform layer implements all of them (libps5platform.a, from my
+# payload SDK fork), and src/platform_wraps.c binds these links to it. A core's
+# own imports of the same calls are bound to it by tools/core-imports.py.
 directory_wrap_flags="--wrap=opendir --wrap=readdir --wrap=closedir --wrap=fdopendir --wrap=openat --wrap=unlinkat --wrap=fchmodat"
 # Folders the title or a core creates are 0777 and files at least 0666, so FTP,
 # which runs as another user, can reach them (src/permissions_ps5.cpp).
@@ -237,6 +242,7 @@ PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
 APP_DEFINITIONS="${title_definition_names[*]}" \
 APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
+APP_SDK_ARCHIVES="libps5platform.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
 APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free $memory_wrap_flags $directory_wrap_flags" \

@@ -26,6 +26,8 @@
 #include <ucontext.h>
 #include <unistd.h>
 
+#include <ps5platform/context.h>
+
 extern "C" int sceKernelAvailableFlexibleMemorySize(std::size_t *size);
 
 namespace
@@ -41,12 +43,10 @@ void report(int signal, siginfo_t *info, void *context_pointer)
         funlockfile(stderr);
     }
     const ucontext_t *context = static_cast<const ucontext_t *>(context_pointer);
-    /* The console's mcontext is not the SDK header's FreeBSD layout: measured on
-     * a call through a null pointer (FBNeo, 2026-09-23), rip, cs (0x43), rflags,
-     * rsp and ss (0x3b) sit at words 26-30, six words past the header's mc_rip. */
-    const auto *words = reinterpret_cast<const std::uint64_t *>(&context->uc_mcontext);
-    const std::uintptr_t rip = static_cast<std::uintptr_t>(words[26]);
-    const std::uintptr_t rsp = static_cast<std::uintptr_t>(words[29]);
+    /* The SDK fork's ucontext_t is the console's layout (ps5platform/context.h
+     * refuses any other), so the registers are the header's own fields. */
+    const std::uintptr_t rip = static_cast<std::uintptr_t>(context->uc_mcontext.mc_rip);
+    const std::uintptr_t rsp = static_cast<std::uintptr_t>(context->uc_mcontext.mc_rsp);
     /* After a call through a bad pointer the return address is on top of the
      * stack; otherwise the word is only a hint, and is read only when rsp looks
      * like a stack address. */

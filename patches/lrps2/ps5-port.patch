@@ -54,19 +54,10 @@ index 614ffb9f2..01ccd70c8 100644
  #else
  #include <malloc.h> // alloca
 diff --git a/libretro/libretro-common/faulthandler/faulthandler.c b/libretro/libretro-common/faulthandler/faulthandler.c
-index e4b25206d..70ffc2a64 100644
+index e4b25206d..ae5e046b9 100644
 --- a/libretro/libretro-common/faulthandler/faulthandler.c
 +++ b/libretro/libretro-common/faulthandler/faulthandler.c
-@@ -23,6 +23,8 @@
- #define _GNU_SOURCE 1   /* REG_RIP in <ucontext.h> */
- #endif
- 
-+#include <stddef.h>
-+#include <stdint.h>
- #include <string.h>
- #include <faulthandler.h>
- #include <retro_atomic.h>
-@@ -83,7 +85,7 @@ static retro_atomic_int_t s_slot_inhandler[RETRO_FAULT_MAX_THREADS];
+@@ -83,7 +83,7 @@ static retro_atomic_int_t s_slot_inhandler[RETRO_FAULT_MAX_THREADS];
  #if defined(_WIN32)
  static void *s_veh_handle;
  #else
@@ -75,7 +66,7 @@ index e4b25206d..70ffc2a64 100644
  static struct sigaction s_old_sigbus;
  #endif
  #if !defined(__APPLE__) || defined(__aarch64__)
-@@ -214,7 +216,7 @@ static LONG __stdcall fault_veh(EXCEPTION_POINTERS *eps)
+@@ -214,7 +214,7 @@ static LONG __stdcall fault_veh(EXCEPTION_POINTERS *eps)
  /* Chain to whatever handled this signal before us. */
  static void fault_chain(int sig, siginfo_t *si, void *ctx)
  {
@@ -84,20 +75,7 @@ index e4b25206d..70ffc2a64 100644
  #if !defined(__APPLE__) || defined(__aarch64__)
     const struct sigaction *sa = (sig == SIGBUS) ? &s_old_sigbus : &s_old_sigsegv;
  #else
-@@ -263,6 +265,12 @@ static void fault_filter(int sig, siginfo_t *si, void *ctx)
-    pc = (void*)((ucontext_t*)ctx)->uc_mcontext->__ss.__rip;
- #elif defined(__APPLE__) && defined(__aarch64__)
-    pc = (void*)((ucontext_t*)ctx)->uc_mcontext->__ss.__pc;
-+#elif defined(__PROSPERO__)
-+   /* The PS5's machine context is FreeBSD's, six words further on than the
-+    * SDK's header places it: rip, cs, rflags, rsp and ss were measured at
-+    * words 26-30 (the PS5 RetroArch title's Dolphin and PPSSPP ports). */
-+   pc = (void*)((const uint64_t*)&((ucontext_t*)ctx)->uc_mcontext)
-+         [offsetof(mcontext_t, mc_rip) / sizeof(uint64_t) + 6];
- #elif defined(__FreeBSD__) && defined(__x86_64__)
-    pc = (void*)((ucontext_t*)ctx)->uc_mcontext.mc_rip;
- #elif defined(__x86_64__)
-@@ -318,9 +326,10 @@ bool retro_faulthandler_install(retro_fault_handler_t handler)
+@@ -318,9 +318,10 @@ bool retro_faulthandler_install(retro_fault_handler_t handler)
         * old one must be able to raise it again. */
        sa.sa_flags    |= SA_NODEFER;
  #endif
@@ -110,7 +88,7 @@ index e4b25206d..70ffc2a64 100644
        if (sigaction(SIGBUS, &sa, &s_old_sigbus) != 0)
           ok = false;
  #endif
-@@ -375,7 +384,7 @@ void retro_faulthandler_remove(retro_fault_handler_t handler)
+@@ -375,7 +376,7 @@ void retro_faulthandler_remove(retro_fault_handler_t handler)
  #else
     {
        struct sigaction sa;
@@ -120,61 +98,38 @@ index e4b25206d..70ffc2a64 100644
  #endif
  #if !defined(__APPLE__) || defined(__aarch64__)
 diff --git a/libretro/libretro-common/memmap/memmap.c b/libretro/libretro-common/memmap/memmap.c
-index f67ff39df..b7390cac0 100644
+index f67ff39df..9c113f490 100644
 --- a/libretro/libretro-common/memmap/memmap.c
 +++ b/libretro/libretro-common/memmap/memmap.c
-@@ -25,6 +25,50 @@
+@@ -25,6 +25,27 @@
  #include <string.h>   /* strlen, memcpy, memset */
  #include <memmap.h>
  
 +#if defined(__PROSPERO__)
-+/* PS5: shared memory is libkernel's direct memory. Every mapping of an
-+ * anonymous or shared-memory object is charged to the title's small
-+ * flexible-memory budget, while direct memory is a separate pool of
-+ * several GiB, one allocation of which can be mapped at any number of
-+ * addresses -- which is what a shared-memory object is for here (the
-+ * PS5 RetroArch title's Dolphin port measured both). A reservation is
-+ * the kernel's virtual-range reservation, which holds addresses without
-+ * backing them. Views and reservations are placed above the GPU-visible
++/* PS5: shared memory is direct memory, through the platform layer (my
++ * payload SDK fork, ps5platform/shm.h). Every mapping of an anonymous or
++ * shared-memory object is charged to the title's 448 MiB of flexible
++ * memory; one direct-memory object is charged to nothing but the 12 GiB
++ * direct pool and maps at any number of addresses -- which is what a
++ * shared-memory object is for here. A reservation holds addresses without
++ * backing them. Views and reservations are placed outside the GPU-visible
 + * window at 0x2_0000_0000 - 0x2_FFFF_FFFF, which the console's Vulkan
-+ * driver needs, and below libkernel's modules at 0x8_0000_0000. */
++ * driver needs. */
 +#include <sys/mman.h>
-+int64_t sceKernelGetDirectMemorySize(void);
-+int32_t sceKernelAllocateDirectMemory(int64_t search_start, int64_t search_end,
-+      size_t bytes, size_t alignment, int type, int64_t *start);
-+int32_t sceKernelMapDirectMemory(void **address, size_t bytes, int protection,
-+      int flags, int64_t start, size_t alignment);
-+int32_t sceKernelReleaseDirectMemory(int64_t start, size_t bytes);
-+int32_t sceKernelReserveVirtualRange(void **address, size_t bytes, int flags,
-+      size_t alignment);
-+#define MEMMAP_PS5_ALIGN     ((size_t)0x10000)
-+#define MEMMAP_PS5_PAGE      ((size_t)0x4000)
-+/* CPU read and write: the type the title's own direct-memory heap uses. */
-+#define MEMMAP_PS5_TYPE      12
-+/* The kernel's fixed-address flag (FreeBSD's MAP_FIXED value). */
-+#define MEMMAP_PS5_FIXED     0x10
-+#define MEMMAP_PS5_VIEW_HINT ((uintptr_t)0x400000000ull)
-+#define MEMMAP_PS5_AREA_HINT ((uintptr_t)0x1400000000ull)
-+#define MEMMAP_PS5_GPU_LOW   ((uintptr_t)0x200000000ull)
-+#define MEMMAP_PS5_GPU_HIGH  ((uintptr_t)0x300000000ull)
-+
-+typedef struct
-+{
-+   int64_t start;
-+   size_t  len;
-+} memshm_ps5_t;
++#include <ps5platform/shm.h>
++#define MEMMAP_PS5_AREA_HINT ((void*)0x1400000000ull)
 +
 +/* Direct memory maps for the CPU with read and write only. */
 +static int memshm_ps5_prot(int prot)
 +{
-+   return prot & (PROT_READ | PROT_WRITE);
++   return (prot & PROT_READ ? PS5_SHM_READ : 0) | (prot & PROT_WRITE ? PS5_SHM_WRITE : 0);
 +}
 +#endif
 +
  #ifndef PROT_READ
  #define PROT_READ         0x1  /* Page can be read */
  #endif
-@@ -483,6 +527,59 @@ void memshm_unmap(void *addr, size_t len)
+@@ -483,6 +504,50 @@ void memshm_unmap(void *addr, size_t len)
  /* Gated on MAP_SHARED, as reserve/commit gates on its constants: DJGPP
   * defines __unix__ and HAVE_MMAN but ships a stub <sys/mman.h> with no
   * MAP_SHARED and no shm_open, and falls through to the stubs below. */
@@ -182,45 +137,36 @@ index f67ff39df..b7390cac0 100644
 +
 +void *memshm_create(const char *name, size_t len)
 +{
-+   memshm_ps5_t *h;
-+   int64_t start   = -1;
-+   size_t  bytes   = (len + MEMMAP_PS5_ALIGN - 1) & ~(MEMMAP_PS5_ALIGN - 1);
++   struct ps5_shm *h = (struct ps5_shm*)calloc(1, sizeof(*h));
 +   (void)name;
-+   if (!bytes || sceKernelAllocateDirectMemory(0, sceKernelGetDirectMemorySize(),
-+            bytes, MEMMAP_PS5_ALIGN, MEMMAP_PS5_TYPE, &start) != 0)
-+      return NULL;
-+   h = (memshm_ps5_t*)malloc(sizeof(*h));
 +   if (!h)
++      return NULL;
++   if (!len || ps5_shm_create(len, h) != 0)
 +   {
-+      sceKernelReleaseDirectMemory(start, bytes);
++      free(h);
 +      return NULL;
 +   }
-+   h->start = start;
-+   h->len   = bytes;
 +   return h;
 +}
 +
 +void memshm_destroy(void *handle)
 +{
-+   memshm_ps5_t *h = (memshm_ps5_t*)handle;
++   struct ps5_shm *h = (struct ps5_shm*)handle;
 +   if (!h)
 +      return;
-+   sceKernelReleaseDirectMemory(h->start, h->len);
++   ps5_shm_destroy(h);
 +   free(h);
 +}
 +
-+/* A hint is where the kernel starts looking, as mmap's is: the caller
-+ * compares what it got, as on the other platforms. No hint means above
++/* A hint is where the view is asked for, as mmap's is: the caller compares
++ * what it got, as on the other platforms. No hint means anywhere outside
 + * the GPU window. */
 +void *memshm_map(void *handle, size_t offset, void *hint, size_t len, int prot)
 +{
-+   memshm_ps5_t *h = (memshm_ps5_t*)handle;
-+   void *addr;
-+   if (!h || !len || offset > h->len || len > h->len - offset)
-+      return NULL;
-+   addr = hint ? hint : (void*)MEMMAP_PS5_VIEW_HINT;
-+   if (sceKernelMapDirectMemory(&addr, len, memshm_ps5_prot(prot), 0,
-+            h->start + (int64_t)offset, MEMMAP_PS5_PAGE) != 0)
++   void *addr = NULL;
++   if (!handle || !len ||
++         ps5_shm_map((const struct ps5_shm*)handle, offset, len, hint,
++            memshm_ps5_prot(prot), 0, &addr) != 0)
 +      return NULL;
 +   return addr;
 +}
@@ -228,13 +174,13 @@ index f67ff39df..b7390cac0 100644
 +void memshm_unmap(void *addr, size_t len)
 +{
 +   if (addr)
-+      munmap(addr, len);
++      ps5_shm_unmap(addr, len, 0);
 +}
 +
  #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_SHARED)
  
  #include <unistd.h>
-@@ -859,6 +956,30 @@ static void memshm_legacy_release(memshm_area_t *a, size_t first, size_t count)
+@@ -859,6 +924,25 @@ static void memshm_legacy_release(memshm_area_t *a, size_t first, size_t count)
  
  memshm_area_t *memshm_area_create(size_t len)
  {
@@ -244,18 +190,13 @@ index f67ff39df..b7390cac0 100644
 +    * At the hint first, anywhere else if it is taken, never in the GPU
 +    * window. */
 +   memshm_area_t *a;
-+   void *addr = (void*)MEMMAP_PS5_AREA_HINT;
-+   if (sceKernelReserveVirtualRange(&addr, len, 0, MEMMAP_PS5_ALIGN) != 0)
++   void *addr = NULL;
++   if (ps5_vrange_reserve(len, MEMMAP_PS5_AREA_HINT, 0x10000, &addr) != 0)
 +      return NULL;
-+   if ((uintptr_t)addr < MEMMAP_PS5_GPU_HIGH && (uintptr_t)addr + len > MEMMAP_PS5_GPU_LOW)
-+   {
-+      munmap(addr, len);
-+      return NULL;
-+   }
 +   a = (memshm_area_t*)calloc(1, sizeof(*a));
 +   if (!a)
 +   {
-+      munmap(addr, len);
++      ps5_vrange_release(addr, len);
 +      return NULL;
 +   }
 +   a->base = (unsigned char*)addr;
@@ -265,7 +206,7 @@ index f67ff39df..b7390cac0 100644
  #if (defined(_WIN32) && !defined(_XBOX)) || (defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_ANONYMOUS))
     memshm_area_t *a;
  #endif
-@@ -994,6 +1115,7 @@ memshm_area_t *memshm_area_create(size_t len)
+@@ -994,6 +1078,7 @@ memshm_area_t *memshm_area_create(size_t len)
     (void)len;
     return NULL;
  #endif
@@ -273,46 +214,43 @@ index f67ff39df..b7390cac0 100644
  }
  
  void memshm_area_free(memshm_area_t *area)
-@@ -1019,6 +1141,9 @@ void memshm_area_free(memshm_area_t *area)
+@@ -1019,6 +1104,9 @@ void memshm_area_free(memshm_area_t *area)
     }
     /* Every placeholder and every mapping goes with the reservation. */
     VirtualFree(area->base, 0, MEM_RELEASE);
 +#elif defined(__PROSPERO__)
 +   /* The reservation and every mapping made into it. */
-+   munmap(area->base, area->len);
++   ps5_vrange_release(area->base, area->len);
  #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
     munmap(area->base, area->len);
  #endif
-@@ -1134,6 +1259,17 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
+@@ -1134,6 +1222,16 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
  #else
     return NULL;
  #endif
 +#elif defined(__PROSPERO__)
-+   memshm_ps5_t *h = (memshm_ps5_t*)handle;
-+   void *addr      = at;
-+   if (!area || !h || !at || !len || offset > h->len || len > h->len - offset)
++   void *addr = NULL;
++   if (!area || !handle || !at || !len)
 +      return NULL;
 +   /* Fixed, over the reservation or a hole memshm_area_unmap reserved again. */
-+   if (sceKernelMapDirectMemory(&addr, len, memshm_ps5_prot(prot), MEMMAP_PS5_FIXED,
-+            h->start + (int64_t)offset, MEMMAP_PS5_PAGE) != 0 || addr != at)
++   if (ps5_shm_map((const struct ps5_shm*)handle, offset, len, at, memshm_ps5_prot(prot),
++            PS5_SHM_FIXED, &addr) != 0)
 +      return NULL;
 +   area->mappings++;
 +   return (unsigned char*)addr;
  #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
     void *p;
     if (!area || !at || !len)
-@@ -1226,6 +1362,17 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
+@@ -1226,6 +1324,15 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
  #else
     return false;
  #endif
 +#elif defined(__PROSPERO__)
-+   void *addr = at;
 +   if (!area || !at || !len)
 +      return false;
 +   /* The mapping goes and the hole is reserved again, so nothing else is
 +    * placed inside the area. */
-+   munmap(at, len);
-+   if (sceKernelReserveVirtualRange(&addr, len, MEMMAP_PS5_FIXED, 0) != 0)
++   if (ps5_shm_unmap(at, len, PS5_SHM_KEEP_RESERVED) != 0)
 +      return false;
 +   area->mappings--;
 +   return true;
@@ -695,21 +633,20 @@ index b57a0c8e3..166bdfa1c 100644
  	}
  #endif
 diff --git a/pcsx2/Memory.cpp b/pcsx2/Memory.cpp
-index 1adeb1c31..f1f7159bc 100644
+index 1adeb1c31..04bed82bc 100644
 --- a/pcsx2/Memory.cpp
 +++ b/pcsx2/Memory.cpp
-@@ -55,6 +55,10 @@ namespace HostMemoryMap
- } // namespace HostMemoryMap
- 
- /// Attempts to find a spot near static variables for the main memory
+@@ -46,6 +46,9 @@ BIOS
+ #include "ps2/HwInternal.h"
+ #include "ps2/BiosTools.h"
+ #include "SPU2/spu2.h"
 +#ifdef __PROSPERO__
-+extern "C" int sceKernelAvailableFlexibleMemorySize(size_t* size);
++#include <ps5platform/kernel.h>
 +#endif
-+
- static VirtualMemoryManagerPtr AllocateVirtualMemory(const char* name, size_t size, size_t offset_from_base)
+ 
+ namespace HostMemoryMap
  {
- #if defined(_WIN32)
-@@ -80,6 +84,52 @@ static VirtualMemoryManagerPtr AllocateVirtualMemory(const char* name, size_t si
+@@ -80,6 +83,53 @@ static VirtualMemoryManagerPtr AllocateVirtualMemory(const char* name, size_t si
  		if (mgr->IsOk())
  			return mgr;
  	}
@@ -745,9 +682,10 @@ index 1adeb1c31..f1f7159bc 100644
 +				(start < 0x300000000ull && start + span > 0x200000000ull))
 +			continue;
 +		VirtualMemoryManagerPtr mgr = std::make_shared<VirtualMemoryManager>(name, base, size, /*upper_bounds=*/0, /*strict=*/true);
-+		/* The code area is anonymous memory, which comes out of the title's
-+		 * flexible memory (main memory is direct memory, memmap.c): what is
-+		 * left of it is what the rest of the core allocates from. */
++		/* Main memory and the code area are direct memory (memmap.c and
++		 * VirtualMemory.cpp, through the platform layer); what is left of the
++		 * title's flexible memory is what the rest of the core allocates
++		 * from. */
 +		size_t flexible_free = 0;
 +		sceKernelAvailableFlexibleMemorySize(&flexible_free);
 +		log_cb(mgr->IsOk() ? RETRO_LOG_INFO : RETRO_LOG_WARN,
@@ -763,30 +701,19 @@ index 1adeb1c31..f1f7159bc 100644
  	return std::make_shared<VirtualMemoryManager>(name, 0, size);
  }
 diff --git a/pcsx2/Memory.h b/pcsx2/Memory.h
-index 5b2f26275..8ba12740b 100644
+index 5b2f26275..51b4d67a5 100644
 --- a/pcsx2/Memory.h
 +++ b/pcsx2/Memory.h
-@@ -79,32 +79,57 @@ namespace HostMemoryMap
+@@ -79,32 +79,43 @@ namespace HostMemoryMap
  	//////////////////////////////////////////////////////////////////////////
  	// Code
  	//////////////////////////////////////////////////////////////////////////
 -	static const u32 CodeSize = 0x13100000; // 305 mb
-+	// Each recompiler's code cache, one after another. A cache that fills is
-+	// cleared and refilled, so a smaller one costs the occasional reset and
-+	// nothing else.
-+#if defined(__PROSPERO__)
-+	// PS5: the code area is anonymous memory, charged in full to the title's
-+	// flexible-memory budget when it is mapped -- about 450MB for the whole
-+	// title, RetroArch and the core image included -- where upstream's 305MB
-+	// would not fit. VU0's microprograms are small; VU1's are what games run.
-+	static const u32 EErecSize        = 0x02800000; // 40mb
-+	static const u32 IOPrecSize       = 0x00C00000; // 12mb
-+	static const u32 VIFrecSize       = 0x00600000; // 6mb each
-+	static const u32 mVU0recSize      = 0x01000000; // 16mb
-+	static const u32 mVU1recSize      = 0x03000000; // 48mb
-+	static const u32 VIFUnpackRecSize = 0x00100000; // 1mb
-+	static const u32 SWrecSize        = 0x02000000; // 32mb
-+#else
+-
+-	// EE recompiler code cache area (64mb)
++	// Each recompiler's code cache, one after another, at upstream's sizes (305
++	// MiB together). On the PS5 the area is executable direct memory from the
++	// platform layer (VirtualMemory.cpp), out of the 12 GiB pool.
 +	static const u32 EErecSize        = 0x04000000; // 64mb
 +	static const u32 IOPrecSize       = 0x02000000; // 32mb
 +	static const u32 VIFrecSize       = 0x00800000; // 8mb each
@@ -794,9 +721,7 @@ index 5b2f26275..8ba12740b 100644
 +	static const u32 mVU1recSize      = 0x04000000; // 64mb
 +	static const u32 VIFUnpackRecSize = 0x00100000; // 1mb
 +	static const u32 SWrecSize        = 0x04000000; // 64mb
-+#endif
- 
--	// EE recompiler code cache area (64mb)
++
 +	// EE recompiler code cache area
  	static const u32 EErecOffset   = 0x00000000;
  
@@ -841,6 +766,92 @@ index 5b2f26275..8ba12740b 100644
  }
  
  // --------------------------------------------------------------------------------------
+diff --git a/pcsx2/VirtualMemory.cpp b/pcsx2/VirtualMemory.cpp
+index e642655f6..05c476254 100644
+--- a/pcsx2/VirtualMemory.cpp
++++ b/pcsx2/VirtualMemory.cpp
+@@ -65,6 +65,20 @@ VirtualMemoryManager::VirtualMemoryManager(const char* file_mapping_name, uptr b
+ 	}
+ 	else
+ 	{
++#if defined(__PROSPERO__)
++		/* PS5: the code area is direct memory through the platform layer,
++		 * read, write and execute at once: out of the 12 GiB direct pool
++		 * rather than the title's 448 MiB of flexible memory, so the
++		 * recompilers' caches are upstream's sizes (Memory.h). It is placed
++		 * at base only if that range is free (PS5_EXEC_AT): the caller tries
++		 * places near the core's code in turn (Memory.cpp). */
++		ps5_exec_request request = {};
++		request.bytes   = reserved_bytes;
++		request.address = base;
++		request.flags   = base ? PS5_EXEC_AT : 0;
++		if (ps5_exec_alloc(&request, &m_exec) == 0)
++			m_baseptr = static_cast<u8*>(m_exec.base);
++#else
+ 		PageProtectionMode mode;
+ 		mode.m_read  = true;
+ 		mode.m_write = true;
+@@ -81,6 +95,7 @@ VirtualMemoryManager::VirtualMemoryManager(const char* file_mapping_name, uptr b
+ 			if (base)
+ 				m_baseptr = static_cast<u8*>(host_mmap(0, reserved_bytes, mode));
+ 		}
++#endif
+ 	}
+ 
+ 	bool fulfillsRequirements = true;
+@@ -101,7 +116,11 @@ VirtualMemoryManager::VirtualMemoryManager(const char* file_mapping_name, uptr b
+ 		}
+ 		else
+ 		{
++#if defined(__PROSPERO__)
++			ps5_exec_free(&m_exec);
++#else
+ 			host_munmap(m_baseptr, reserved_bytes);
++#endif
+ 			m_baseptr = 0;
+ 		}
+ 	}
+@@ -136,7 +155,11 @@ VirtualMemoryManager::~VirtualMemoryManager()
+ #endif
+ 		}
+ 		else
++#if defined(__PROSPERO__)
++			ps5_exec_free(&m_exec);
++#else
+ 			host_munmap(m_baseptr, bytes);
++#endif
+ 	}
+ 	if (m_file_handle)
+ 		memshm_destroy(m_file_handle);
+diff --git a/pcsx2/VirtualMemory.h b/pcsx2/VirtualMemory.h
+index f73eabc0e..c755c7b8b 100644
+--- a/pcsx2/VirtualMemory.h
++++ b/pcsx2/VirtualMemory.h
+@@ -18,6 +18,12 @@
+ #include <retro_atomic.h>
+ #include "../common/General.h"
+ 
++#if defined(__PROSPERO__)
++/* PS5: the code area is the platform layer's executable direct memory (my
++ * payload SDK fork, ps5platform/exec.h; VirtualMemory.cpp). */
++#include <ps5platform/exec.h>
++#endif
++
+ /* The code reserve below holds a manager pointer without ever completing the
+  * type, so C needs a name for it and nothing more. */
+ #ifdef __cplusplus
+@@ -47,6 +53,11 @@ class VirtualMemoryManager
+ 	// reserved memory (in pages)
+ 	u32 m_pages_reserved;
+ 
++#if defined(__PROSPERO__)
++	// PS5: the code area's region, when this manager holds one.
++	ps5_exec_region m_exec{};
++#endif
++
+ public:
+ 	// If upper_bounds is nonzero and the OS fails to allocate memory that is below it,
+ 	// calls to IsOk() will return false and Alloc() will always return null pointers
 diff --git a/pcsx2/microVU/microVU_Structs.h b/pcsx2/microVU/microVU_Structs.h
 index 1f76f1128..191de2846 100644
 --- a/pcsx2/microVU/microVU_Structs.h

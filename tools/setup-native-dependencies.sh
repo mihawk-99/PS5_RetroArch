@@ -3,7 +3,8 @@
 # Copyright (C) 2026 BlackBearReloaded
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Fetches the public PS5 payload SDK and static zlib into the ignored cache.
+# Installs the PS5 payload SDK (my fork, pinned below) and static zlib into the
+# ignored cache.
 
 set -euo pipefail
 
@@ -16,8 +17,13 @@ zlib_version="1.3.2"
 zlib_source="$zlib_directory/zlib-$zlib_version"
 zlib_archive="$zlib_directory/zlib-$zlib_version.tar.gz"
 zlib_stamp="$zlib_root/.source-version"
-sdk_url="https://github.com/ps5-payload-dev/sdk/releases/download/v0.42/ps5-payload-sdk.zip"
-sdk_hash="8cfbc7cd5811e719eb4f0c47eea668d3dc7b40bc8ab11c4a5031d40c23ec02da"
+# The payload SDK is my fork, ../PS5_PayloadSDK: the upstream v0.42 release with
+# the PS5 platform layer (libps5platform.a, include/ps5platform) and the
+# console's machine-context layout installed over it (platform/README.md
+# there). The pinned revision is exported with git archive, so a build never
+# depends on the fork's working tree, and the SDK directory records it.
+sdk_fork="${PS5_PAYLOAD_SDK_FORK:-$root/../PS5_PayloadSDK}"
+sdk_revision=a5bd474a50e5eb50e4d5bfef86e76c8ffc1d81ed
 zlib_url="https://zlib.net/fossils/zlib-$zlib_version.tar.gz"
 zlib_hash="bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
 skip_sdk=false
@@ -29,7 +35,7 @@ elif [[ $# -ne 0 ]]; then
     exit 2
 fi
 
-for command in wget unzip sha256sum tar make; do
+for command in git wget unzip sha256sum tar make; do
     command -v "$command" >/dev/null || {
         echo "missing required command: $command" >&2
         exit 2
@@ -44,13 +50,15 @@ ranlib=$(command -v llvm-ranlib-18 || command -v llvm-ranlib || command -v ranli
 }
 
 mkdir -p "$cache"
-if ! $skip_sdk && [[ ! -x "$sdk/bin/prospero-lld" ]]; then
-    archive="$cache/ps5-payload-sdk.zip"
-    temporary="$archive.download"
-    wget -q "$sdk_url" -O "$temporary"
-    printf '%s  %s\n' "$sdk_hash" "$temporary" | sha256sum --check --strict
-    mv "$temporary" "$archive"
-    unzip -q -o "$archive" -d "$cache"
+if ! $skip_sdk && [[ ! -f $sdk/.ps5-sdk-revision || $(<"$sdk/.ps5-sdk-revision") != "$sdk_revision" ]]; then
+    git -C "$sdk_fork" cat-file -e "$sdk_revision^{commit}" 2>/dev/null || {
+        echo "the payload SDK fork at $sdk_fork does not have $sdk_revision" >&2
+        exit 2
+    }
+    sdk_tree=$(mktemp -d)
+    git -C "$sdk_fork" archive "$sdk_revision" | tar -x -C "$sdk_tree"
+    bash "$sdk_tree/platform/tools/setup-sdk.sh" "$sdk" "$sdk_revision" "$cache" >&2
+    rm -rf -- "$sdk_tree"
 fi
 if ! $skip_sdk && [[ ! -x "$sdk/bin/prospero-lld" || ! -d "$sdk/target/include" ]]; then
     echo "the pinned PS5 payload SDK is incomplete" >&2

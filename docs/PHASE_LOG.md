@@ -3608,3 +3608,70 @@ Everything the runs created is reachable over FTP (0777/0666). The shared
 memory cards and empty per-core folders they left outside the test folder
 were removed afterwards; my own saves, cards and configurations were not
 touched.
+
+## 2026-09-26 — The payload SDK fork and its platform layer, adopted
+
+The title and every project now build with my fork of the payload SDK
+(../PS5_PayloadSDK, pinned in tools/setup-native-dependencies.sh): the v0.42
+release binaries with the fork's headers and its platform layer installed over
+them (docs/PLATFORM_FIRMWARE_ANALYSIS.md has what the layer rests on). What
+moved into it, and out of the title and the cores:
+
+- **The machine context.** The fork's `sys/_ucontext.h` declares the console's
+  48 extra bytes, so `uc_mcontext.mc_rip` is the faulting instruction. The
+  crash reporter, the sampler and the Dolphin, PPSSPP and LRPS2 ports read the
+  header's fields; the six-word offset each carried is gone. The probe built
+  with the fork's header finds rip at its field.
+- **The libc gaps.** `src/ps5_directory.cpp` and most of `src/libc_shims.c`
+  are the platform's `ps5_*` functions now. `src/platform_wraps.c` binds the
+  title's `--wrap` links to them, and tools/core-imports.py binds a core's
+  imports (the whole `*at` family, `utimensat`, `futimens`,
+  `clock_nanosleep`, `arc4random*`, `statvfs`/`fstatvfs`). The directory
+  fixture test moved to the fork with the code. The platform's `statvfs`
+  refuses a path that does not exist, as a desktop build sees it; the title's
+  answered for any path.
+- **Executable code.** Dolphin's `AllocateExecutableMemory`, PPSSPP's, and
+  LRPS2's code area come from the platform's executable direct memory, near
+  each core's own code, instead of anonymous flexible memory. The code caches
+  are upstream's sizes again: Dolphin's near and far caches 128 + 64 MiB (32
+  + 16 before), LRPS2's recompilers 305 MiB (161 before). Dolphin frees its
+  code blocks through `FreeMemoryPages` off iOS, so that returns platform
+  memory too.
+- **Guest memory.** Dolphin's `MemArena`, PPSSPP's arena (a shared-memory
+  object before, every view charged to flexible memory) and LRPS2's memshm are
+  the platform's direct-memory objects, views and reserved ranges. PPSSPP maps
+  its VRAM view 80 KiB into its guest memory; the platform first refused a view
+  off the 64 KiB allocation unit (PPSSPP's memory init failed). The probe then
+  measured a view at a 16 KiB page offset mapping and aliasing correctly, and
+  the platform now takes page offsets.
+- **Reporting.** A profiled run's memory line is followed by the platform's:
+  `memory: platform exec=<regions>/<MiB> shm=<objects>/<MiB> views=<n>
+  ranges=<n>/<MiB>`.
+
+Measured on the console with this build, against the runs before it:
+
+| | before | now |
+|---|---|---|
+| Dolphin, flexible memory free in game (RE4, Melee, Wind Waker) | 243,712 KiB | 303,104 KiB |
+| Dolphin, JIT code | 48 MiB of flexible memory | one 200 MiB direct region (288 MiB with the MMU: Rogue Leader) |
+| LRPS2, code area | 161 MiB, 163,840 KiB flexible left | 305 MiB, 328,704 KiB flexible left |
+| PPSSPP, guest memory | a shared-memory object, views in flexible memory | 144 MiB of direct memory, 19 views |
+
+- **Dolphin, Profiles 0 and 1** on Melee, RE4 and Wind Waker: no crash, every
+  steady window at 100% but one Melee window at 98% in each profile.
+- **Dolphin, Profile 9** (Melee, four reloads): no crash; the platform holds
+  one code region, one guest-memory object and one arena after each reload,
+  so each reload returns them; flexible memory drops 2 MiB once and holds; the
+  driver's direct mappings are flat at the reloads (180 each).
+- **Rogue Leader** from boot: no crash, no FIFO alert, no unknown opcode; the
+  attract sequence's windows are as before (its heavy section read a few
+  points lower on this run).
+- **PPSSPP, God of War: Ghost of Sparta** from its state: full speed (480,000
+  of 480,000 frames every window after the first), 1,200 presents per 10 s,
+  no crash.
+- **LRPS2** boots its BIOS with the new code area; the hardware renderer still
+  stops at the driver's first-vertex refusal, the next driver round.
+- When content closes, the platform's counters go back to zero.
+
+Still to run on this build: Profile 10 (save-state stress), whose test harness
+I have to rebuild, and a second Rogue Leader run for its heavy section.

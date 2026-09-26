@@ -119,12 +119,14 @@ done
 definitions=()
 includes=()
 archives=()
+sdk_archives=()
 pacbrew_packages=()
 pacbrew_includes=()
 pacbrew_archives=()
 [[ -z ${APP_DEFINITIONS:-} ]] || read -r -a definitions <<< "$APP_DEFINITIONS"
 [[ -z ${APP_INCLUDE_PATHS:-} ]] || read -r -a includes <<< "$APP_INCLUDE_PATHS"
 [[ -z ${APP_STATIC_ARCHIVES:-} ]] || read -r -a archives <<< "$APP_STATIC_ARCHIVES"
+[[ -z ${APP_SDK_ARCHIVES:-} ]] || read -r -a sdk_archives <<< "$APP_SDK_ARCHIVES"
 [[ -z ${PACBREW_PACKAGES:-} ]] || read -r -a pacbrew_packages <<< "$PACBREW_PACKAGES"
 [[ -z ${PACBREW_INCLUDE_PATHS:-} ]] || read -r -a pacbrew_includes <<< "$PACBREW_INCLUDE_PATHS"
 [[ -z ${PACBREW_STATIC_ARCHIVES:-} ]] || read -r -a pacbrew_archives <<< "$PACBREW_STATIC_ARCHIVES"
@@ -271,6 +273,13 @@ for archive in "${archives[@]}"; do
         echo "invalid static archive: $archive" >&2; exit 2;
     }
     link_inputs+=("$root/$archive")
+done
+# Archives the SDK installs (its platform layer): named, found in target/lib.
+for archive in "${sdk_archives[@]}"; do
+    [[ $archive =~ ^lib[A-Za-z0-9_.+-]+\.a$ && -f $sdk_root/target/lib/$archive ]] || {
+        echo "invalid SDK archive: $archive" >&2; exit 2;
+    }
+    link_inputs+=("$sdk_root/target/lib/$archive")
 done
 if (( ${#pacbrew_libs[@]} > 0 )); then
     link_inputs+=(--start-group "${pacbrew_libs[@]}" --end-group)

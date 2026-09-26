@@ -44,6 +44,8 @@
 #include <unistd.h>
 
 #include <cxxabi.h>
+#include <ps5platform/platform.h>
+#include <ps5platform/probe.h>
 
 #include "trace.hpp"
 #include "memory_diagnostics.hpp"
@@ -77,9 +79,11 @@ namespace
 constexpr const char *config_path = "/app0/config/retroarch.cfg";
 
 /* A profiled test run (the driver's /app0/ps5vk-profile.txt survived the stale
- * test file sweep) also reports the flexible memory left every ten seconds:
- * with the driver's direct_live, a soak's leak is a line that only moves one
- * way. Set once main has swept. */
+ * test file sweep) also reports the flexible memory left every ten seconds,
+ * and what the platform layer holds: the cores' executable code, their
+ * direct-memory arenas and the ranges reserved for them. With the driver's
+ * direct_live, a soak's leak is a line that only moves one way. Set once main
+ * has swept. */
 std::atomic<bool> g_memory_report{false};
 
 /* Writes every buffered output stream out -- the trace file and RetroArch's
@@ -95,6 +99,9 @@ void *log_flusher(void *)
             std::size_t flexible = 0;
             sceKernelAvailableFlexibleMemorySize(&flexible);
             std::fprintf(stderr, "memory: flexible_free=%zu KiB\n", flexible >> 10);
+            char platform[192];
+            ps5_platform_report(platform, sizeof(platform));
+            std::fprintf(stderr, "memory: %s\n", platform);
         }
         std::fflush(nullptr);
     }
@@ -106,6 +113,45 @@ void start_log_flusher()
     pthread_t thread;
     if (pthread_create(&thread, nullptr, log_flusher, nullptr) == 0)
         pthread_detach(thread);
+}
+
+/* The platform probe (the SDK fork's platform/src/probe.c):
+ * /app0/platform-probe.txt, a test file of one launch like the others, runs the
+ * console capability probe in this process -- the one whose flexible budget,
+ * imports, GPU window and core loader the cores live with -- and ends the
+ * launch. Its words select the optional tests: "large" (4 GiB of guest memory
+ * beside 1 GiB of code), "huge" (10 GiB mapped and written at once), "full"
+ * (the largest direct allocation mapped and written) and "jit" (the
+ * shared-memory JIT interface, last, since a refused import would stop the
+ * process). Every line goes to the trace as it is measured. */
+static void probe_line(void *, const char *line)
+{
+    ps5::debug::mark(line);
+}
+
+static bool run_platform_probe()
+{
+    std::FILE *const file = std::fopen("/app0/platform-probe.txt", "r");
+    if (!file)
+        return false;
+    char words[128] = {};
+    const size_t read = std::fread(words, 1, sizeof(words) - 1, file);
+    words[read] = '\0';
+    std::fclose(file);
+    std::remove("/app0/platform-probe.txt");
+    unsigned flags = 0;
+    if (std::strstr(words, "large"))
+        flags |= PS5_PROBE_LARGE;
+    if (std::strstr(words, "huge"))
+        flags |= PS5_PROBE_HUGE;
+    if (std::strstr(words, "full"))
+        flags |= PS5_PROBE_FULL;
+    if (std::strstr(words, "jit"))
+        flags |= PS5_PROBE_JIT_API;
+    const int failures = ps5_platform_probe(probe_line, nullptr, flags);
+    ps5::debug::mark_value("platform probe: failures", failures);
+    std::fflush(stderr);
+    return true;
 }
 
 /* Profile 10's entry state (docs/PHASE_LOG.md): /app0/state-copy.txt names a
@@ -333,6 +379,7 @@ int main()
             "/app0/dolphin-options.txt",
             "/app0/dolphin-debug.txt",
             "/app0/state-copy.txt",
+            "/app0/platform-probe.txt",
         };
         unsigned removed = 0;
         for (const char *const path : test_files)
@@ -342,6 +389,8 @@ int main()
     }
     copy_test_file();
     std::remove("/app0/state-copy.txt");
+    if (run_platform_probe())
+        return 0;
     if (std::FILE *profile = std::fopen("/app0/ps5vk-profile.txt", "rb"))
     {
         std::fclose(profile);

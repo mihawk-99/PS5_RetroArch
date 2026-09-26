@@ -11,7 +11,7 @@ extern "C"
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include "ps5_directory.h"
+#include <ps5platform/libc.h>
 #include <initializer_list>
 #include <sys/stat.h>
 

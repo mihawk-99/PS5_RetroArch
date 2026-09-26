@@ -8,8 +8,9 @@
 # cores). The stamp is a hash of everything the core's build reads that this
 # repository controls: its build script (which pins the revision and the archive
 # digests), its patches and port tooling, the shared native loader files, the
-# ABI checker and the SDK compiler wrappers. When the stamp matches and every
-# staged output is present, the build is skipped. PS5_FORCE_CORES=1 builds anyway.
+# ABI checker, the SDK compiler wrappers and the SDK fork's revision. When the
+# stamp matches and every staged output is present, the build is skipped.
+# PS5_FORCE_CORES=1 builds anyway.
 
 core_stamp_dir="$root/build/cores/stamps"
 
@@ -38,7 +39,8 @@ core_stamp_skip() {
         "$root/tooling/native/ps5-core.ld" "$root/tooling/native/core_cxx_runtime.cpp"
         "$root/tools/check-core.py" "$root/tools/core-stamp.sh" "$root/tooling/prospero-clang18"
         "$root/.deps/native/ps5-payload-sdk/bin/prospero-clang"
-        "$root/.deps/native/ps5-payload-sdk/bin/prospero-clang++")
+        "$root/.deps/native/ps5-payload-sdk/bin/prospero-clang++"
+        "$root/.deps/native/ps5-payload-sdk/.ps5-sdk-revision")
     core_stamp_value=$(core_stamp_compute "${inputs[@]}")
     core_stamp_name=$name
     [[ ${PS5_FORCE_CORES:-0} == 1 ]] && return 0

@@ -34,7 +34,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 
-#include "ps5_directory.h"
+#include <ps5platform/libc.h>
 #include "trace.hpp"
 
 extern "C" int __real_mkdir(const char *path, mode_t mode);

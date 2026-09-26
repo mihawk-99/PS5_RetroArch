@@ -33,6 +33,8 @@
 #include <signal.h>
 #include <ucontext.h>
 
+#include <ps5platform/context.h>
+
 extern "C"
 {
     /* ../PS5_Vulkan's debug API; the title always links the driver. */
@@ -74,12 +76,10 @@ constexpr std::uint64_t kStackSpan = 16ull * 1024 * 1024;
 void on_sample(int, siginfo_t *, void *context_pointer)
 {
     const auto *context = static_cast<const ucontext_t *>(context_pointer);
-    /* The console's mcontext is the SDK header's shifted by six words
-     * (src/crash_report.cpp): rip at 26, rsp at 29, and so rbp at 15. */
-    const auto *words = reinterpret_cast<const std::uint64_t *>(&context->uc_mcontext);
+    const mcontext_t &registers = context->uc_mcontext;
     const std::uint32_t at = g_head.fetch_add(1, std::memory_order_relaxed);
     std::uint64_t *const sample = g_ring[at & (kRingSize - 1)];
-    const std::uint64_t rsp = words[29];
+    const std::uint64_t rsp = static_cast<std::uint64_t>(registers.mc_rsp);
     unsigned thread = 0;
     const pthread_t self = pthread_self();
     const unsigned count = g_thread_count.load(std::memory_order_acquire);
@@ -87,9 +87,9 @@ void on_sample(int, siginfo_t *, void *context_pointer)
         if (pthread_equal(g_threads[index], self))
             thread = index;
     sample[0] = (g_stall.load(std::memory_order_relaxed) ? 1u : 0u) | (std::uint64_t{thread} << 8);
-    sample[1] = words[26];
+    sample[1] = static_cast<std::uint64_t>(registers.mc_rip);
     sample[2] = (rsp & 7) == 0 && rsp != 0 ? *reinterpret_cast<const std::uint64_t *>(rsp) : 0;
-    std::uint64_t frame = words[15];
+    std::uint64_t frame = static_cast<std::uint64_t>(registers.mc_rbp);
     for (unsigned depth = 3; depth <= kFrames; ++depth)
     {
         if ((frame & 7) != 0 || frame < rsp || frame + 16 > rsp + kStackSpan)
