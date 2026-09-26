@@ -336,10 +336,23 @@ index 6039ad6de..55f78f07c 100644
  #include <AvailabilityMacros.h>
  #if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 diff --git a/libretro/libretro_core_options.h b/libretro/libretro_core_options.h
-index 52d608271..e16e6ab59 100644
+index 52d608271..f7cd3947e 100644
 --- a/libretro/libretro_core_options.h
 +++ b/libretro/libretro_core_options.h
-@@ -278,7 +278,10 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+@@ -266,7 +266,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+          { "Software (SW)", NULL },
+          { NULL, NULL },
+       },
++#if defined(__PROSPERO__) && defined(ENABLE_VULKAN)
++      /* The PS5's renderer is its Vulkan driver's hardware one. */
++      "Vulkan"
++#else
+       "Auto"
++#endif
+    },
+    {
+       "pcsx2_upscale_multiplier",
+@@ -278,11 +283,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
        {
           { "1x Native (PS2)", NULL },
           { "2x Native (~720p)", NULL },
@@ -350,7 +363,17 @@ index 52d608271..e16e6ab59 100644
           { "8x Native (~2880p/5K)", NULL },
           { NULL, NULL },
        },
-@@ -758,11 +761,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
++#ifdef __PROSPERO__
++      /* The PS5 renders PS2 games at 4K height by default: God of War II's and
++       * FFX's demos and San Andreas run at full speed at 6x on the console. */
++      "6x Native (~2160p/4K)"
++#else
+       "1x Native (PS2)"
++#endif
+    },
+    {
+       "pcsx2_native_scaling",
+@@ -758,11 +772,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
        "pcsx2_mtvu",
        "Emulation > MTVU (Multi-Threaded VU1) (Restart)",
        "MTVU (Multi-Threaded VU1) (Restart)",
@@ -364,7 +387,7 @@ index 52d608271..e16e6ab59 100644
           { "enabled", NULL },
           { "disabled", NULL },
  #else
-@@ -771,7 +774,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+@@ -771,7 +785,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
  #endif
           { NULL, NULL },
        },
