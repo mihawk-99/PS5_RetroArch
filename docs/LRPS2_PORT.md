@@ -115,7 +115,10 @@ runs God of War II's demo, Final Fantasy X's demo and San Andreas at 6x
 
 - the comparison with desktop LRPS2 at the same revision and settings, which is
   where San Andreas' doubled radiosity haze at 6x is settled;
-- FFX's pacing on the 120 Hz output: a PAL game presents at 50 Hz;
+- FFX's pacing on the 120 Hz output: a PAL game presents at 50 Hz, two and
+  three refreshes a frame. VideoOut offers no 50 or 100 Hz output to switch to
+  (../PS5_Vulkan R92: only 59.94 and 119.88 Hz), so the cadence is the pacer's
+  to keep even;
 - the Ratchet & Clank demo, once its .7z is converted on the console's own
   storage;
 - memory cards and save states in a test directory (Profile 10), then Phase 4's

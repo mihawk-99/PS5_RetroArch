@@ -3759,23 +3759,46 @@ directory `/app0/lrps2-test/states`, never mine; save state on L3 and load
 state on R3, alternating 3 s apart fifteen times each, then six of each 0.6 s
 apart, screenshots after loads. Each state is 50,599,352 bytes.
 
-- All 21 saves were written, and every load that ran succeeded: no state error,
-  no crash, flexible memory at 323,584 KiB throughout. The screenshots after
-  loads show the game going on from the loaded moment, with the frontend's
-  "loaded state from slot 0" notice.
-- Only 11 of the 21 load presses produced a load. The log shows the requests
-  bunching behind saves -- three saves, then two load requests and one load --
-  with state compression on and off alike (the same 21 and 11). Dolphin's
-  Profile 10 at the same timing ran every load. Why LRPS2's do not is open; it
-  needs a timing capture of the frontend's state tasks.
+- Every save and load that ran succeeded: no state error, no crash, flexible
+  memory at 323,584 KiB throughout. The screenshots after loads show the game
+  going on from the loaded moment, with the frontend's "loaded state from slot
+  0" notice.
+- About half the presses produced an operation: 11 of 21 loads ran (the
+  frontend backs up the running state to "RAM" only for a load it applies),
+  and 10 of 21 saves (a bounded timing capture in the frontend, removed since,
+  logged each save that finished). The frontend runs one save or load at a
+  time: `task_queue_push` skips a blocking task while another is running ("user
+  must try again later"), and `content_load_state` ignores that answer, so a
+  press that arrives while the last operation is still going does nothing. Its
+  "Saving state" and "Loading state" lines do not show this: the first is
+  written before the task is pushed, and the second also when a save reads the
+  old file into its undo buffer. The Dolphin Profile 10 entry above counted
+  those lines, so how many of Dolphin's operations ran is not known from it.
+- A save holds that slot 2.1-2.6 s with state compression on (50.6 MB
+  compressed to about 18 MB) and 2.7-2.9 s with it off: the title's file writes
+  run at about 18 MB/s, and writing in 4 MiB chunks instead of RetroArch's
+  100 KB changes nothing (2.4 and 2.8 s). What limits the writes is the next
+  thing to measure, below RetroArch.
 - A load stalls the game up to 320 ms; windows with state operations run at
   93-100%, the others at 100%.
 - A first run with a full-size thumbnail per save (2880x2160 PNG) and a new
-  slot for each wrote only 5 of 21 saves, 12-15 s apart; without either, all 21
-  were written. The thumbnail encode is the likely cost, not yet isolated, and
-  the profile runs without thumbnails, as Dolphin's did. The test states were
-  deleted after each run.
+  slot for each wrote only 5 of 21 saves, 12-15 s apart. The profile runs
+  without thumbnails, as Dolphin's did. The test states were deleted after
+  each run.
 
 Memory cards: each game's run created its own card in `/app0/lrps2-test/saves`
 (the per-game cards the core options select), beside the test states and away
 from mine.
+
+**LRPS2, 30-minute soaks** at 6x (God of War II's demo from boot, the driver
+profile armed, a screenshot every five minutes):
+
+| Run | Windows | After the first | Direct mappings | Flexible memory |
+|---|---|---|---|---|
+| idle after the menus: Kratos dies at about five minutes and the game waits on "You are dead" | 185 | all at 99.2% or better | 228 → 318 (1,616 MiB) by the first quarter, flat after | 323,584 KiB throughout |
+| Cross every 20 s: fighting, dying and restarting from the checkpoint for the whole half hour | 184 | two windows at 98.9%, the rest 99.6% or better | 228 → 315 at the first quarter, 346 at the end (1,616 → 1,618 MiB) | 323,584 KiB throughout |
+
+Neither crashed; the hitches are the screenshots and scene loads (17 in the
+active run, the worst 128 ms). The mappings the active run adds after the first
+quarter are small ones -- 31 of them, 2 MiB -- as new fights bring new
+pipelines.
