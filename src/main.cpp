@@ -50,6 +50,7 @@
 #include "trace.hpp"
 #include "memory_diagnostics.hpp"
 #include "../build/title_build_identity.h"
+#include "title_threads.hpp"
 
 /* RetroArch's entry, in C. */
 extern "C" int rarch_main(int argc, char *argv[], void *data);
@@ -111,7 +112,7 @@ void *log_flusher(void *)
 void start_log_flusher()
 {
     pthread_t thread;
-    if (pthread_create(&thread, nullptr, log_flusher, nullptr) == 0)
+    if (create_title_thread(&thread, log_flusher, nullptr) == 0)
         pthread_detach(thread);
 }
 

@@ -16,6 +16,7 @@
 #include <cstring>
 #include <new>
 #include <ctime>
+#include "title_threads.hpp"
 
 extern "C"
 {
@@ -143,7 +144,7 @@ void *audio_init(const char *device, unsigned requested_rate, unsigned latency, 
         return nullptr;
     }
     a->port = sceAudioOutOpen(0xff, 0, 0, grain, rate, 1);
-    const int thread_result = a->port > 0 ? pthread_create(&a->thread, nullptr, worker, a) : -1;
+    const int thread_result = a->port > 0 ? create_title_thread(&a->thread, worker, a) : -1;
     if (thread_result != 0)
     {
         std::fprintf(stderr, "audio ps5: open/thread failed port=%08x thread=%d\n",

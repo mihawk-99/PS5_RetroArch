@@ -3884,3 +3884,38 @@ platform-probe.txt) and links ../PS5_Vulkan 060c5ac. The unit gate's patch
 count moves 203 -> 212: 0094's seven blocks, which its commit (44d6fa5) left
 out of the pinned count, and 0095 and 0096; 0019's old block joins the
 withdrawn ones. tools/verify.sh PASS.
+
+## 2026-09-26 — A release without the crashes: the stability checks
+
+Before a release, the classes of the tester's crashes were looked for
+everywhere, not only where they struck.
+
+- **Thread stacks.** Every thread the title starts for itself -- the log
+  flusher, the audio worker, the permission repair, the sampler, the
+  core-thread factory -- was created with no attributes, 64 KiB here; they ask
+  for 256 KiB now (src/title_threads.hpp), as the driver's shader-cache writer
+  and blit workers do (../PS5_Vulkan 40e9d30). RetroArch's threads have 2 MiB
+  (0096), the cores' 2 MiB.
+- **Device state changed from several threads.** Beyond R93's lists, the
+  driver's writable globals are atomic or locked. One more was not: each draw
+  claimed a slot of the device's debug descriptor-table array with a check and
+  an increment, so two recording threads -- a core's and the frontend's with
+  threaded video -- could write an entry past it. It is an atomic increment now.
+
+The release candidate (build 870bd1bb; LRPS2 at its pinned revision, the
+upstream port and 8x staying out until they are validated) on the console, V-Sync
+on, my saves, configs and history kept out of the way (a test save folder,
+core-options file and no history):
+
+- every core with a game -- FCEUmm (Super Mario Bros.), snes9x (Zelda: A Link
+  to the Past), mGBA (Mario Pinball Land), Genesis Plus GX (Sonic), FBNeo
+  (Metal Slug), PPSSPP (God of War: Ghost of Sparta), Dolphin (Wind Waker),
+  LRPS2 (God of War II's demo) -- through its title screens, the menu opened
+  and closed, then a Quick Menu action, threaded video on for four of them: no
+  crash, no fatal signal. The script's first DOWN was dropped for snes9x and
+  Dolphin, which restarted the content instead of closing it; closing snes9x
+  was already run on this code with threaded video on and off.
+- PPSSPP for ten minutes with threaded video, the menu opened and closed every
+  20 s (25 times): no crash, every audio window 98-100%.
+
+tools/verify.sh PASS; ../PS5_Vulkan tools/check-driver.sh PASS.

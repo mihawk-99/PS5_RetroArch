@@ -36,6 +36,7 @@
 
 #include <ps5platform/libc.h>
 #include "trace.hpp"
+#include "title_threads.hpp"
 
 extern "C" int __real_mkdir(const char *path, mode_t mode);
 extern "C" int __real_open(const char *path, int flags, ...);
@@ -175,7 +176,7 @@ void *repair_thread(void *)
 extern "C" void ps5_open_permissions()
 {
     pthread_t thread;
-    if (pthread_create(&thread, nullptr, repair_thread, nullptr) == 0)
+    if (create_title_thread(&thread, repair_thread, nullptr) == 0)
         pthread_detach(thread);
     else
         ps5::debug::mark("permissions: the repair thread could not start");

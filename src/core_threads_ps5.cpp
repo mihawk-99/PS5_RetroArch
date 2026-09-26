@@ -31,6 +31,7 @@
 #include <mutex>
 
 #include <pthread.h>
+#include "title_threads.hpp"
 
 extern "C" void ps5_sampler_add_thread(pthread_t thread, const void *start);
 
@@ -170,7 +171,7 @@ extern "C" void ps5_core_threads_start()
     if (factory_running)
         return;
     pthread_t thread;
-    if (pthread_create(&thread, nullptr, factory, nullptr) == 0)
+    if (create_title_thread(&thread, factory, nullptr) == 0)
     {
         pthread_detach(thread);
         factory_running = true;

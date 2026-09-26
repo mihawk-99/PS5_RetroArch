@@ -34,6 +34,7 @@
 #include <ucontext.h>
 
 #include <ps5platform/context.h>
+#include "title_threads.hpp"
 
 extern "C"
 {
@@ -254,7 +255,7 @@ extern "C" void ps5_sampler_start()
         return;
     }
     pthread_t thread;
-    if (pthread_create(&thread, nullptr, sampler, nullptr) == 0)
+    if (create_title_thread(&thread, sampler, nullptr) == 0)
     {
         pthread_detach(thread);
         std::fputs("sampler: sampling the main thread and core threads every 2 ms\n", stderr);
