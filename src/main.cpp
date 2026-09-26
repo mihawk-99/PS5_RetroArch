@@ -121,9 +121,11 @@ void start_log_flusher()
  * imports, GPU window and core loader the cores live with -- and ends the
  * launch. Its words select the optional tests: "large" (4 GiB of guest memory
  * beside 1 GiB of code), "huge" (10 GiB mapped and written at once), "full"
- * (the largest direct allocation mapped and written) and "jit" (the
+ * (the largest direct allocation mapped and written), "jit" (the
  * shared-memory JIT interface, last, since a refused import would stop the
- * process). Every line goes to the trace as it is measured. */
+ * process) and "files" (the file probe: 256 MiB written and read back in the
+ * title's own folder at three chunk sizes, the file removed after each). Every
+ * line goes to the trace as it is measured. */
 static void probe_line(void *, const char *line)
 {
     ps5::debug::mark(line);
@@ -148,7 +150,9 @@ static bool run_platform_probe()
         flags |= PS5_PROBE_FULL;
     if (std::strstr(words, "jit"))
         flags |= PS5_PROBE_JIT_API;
-    const int failures = ps5_platform_probe(probe_line, nullptr, flags);
+    int failures = ps5_platform_probe(probe_line, nullptr, flags);
+    if (std::strstr(words, "files"))
+        failures += ps5_platform_probe_files(probe_line, nullptr, "/app0");
     ps5::debug::mark_value("platform probe: failures", failures);
     std::fflush(stderr);
     return true;

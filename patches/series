@@ -173,3 +173,11 @@
 #       when the context reports HDR support: it leaked on every video init
 #       gfx/drivers/vulkan.c
 0093-release-hdr-uniform-buffer
+
+# 0094  write save states without stdio on this console: the libc's fwrite() ran
+#       at 3-13 MiB/s where write() of 1 MiB and more runs at 150-230 MiB/s, so
+#       a state (uncompressed in 4 MiB chunks, compressed in 1 MiB ones) goes
+#       to the raw descriptor through the frequent-access hint
+#       libretro-common/vfs/vfs_implementation.c, tasks/task_save.c,
+#       libretro-common/streams/rzip_stream.c
+0094-write-states-without-stdio

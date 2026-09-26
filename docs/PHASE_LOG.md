@@ -3802,3 +3802,29 @@ Neither crashed; the hitches are the screenshots and scene loads (17 in the
 active run, the worst 128 ms). The mappings the active run adds after the first
 quarter are small ones -- 31 of them, 2 MiB -- as new fights bring new
 pipelines.
+
+## 2026-09-26 — Save states written without stdio (patch 0094)
+
+The payload SDK fork's file probe (its docs/PROBE.md, "Files") found this
+console's `fwrite()` at 3-13 MiB/s, slower the larger its buffer, where
+`write()` of a megabyte or more runs at 150-230 MiB/s. RetroArch writes save
+states through stdio. Patch 0094 gives a state the raw descriptor on this
+console: uncompressed in 4 MiB chunks, compressed (rzip) in 1 MiB ones. Small
+writers such as configuration files keep stdio.
+
+LRPS2's 50.6 MB God of War II state, measured with a bounded timing capture
+removed since:
+
+| | before | 0094 |
+|---|---|---|
+| uncompressed | 2.7-2.9 s | 0.28-0.29 s |
+| compressed (the default) | 2.1-2.6 s | 1.8 s, now mostly zlib at upstream's level |
+
+The Profile 10 stress on the committed build (compressed, the default): no state
+error, no crash, the game at 93-100% in windows with state operations. With
+saves this short, the uncompressed run completed 15 of 21 saves and 16 of 21
+loads (10 and 11 before). The ones still skipped come in the burst 0.6 s apart,
+where each operation overlaps the last.
+
+The title also pins the fork at 66f658e, whose platform probe takes the word
+`files` (`/app0/platform-probe.txt`) to run the file probe in `/app0`.

@@ -2940,6 +2940,114 @@ EDITS = [
         "         vulkan_destroy_hdr_buffer(vk->context->device, &vk->main_buffer);\n",
         "patches/series, 0093): vulkan_init creates the",
     ),
+    (
+        # 0094: a save state is written without stdio. This console's libc wrote
+        # 256 MiB through fwrite() of 16 MiB at 13.2 MiB/s with the stream's own
+        # buffer, 10.4 with a 1 MiB setvbuf() buffer and 3.1 with a 4 MiB one,
+        # while write() ran at 25.9 MiB/s in 100 KiB chunks, 148.5 in 1 MiB and
+        # 235.9 in 16 MiB (the payload SDK fork's file probe, 2026-09-26). An
+        # LRPS2 state of 50.6 MB took 2.1-2.9 s to save, which held the
+        # frontend's one state operation and dropped the presses behind it. A
+        # file written with the frequent-access hint gets the raw descriptor.
+        "libretro-common/vfs/vfs_implementation.c",
+        "#ifdef HAVE_MMAP\n"
+        "   if (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS && mode == RETRO_VFS_FILE_ACCESS_READ)\n",
+        "#ifdef __PROSPERO__\n"
+        "   /* Changed by this port (patches/series, 0094): a file written whole on this\n"
+        "    * console bypasses stdio, whose fwrite() ran at 3-13 MiB/s where write() of\n"
+        "    * 1 MiB and more runs at 150-230 MiB/s. A writer that asks for frequent\n"
+        "    * access -- a save state -- gets the raw descriptor. */\n"
+        "   if (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS && mode == RETRO_VFS_FILE_ACCESS_WRITE)\n"
+        "   {\n"
+        "      stream->hints |= RFILE_HINT_UNBUFFERED;\n"
+        "      stream->hints &= ~RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS;\n"
+        "   }\n"
+        "   else\n"
+        "#endif\n"
+        "#ifdef HAVE_MMAP\n"
+        "   if (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS && mode == RETRO_VFS_FILE_ACCESS_READ)\n",
+        "patches/series, 0094): a file written whole on this",
+    ),
+    (
+        # 0094 too: the save task writes 4 MiB at a time, and asks for the raw
+        # descriptor. The task runs on its own thread, so no frame waits.
+        "tasks/task_save.c",
+        "#define SAVE_STATE_CHUNK 100 * 1024\n"
+        "#endif\n",
+        "#define SAVE_STATE_CHUNK 100 * 1024\n"
+        "#endif\n"
+        "\n"
+        "/* Changed by this port (patches/series, 0094): on this console a state is\n"
+        " * written with write() of 4 MiB at a time, not through stdio in 100 KiB. */\n"
+        "#ifdef __PROSPERO__\n"
+        "#undef SAVE_STATE_CHUNK\n"
+        "#define SAVE_STATE_CHUNK (4 * 1024 * 1024)\n"
+        "#define PS5_STATE_WRITE_HINT RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS\n"
+        "#else\n"
+        "#define PS5_STATE_WRITE_HINT RETRO_VFS_FILE_ACCESS_HINT_NONE\n"
+        "#endif\n",
+        "patches/series, 0094): on this console a state is",
+    ),
+    (
+        # 0094 too: the save task's uncompressed state.
+        "tasks/task_save.c",
+        "         state->file   = intfstream_open_file(\n"
+        "               state->path, RETRO_VFS_FILE_ACCESS_WRITE,\n"
+        "               RETRO_VFS_FILE_ACCESS_HINT_NONE);\n",
+        "         state->file   = intfstream_open_file(\n"
+        "               state->path, RETRO_VFS_FILE_ACCESS_WRITE,\n"
+        "               PS5_STATE_WRITE_HINT /* patches/series, 0094: the task's state */);\n",
+        "PS5_STATE_WRITE_HINT /* patches/series, 0094: the task's state */",
+    ),
+    (
+        # 0094 too: the synchronous save's uncompressed state.
+        "tasks/task_save.c",
+        "      file = intfstream_open_file(path, RETRO_VFS_FILE_ACCESS_WRITE,\n"
+        "                                  RETRO_VFS_FILE_ACCESS_HINT_NONE);\n",
+        "      file = intfstream_open_file(path, RETRO_VFS_FILE_ACCESS_WRITE,\n"
+        "                                  PS5_STATE_WRITE_HINT /* patches/series, 0094 */);\n",
+        "PS5_STATE_WRITE_HINT /* patches/series, 0094 */",
+    ),
+    (
+        # 0094 too: a compressed state's file gets the raw descriptor, and 1 MiB
+        # chunks, so its writes are few and large. The chunk size is in the
+        # file's header, which readers take it from.
+        "libretro-common/streams/rzip_stream.c",
+        "      /* Written files are always compressed */\n"
+        "      stream->is_compressed = true;\n"
+        "      file_mode             = RETRO_VFS_FILE_ACCESS_WRITE;\n",
+        "      /* Written files are always compressed */\n"
+        "      stream->is_compressed = true;\n"
+        "      file_mode             = RETRO_VFS_FILE_ACCESS_WRITE;\n"
+        "#ifdef __PROSPERO__\n"
+        "      /* Changed by this port (patches/series, 0094): written in 1 MiB chunks\n"
+        "       * on the raw descriptor, not through stdio. */\n"
+        "      stream->chunk_size    = 1024 * 1024;\n"
+        "      file_hints            = RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS;\n"
+        "#endif\n",
+        "patches/series, 0094): written in 1 MiB chunks",
+    ),
+    (
+        # 0094 too: the hint rzip opens its file with.
+        "libretro-common/streams/rzip_stream.c",
+        "      rzipstream_t *stream, const char *path, bool is_writing)\n"
+        "{\n"
+        "   unsigned file_mode;\n",
+        "      rzipstream_t *stream, const char *path, bool is_writing)\n"
+        "{\n"
+        "   unsigned file_mode;\n"
+        "   unsigned file_hints = RETRO_VFS_FILE_ACCESS_HINT_NONE; /* patches/series, 0094 */\n",
+        "unsigned file_hints = RETRO_VFS_FILE_ACCESS_HINT_NONE; /* patches/series, 0094 */",
+    ),
+    (
+        # 0094 too.
+        "libretro-common/streams/rzip_stream.c",
+        "   if (!(stream->file = filestream_open(\n"
+        "         path, file_mode, RETRO_VFS_FILE_ACCESS_HINT_NONE)))\n",
+        "   if (!(stream->file = filestream_open(\n"
+        "         path, file_mode, file_hints /* patches/series, 0094 */)))\n",
+        "file_hints /* patches/series, 0094 */",
+    ),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.
