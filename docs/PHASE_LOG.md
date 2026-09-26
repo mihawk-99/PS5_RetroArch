@@ -3741,3 +3741,41 @@ The Wind Waker 30-minute soak on the adoption build (before this entry's
 changes, Profile 11's recipe) was flat: 185 windows, every one after the first
 at 99.6% or better, 349 direct mappings (680 MiB) start to end, 301,056 KiB of
 flexible memory free throughout (245,760 before the adoption), no crash.
+
+## 2026-09-26 — The committed title on every core, and LRPS2's save states
+
+The title as committed (build ad1207c6: driver R91, whose step end now flushes
+every GPU cache, the SDK fork's platform layer, LRPS2 with MTVU on) was run
+through the regressions the earlier builds passed:
+
+- **Dolphin, Profiles 0 and 1**, RE4, Melee and Wind Waker from my entry states:
+  no crash; every window after the first at 100%, but one Melee window at 98%
+  in each profile, as before.
+- **PPSSPP, God of War: Ghost of Sparta** from its state: 100% in every window
+  after the first, 1,200 presents per 10 s.
+
+**LRPS2, Profile 10** (God of War II's demo at 6x, from boot): states in the test
+directory `/app0/lrps2-test/states`, never mine; save state on L3 and load
+state on R3, alternating 3 s apart fifteen times each, then six of each 0.6 s
+apart, screenshots after loads. Each state is 50,599,352 bytes.
+
+- All 21 saves were written, and every load that ran succeeded: no state error,
+  no crash, flexible memory at 323,584 KiB throughout. The screenshots after
+  loads show the game going on from the loaded moment, with the frontend's
+  "loaded state from slot 0" notice.
+- Only 11 of the 21 load presses produced a load. The log shows the requests
+  bunching behind saves -- three saves, then two load requests and one load --
+  with state compression on and off alike (the same 21 and 11). Dolphin's
+  Profile 10 at the same timing ran every load. Why LRPS2's do not is open; it
+  needs a timing capture of the frontend's state tasks.
+- A load stalls the game up to 320 ms; windows with state operations run at
+  93-100%, the others at 100%.
+- A first run with a full-size thumbnail per save (2880x2160 PNG) and a new
+  slot for each wrote only 5 of 21 saves, 12-15 s apart; without either, all 21
+  were written. The thumbnail encode is the likely cost, not yet isolated, and
+  the profile runs without thumbnails, as Dolphin's did. The test states were
+  deleted after each run.
+
+Memory cards: each game's run created its own card in `/app0/lrps2-test/saves`
+(the per-game cards the core options select), beside the test states and away
+from mine.
