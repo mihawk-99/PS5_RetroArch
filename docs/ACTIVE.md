@@ -1,65 +1,42 @@
 # Active work
 
-_Updated: 2026-09-25_
+_Updated: 2026-09-26_
 
-## Now: Dolphin (GameCube) with Wind Waker
+## Now: v0.2.0-alpha.1 released; asynchronous shader compilation next
 
-**Goal:** Wind Waker correct, full speed, with audio, input and saves, stable
-in long play; then the 6x/UberShader/EFB/MSAA torture profiles. Driver work it
-needs goes into ../PS5_Vulkan as general fixes with their own probes.
+**Released.** Build `870bd1bb` (commits up to `3712ce1`; release notes
+`docs/releases/v0.2.0-alpha.1.md`): eight cores, Dolphin, LRPS2 and PPSSPP on the
+GPU, SDK fork `a110320`, ../PS5_Vulkan `40e9d30`, LRPS2 at its pinned revision
+`6d14775` (6x). It is in `dist/PPSA99169`, staged in `handoff/PPSA99169`, kept in
+`build/release/PPSA99169-870bd1bb` and on the console. The tester's three
+problems -- half speed with V-Sync on a 60 Hz display, a crash re-creating the
+video driver on a 64 KiB RetroArch thread, PPSSPP crashes in vkDestroyBuffer --
+are fixed; the release battery (every core, boot, menu and a Quick Menu action,
+Threaded Video on half) and a 10-minute PPSSPP soak had no crash
+(docs/PHASE_LOG.md, 2026-09-26).
 
-**Where it is.** The core (libretro/dolphin `c6630001e0`, Dolphin 2609) builds
-with `tools/build-dolphin.sh` and one patch, `patches/dolphin/ps5-port.patch`,
-and ships in the title. Wind Waker boots with JIT64 and fastmem, save states
-save and load, and from my save state on Outset Island the 3D scene, Link and
-the HUD draw correctly (`evidence/dolphin-restart-strips`): a ten-frame FIFO
-log of Link on the ship deck matches desktop Dolphin to resampling (mean
-difference 1.13-1.16, from 64-71).
+**Open from the release:**
 
-What the bring-up needed, by layer (details in `docs/PHASE_LOG.md`):
+1. **Asynchronous shader compilation** (my standing requirement: 100% speed
+   while shaders compile). ../PS5_Vulkan compiles every pipeline, cache hits
+   included, under one global mutex (`ps5vk_compile_mutex`), so a core's
+   background compiles queue and the render thread waits behind them; Dolphin
+   defaults to Synchronous. Parallel compiles in the driver, then asynchronous
+   modes as the cores' defaults.
+2. Rogue Leader's attract sequence at 72-85% with every shader cached: the
+   driver's CPU cost on Dolphin's GPU thread (CPU copies that wait for the GPU,
+   a cache flush per draw; profiled 2026-09-25).
+3. The 60 Hz fallback has only run on a 120 Hz display; the tester's next trace
+   confirms it.
+4. LRPS2 after that: the upstream PCSX2 port in ../PS5_LRPS2's working tree
+   (San Andreas' modes, texture replacement), 8x as the PS5 default, the
+   lighting compared with the native picture.
 
-- **Platform (core patch):** guest RAM as one direct-memory allocation mapped at
-  every mirror, the fastmem arena away from the GPU window, JIT code at
-  0x3_0000_0000, the console's fault context, a 32 MiB code cache. Single-core
-  FIFO playback (`Core/Core.cpp`) returns to retro_run like the CPU thread
-  does; it hung before.
-- **Title and frontend:** the `*at` directory family, direct-memory
-  allocations, patches 0089 and 0090.
-- **Driver (../PS5_Vulkan):** R57 border colours, R58 primitive restart, R59
-  inverted depth, R60 large stages, R62 uniform buffers as byte ranges (fog and
-  matrices), R64 restart state behind SQ_NON_EVENT (the corrupt 3D scene), R65
-  restart off after a copy's split (stray triangles, minimap).
-
-**Test aids** (never shipped; the title deletes their files on any launch that
-is not a test run): `/app0/dolphin-options.txt` overrides core options for one
-run; `/app0/dolphin-debug.txt` names a debug mode: `fog`, `fifo` or `fifo N`
-(records a FIFO log at frame 300, or N), `dump`, `swloader`, `cmploader`, or
-`objects A B` (plays only objects A to B of each FIFO frame, to bisect against
-desktop Dolphin). The core also copies its first 32 alerts to the trace
-(`dolphin alert:`). `/app0/ps5-sampler.txt` arms the CPU sampler
-(`src/sampler_ps5.cpp`); its `stall-ms N` line sets the late-frame threshold.
-
-## Next
-
-The acceptance goal (2026-09-25): Resident Evil 4, Super Smash Bros. Melee and
-Wind Waker correct, full speed, with audio, input and states, then stable and
-measured through the profiles in `tooling/dolphin-profiles/` (docs/PHASE_LOG.md).
-
-1. Profiles 0, 1 and 2 (1x and 6x) pass on all three games: correct
-   pictures, full speed, display-paced frames, five swapchain images at 120 Hz
-   (docs/PHASE_LOG.md, 2026-09-25). Tolerated: a screenshot's 55 ms read-back
-   leaves its audio window ~0.4% short.
-2. The driver's copy throughput: the 55 ms read-back of the 4K output, a
-   218 ms copy in RE4's load, and Wind Waker's 40-90 read-backs a second, each
-   done by the CPU after a wait for the GPU; Profile 5's EFB copies to RAM
-   depend on it.
-3. Profiles 3-10 pass on all three games; the maximum MSAA torture is correct
-   and GPU-bound at 60-97% (uncompressed multisampled surfaces). Profile 9
-   leaves 2 small direct mappings a reload (unidentified); a state load stalls
-   250-400 ms while Dolphin recompiles its cleared JIT cache. Profile 11 passes: Melee, RE4
-   and Wind Waker for 30 minutes and Wind Waker for an hour, every window after boot at 99.5%
-   or better, the mappings level and flexible memory flat.
-4. The dual-core FIFO playback stall (single core plays).
+**Test runs and core options.** RetroArch here uses per-core options
+(`global_core_options = false` in my config), so a run's `core_options_path`
+is ignored and each core reads `config/<core>/<core>.opt`. A test that needs
+its own options sets `global_core_options = "true"` with its own path; my
+per-core files are never edited.
 
 ## Accepted baselines
 
