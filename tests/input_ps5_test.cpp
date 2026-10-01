@@ -15,6 +15,8 @@ unsigned vibrations = 0;
 ScePadVibrationParam last_vibration{};
 unsigned vibration_modes = 0;
 int32_t last_vibration_mode = -1;
+unsigned trigger_effects = 0;
+ScePadTriggerEffectParam last_trigger_effect{};
 PadSample sample()
 {
     PadSample p{};
@@ -58,6 +60,13 @@ extern "C"
         assert(handle == 1);
         ++vibration_modes;
         last_vibration_mode = mode;
+        return 0;
+    }
+    int32_t scePadSetTriggerEffect(int32_t handle, const ScePadTriggerEffectParam *param)
+    {
+        assert(handle == 1 && param && param->trigger_mask == 0x03);
+        ++trigger_effects;
+        last_trigger_effect = *param;
         return 0;
     }
     int32_t scePadRead(int32_t, void *out, int32_t capacity)
@@ -285,6 +294,19 @@ int main()
     assert(last_vibration.largeMotor == 0 && last_vibration.smallMotor == 128);
     assert(!ps5_joypad.set_rumble(1, RETRO_RUMBLE_STRONG, 65535)); // no second pad
     assert(vibrations == 3);
+    // Rumble also drives the adaptive triggers: vibration mode on both
+    // triggers, amplitude/frequency tracking the stronger motor, and the
+    // service call skipped while the effect is unchanged.
+    assert(trigger_effects == 2); // the WEAK call at same max level was deduped
+    assert(last_trigger_effect.command[0].mode == 3 &&
+           last_trigger_effect.command[1].mode == 3);
+    assert(last_trigger_effect.command[0].command_data[1] == 5); // amplitude for 128
+    assert(last_trigger_effect.command[0].command_data[2] == 174); // 110 + 128/2
+    assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_WEAK, 0));
+    assert(trigger_effects == 3); // level 0 releases the triggers
+    assert(last_trigger_effect.command[0].mode == 0);
+    assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 0));
+    assert(trigger_effects == 3); // already released; no repeat call
     input_ps5.free(input);
     ps5_joypad.destroy();
     ps5_joypad.destroy();

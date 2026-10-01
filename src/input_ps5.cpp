@@ -79,6 +79,36 @@ struct ScePadVibrationParam
     std::uint8_t smallMotor;
 };
 
+/* scePadSetTriggerEffect's parameter block: a trigger mask byte, then two
+ * 56-byte command slots at offsets 8 and 64 (command[0] is L2, command[1] is
+ * R2), for 120 bytes total. Each slot is a 32-bit mode, a 4-byte gap, and the
+ * 48-byte mode payload. The shape is the one the SDK header documents and
+ * duaLib's libScePad reimplementation carries, and the mask/command offsets
+ * match the console library's own parameter validation. */
+enum ScePadTriggerEffectMode : std::int32_t
+{
+    trigger_effect_off = 0,
+    trigger_effect_vibration = 3, /* vibrates the motor arm around a position */
+};
+
+struct ScePadTriggerEffectCommand
+{
+    std::int32_t mode;
+    std::uint8_t reserved[4];
+    /* Vibration payload: [0] position on the trigger's travel (0..9),
+     * [1] amplitude (0..8), [2] frequency in Hz. Unused bytes stay zero. */
+    std::uint8_t command_data[48];
+};
+
+struct ScePadTriggerEffectParam
+{
+    std::uint8_t trigger_mask; /* 0x01 selects command[0] (L2), 0x02 command[1] (R2) */
+    std::uint8_t reserved[7];
+    ScePadTriggerEffectCommand command[2];
+};
+static_assert(sizeof(ScePadTriggerEffectParam) == 120,
+              "ScePadTriggerEffectParam must be the library's 120-byte block");
+
 extern "C"
 {
     /* The console's pad service. Declarations rather than the SDK's headers: this
@@ -90,6 +120,7 @@ extern "C"
     std::int32_t scePadRead(std::int32_t handle, void *samples, std::int32_t capacity);
     std::int32_t scePadClose(std::int32_t handle);
     std::int32_t scePadSetVibration(std::int32_t handle, const ScePadVibrationParam *param);
+    std::int32_t scePadSetTriggerEffect(std::int32_t handle, const ScePadTriggerEffectParam *param);
     /* Vibration output mode: 1 = advanced (DualSense haptics), 2 = compatible,
      * the classic dual-motor path scePadSetVibration drives. A DualSense opens
      * in advanced mode, so without this call the two motor levels move nothing.
@@ -176,6 +207,14 @@ struct PadState
      * both, while RetroArch sets one motor at a time. */
     std::uint8_t rumble_large = 0;
     std::uint8_t rumble_small = 0;
+    /* The trigger vibration last pushed: the service call is skipped when the
+     * effect is already what the rumble state asks for. trigger_effect_rejected
+     * latches a pad that refuses the command, so a failure is not retried every
+     * rumble event. */
+    std::int32_t trigger_mode = -1;
+    std::uint8_t trigger_amplitude = 0;
+    std::uint8_t trigger_frequency = 0;
+    bool trigger_effect_rejected = false;
     bool owns_user_service = false;
     bool announced = false;
 };
@@ -822,6 +861,8 @@ const char *joypad_name(unsigned port) noexcept
 /* RetroArch hands rumble in 0..65535 per effect; the pad wants 0..255 per
  * motor. STRONG drives the large motor, WEAK the small one, and each call
  * restates both because scePadSetVibration is the whole state, not a delta. */
+void update_trigger_rumble(PadState &state) noexcept;
+
 bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
                        std::uint16_t strength) noexcept
 {
@@ -840,7 +881,52 @@ bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
         return false;
     }
     const ScePadVibrationParam param{active_pad->rumble_large, active_pad->rumble_small};
-    return scePadSetVibration(active_pad->handle, &param) == 0;
+    const bool set = scePadSetVibration(active_pad->handle, &param) == 0;
+    update_trigger_rumble(*active_pad);
+    return set;
+}
+
+/* Rumble also drives the adaptive triggers: the DualSense's motor arm vibrates
+ * the trigger lever at a chosen position, which reads as a sharper, localized
+ * texture than the body motors. The mapping tracks the stronger motor -
+ * strong rumble thumps at a low frequency, weak rumble buzzes high - and level
+ * zero releases both triggers. The service is only called when the effect
+ * actually changes. */
+void update_trigger_rumble(PadState &state) noexcept
+{
+    if (state.handle < 0 || state.trigger_effect_rejected)
+        return;
+    const std::uint8_t level = state.rumble_large > state.rumble_small
+                                   ? state.rumble_large
+                                   : state.rumble_small;
+    const std::int32_t mode = level == 0 ? trigger_effect_off : trigger_effect_vibration;
+    const std::uint8_t amplitude =
+        level == 0 ? 0 : static_cast<std::uint8_t>(1 + (level * 7 + 127) / 255);
+    const std::uint8_t frequency =
+        level == 0 ? 0
+                   : static_cast<std::uint8_t>(state.rumble_large >= state.rumble_small
+                                                   ? 40 + state.rumble_large / 2
+                                                   : 110 + state.rumble_small / 2);
+    if (state.trigger_mode == mode && state.trigger_amplitude == amplitude &&
+        state.trigger_frequency == frequency)
+        return;
+    ScePadTriggerEffectParam param{};
+    param.trigger_mask = 0x03;
+    for (auto &cmd : param.command)
+    {
+        cmd.mode = mode;
+        cmd.command_data[0] = 5; /* mid-travel */
+        cmd.command_data[1] = amplitude;
+        cmd.command_data[2] = frequency;
+    }
+    if (scePadSetTriggerEffect(state.handle, &param) != 0)
+    {
+        state.trigger_effect_rejected = true;
+        return;
+    }
+    state.trigger_mode = mode;
+    state.trigger_amplitude = amplitude;
+    state.trigger_frequency = frequency;
 }
 
 void *ps5_input_init(const char *) noexcept
