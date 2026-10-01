@@ -13,6 +13,8 @@ int read_result = 0;
 unsigned reads = 0, opens = 0, closes = 0, connects = 0, disconnects = 0;
 unsigned vibrations = 0;
 ScePadVibrationParam last_vibration{};
+unsigned vibration_modes = 0;
+int32_t last_vibration_mode = -1;
 PadSample sample()
 {
     PadSample p{};
@@ -49,6 +51,13 @@ extern "C"
         assert(handle == 1 && param);
         ++vibrations;
         last_vibration = *param;
+        return 0;
+    }
+    int32_t scePadSetVibrationMode(int32_t handle, int32_t mode)
+    {
+        assert(handle == 1);
+        ++vibration_modes;
+        last_vibration_mode = mode;
         return 0;
     }
     int32_t scePadRead(int32_t, void *out, int32_t capacity)
@@ -137,6 +146,9 @@ int main()
     void *input = input_ps5.init("");
     assert(ps5_joypad.init(input));
     assert(opens == 1 && !ps5_joypad.query_pad(0));
+    // Opening the pad selects compatible vibration mode once (DualSense opens
+    // in advanced/haptics mode, where the two motor levels move nothing).
+    assert(vibration_modes == 1 && last_vibration_mode == 2);
     auto p = sample();
     feed(p);
     assert(ps5_joypad.query_pad(0) && !ps5_joypad.query_pad(1) && connects == 1);
@@ -280,6 +292,7 @@ int main()
     assert(ps5_joypad.init(input));
     ps5_joypad.destroy();
     assert(opens == 2 && closes == 2);
+    assert(vibration_modes == 2);
     ps5_input_reset_autoconfig(); // Safe before/after driver lifetime.
 
     // STOP ends the run on the next frame, as --max-frames does, and only once.

@@ -90,6 +90,12 @@ extern "C"
     std::int32_t scePadRead(std::int32_t handle, void *samples, std::int32_t capacity);
     std::int32_t scePadClose(std::int32_t handle);
     std::int32_t scePadSetVibration(std::int32_t handle, const ScePadVibrationParam *param);
+    /* Vibration output mode: 1 = advanced (DualSense haptics), 2 = compatible,
+     * the classic dual-motor path scePadSetVibration drives. A DualSense opens
+     * in advanced mode, so without this call the two motor levels move nothing.
+     * Values per ../ps5-native-gamepad-input-research's FEATURES.md, validated
+     * on hardware. */
+    std::int32_t scePadSetVibrationMode(std::int32_t handle, std::int32_t mode);
     std::int32_t sceUserServiceInitialize(const void *params);
     std::int32_t sceUserServiceGetInitialUser(std::int32_t *user_id);
     std::int32_t sceUserServiceTerminate();
@@ -463,10 +469,17 @@ void *open_pad() noexcept
         ps5_input_trace(line);
         return state;
     }
+    /* Select compatible vibration once, at open, not in the hot path: mode 2
+     * is what makes the large/small motor levels reachable. The call can fail
+     * on a controller that lacks the mode, which leaves rumble silently off
+     * rather than breaking input - so the result is logged, not fatal. */
     {
+        const std::int32_t mode_result = scePadSetVibrationMode(state->handle, 2);
         char line[176];
-        std::snprintf(line, sizeof(line), "input: pad opened, user=%d handle=%d",
-                      static_cast<int>(user_id), state->handle);
+        std::snprintf(line, sizeof(line),
+                      "input: pad opened, user=%d handle=%d vibration_mode=%d",
+                      static_cast<int>(user_id), state->handle,
+                      static_cast<int>(mode_result));
         ps5_input_trace(line);
     }
     return state;
