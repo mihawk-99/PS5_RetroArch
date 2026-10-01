@@ -48,12 +48,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <pthread.h>
 
 #include <gfx/video_defines.h>
 
@@ -69,6 +71,7 @@
 #include "runloop.h"
 #include "tasks/task_content.h"
 #include <tasks/tasks_internal.h>
+#include "title_threads.hpp"
 
 /* scePadSetVibration's parameter block: a level per motor, 0..255. The shape is
  * the one libScePad documents and shadPS4's pad library implements, and the
@@ -100,6 +103,19 @@ extern "C"
     std::int32_t sceUserServiceGetInitialUser(std::int32_t *user_id);
     std::int32_t sceUserServiceTerminate();
     std::int32_t sceKernelUsleep(std::uint32_t microseconds);
+    /* The audio service. The same declarations and call shape as
+     * src/audio_ps5.cpp, which follows ProsperoLight's moonlight_stream.cpp.
+     * Port type 10 is the pad's vibration port: PCM written there reaches the
+     * DualSense's voice-coil actuators, which is how titles produce real
+     * haptic feedback rather than the compatible-mode motor emulation. The
+     * constant comes from the port-type enumeration mirrored in AnyPS5's
+     * libSceAudioOut reimplementation; it is not verified on this title's
+     * hardware yet. */
+    std::int32_t sceAudioOutInit();
+    std::int32_t sceAudioOutOpen(std::int32_t user_id, std::int32_t type, std::int32_t index,
+                                 std::uint32_t len, std::uint32_t freq, std::uint32_t param);
+    std::int32_t sceAudioOutOutput(std::int32_t handle, const void *data);
+    std::int32_t sceAudioOutClose(std::int32_t handle);
 }
 
 namespace
@@ -173,9 +189,17 @@ struct PadState
     std::int32_t sample_count = 0;
     std::uint32_t buttons = 0;
     /* Last motor levels pushed to the pad: one scePadSetVibration call carries
-     * both, while RetroArch sets one motor at a time. */
-    std::uint8_t rumble_large = 0;
-    std::uint8_t rumble_small = 0;
+     * both, while RetroArch sets one motor at a time. Atomic because the
+     * haptic feeder thread reads them from outside the input path. */
+    std::atomic<std::uint8_t> rumble_large{0};
+    std::atomic<std::uint8_t> rumble_small{0};
+    /* The vibration audio port (sceAudioOutOpen type 10) and its feeder thread.
+     * -1 / not started when the port could not be opened and rumble falls back
+     * to the compatible-mode motor path. */
+    std::int32_t haptic_port = -1;
+    pthread_t haptic_thread{};
+    bool haptic_thread_started = false;
+    std::atomic<bool> haptic_stop{false};
     bool owns_user_service = false;
     bool announced = false;
 };
@@ -428,6 +452,110 @@ std::int16_t stick_axis(std::uint8_t value) noexcept
     return static_cast<std::int16_t>(scaled);
 }
 
+/* Vibration-port streaming. A DualSense's actuators are voice coils played by
+ * an audio stream, and titles send that stream to a dedicated port rather than
+ * through libScePad. The shape mirrors the main-output path in
+ * src/audio_ps5.cpp: 256 S16-stereo frames at 48 kHz per sceAudioOutOutput
+ * call, which the service paces for us. */
+constexpr std::int32_t haptic_port_type = 10;
+constexpr std::uint32_t haptic_rate = 48000;
+constexpr std::uint32_t haptic_grain = 256;
+/* param low byte 1 = S16 stereo, the same format the main port negotiates. */
+constexpr std::uint32_t haptic_format_s16_stereo = 1;
+constexpr std::uint32_t haptic_format_f32_stereo = 4;
+constexpr int haptic_output_failures_to_quit = 40;
+
+float haptic_noise(std::uint32_t &rng) noexcept
+{
+    rng = rng * 1664525u + 1013904223u;
+    return static_cast<float>((rng >> 9) & 0xffffu) / 32768.0f - 1.0f;
+}
+
+void *haptic_worker(void *opaque) noexcept
+{
+    auto *state = static_cast<PadState *>(opaque);
+    std::int16_t out[haptic_grain * 2];
+    double phase_low = 0.0, phase_high = 0.0;
+    float env_strong = 0.0f, env_weak = 0.0f;
+    float lp_left = 0.0f, lp_right = 0.0f;
+    std::uint32_t rng = 0x9e3779b9u;
+    /* A start-up pattern of three bursts tells the holder the channel works
+     * before any game asks for rumble: ~300 ms on, ~150 ms off, three times. */
+    const int chirp_total = static_cast<int>(haptic_rate) * 3 / 2;
+    int chirp_left = chirp_total;
+    int failures = 0;
+    while (!state->haptic_stop.load(std::memory_order_relaxed))
+    {
+        for (std::uint32_t i = 0; i < haptic_grain; ++i)
+        {
+            float strong, weak;
+            if (chirp_left > 0)
+            {
+                const int pos = chirp_total - chirp_left;
+                const int window = static_cast<int>(haptic_rate) / 2;
+                strong = pos % window < window * 3 / 5 ? 0.9f : 0.0f;
+                weak = 0.0f;
+                --chirp_left;
+            }
+            else
+            {
+                strong = state->rumble_large.load(std::memory_order_relaxed) / 255.0f;
+                weak = state->rumble_small.load(std::memory_order_relaxed) / 255.0f;
+            }
+            /* Smooth toward the target so square rumble changes do not click. */
+            env_strong += (strong - env_strong) * 0.02f;
+            env_weak += (weak - env_weak) * 0.02f;
+            const float n_l = haptic_noise(rng);
+            const float n_r = haptic_noise(rng);
+            lp_left += 0.08f * (n_l - lp_left);
+            lp_right += 0.08f * (n_r - lp_right);
+            phase_low += 55.0 / haptic_rate;
+            phase_high += 190.0 / haptic_rate;
+            if (phase_low >= 1.0)
+                phase_low -= 1.0;
+            if (phase_high >= 1.0)
+                phase_high -= 1.0;
+            const double two_pi = 6.283185307179586;
+            /* Left and right actuators get decorrelated noise so textures read
+             * as surface, not as one monotone buzz. */
+            const float left = env_strong * (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) +
+                                             0.5f * lp_left) +
+                               env_weak * (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) +
+                                           0.45f * lp_right);
+            const float right = env_strong * (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) +
+                                              0.5f * lp_right) +
+                                env_weak * (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) +
+                                            0.45f * lp_left);
+            const auto to_s16 = [](float v) -> std::int16_t {
+                const float scaled = v * 26000.0f;
+                if (scaled > 32767.0f)
+                    return 32767;
+                if (scaled < -32768.0f)
+                    return -32768;
+                return static_cast<std::int16_t>(scaled);
+            };
+            out[2 * i] = to_s16(left);
+            out[2 * i + 1] = to_s16(right);
+        }
+        if (sceAudioOutOutput(state->haptic_port, out) < 0)
+        {
+            if (++failures >= haptic_output_failures_to_quit)
+            {
+                /* The port went dead: put the pad back on the motor path so
+                 * rumble still works, then let the thread end. */
+                if (state->handle >= 0)
+                    (void)scePadSetVibrationMode(state->handle, 2);
+                ps5_input_trace("input: haptic port stopped answering; back to motor rumble");
+                return nullptr;
+            }
+            (void)sceKernelUsleep(2000);
+        }
+        else
+            failures = 0;
+    }
+    return nullptr;
+}
+
 void *open_pad() noexcept
 {
     auto *state = new (std::nothrow) PadState();
@@ -469,16 +597,32 @@ void *open_pad() noexcept
         ps5_input_trace(line);
         return state;
     }
-    /* Select compatible vibration once, at open, not in the hot path: mode 2
-     * is what makes the large/small motor levels reachable. The call can fail
-     * on a controller that lacks the mode, which leaves rumble silently off
-     * rather than breaking input - so the result is logged, not fatal. */
+    /* Try the vibration audio port. When it opens, the pad goes to advanced
+     * mode (1), where the actuators follow the PCM stream the worker feeds -
+     * and the motor-level path stays silent, which is fine because the worker
+     * synthesizes from the same rumble levels. When the port refuses, the pad
+     * keeps compatible mode (2) and scePadSetVibration still moves the motors. */
+    (void)sceAudioOutInit();
+    state->haptic_port =
+        sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain, haptic_rate,
+                        haptic_format_s16_stereo);
+    if (state->haptic_port < 0)
+        state->haptic_port =
+            sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain, haptic_rate,
+                            haptic_format_f32_stereo);
+    const std::int32_t mode_result =
+        scePadSetVibrationMode(state->handle, state->haptic_port >= 0 ? 1 : 2);
+    if (state->haptic_port >= 0)
+        state->haptic_thread_started =
+            create_title_thread(&state->haptic_thread, haptic_worker, state) == 0;
     {
-        const std::int32_t mode_result = scePadSetVibrationMode(state->handle, 2);
-        char line[176];
+        char line[224];
         std::snprintf(line, sizeof(line),
-                      "input: pad opened, user=%d handle=%d vibration_mode=%d",
+                      "input: pad opened, user=%d handle=%d haptic_port=%d haptic_thread=%d "
+                      "vibration_mode=%d",
                       static_cast<int>(user_id), state->handle,
+                      static_cast<int>(state->haptic_port),
+                      state->haptic_thread_started ? 1 : 0,
                       static_cast<int>(mode_result));
         ps5_input_trace(line);
     }
@@ -515,6 +659,17 @@ void close_pad(void *data) noexcept
     PadState *state = state_of(data);
     if (state == nullptr)
         return;
+    if (state->haptic_thread_started)
+    {
+        state->haptic_stop.store(true, std::memory_order_relaxed);
+        (void)pthread_join(state->haptic_thread, nullptr);
+        state->haptic_thread_started = false;
+    }
+    if (state->haptic_port >= 0)
+    {
+        (void)sceAudioOutClose(state->haptic_port);
+        state->haptic_port = -1;
+    }
     if (state->handle >= 0)
     {
         (void)scePadClose(state->handle);
@@ -831,15 +986,16 @@ bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
     switch (effect)
     {
     case RETRO_RUMBLE_STRONG:
-        active_pad->rumble_large = level;
+        active_pad->rumble_large.store(level, std::memory_order_relaxed);
         break;
     case RETRO_RUMBLE_WEAK:
-        active_pad->rumble_small = level;
+        active_pad->rumble_small.store(level, std::memory_order_relaxed);
         break;
     default:
         return false;
     }
-    const ScePadVibrationParam param{active_pad->rumble_large, active_pad->rumble_small};
+    const ScePadVibrationParam param{active_pad->rumble_large.load(std::memory_order_relaxed),
+                                     active_pad->rumble_small.load(std::memory_order_relaxed)};
     return scePadSetVibration(active_pad->handle, &param) == 0;
 }
 

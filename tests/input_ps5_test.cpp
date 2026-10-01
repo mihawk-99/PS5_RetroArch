@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <unistd.h>
 #include <vector>
 #include "../src/input_ps5.cpp"
 #include "input_state_wrap.inc"
@@ -15,6 +16,8 @@ unsigned vibrations = 0;
 ScePadVibrationParam last_vibration{};
 unsigned vibration_modes = 0;
 int32_t last_vibration_mode = -1;
+int32_t haptic_open_result = -1;
+unsigned audio_inits = 0, audio_opens = 0, audio_outputs = 0, audio_closes = 0;
 PadSample sample()
 {
     PadSample p{};
@@ -86,6 +89,33 @@ extern "C"
     }
     int32_t sceKernelUsleep(uint32_t)
     {
+        return 0;
+    }
+    int32_t sceAudioOutInit()
+    {
+        ++audio_inits;
+        return 0;
+    }
+    int32_t sceAudioOutOpen(int32_t, int32_t type, int32_t, uint32_t, uint32_t, uint32_t)
+    {
+        if (haptic_open_result >= 0)
+        {
+            assert(type == 10);
+            ++audio_opens;
+        }
+        return haptic_open_result;
+    }
+    int32_t sceAudioOutOutput(int32_t handle, const void *)
+    {
+        assert(handle == 77);
+        ++audio_outputs;
+        usleep(1000);
+        return 256;
+    }
+    int32_t sceAudioOutClose(int32_t handle)
+    {
+        assert(handle == 77);
+        ++audio_closes;
         return 0;
     }
     void ps5_input_trace(const char *) noexcept
@@ -294,6 +324,17 @@ int main()
     assert(opens == 2 && closes == 2);
     assert(vibration_modes == 2);
     ps5_input_reset_autoconfig(); // Safe before/after driver lifetime.
+
+    // With the vibration audio port answering, the pad picks advanced mode and
+    // the feeder thread streams PCM; destroy joins the thread and closes it.
+    haptic_open_result = 77;
+    assert(ps5_joypad.init(input));
+    assert(audio_opens == 1 && vibration_modes == 3 && last_vibration_mode == 1);
+    usleep(20000);
+    assert(audio_outputs > 0);
+    ps5_joypad.destroy();
+    assert(audio_closes == 1 && opens == 3 && closes == 3);
+    haptic_open_result = -1;
 
     // STOP ends the run on the next frame, as --max-frames does, and only once.
     test_video.frame_count = 1234;
