@@ -479,29 +479,15 @@ void *haptic_worker(void *opaque) noexcept
     float env_strong = 0.0f, env_weak = 0.0f;
     float lp_left = 0.0f, lp_right = 0.0f;
     std::uint32_t rng = 0x9e3779b9u;
-    /* A start-up pattern of three bursts tells the holder the channel works
-     * before any game asks for rumble: ~300 ms on, ~150 ms off, three times. */
-    const int chirp_total = static_cast<int>(haptic_rate) * 3 / 2;
-    int chirp_left = chirp_total;
     int failures = 0;
     while (!state->haptic_stop.load(std::memory_order_relaxed))
     {
         for (std::uint32_t i = 0; i < haptic_grain; ++i)
         {
-            float strong, weak;
-            if (chirp_left > 0)
-            {
-                const int pos = chirp_total - chirp_left;
-                const int window = static_cast<int>(haptic_rate) / 2;
-                strong = pos % window < window * 3 / 5 ? 0.9f : 0.0f;
-                weak = 0.0f;
-                --chirp_left;
-            }
-            else
-            {
-                strong = state->rumble_large.load(std::memory_order_relaxed) / 255.0f;
-                weak = state->rumble_small.load(std::memory_order_relaxed) / 255.0f;
-            }
+            const float strong =
+                state->rumble_large.load(std::memory_order_relaxed) / 255.0f;
+            const float weak =
+                state->rumble_small.load(std::memory_order_relaxed) / 255.0f;
             /* Smooth toward the target so square rumble changes do not click. */
             env_strong += (strong - env_strong) * 0.02f;
             env_weak += (weak - env_weak) * 0.02f;
