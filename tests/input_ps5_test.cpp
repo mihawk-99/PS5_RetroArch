@@ -11,6 +11,8 @@ namespace
 std::vector<PadSample> pending;
 int read_result = 0;
 unsigned reads = 0, opens = 0, closes = 0, connects = 0, disconnects = 0;
+unsigned vibrations = 0;
+ScePadVibrationParam last_vibration{};
 PadSample sample()
 {
     PadSample p{};
@@ -40,6 +42,13 @@ extern "C"
     int32_t scePadClose(int32_t)
     {
         ++closes;
+        return 0;
+    }
+    int32_t scePadSetVibration(int32_t handle, const ScePadVibrationParam *param)
+    {
+        assert(handle == 1 && param);
+        ++vibrations;
+        last_vibration = *param;
         return 0;
     }
     int32_t scePadRead(int32_t, void *out, int32_t capacity)
@@ -254,6 +263,16 @@ int main()
     ps5_joypad.get_buttons(1, &bits);
     for (auto byte : bits.data)
         assert(byte == 0);
+    // Rumble: strength scales 0..65535 to the pad's 0..255 motors. Each call
+    // restates both motors because scePadSetVibration is the whole state.
+    assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 65535));
+    assert(last_vibration.largeMotor == 255 && last_vibration.smallMotor == 0);
+    assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_WEAK, 32768));
+    assert(last_vibration.largeMotor == 255 && last_vibration.smallMotor == 128);
+    assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 0));
+    assert(last_vibration.largeMotor == 0 && last_vibration.smallMotor == 128);
+    assert(!ps5_joypad.set_rumble(1, RETRO_RUMBLE_STRONG, 65535)); // no second pad
+    assert(vibrations == 3);
     input_ps5.free(input);
     ps5_joypad.destroy();
     ps5_joypad.destroy();
@@ -292,6 +311,6 @@ int main()
     assert(option_set_idx == 99 && option_set_val == 99);
     test_runloop.core_options = nullptr;
     action_count = 0;
-    std::puts("PS5 joypad: raw binding capture, axes, user mappings, poll retention, lifecycle and "
-              "the script's STOP and OPTION PASS");
+    std::puts("PS5 joypad: raw binding capture, axes, user mappings, rumble, poll retention, "
+              "lifecycle and the script's STOP and OPTION PASS");
 }

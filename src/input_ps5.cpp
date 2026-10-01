@@ -70,6 +70,15 @@
 #include "tasks/task_content.h"
 #include <tasks/tasks_internal.h>
 
+/* scePadSetVibration's parameter block: a level per motor, 0..255. The shape is
+ * the one libScePad documents and shadPS4's pad library implements, and the
+ * OpenOrbis pad documentation states the same two fields. */
+struct ScePadVibrationParam
+{
+    std::uint8_t largeMotor;
+    std::uint8_t smallMotor;
+};
+
 extern "C"
 {
     /* The console's pad service. Declarations rather than the SDK's headers: this
@@ -80,6 +89,7 @@ extern "C"
                             const void *params);
     std::int32_t scePadRead(std::int32_t handle, void *samples, std::int32_t capacity);
     std::int32_t scePadClose(std::int32_t handle);
+    std::int32_t scePadSetVibration(std::int32_t handle, const ScePadVibrationParam *param);
     std::int32_t sceUserServiceInitialize(const void *params);
     std::int32_t sceUserServiceGetInitialUser(std::int32_t *user_id);
     std::int32_t sceUserServiceTerminate();
@@ -156,6 +166,10 @@ struct PadState
      * holds older frames and must not be reported as current. */
     std::int32_t sample_count = 0;
     std::uint32_t buttons = 0;
+    /* Last motor levels pushed to the pad: one scePadSetVibration call carries
+     * both, while RetroArch sets one motor at a time. */
+    std::uint8_t rumble_large = 0;
+    std::uint8_t rumble_small = 0;
     bool owns_user_service = false;
     bool announced = false;
 };
@@ -792,6 +806,30 @@ const char *joypad_name(unsigned port) noexcept
     return port == 0 ? "PS5 Controller" : nullptr;
 }
 
+/* RetroArch hands rumble in 0..65535 per effect; the pad wants 0..255 per
+ * motor. STRONG drives the large motor, WEAK the small one, and each call
+ * restates both because scePadSetVibration is the whole state, not a delta. */
+bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
+                       std::uint16_t strength) noexcept
+{
+    if (joypad != 0 || !active_pad || active_pad->handle < 0)
+        return false;
+    const std::uint8_t level = static_cast<std::uint8_t>(strength >> 8);
+    switch (effect)
+    {
+    case RETRO_RUMBLE_STRONG:
+        active_pad->rumble_large = level;
+        break;
+    case RETRO_RUMBLE_WEAK:
+        active_pad->rumble_small = level;
+        break;
+    default:
+        return false;
+    }
+    const ScePadVibrationParam param{active_pad->rumble_large, active_pad->rumble_small};
+    return scePadSetVibration(active_pad->handle, &param) == 0;
+}
+
 void *ps5_input_init(const char *) noexcept
 {
     static int cookie;
@@ -873,7 +911,7 @@ extern "C" void ps5_input_reset_autoconfig() noexcept
 
 extern "C" input_device_driver_t ps5_joypad = {
     joypad_init, joypad_query, joypad_destroy, joypad_button, joypad_state, joypad_get_buttons,
-    joypad_axis, joypad_poll,  nullptr,        nullptr,       nullptr,      nullptr,
+    joypad_axis, joypad_poll,  joypad_set_rumble, nullptr,    nullptr,      nullptr,
     joypad_name, "ps5",
 };
 
