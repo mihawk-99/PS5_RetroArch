@@ -100,6 +100,11 @@ export SOURCE_DATE_EPOCH="$source_date_epoch"
 #   ps5-stubs.o         entry points Flycast references on code paths that never
 #                       run here (PTY serial, unwind registration, locale_t
 #                       helpers); see that file
+#   ps5-net.o           getaddrinfo/freeaddrinfo/gethostbyname: the SDK routes
+#                       the resolver family to a module titles do not load, so
+#                       the core carries a direct UDP DNS client instead.
+#                       Defined hidden in the link, so the references bind here
+#                       instead of the import table.
 #   ps5-libcxx-inst.o   the explicit instantiation of std::stringbuf::str(str),
 #                       inline-only in the SDK headers
 #   libc++ members      std::future's machinery (future/memory/system_error/
@@ -112,13 +117,15 @@ build="$root/build/cores/flycast"
 mkdir -p "$build" "$build/libcxx" "$root/build/cores/stage/cores" "$root/build/cores/stage/info"
 "$sdk/bin/prospero-clang" -O2 -fPIC \
     -c "$root/tooling/flycast/ps5-stubs.c" -o "$build/ps5-stubs.o"
+"$sdk/bin/prospero-clang" -O2 -fPIC \
+    -c "$root/tooling/flycast/ps5-net.c" -o "$build/ps5-net.o"
 "$sdk/bin/prospero-clang++" -std=c++11 -fPIC -fno-exceptions -fno-rtti \
     -c "$root/tooling/native/core_cxx_runtime.cpp" -o "$build/core_cxx_runtime.o"
 "$sdk/bin/prospero-clang++" -std=c++17 -O2 -fPIC \
     -c "$root/tooling/flycast/ps5-libcxx-inst.cpp" -o "$build/ps5-libcxx-inst.o"
 (cd "$build/libcxx" && "$sdk/bin/prospero-ar" x "$sdk/target/lib/libc++.a" \
     future.cpp.o memory.cpp.o system_error.cpp.o thread.cpp.o)
-link_inputs="$build/core_cxx_runtime.o $build/ps5-stubs.o $build/ps5-libcxx-inst.o"
+link_inputs="$build/core_cxx_runtime.o $build/ps5-stubs.o $build/ps5-net.o $build/ps5-libcxx-inst.o"
 link_inputs="$link_inputs $build/libcxx/future.cpp.o $build/libcxx/memory.cpp.o"
 link_inputs="$link_inputs $build/libcxx/system_error.cpp.o $build/libcxx/thread.cpp.o"
 
@@ -166,7 +173,7 @@ report.update(source_revision=revision,
 report['sdk_compiler_wrapper_sha256'] = sha(pathlib.Path('.deps/native/ps5-payload-sdk/bin/prospero-clang'))
 report['port_inputs_sha256'] = {name: sha(pathlib.Path(name)) for name in
     ['tools/build-flycast.sh', 'tooling/flycast/ps5-toolchain.cmake',
-     'tooling/flycast/ps5-stubs.c', 'tooling/flycast/ps5-libcxx-inst.cpp',
+     'tooling/flycast/ps5-stubs.c', 'tooling/flycast/ps5-net.c', 'tooling/flycast/ps5-libcxx-inst.cpp',
      'tooling/native/core_cxx_runtime.cpp', 'tooling/native/ps5-core.ld',
      'patches/flycast/flycast-ps5.patch']}
 (build / 'build.json').write_text(json.dumps(report, indent=2) + '\n')

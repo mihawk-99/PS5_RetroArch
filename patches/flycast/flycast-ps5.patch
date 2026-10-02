@@ -79,3 +79,73 @@ index 2d424109..212e9d11 100644
  }
  
  // Use two addr spaces: need to remap something twice, therefore use allocate_shared_filemem()
+diff --git a/core/network/net_platform.h b/core/network/net_platform.h
+index bf4fd41..1b480e2 100644
+@@ -77,7 +77,17 @@
+ static inline void set_non_blocking(sock_t fd)
+ {
+ #ifndef _WIN32
++#if defined(__PROSPERO__)
++	// A PS5 title cannot change socket flags: a ~0 timeout emulates
++	// non-blocking recv/send for the short waits the network code does.
++	struct timeval tv;
++	tv.tv_sec = 0;
++	tv.tv_usec = 1;
++	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
++	setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
++#else
+ 	fcntl(fd, F_SETFL, O_NONBLOCK);
++#endif
+ #else
+ 	u_long optl = 1;
+ 	ioctlsocket(fd, FIONBIO, &optl);
+
+diff --git a/core/deps/asio/asio/include/asio/detail/impl/socket_ops.ipp b/core/deps/asio/asio/include/asio/detail/impl/socket_ops.ipp
+index af895bd..48fdc50 100644
+@@ -427,6 +427,24 @@
+   }
+ #endif // defined(__SYMBIAN32__) || defined(__EMSCRIPTEN__)
+ 
++#if defined(__PROSPERO__)
++  if (result < 0)
++  {
++    // A PS5 title cannot change socket flags: FIONBIO and
++    // fcntl(F_SETFL, O_NONBLOCK) are refused with EACCES. Keep the socket
++    // blocking, bound it to a short timeout so an unexpected blocking call
++    // still returns EAGAIN, and report success: readiness comes from the
++    // reactor either way.
++    struct timeval tv;
++    tv.tv_sec = 0;
++    tv.tv_usec = 100;
++    ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
++    ::setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
++    result = 0;
++    ec = asio::error_code();
++  }
++#endif
++
+   if (result >= 0)
+   {
+     if (value)
+@@ -503,6 +521,21 @@
+   }
+ #endif // defined(__SYMBIAN32__) || defined(__EMSCRIPTEN__)
+ 
++#if defined(__PROSPERO__)
++  if (result < 0)
++  {
++    // See set_user_non_blocking: socket flags cannot be changed inside a
++    // PS5 title, so emulate non-blocking with a short socket timeout.
++    struct timeval tv;
++    tv.tv_sec = 0;
++    tv.tv_usec = 100;
++    ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
++    ::setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
++    result = 0;
++    ec = asio::error_code();
++  }
++#endif
++
+   if (result >= 0)
+   {
+     if (value)
