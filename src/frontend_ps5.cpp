@@ -18,18 +18,35 @@ extern "C"
 
 namespace
 {
+extern "C" unsigned ps5_sandbox_mount_host_fs() noexcept;
+extern "C" void ps5_bootlog(const char *line) noexcept;
+
+/* libSceNet: brings the socket resolver and the net subsystem up. The BSD
+ * socket calls themselves are kernel exports, but getaddrinfo goes through
+ * sceNetResolver, which fails until sceNetInit ran once. */
+extern "C" int sceNetInit(void);
+extern "C" int sceNetCtlInit(void);
+
+extern "C" void ps5_input_trace(const char *line) noexcept;
+
 constexpr const char *saved_config = "/app0/config/retroarch.cfg";
 
 // The top of the file browser, Load Content included (patches/series, 0097):
 // INTERNAL, the title's own folder, and EXTERNAL, where the console mounts USB
 // drives, an extended storage drive and any other external storage. Each shows
-// its name, and opening it opens its folder.
+// its name, and opening it opens its folder. SYSTEM is the console's real
+// filesystem, visible only while the sandbox mounts from
+// ps5_sandbox_mount_host_fs succeeded - without them the title sees nothing
+// outside /app0.
 struct Root
 {
     const char *path;
     const char *name;
 };
-constexpr Root roots[] = {{"/app0", "INTERNAL"}, {"/mnt", "EXTERNAL"}};
+constexpr Root internal_root{"/app0", "INTERNAL"};
+constexpr Root external_root{"/mnt", "EXTERNAL"};
+constexpr Root host_root{"/hostroot", "SYSTEM"};
+unsigned sandbox_mounts = 0;
 
 void set_directory(default_dirs slot, const char *path)
 {
@@ -38,9 +55,32 @@ void set_directory(default_dirs slot, const char *path)
 
 void initialize(void *)
 {
-    const char *directories[] = {"/app0/config",   "/app0/cores",     "/app0/content",
-                                 "/app0/system",   "/app0/savefiles", "/app0/savestates",
-                                 "/app0/playlists"};
+    /* The sandbox mount happens before anything else touches the filesystem:
+     * the browser roots below depend on whether /hostroot and the real /mnt
+     * came up. */
+    sandbox_mounts = ps5_sandbox_mount_host_fs();
+    {
+        /* libSceNet carries the resolver; NetCtl brings the interface state
+         * machine up. Both stay silent unless they fail - a bootlog line is
+         * the only witness an early crash leaves behind. */
+        const int net_result = sceNetInit();
+        const int ctl_result = sceNetCtlInit();
+        char line[96];
+        std::snprintf(line, sizeof(line),
+                      "frontend: sceNetInit=%d sceNetCtlInit=%d",
+                      net_result, ctl_result);
+        ps5_input_trace(line);
+        if (net_result || ctl_result)
+            ps5_bootlog(line);
+    }
+    const char *directories[] = {"/app0/config",    "/app0/cores",     "/app0/content",
+                                 "/app0/system",    "/app0/savefiles", "/app0/savestates",
+                                 "/app0/playlists", "/app0/cheats",    "/app0/shaders",
+                                 "/app0/overlays",  "/app0/autoconfig",
+                                 "/app0/database",  "/app0/thumbnails",
+                                 "/app0/screenshots", "/app0/remaps",  "/app0/recordings",
+                                 "/app0/filters",   "/app0/filters/audio",
+                                 "/app0/filters/video", "/app0/cache"};
     for (const char *path : directories)
     {
         if (mkdir(path, 0777) != 0 && errno != EEXIST)
@@ -95,9 +135,32 @@ void initialize(void *)
     set_directory(DEFAULT_DIR_PLAYLIST, "/app0/playlists");
     set_directory(DEFAULT_DIR_ASSETS, "/app0/assets");
     set_directory(DEFAULT_DIR_LOGS, "/app0");
+    /* The rest of the PC layout: cheats, shaders, overlays, autoconfig and the
+     * database directories a RetroArch asset drop expects to find. */
+    set_directory(DEFAULT_DIR_CHEATS, "/app0/cheats");
+    set_directory(DEFAULT_DIR_SHADER, "/app0/shaders");
+    set_directory(DEFAULT_DIR_OVERLAY, "/app0/overlays");
+    set_directory(DEFAULT_DIR_OSK_OVERLAY, "/app0/overlays");
+    set_directory(DEFAULT_DIR_AUTOCONFIG, "/app0/autoconfig");
+    set_directory(DEFAULT_DIR_AUDIO_FILTER, "/app0/filters/audio");
+    set_directory(DEFAULT_DIR_VIDEO_FILTER, "/app0/filters/video");
+    set_directory(DEFAULT_DIR_DATABASE, "/app0/database");
+    set_directory(DEFAULT_DIR_THUMBNAILS, "/app0/thumbnails");
+    set_directory(DEFAULT_DIR_SCREENSHOT, "/app0/screenshots");
+    set_directory(DEFAULT_DIR_REMAP, "/app0/remaps");
+    set_directory(DEFAULT_DIR_RECORD_CONFIG, "/app0/recordings");
+    set_directory(DEFAULT_DIR_RECORD_OUTPUT, "/app0/recordings");
+    set_directory(DEFAULT_DIR_WALLPAPERS, "/app0/assets/wallpapers");
+    set_directory(DEFAULT_DIR_CONTENT_FAVORITES, "/app0/playlists");
+    set_directory(DEFAULT_DIR_CONTENT_HISTORY, "/app0/playlists");
+    set_directory(DEFAULT_DIR_CONTENT_IMAGE_HISTORY, "/app0/playlists");
+    set_directory(DEFAULT_DIR_CONTENT_MUSIC_HISTORY, "/app0/playlists");
+    set_directory(DEFAULT_DIR_CONTENT_VIDEO_HISTORY, "/app0/playlists");
+    set_directory(DEFAULT_DIR_CACHE, "/app0/cache");
     std::fprintf(stderr, "frontend ps5: config=%s browser=/app0 cores=/app0/cores\n", saved_config);
     // Startup summary: known roots only; never log the user's file names.
-    for (const char *path : {"/app0", "/app0/cores", "/mnt", "/mnt/usb0"})
+    for (const char *path : {"/app0", "/app0/cores", "/mnt", "/mnt/usb0", "/hostroot",
+                             "/hostroot/mnt", "/hostroot/data"})
     {
         errno = 0;
         DIR *dir = ps5_opendir(path);
@@ -124,9 +187,15 @@ int drives(void *data, bool content)
     auto *list = static_cast<file_list_t *>(data);
     const auto label = content ? MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR
                                : MENU_ENUM_LABEL_FILE_BROWSER_DIRECTORY;
-    for (const Root &root : roots)
-        if (menu_entries_append(list, root.path, "", label, FILE_TYPE_DIRECTORY, 0, 0, nullptr))
-            file_list_set_alt_at_offset(list, list->size - 1, root.name);
+    const Root *const all_roots[] = {&internal_root, &external_root, &host_root};
+    for (const Root *root : all_roots)
+    {
+        if (root == &host_root && !(sandbox_mounts & 1))
+            continue; /* no host root without the sandbox mount */
+        if (menu_entries_append(list, root->path, "", label, FILE_TYPE_DIRECTORY, 0, 0,
+                                nullptr))
+            file_list_set_alt_at_offset(list, list->size - 1, root->name);
+    }
     return 0;
 }
 } // namespace

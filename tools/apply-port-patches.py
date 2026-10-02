@@ -3342,6 +3342,115 @@ EDITS = [
         "#endif\n",
         "patches/series, 0101): the pad script's",
     ),
+    # 0102: the SDK's getaddrinfo family resolves to a module titles do not
+    # load (every call answers EAI_FAIL), so DNS goes to libSceNet's resolver,
+    # implemented in src/platform_wraps.c.
+    ('libretro-common/net/net_compat.c', '   return getaddrinfo(node, service, hints, res);',
+     '   /* patches/series, 0102: sceNetResolver-backed DNS. */\n'
+     '   {\n'
+     '      extern int ps5_dns_getaddrinfo(const char *, const char *,\n'
+     '                                     const struct addrinfo *, struct addrinfo **);\n'
+     '      return ps5_dns_getaddrinfo(node, service, hints, res);\n'
+     '   }', 'patches/series, 0102: sceNetResolver-backed DNS'),
+    ('libretro-common/net/net_compat.c', '   freeaddrinfo(res);',
+     '   /* patches/series, 0102: matches ps5_dns_getaddrinfo. */\n'
+     '   {\n'
+     '      extern void ps5_dns_freeaddrinfo(struct addrinfo *);\n'
+     '      ps5_dns_freeaddrinfo(res);\n'
+     '   }', 'patches/series, 0102: matches ps5_dns_getaddrinfo'),
+    # 0104: a title's fcntl() on a socket is refused (EACCES); try FIONBIO
+    # through the socket ioctl path first, fcntl as the fallback.
+    ('libretro-common/net/net_socket.c', '#include <net/net_socket.h>',
+     '#include <net/net_socket.h>\n/* patches/series, 0104: FIONBIO */\n#include <sys/filio.h>\n#include <sys/ioctl.h>',
+     '0104: FIONBIO'),
+    ('libretro-common/net/net_socket.c', '#else\n   int flags = fcntl(fd, F_GETFL);\n\n   if (block)\n      flags &= ~O_NONBLOCK;\n   else\n      flags |= O_NONBLOCK;\n\n   return !fcntl(fd, F_SETFL, flags);\n#endif',
+     '#else\n   /* patches/series, 0104: a title refuses fcntl on sockets; the\n    * ioctl path is the same nonblocking request through soo_ioctl. */\n   {\n      int nb = !block;\n      if (ioctl(fd, FIONBIO, &nb) == 0)\n         return true;\n   }\n   {\n      int flags = fcntl(fd, F_GETFL);\n\n      if (block)\n         flags &= ~O_NONBLOCK;\n      else\n         flags |= O_NONBLOCK;\n\n      return !fcntl(fd, F_SETFL, flags);\n   }\n#endif',
+     '0104: a title refuses fcntl on sockets'),
+    # 0105: with fcntl AND FIONBIO both refused to a title, a socket cannot go
+    # nonblocking at all - so the connect path lies: the fd stays blocking,
+    # connect() then completes in one call, and the receive side gets
+    # SO_RCVTIMEO so the task loop sees "try again later" instead of a hang.
+    ('libretro-common/net/net_socket.c', '      return !fcntl(fd, F_SETFL, flags);\n   }\n#endif\n}',
+     '      /* the sandbox refuses every nonblocking path: connect() on a still\n       * blocking fd completes in one call, so report success either way */\n      (void)fcntl(fd, F_SETFL, flags);\n      return true;\n   }\n#endif\n}',
+     'blocking fd completes in one call'),
+    ('libretro-common/net/net_http.c', '         if (socket_connect_with_timeout(conn->fd, next_addr, 5000))\n         {\n            conn->connected = true;\n            return true;\n         }',
+     '         if (socket_connect_with_timeout(conn->fd, next_addr, 5000))\n         {\n'
+     '            /* patches/series, 0105: blocking sockets get a receive/send\n'
+     '            * timeout so the task loop still turns over. */\n'
+     '            {\n'
+     '               struct timeval tv;\n'
+     '               tv.tv_sec  = 0;\n'
+     '               tv.tv_usec = 200000;\n'
+     '               (void)setsockopt(conn->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));\n'
+     '               (void)setsockopt(conn->fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));\n'
+     '            }\n'
+     '            conn->connected = true;\n            return true;\n         }',
+     '0105: blocking sockets get a receive/send'),
+    # create the directory" shows, and what errno the mkdir wrapper reported.
+    # 0107: a config file saved with these paths as explicit empty strings
+    # blanks the defaults the frontend installed (g_defaults.dirs); the updater
+    # then writes to "" and mkdir fails EINVAL. Refill any directory setting
+    # that came back empty after the config file was parsed - a title's
+    # platform paths are fixed anyway.
+    ('configuration.c',
+     'void config_load(void *data)\n{\n   global_t *global = (global_t*)data;\n   config_set_defaults(global);\n#ifdef HAVE_CONFIGFILE\n   config_parse_file(global);\n#endif\n}',
+          '/* patches/series, 0107: platform-fixed directories refill */\n'
+     '#include <stddef.h>\n'
+     'static void ps5_fix_platform_dirs(settings_t *settings)\n'
+     '{\n'
+     '   static const struct { size_t off; int dir; } map[] = {\n'
+     '      { offsetof(struct settings, paths.directory_libretro),           DEFAULT_DIR_CORE },\n'
+     '      { offsetof(struct settings, paths.path_libretro_info),           DEFAULT_DIR_CORE_INFO },\n'
+     '      { offsetof(struct settings, paths.directory_menu_content),       DEFAULT_DIR_MENU_CONTENT },\n'
+     '      { offsetof(struct settings, paths.directory_menu_config),        DEFAULT_DIR_MENU_CONFIG },\n'
+     '      { offsetof(struct settings, paths.directory_core_assets),        DEFAULT_DIR_CORE_ASSETS },\n'
+     '      { offsetof(struct settings, paths.directory_autoconfig),         DEFAULT_DIR_AUTOCONFIG },\n'
+     '      { offsetof(struct settings, paths.directory_audio_filter),       DEFAULT_DIR_AUDIO_FILTER },\n'
+     '      { offsetof(struct settings, paths.directory_video_filter),       DEFAULT_DIR_VIDEO_FILTER },\n'
+     '      { offsetof(struct settings, paths.directory_assets),             DEFAULT_DIR_ASSETS },\n'
+     '      { offsetof(struct settings, paths.directory_overlay),            DEFAULT_DIR_OVERLAY },\n'
+     '      { offsetof(struct settings, paths.directory_osk_overlay),        DEFAULT_DIR_OSK_OVERLAY },\n'
+     '      { offsetof(struct settings, paths.directory_video_shader),       DEFAULT_DIR_SHADER },\n'
+     '      { offsetof(struct settings, paths.directory_screenshot),         DEFAULT_DIR_SCREENSHOT },\n'
+     '      { offsetof(struct settings, paths.directory_system),             DEFAULT_DIR_SYSTEM },\n'
+     '      { offsetof(struct settings, paths.directory_playlist),           DEFAULT_DIR_PLAYLIST },\n'
+     '      { offsetof(struct settings, paths.directory_input_remapping),    DEFAULT_DIR_REMAP },\n'
+     '      { offsetof(struct settings, paths.directory_cache),              DEFAULT_DIR_CACHE },\n'
+     '      { offsetof(struct settings, paths.directory_dynamic_wallpapers), DEFAULT_DIR_WALLPAPERS },\n'
+     '      { offsetof(struct settings, paths.directory_thumbnails),         DEFAULT_DIR_THUMBNAILS },\n'
+     '      { offsetof(struct settings, paths.path_content_database),        DEFAULT_DIR_DATABASE },\n'
+     '      { offsetof(struct settings, paths.path_cheat_database),          DEFAULT_DIR_CHEATS },\n'
+     '   };\n'
+     '   size_t i;\n'
+     '   for (i = 0; i < sizeof(map) / sizeof(map[0]); i++)\n'
+     '   {\n'
+     '      char *dst = (char*)settings + map[i].off;\n'
+     '      const char *def = g_defaults.dirs[map[i].dir];\n'
+     '      /* configuration_set_string is strlcpy(dst,src,sizeof(dst)) and\n'
+     '       * sizeof(char*) is 8 here - the refill truncated every path to\n'
+     '       * seven bytes ("/app0/cheats" -> "/app0/c"). A stale wrong value\n'
+     '       * is overwritten too: the truncated paths were already saved to\n'
+     '       * the live config. */\n'
+     '      if (!string_is_empty(def) && strcmp(dst, def) != 0)\n'
+     '      {\n'
+     '         fprintf(stderr, "cfg: fixdir %s -> %s\\n",\n'
+     '               *dst ? dst : "(empty)", def);\n'
+     '         strlcpy(dst, def, DIR_MAX_LENGTH);\n'
+     '         settings->flags |= SETTINGS_FLG_MODIFIED;\n'
+     '      }\n'
+     '   }\n'
+     '}\n'
+     '\n'
+     'void config_load(void *data)\n'
+     '{\n'
+     '   global_t *global = (global_t*)data;\n'
+     '   config_set_defaults(global);\n'
+     '#ifdef HAVE_CONFIGFILE\n'
+     '   config_parse_file(global);\n'
+     '#endif\n'
+     '   ps5_fix_platform_dirs(config_st);\n'
+     '}',
+     '0107: platform-fixed directories refill'),
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

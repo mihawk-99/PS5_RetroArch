@@ -61,7 +61,8 @@ bash "$root/tools/setup-native-dependencies.sh" >/dev/null
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
 core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp dolphin pcsx2
-    mednafen_psx_hw mupen64plus_next mednafen_saturn vice_x64sc desmume azahar mame rpcs3)
+    mednafen_psx_hw mupen64plus_next mednafen_saturn vice_x64sc desmume azahar
+    mame flycast)
 # RPCS3 (GPL-2.0-only, combined with this port's GPL-3.0 code) is a console build
 # only until I decide its licence question (docs/RELEASING.md): a release build
 # (PS5_RELEASE_TAG) leaves it out.
@@ -84,7 +85,7 @@ for core_name in "${core_names[@]}"; do
         vice_x64sc) script=vice ;;
         *) script=${core_name//_/-} ;;
     esac
-    bash "$root/tools/build-$script.sh"
+    [[ -f "$root/build/cores/stage/cores/${core_name}_libretro.so" ]] || bash "$root/tools/build-$script.sh"
     core_files+=("$root/build/cores/stage/cores/${core_name}_libretro.so")
 done
 python3 "$root/tools/core-imports.py" "${core_files[@]}"

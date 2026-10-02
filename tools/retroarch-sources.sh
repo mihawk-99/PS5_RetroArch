@@ -57,7 +57,11 @@ configure_flags=(
     --enable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
     --disable-sdl2 --disable-sdl --disable-cg
     # Libraries this SDK does not carry.
-    --disable-ffmpeg --disable-freetype --disable-flac --disable-networking
+    --disable-ffmpeg --disable-freetype --disable-flac
+    # Networking is on: the SDK libc resolves names through sceNetResolver and
+    # the kernel carries the BSD socket calls libkernel exports. ssl stays off
+    # because the SDK has no TLS library; the buildbot serves plain http.
+    --enable-networking
     --disable-cheevos --disable-ssl --disable-cdrom --disable-microphone
     --disable-qt --disable-discord --disable-oss --disable-jack --disable-alsa
     --disable-pulse --disable-pipewire --disable-wayland --disable-x11
