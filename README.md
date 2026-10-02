@@ -25,10 +25,10 @@ application foundation derived from
 > Do not share or redistribute the binaries you build.
 
 The title launches as a homebrew title, presents XMB through RetroArch's Vulkan
-video driver, and runs fifteen native libretro cores in its releases, six of
-them (PSP, GameCube/Wii, PlayStation 2, PlayStation, Nintendo 64 and Nintendo
-3DS) rendering on the PS5's GPU. A sixteenth, RPCS3 (PlayStation 3), is
-available only as source that you build yourself. Input, stereo audio,
+video driver, and runs sixteen native libretro cores in its releases, seven of
+them (PSP, GameCube/Wii, PlayStation 2, PlayStation, Nintendo 64, Nintendo 3DS
+and Dreamcast) rendering on the PS5's GPU. A seventeenth, RPCS3 (PlayStation 3),
+is available only as source that you build yourself. Input, stereo audio,
 configuration persistence and content browsing have been verified on a
 console. This is an active development project; the tested paths below do not
 imply complete core compatibility or Vulkan conformance.
@@ -85,8 +85,9 @@ games, not every possible workload; the release notes list them, and
 The title build includes these cores and their official metadata. FCEUmm,
 mGBA, Snes9x, FBNeo, Genesis Plus GX, Beetle Saturn, VICE, MAME and DeSmuME
 **render emulated games in software**; RetroArch uploads their frames and presents
-them through Vulkan. PPSSPP, Dolphin, LRPS2, Beetle PSX HW, Mupen64Plus-Next and
-Azahar **render on the GPU** through RADV, with their Vulkan renderers.
+them through Vulkan. PPSSPP, Dolphin, LRPS2, Beetle PSX HW, Mupen64Plus-Next,
+Azahar and Flycast **render on the GPU** through RADV, with their Vulkan
+renderers.
 
 The frontend now supplies balanced defaults for a 4K display. Internal rendering
 can be below 4K to leave GPU and memory headroom; RetroArch presents the result
@@ -147,6 +148,7 @@ creation failure or establish stability for every game. See the
 | [MAME](https://github.com/libretro/mame) 0.289 | Arcade | ✅ A tested game from a 0.289 non-merged set, BIOS in the same folder: full speed, and closing and reopening it. Raster games render at their native size and are scaled on the GPU. Vector games are drawn at 4K by MAME's alternate renderer (not yet tested on the console). Sets must match 0.289. |
 | [DeSmuME](https://github.com/libretro/desmume) | Nintendo DS | ✅ 5× (1280×960) with the JIT and eight rasterizer threads, full speed, and closing and reopening the game. 6× measured 93–95%. |
 | [Azahar](https://github.com/azahar-emu/azahar) | Nintendo 3DS | ✅ 18× internal resolution (the most Azahar offers) on Vulkan, with asynchronous shader compilation and the JIT, full speed after boot, and closing and reopening the game. Decrypted games only. |
+| [Flycast](https://github.com/sysfce2/libretro-flycast) | Dreamcast, NAOMI/NAOMI 2, Atomiswave | ⚠️ The core loads and boots the Dreamcast BIOS on the console; the dynarecs run on title-provided executable memory (`ps5platform/exec.h`). Full game verification is still pending. Needs your own BIOS in `system/dc/` (`dc_boot.bin`, `dc_flash.bin`; `naomi.zip`/`awbios.zip` for the arcade boards). |
 | [RPCS3](https://github.com/mihawk-99/PS5_RPCS3) (my fork) | PlayStation 3 | ⚠️ **Not in any release: build it yourself from source** ([how](#playstation-3-rpcs3-build-it-yourself); its licence, see [License and third-party terms](#license-and-third-party-terms)). On my console build: 4K at 60 fps in gameplay in one tested game, and 4K held at 30 fps in another (a game with only an "Unlock FPS" patch runs it with RPCS3's frame limit at 30 by default, the "Frame-rate patches" option), steady where the emulation keeps up, with its busiest scenes still at 24–27 fps. Needs your own PS3 system software (`PS3UPDAT.PUP` in `system/RPCS3/`) and your own games; a PSN purchase installs with its `.rap` licence file. |
 
 None of the games I tested with is provided.
@@ -168,7 +170,7 @@ Software core → video callback → RetroArch Vulkan video driver
                                 → RADV, linked into the title → PS5 display
 XMB / RGUI ──────────────────────┘
 Hardware cores (PPSSPP, Dolphin, LRPS2, Beetle PSX HW,
-Mupen64Plus-Next, Azahar) → Vulkan through RetroArch's HW context → RADV
+Mupen64Plus-Next, Azahar, Flycast) → Vulkan through RetroArch's HW context → RADV
 ```
 
 [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan), which I also maintain,

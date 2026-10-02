@@ -361,6 +361,19 @@
       "modifications": "The fork's commits over libretro/mame."
     },
     {
+      "id": "flycast",
+      "name": "Flycast (Dreamcast, NAOMI/NAOMI 2, Atomiswave)",
+      "kind": "code",
+      "artifacts": ["cores/flycast_libretro.so"],
+      "licence": "GPL-2.0-only",
+      "copyright": [
+        "Copyright (c) 2018-2026 flyinghead and the Flycast contributors"
+      ],
+      "texts": [{"from": ".deps/flycast-src/LICENSE", "to": "LICENSE"}],
+      "source": {"kind": "core", "build": "flycast", "tree": ".deps/flycast-src", "remote": "https://github.com/sysfce2/libretro-flycast"},
+      "modifications": "patches/flycast/flycast-ps5.patch (PS5_RetroArch); submodules at the revisions its build.json records."
+    },
+    {
       "id": "rpcs3",
       "name": "RPCS3 (PlayStation 3), with its bundled third-party code, LLVM, FFmpeg and GNU libiconv",
       "kind": "code",
