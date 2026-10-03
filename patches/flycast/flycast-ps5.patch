@@ -149,3 +149,150 @@ index af895bd..48fdc50 100644
    if (result >= 0)
    {
      if (value)
+diff --git a/core/cfg/option.h b/core/cfg/option.h
+index 267c90b..f22d432 100644
+--- a/core/cfg/option.h
++++ b/core/cfg/option.h
+@@ -417,6 +417,9 @@ public:
+ 			RenderType::DirectX11
+ #elif defined(USE_DX9)
+ 			RenderType::DirectX9
++#elif defined(__PROSPERO__) && !defined(USE_OPENGL)
++			// PS5: per-pixel (OIT) transparency is the built-in default.
++			RenderType::Vulkan_OIT
+ #elif !defined(USE_OPENGL)
+ 			RenderType::Vulkan
+ #else
+@@ -468,7 +471,11 @@ extern Option<bool> IntegerScale;
+ extern Option<bool> LinearInterpolation;
+ extern Option<bool> VSync;
+ extern Option<int64_t> PixelBufferSize;
++#ifdef __PROSPERO__
++extern IntOption AnisotropicFiltering;
++#else
+ extern Option<int> AnisotropicFiltering;
++#endif
+ extern Option<int> TextureFiltering; // 0: default, 1: force nearest, 2: force linear
+ extern Option<bool> ThreadedRendering;
+ extern Option<bool> DupeFrames;
+diff --git a/core/hw/maple/maple_devs.cpp b/core/hw/maple/maple_devs.cpp
+index 9402444..124698f 100755
+--- a/core/hw/maple/maple_devs.cpp
++++ b/core/hw/maple/maple_devs.cpp
+@@ -16,6 +16,13 @@
+ #include <thread>
+ #include <chrono>
+ 
++#if defined(__PROSPERO__)
++// The title's DualSense driver takes the raw Puru Puru command so its haptic
++// actuators can keep the effect's frequency, ramp and duration; the libretro
++// rumble interface only carries a flat amplitude.
++extern "C" void ps5_dc_rumble(int port, unsigned vibset, unsigned ast_ms);
++#endif
++
+ const char* maple_sega_controller_name = "Dreamcast Controller";
+ const char* maple_sega_vmu_name        = "Visual Memory";
+ const char* maple_sega_kbd_name        = "Emulated Dreamcast Keyboard";
+@@ -1122,6 +1129,9 @@ struct maple_sega_purupuru : maple_base
+ 				else
+ 					inclination = FREQ / (1000.0 * INC * std::max(POW_POS, POW_NEG));
+ 				config->SetVibration(power, inclination, duration_ms);
++#if defined(__PROSPERO__)
++				ps5_dc_rumble(player_num, VIBSET, AST_ms);
++#endif
+ 
+ 				relayMapleLink();
+ 			}
+diff --git a/shell/libretro/libretro_core_options.h b/shell/libretro/libretro_core_options.h
+index 8c58e74..be551e8 100644
+--- a/shell/libretro/libretro_core_options.h
++++ b/shell/libretro/libretro_core_options.h
+@@ -318,6 +318,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+       },
+ #ifdef LOW_RES
+       "320x240",
++#elif defined(__PROSPERO__)
++      /* PS5: the title's 4K output holds x4.5 easily. */
++      "2880x2160",
+ #else
+       "640x480",
+ #endif
+@@ -385,6 +388,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+       },
+ #if defined(LOW_END)
+       "per-strip (fast, least accurate)",
++#elif defined(__PROSPERO__)
++      /* PS5: accurate per-pixel (OIT) transparency on RADV. */
++      "per-pixel (accurate)",
+ #else
+       "per-triangle (normal)",
+ #endif
+@@ -510,7 +516,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+          { "16",  NULL },
+          { NULL, NULL },
+       },
++#ifdef __PROSPERO__
++      /* PS5: full anisotropy; the GPU absorbs it. */
++      "16",
++#else
+       "4",
++#endif
+    },
+    {
+       CORE_OPTION_NAME "_texture_filtering",
+@@ -708,7 +719,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
+          { "enabled",  NULL },
+          { NULL, NULL },
+       },
++#ifdef __PROSPERO__
++      /* PS5: the title renders fullscreen 16:9, so draw the extra
++       * geometry instead of letterboxing to 4:3. */
++      "enabled",
++#else
+       "disabled",
++#endif
+    },
+    {
+       CORE_OPTION_NAME "_gdrom_fast_loading",
+diff --git a/shell/libretro/option.cpp b/shell/libretro/option.cpp
+index 6d317df..49b8086 100644
+--- a/shell/libretro/option.cpp
++++ b/shell/libretro/option.cpp
+@@ -54,7 +54,12 @@ Option<bool> VmuSound(CORE_OPTION_NAME "_vmu_sound", false);
+ 
+ RendererOption RendererType;
+ Option<bool> UseMipmaps(CORE_OPTION_NAME "_mipmapping", true);
++#ifdef __PROSPERO__
++// PS5: fallback matching the option definition's enabled default.
++Option<bool> Widescreen(CORE_OPTION_NAME "_widescreen_hack", true);
++#else
+ Option<bool> Widescreen(CORE_OPTION_NAME "_widescreen_hack");
++#endif
+ Option<bool> SuperWidescreen("");
+ Option<bool> ShowFPS("");
+ Option<bool> RenderToTextureBuffer(CORE_OPTION_NAME "_enable_rttb");
+@@ -84,12 +89,24 @@ std::array<Option<int>, 4> CrosshairColor {
+ Option<int> SkipFrame(CORE_OPTION_NAME "_frame_skipping");
+ Option<int> MaxThreads("", 3);
+ Option<int> AutoSkipFrame(CORE_OPTION_NAME "_auto_skip_frame", 0);
++#ifdef __PROSPERO__
++// PS5: fallback used only if the frontend never answers GET_VARIABLE; the
++// option definition default (2880x2160) is what RetroArch actually sends.
++Option<int> RenderResolution("", 2160);
++#else
+ Option<int> RenderResolution("", 480);
++#endif
+ Option<bool> IntegerScale("");
+ Option<bool> LinearInterpolation("", true);
+ Option<bool> VSync("", true);
+ Option<bool> ThreadedRendering(CORE_OPTION_NAME "_threaded_rendering", true);
++#ifdef __PROSPERO__
++// PS5: IntOption keeps the picked string's numeric value (16), where
++// Option<int> would return the index into the values list (4) instead.
++IntOption AnisotropicFiltering(CORE_OPTION_NAME "_anisotropic_filtering", 16);
++#else
+ Option<int> AnisotropicFiltering(CORE_OPTION_NAME "_anisotropic_filtering");
++#endif
+ Option<int> TextureFiltering(CORE_OPTION_NAME "_texture_filtering");
+ Option<bool> PowerVR2Filter(CORE_OPTION_NAME "_pvr2_filtering");
+ Option<int64_t> PixelBufferSize("", 512_MB);
