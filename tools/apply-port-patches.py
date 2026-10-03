@@ -3451,26 +3451,7 @@ EDITS = [
      '   ps5_fix_platform_dirs(config_st);\n'
      '}',
      '0107: platform-fixed directories refill'),
-    # 0108: the PS5 OpenGL context driver (src/ps5_egl_ctx.c): the bundled
-    # ps5-opengl runtime is a fullscreen EGL, and this registers it with the
-    # gl3 driver's context probe like every other console context.
-    ("gfx/video_driver.h",
-     "extern const gfx_ctx_driver_t gfx_ctx_null;",
-     "/* patches/series, 0108: the port's PS5 EGL context driver lives in src/. */\n"
-     "extern const gfx_ctx_driver_t ps5_egl_ctx;\n"
-     "extern const gfx_ctx_driver_t gfx_ctx_null;",
-     "patches/series, 0108: the port's PS5 EGL context driver"),
-    ("gfx/video_driver.c",
-     "static const gfx_ctx_driver_t *gfx_ctx_gl_drivers[] = {",
-     "static const gfx_ctx_driver_t *gfx_ctx_gl_drivers[] = {\n"
-     "#if defined(__PROSPERO__)\n"
-     "   /* patches/series, 0108: probed first - it is the only GL context this\n"
-     "    * console has. */\n"
-     "   &ps5_egl_ctx,\n"
-     "#endif\n",
-     "&ps5_egl_ctx,"),
 ]
-
 
 # Changes that are withdrawn rather than deleted, by marker.
 #

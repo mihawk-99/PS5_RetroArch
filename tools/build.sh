@@ -281,22 +281,6 @@ for archive in "${sdk_archives[@]}"; do
     }
     link_inputs+=("$sdk_root/target/lib/$archive")
 done
-# The console's OpenGL runtime, when build-title.sh found the ps5-opengl SDK
-# (APP_OPENGL_ARCHIVES): the GROUP set its libPS5OpenGLCore33.a linker script
-# names - the EGL facade, Mesa, gallium and the PSBC shader compiler. -u pulls
-# ps5_agc_gate2_run, the Agc gate table nothing references directly, which is
-# exactly what the SDK's own ps5-opengl-core33.mk prescribes for a consumer
-# link. The runtime's sceAgc*/sceVideoOut*/sceKernel* calls resolve against the
-# module stubs above and the SDK .so tail below, like everything else.
-if [[ -n ${APP_OPENGL_ARCHIVES:-} ]]; then
-    read -r -a opengl_archives <<< "$APP_OPENGL_ARCHIVES"
-    for archive in "${opengl_archives[@]}"; do
-        [[ $archive =~ ^[A-Za-z0-9_./+-]+\.a$ && -f $archive ]] || {
-            echo "invalid OpenGL archive: $archive" >&2; exit 2;
-        }
-    done
-    link_inputs+=(-u ps5_agc_gate2_run --start-group "${opengl_archives[@]}" --end-group)
-fi
 if (( ${#pacbrew_libs[@]} > 0 )); then
     link_inputs+=(--start-group "${pacbrew_libs[@]}" --end-group)
 fi

@@ -103,18 +103,3 @@ uint32_t *sceAgcDcbDrawIndex(void *command, uint32_t count, void *indices, uint6
     (void)command; (void)count; (void)indices; (void)modifier;
     return 0;
 }
-/* Added for the ps5-opengl runtime (libps5_opengl_core33.a): the EGL presenter
- * submits its command buffers through the CB path and acquires DCB memory, two
- * entry points the Vulkan driver never called. Same contract as above - bodies
- * exist only so the native converter records the libSceAgc imports. */
-uint32_t *sceAgcDcbAcquireMem(void *command, uint32_t size)
-{
-    (void)command; (void)size;
-    return 0;
-}
-uint32_t *sceAgcCbDispatch(void *command, uint32_t workgroups_x, uint32_t workgroups_y,
-                           uint32_t workgroups_z, uint64_t modifier)
-{
-    (void)command; (void)workgroups_x; (void)workgroups_y; (void)workgroups_z; (void)modifier;
-    return 0;
-}

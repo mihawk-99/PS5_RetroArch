@@ -223,10 +223,3 @@
 #       frames and the longest gap between them over exact script times
 #       gfx/video_driver.c
 0101-pad-script-frame-marks
-
-# 0108  register the PS5 EGL context driver (src/ps5_egl_ctx.c): the bundled
-#       ps5-opengl runtime is a fullscreen EGL - null native window on
-#       EGL_DEFAULT_DISPLAY - and the gl3 driver reaches it through the GL
-#       context probe like every other console context
-#       gfx/video_driver.{h,c}
-0108-ps5-egl-context-driver

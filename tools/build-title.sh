@@ -254,23 +254,9 @@ else
     mapfile -t vulkan_objects <<< "$vulkan_object_list"
 fi
 
-# The ps5-opengl SDK's archives go through tools/build-gl-runtime.sh first: the
-# GL stack and the Vulkan driver both embed Mesa's compiler objects, and the
-# linker must not see fifteen thousand of the same names on both sides. The
-# script prints the namespaced copies under build/gl-archives/, which are what
-# this link uses. EGL is in the set, so the RetroArch objects' egl* references
-# resolve.
-if ! opengl_archive_list=$(PS5_VULKAN_DIR="$vulkan_dir" PS5_VULKAN_DRIVER="$vulkan_driver" \
-        PS5_PAYLOAD_SDK="$sdk" PS5_OPENGL_SDK="${PS5_OPENGL_SDK:-$root/../ps5-opengl-sdk-0.3.0/sdk}" \
-        bash "$root/tools/build-gl-runtime.sh"); then
-    echo "error: the OpenGL runtime archives did not build" >&2
-    exit 2
-fi
-mapfile -t opengl_archives <<< "$opengl_archive_list"
-
 # Bind the running trace and FTP readback to these exact source/archive inputs.
 # The console transforms the SELF container, so its whole-file digest differs.
-CORE_NAMES="${core_names[*]}" python3 - "$root" "$memory_diagnostics" "${vulkan_archives[@]}" "${vulkan_objects[@]}" "${opengl_archives[@]}" <<'PY'
+CORE_NAMES="${core_names[*]}" python3 - "$root" "$memory_diagnostics" "${vulkan_archives[@]}" "${vulkan_objects[@]}" <<'PY'
 import hashlib, os, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
@@ -311,15 +297,13 @@ directory_wrap_flags+=" --wrap=getcwd"
 directory_wrap_flags+=" --wrap=mkdir --wrap=open --wrap=fopen"
 echo "==> [title] step 2/3: the title"
 # Large frontend/core buffers use mapped memory; wrap all ownership operations.
-
 PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
 PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
 APP_DEFINITIONS="${title_definition_names[*]}" \
-APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb .deps/native/ps5-opengl-sdk/sdk/include" \
+APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
 APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
 APP_SDK_ARCHIVES="libps5platform.a" \
-APP_OPENGL_ARCHIVES="${opengl_archives[*]}" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
 APP_LINK_FLAGS="$vulkan_flags --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free $memory_wrap_flags $directory_wrap_flags" \

@@ -152,10 +152,6 @@ includes=(
     -I"$tree/deps/glslang/glslang"
     # RetroArch vendors the Vulkan headers it compiles against in gfx/include.
     -I"$tree/gfx/include"
-    # The EGL and GL headers the context driver (src/ps5_egl_ctx.c) and
-    # gfx/common/egl_common.c compile against come from the ps5-opengl SDK,
-    # not from the payload SDK - the console has no system GL.
-    -I"${PS5_OPENGL_SDK:-$root/../ps5-opengl-sdk-0.3.0/sdk}/include"
     # Vulkan's shader path includes SPIRV-Cross as <spirv_cross.hpp>.
     -I"$tree/deps/SPIRV-Cross"
     -I"$root/src"
