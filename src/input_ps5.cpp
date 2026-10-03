@@ -209,6 +209,13 @@ struct PadState
     pthread_t haptic_thread{};
     bool haptic_thread_started = false;
     std::atomic<bool> haptic_stop{false};
+    /* The last Puru Puru SetCondition a Dreamcast core reported through
+     * ps5_dc_rumble: the raw command word and the millisecond it must stop
+     * at. Written from the core's thread; the worker decodes it so haptics
+     * keep the effect's frequency and ramp, which the flat libretro rumble
+     * levels drop. dc_fx_until_ms older than now means no effect. */
+    std::atomic<std::uint32_t> dc_fx_vibset{0};
+    std::atomic<std::int64_t> dc_fx_until_ms{0};
     bool owns_user_service = false;
     bool announced = false;
 };
@@ -501,9 +508,10 @@ void *haptic_worker(void *opaque) noexcept
     auto *state = static_cast<PadState *>(opaque);
     alignas(16) std::int16_t out[haptic_grain * 2];
     alignas(16) float float_out[haptic_grain * 2];
-    double phase_low = 0.0, phase_high = 0.0;
-    float env_strong = 0.0f, env_weak = 0.0f;
-    float lp_left = 0.0f, lp_right = 0.0f;
+    const double two_pi = 6.283185307179586;
+    double phase_low = 0.0, phase_high = 0.0, phase_fx = 0.0;
+    float env_strong = 0.0f, env_weak = 0.0f, env_fx = 0.0f;
+    float lp_left = 0.0f, lp_right = 0.0f, lp_fx = 0.0f;
     std::uint32_t rng = 0x9e3779b9u;
     int failures = 0;
     unsigned outputs = 0, active_outputs = 0, errors = 0;
@@ -517,6 +525,68 @@ void *haptic_worker(void *opaque) noexcept
             /* Smooth toward the target so square rumble changes do not click. */
             env_strong += (strong - env_strong) * 0.02f;
             env_weak += (weak - env_weak) * 0.02f;
+
+            /* A live Dreamcast effect overrides the generic texture: its raw
+             * command carries the drive frequency and the ramp, so the pad
+             * can feel the difference between, say, gravel and a heartbeat. */
+            const std::int64_t now_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                    .count();
+            const std::uint32_t vibset =
+                state->dc_fx_vibset.load(std::memory_order_relaxed);
+            const std::int64_t fx_until =
+                state->dc_fx_until_ms.load(std::memory_order_relaxed);
+            if (vibset != 0 && now_ms < fx_until)
+            {
+                const int pow_pos = (vibset >> 8) & 7;
+                const int pow_neg = (vibset >> 12) & 7;
+                const int freq = (vibset >> 16) & 0xff;
+                int inc = (vibset >> 24) & 0xff;
+                if (vibset & 0x8000)
+                    inc = -inc; /* INH */
+                else if (!(vibset & 0x0800))
+                    inc = 0; /* neither INH nor EXH */
+                float power = (pow_pos + pow_neg) / 7.0f;
+                if (power > 1.0f)
+                    power = 1.0f;
+                power = std::sqrt(power);
+                /* EXH (inc > 0) decays like the core's rumble timer does:
+                 * amplitude falls to zero when rem * slope dips under it. */
+                if (inc > 0)
+                {
+                    const double slope = freq /
+                        (1000.0 * inc * (pow_pos > pow_neg ? pow_pos : pow_neg));
+                    const double decay = (fx_until - now_ms) * slope;
+                    if (decay < 1.0)
+                        power *= static_cast<float>(decay);
+                }
+                /* The actuators' strong band sits around 40-150 Hz; raw FREQ
+                 * past ~110 Hz already reads as a faint buzz, so the byte is
+                 * compressed onto 35-150 Hz. 0 means a steady hold. */
+                const float fx_hz = freq > 0 ? 35.0f + freq * 0.45f : 85.0f;
+                phase_fx += fx_hz / haptic_rate;
+                if (phase_fx >= 1.0)
+                    phase_fx -= 1.0;
+                lp_fx += 0.10f * (haptic_noise(rng) - lp_fx);
+                env_fx += (power - env_fx) * 0.05f;
+                const float fx = env_fx *
+                    (0.70f * static_cast<float>(std::sin(two_pi * phase_fx)) +
+                     0.50f * lp_fx);
+                const auto to_s16_fx = [](float v) -> std::int16_t {
+                    const float scaled = v * 32767.0f;
+                    if (scaled > 32767.0f)
+                        return 32767;
+                    if (scaled < -32768.0f)
+                        return -32768;
+                    return static_cast<std::int16_t>(scaled);
+                };
+                out[2 * i] = to_s16_fx(fx);
+                out[2 * i + 1] = to_s16_fx(fx);
+                nonzero = true;
+                continue;
+            }
+            env_fx += (0.0f - env_fx) * 0.05f;
             const float n_l = haptic_noise(rng);
             const float n_r = haptic_noise(rng);
             lp_left += 0.08f * (n_l - lp_left);
@@ -527,7 +597,6 @@ void *haptic_worker(void *opaque) noexcept
                 phase_low -= 1.0;
             if (phase_high >= 1.0)
                 phase_high -= 1.0;
-            const double two_pi = 6.283185307179586;
             /* Left and right actuators get decorrelated noise so textures read
              * as surface, not as one monotone buzz. */
             const float left =
@@ -1284,4 +1353,44 @@ extern "C" void ps5_input_note_new_frame(void)
         new_frames_slow.fetch_add(1, std::memory_order_relaxed);
     new_frame_last_ns = now;
     new_frames.fetch_add(1, std::memory_order_relaxed);
+}
+
+/* Called by a Dreamcast core's Puru Puru emulation with the raw SetCondition
+ * word (tools/core-imports.py binds it for the core like ps5_exec_allocate).
+ * Runs on the core's thread, so it only writes the atomics the worker reads.
+ * The duration rule matches the core's: a FREQ-driven effect pulses for
+ * INC*max(POW)/FREQ seconds unless CNT asks to run to the auto-stop time. */
+extern "C" void ps5_dc_rumble(int port, unsigned vibset, unsigned ast_ms)
+{
+    PadState *pad = active_pad;
+    if (pad == nullptr || vibset == 0)
+        return;
+    (void)port; /* one pad is driven; the port index only matters with more */
+
+    const int pow_pos = (vibset >> 8) & 7;
+    const int pow_neg = (vibset >> 12) & 7;
+    const int freq = (vibset >> 16) & 0xff;
+    int inc = (vibset >> 24) & 0xff;
+    if (vibset & 0x8000)
+        inc = -inc;
+    else if (!(vibset & 0x0800))
+        inc = 0;
+    const bool cnt = (vibset & 1) != 0;
+    const int max_pow = pow_pos > pow_neg ? pow_pos : pow_neg;
+
+    long long duration_ms = ast_ms;
+    if (freq > 0 && (!cnt || inc != 0))
+    {
+        const long long pulsed =
+            1000LL * (inc != 0 ? (inc < 0 ? -inc : inc) * max_pow : 1) / freq;
+        if (pulsed < duration_ms)
+            duration_ms = pulsed;
+    }
+
+    const std::int64_t now_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    pad->dc_fx_vibset.store(vibset, std::memory_order_relaxed);
+    pad->dc_fx_until_ms.store(now_ms + duration_ms, std::memory_order_relaxed);
 }

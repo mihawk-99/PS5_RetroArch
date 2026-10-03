@@ -1,0 +1,92 @@
+diff --git a/src/common/jit_code_buffer.cpp b/src/common/jit_code_buffer.cpp
+index e29571f..e095038 100644
+--- a/src/common/jit_code_buffer.cpp
++++ b/src/common/jit_code_buffer.cpp
+@@ -10,6 +10,14 @@
+ #include <sys/mman.h>
+ #endif
+ 
++#if defined(__PROSPERO__)
++// Executable memory comes from the PS5 RetroArch title runtime
++// (ps5platform/exec.h): a PS5 title cannot mmap PROT_EXEC itself, so
++// ps5_exec_allocate() returns an RWX region from the direct-memory pool and
++// ps5_exec_release() frees it.
++#include <ps5platform/exec.h>
++#endif
++
+ #if defined(__APPLE__) && defined(__aarch64__)
+ // pthread_jit_write_protect_np()
+ #include <pthread.h>
+@@ -36,6 +44,13 @@ bool JitCodeBuffer::Allocate(uint32_t size /* = 64 * 1024 * 1024 */, uint32_t fa
+   m_code_ptr = static_cast<uint8_t*>(VirtualAlloc(nullptr, m_total_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+   if (!m_code_ptr)
+     return false;
++#elif defined(__PROSPERO__)
++  // W^X: a title's own mmap cannot be executable; the title runtime's exec
++  // allocator supplies the region instead.
++  static const char jit_anchor = 0;
++  m_code_ptr = static_cast<uint8_t*>(ps5_exec_allocate(m_total_size, (uintptr_t)&jit_anchor));
++  if (!m_code_ptr)
++    return false;
+ #elif defined(__linux__) || defined(__ANDROID__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__FreeBSD__)
+   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+ #if defined(__APPLE__) && defined(__aarch64__)
+@@ -129,6 +144,9 @@ void JitCodeBuffer::Destroy()
+   {
+ #if defined(_WIN32)
+     VirtualFree(m_code_ptr, 0, MEM_RELEASE);
++#elif defined(__PROSPERO__)
++    if (m_code_ptr)
++      ps5_exec_release(m_code_ptr);
+ #elif defined(__linux__) || defined(__ANDROID__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__FreeBSD__)
+     munmap(m_code_ptr, m_total_size);
+ #endif
+@@ -138,7 +156,7 @@ void JitCodeBuffer::Destroy()
+ #if defined(_WIN32)
+     DWORD old_protect = 0;
+     VirtualProtect(m_code_ptr, m_total_size, m_old_protection, &old_protect);
+-#else
++#elif !defined(__PROSPERO__)
+     mprotect(m_code_ptr, m_total_size, m_old_protection);
+ #endif
+   }
+diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+index 460ea0f..55e1388 100644
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -133,7 +133,15 @@ endif()
+ 
+ if(${CPU_ARCH} STREQUAL "x64")
+   target_include_directories(core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../../dep/xbyak/xbyak")
+-  target_compile_definitions(core PUBLIC "WITH_RECOMPILER=1" "WITH_MMAP_FASTMEM=1")
++  if(PROSPERO)
++    # The MMap fastmem scheme reserves a 4 GiB address range and aliases the
++    # RAM arena into it, then protects code pages and handles the faults -
++    # none of which survives inside a PS5 title's sandbox. The LUT mode keeps
++    # the recompiler and only pays a pointer-table lookup per memory access.
++    target_compile_definitions(core PUBLIC "WITH_RECOMPILER=1")
++  else()
++    target_compile_definitions(core PUBLIC "WITH_RECOMPILER=1" "WITH_MMAP_FASTMEM=1")
++  endif()
+   target_sources(core PRIVATE ${RECOMPILER_SRCS}
+     cpu_recompiler_code_generator_x64.cpp
+   )
+diff --git a/src/core/cpu_code_cache.cpp b/src/core/cpu_code_cache.cpp
+index adfb705..c989f93 100644
+--- a/src/core/cpu_code_cache.cpp
++++ b/src/core/cpu_code_cache.cpp
+@@ -24,8 +24,12 @@ static constexpr uint32_t INVALIDATE_THRESHOLD_TO_DISABLE_LINKING = 10;
+ 
+ #ifdef WITH_RECOMPILER
+ 
+-// Currently remapping the code buffer doesn't work in macOS or Haiku.
+-#if !defined(__HAIKU__) && !defined(__APPLE__)
++// Currently remapping the code buffer doesn't work in macOS or Haiku. On
++// Prospero the static buffer is never usable either - a title cannot mprotect
++// its own image executable - and its 48 MiB of .bss trips the exec-region
++// protection at the image tail. The heap path allocates through
++// ps5_exec_allocate instead, which is the memory the JIT runs from anyway.
++#if !defined(__HAIKU__) && !defined(__APPLE__) && !defined(__PROSPERO__)
+ #define USE_STATIC_CODE_BUFFER 1
+ #endif
+ 

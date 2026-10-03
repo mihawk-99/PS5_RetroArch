@@ -64,6 +64,7 @@ extern "C" void ps5_crash_report_install();
 extern "C" void ps5_core_threads_start();
 extern "C" void ps5_sampler_start();
 extern "C" void ps5_open_permissions();
+extern "C" void ps5_bootlog(const char *line) noexcept;
 /* ../PS5_Vulkan's driver/ps5vk_debug.h: whether VideoOut outlives a swapchain.
  * Weak, so a build without the driver links. */
 extern "C" void ps5vk_display_retain(bool retain) __attribute__((weak));
@@ -366,6 +367,7 @@ int main()
     }
 
     std::set_terminate(on_terminate);
+    ps5_bootlog(PS5_RETROARCH_BUILD_ID);
     ps5::debug::mark(PS5_RETROARCH_BUILD_ID);
     ps5::memory::init("/app0/memory-diagnostics.log", PS5_RETROARCH_BUILD_ID);
     ps5_vulkan_profile_init();
