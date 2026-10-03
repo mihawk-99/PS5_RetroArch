@@ -28,6 +28,7 @@ cd "$root"
 upstream="$root/vendor/retroarch"
 work="$root/build/ra-conf"
 sdk="${PS5_PAYLOAD_SDK:-$root/../ps5-native-app-boilerplate-main/.deps/native/ps5-payload-sdk}"
+gl_sdk="${PS5_OPENGL_SDK:-$root/../ps5-opengl-sdk-0.3.0/sdk}"
 
 configure_flags=(
     --prefix=/user/homebrew
@@ -54,7 +55,14 @@ configure_flags=(
     # second of EXEC with no message" - which is why it could not be diagnosed.
     # The title now passes --log-file, so the frontend's own words land in
     # /app0/retroarch.log and the next run says which name it searched for.
-    --enable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
+    --enable-vulkan --disable-opengl1
+    # OpenGL is on beside Vulkan. ../ps5-opengl-sdk-0.3.0 is a Mesa/gallium
+    # port for this console - GL 3.3 core and better through a fullscreen EGL
+    # - which is the context driver in src/ps5_egl_ctx.c and the gl3 (glcore)
+    # renderer it backs. The cores that need it (mupen64plus-next's GLideN64)
+    # ask RetroArch for a 3.3 core hardware context; without this they only
+    # have the software and Vulkan paths.
+    --enable-opengl --enable-opengl_core --enable-egl
     --disable-sdl2 --disable-sdl --disable-cg
     # Libraries this SDK does not carry.
     --disable-ffmpeg --disable-freetype --disable-flac
@@ -149,6 +157,16 @@ if [[ ! -f $work/config.mk || ! -f $work/config.h || ! -f $work/.configure-id ||
         export PS5_PAYLOAD_SDK="$sdk"
         export CC="$sdk/bin/prospero-clang" CXX="$sdk/bin/prospero-clang++"
         export OS=BSD DISTRO=
+        # configure proves GL with a GL/gl.h compile probe and an -lGL/-lEGL
+        # link probe. The headers come from the ps5-opengl SDK; the libraries do
+        # not exist as linkable names (the runtime's real archives land on the
+        # title link in tools/build.sh), so two empty archives stand in for the
+        # probes, which only ask that the names resolve.
+        stub_lib="$work/.gl-probe-stubs"
+        mkdir -p "$stub_lib"
+        "$sdk/bin/prospero-ar" rcs "$stub_lib/libGL.a"
+        "$sdk/bin/prospero-ar" rcs "$stub_lib/libEGL.a"
+        export CFLAGS="-I$gl_sdk/include" LDFLAGS="-L$stub_lib"
         ./configure "${configure_flags[@]}" >"$work/configure.log" 2>&1
     ) || { echo "error: configure failed; see $work/configure.log" >&2; exit 2; }
     printf '%s\n' "$configure_id" > "$work/.configure-id"
