@@ -1,0 +1,630 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-02T16:54:39.012163+00:00",
+  "title": "Design System: PS5 RetroArch WebUI",
+  "extensions": {
+    "colorMeta": {
+      "rail": {
+        "role": "primary",
+        "displayName": "Rail",
+        "tonalRamp": [
+          "oklch(15% 0.09237 310.37)",
+          "oklch(26% 0.09237 310.37)",
+          "oklch(38% 0.09237 310.37)",
+          "oklch(49% 0.09237 310.37)",
+          "oklch(61% 0.09237 310.37)",
+          "oklch(72% 0.09237 310.37)",
+          "oklch(84% 0.09237 310.37)",
+          "oklch(95% 0.09237 310.37)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "tonalRamp": [
+          "oklch(15% 0.02101 304.02)",
+          "oklch(26% 0.02101 304.02)",
+          "oklch(38% 0.02101 304.02)",
+          "oklch(49% 0.02101 304.02)",
+          "oklch(61% 0.02101 304.02)",
+          "oklch(72% 0.02101 304.02)",
+          "oklch(84% 0.02101 304.02)",
+          "oklch(95% 0.02101 304.02)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.00690 304.24)",
+          "oklch(26% 0.00690 304.24)",
+          "oklch(38% 0.00690 304.24)",
+          "oklch(49% 0.00690 304.24)",
+          "oklch(61% 0.00690 304.24)",
+          "oklch(72% 0.00690 304.24)",
+          "oklch(84% 0.00690 304.24)",
+          "oklch(95% 0.00690 304.24)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.09190 303.01)",
+          "oklch(26% 0.09190 303.01)",
+          "oklch(38% 0.09190 303.01)",
+          "oklch(49% 0.09190 303.01)",
+          "oklch(61% 0.09190 303.01)",
+          "oklch(72% 0.09190 303.01)",
+          "oklch(84% 0.09190 303.01)",
+          "oklch(95% 0.09190 303.01)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.05131 280.52)",
+          "oklch(26% 0.05131 280.52)",
+          "oklch(38% 0.05131 280.52)",
+          "oklch(49% 0.05131 280.52)",
+          "oklch(61% 0.05131 280.52)",
+          "oklch(72% 0.05131 280.52)",
+          "oklch(84% 0.05131 280.52)",
+          "oklch(95% 0.05131 280.52)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15% 0.17449 299.72)",
+          "oklch(26% 0.17449 299.72)",
+          "oklch(38% 0.17449 299.72)",
+          "oklch(49% 0.17449 299.72)",
+          "oklch(61% 0.17449 299.72)",
+          "oklch(72% 0.17449 299.72)",
+          "oklch(84% 0.17449 299.72)",
+          "oklch(95% 0.17449 299.72)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Accent Hover",
+        "tonalRamp": [
+          "oklch(15% 0.16668 299.96)",
+          "oklch(26% 0.16668 299.96)",
+          "oklch(38% 0.16668 299.96)",
+          "oklch(49% 0.16668 299.96)",
+          "oklch(61% 0.16668 299.96)",
+          "oklch(72% 0.16668 299.96)",
+          "oklch(84% 0.16668 299.96)",
+          "oklch(95% 0.16668 299.96)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0.03547 303.78)",
+          "oklch(26% 0.03547 303.78)",
+          "oklch(38% 0.03547 303.78)",
+          "oklch(49% 0.03547 303.78)",
+          "oklch(61% 0.03547 303.78)",
+          "oklch(72% 0.03547 303.78)",
+          "oklch(84% 0.03547 303.78)",
+          "oklch(95% 0.03547 303.78)"
+        ]
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Control",
+        "tonalRamp": [
+          "oklch(15% 0.02898 285.77)",
+          "oklch(26% 0.02898 285.77)",
+          "oklch(38% 0.02898 285.77)",
+          "oklch(49% 0.02898 285.77)",
+          "oklch(61% 0.02898 285.77)",
+          "oklch(72% 0.02898 285.77)",
+          "oklch(84% 0.02898 285.77)",
+          "oklch(95% 0.02898 285.77)"
+        ]
+      },
+      "green": {
+        "role": "secondary",
+        "displayName": "Green",
+        "tonalRamp": [
+          "oklch(15% 0.15730 155.44)",
+          "oklch(26% 0.15730 155.44)",
+          "oklch(38% 0.15730 155.44)",
+          "oklch(49% 0.15730 155.44)",
+          "oklch(61% 0.15730 155.44)",
+          "oklch(72% 0.15730 155.44)",
+          "oklch(84% 0.15730 155.44)",
+          "oklch(95% 0.15730 155.44)"
+        ]
+      },
+      "nav-current": {
+        "role": "primary",
+        "displayName": "Nav Current",
+        "tonalRamp": [
+          "oklch(15% 0.15483 303.97)",
+          "oklch(26% 0.15483 303.97)",
+          "oklch(38% 0.15483 303.97)",
+          "oklch(49% 0.15483 303.97)",
+          "oklch(61% 0.15483 303.97)",
+          "oklch(72% 0.15483 303.97)",
+          "oklch(84% 0.15483 303.97)",
+          "oklch(95% 0.15483 303.97)"
+        ]
+      },
+      "nav-hover": {
+        "role": "primary",
+        "displayName": "Nav Hover",
+        "tonalRamp": [
+          "oklch(15% 0.13913 304.24)",
+          "oklch(26% 0.13913 304.24)",
+          "oklch(38% 0.13913 304.24)",
+          "oklch(49% 0.13913 304.24)",
+          "oklch(61% 0.13913 304.24)",
+          "oklch(72% 0.13913 304.24)",
+          "oklch(84% 0.13913 304.24)",
+          "oklch(95% 0.13913 304.24)"
+        ]
+      },
+      "rail-muted": {
+        "role": "primary",
+        "displayName": "Rail Muted",
+        "tonalRamp": [
+          "oklch(15% 0.05775 304.47)",
+          "oklch(26% 0.05775 304.47)",
+          "oklch(38% 0.05775 304.47)",
+          "oklch(49% 0.05775 304.47)",
+          "oklch(61% 0.05775 304.47)",
+          "oklch(72% 0.05775 304.47)",
+          "oklch(84% 0.05775 304.47)",
+          "oklch(95% 0.05775 304.47)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.20026 302.29)",
+          "oklch(26% 0.20026 302.29)",
+          "oklch(38% 0.20026 302.29)",
+          "oklch(49% 0.20026 302.29)",
+          "oklch(61% 0.20026 302.29)",
+          "oklch(72% 0.20026 302.29)",
+          "oklch(84% 0.20026 302.29)",
+          "oklch(95% 0.20026 302.29)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "tonalRamp": [
+          "oklch(15% 0.00000 89.88)",
+          "oklch(26% 0.00000 89.88)",
+          "oklch(38% 0.00000 89.88)",
+          "oklch(49% 0.00000 89.88)",
+          "oklch(61% 0.00000 89.88)",
+          "oklch(72% 0.00000 89.88)",
+          "oklch(84% 0.00000 89.88)",
+          "oklch(95% 0.00000 89.88)"
+        ]
+      },
+      "error": {
+        "role": "secondary",
+        "displayName": "Error",
+        "tonalRamp": [
+          "oklch(15% 0.15629 6.56)",
+          "oklch(26% 0.15629 6.56)",
+          "oklch(38% 0.15629 6.56)",
+          "oklch(49% 0.15629 6.56)",
+          "oklch(61% 0.15629 6.56)",
+          "oklch(72% 0.15629 6.56)",
+          "oklch(84% 0.15629 6.56)",
+          "oklch(95% 0.15629 6.56)"
+        ]
+      },
+      "update-ground": {
+        "role": "secondary",
+        "displayName": "Update Ground",
+        "tonalRamp": [
+          "oklch(15% 0.03932 91.20)",
+          "oklch(26% 0.03932 91.20)",
+          "oklch(38% 0.03932 91.20)",
+          "oklch(49% 0.03932 91.20)",
+          "oklch(61% 0.03932 91.20)",
+          "oklch(72% 0.03932 91.20)",
+          "oklch(84% 0.03932 91.20)",
+          "oklch(95% 0.03932 91.20)"
+        ]
+      },
+      "update-ink": {
+        "role": "secondary",
+        "displayName": "Update Ink",
+        "tonalRamp": [
+          "oklch(15% 0.07849 77.71)",
+          "oklch(26% 0.07849 77.71)",
+          "oklch(38% 0.07849 77.71)",
+          "oklch(49% 0.07849 77.71)",
+          "oklch(61% 0.07849 77.71)",
+          "oklch(72% 0.07849 77.71)",
+          "oklch(84% 0.07849 77.71)",
+          "oklch(95% 0.07849 77.71)"
+        ]
+      },
+      "current": {
+        "role": "secondary",
+        "displayName": "Current",
+        "tonalRamp": [
+          "oklch(15% 0.12377 156.16)",
+          "oklch(26% 0.12377 156.16)",
+          "oklch(38% 0.12377 156.16)",
+          "oklch(49% 0.12377 156.16)",
+          "oklch(61% 0.12377 156.16)",
+          "oklch(72% 0.12377 156.16)",
+          "oklch(84% 0.12377 156.16)",
+          "oklch(95% 0.12377 156.16)"
+        ]
+      },
+      "dark-rail": {
+        "role": "primary",
+        "displayName": "Dark Rail",
+        "tonalRamp": [
+          "oklch(15% 0.05944 306.74)",
+          "oklch(26% 0.05944 306.74)",
+          "oklch(38% 0.05944 306.74)",
+          "oklch(49% 0.05944 306.74)",
+          "oklch(61% 0.05944 306.74)",
+          "oklch(72% 0.05944 306.74)",
+          "oklch(84% 0.05944 306.74)",
+          "oklch(95% 0.05944 306.74)"
+        ]
+      },
+      "dark-ground": {
+        "role": "neutral",
+        "displayName": "Dark Ground",
+        "tonalRamp": [
+          "oklch(15% 0.04665 306.37)",
+          "oklch(26% 0.04665 306.37)",
+          "oklch(38% 0.04665 306.37)",
+          "oklch(49% 0.04665 306.37)",
+          "oklch(61% 0.04665 306.37)",
+          "oklch(72% 0.04665 306.37)",
+          "oklch(84% 0.04665 306.37)",
+          "oklch(95% 0.04665 306.37)"
+        ]
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "Dark Surface",
+        "tonalRamp": [
+          "oklch(15% 0.05167 308.98)",
+          "oklch(26% 0.05167 308.98)",
+          "oklch(38% 0.05167 308.98)",
+          "oklch(49% 0.05167 308.98)",
+          "oklch(61% 0.05167 308.98)",
+          "oklch(72% 0.05167 308.98)",
+          "oklch(84% 0.05167 308.98)",
+          "oklch(95% 0.05167 308.98)"
+        ]
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "Dark Ink",
+        "tonalRamp": [
+          "oklch(15% 0.02330 310.71)",
+          "oklch(26% 0.02330 310.71)",
+          "oklch(38% 0.02330 310.71)",
+          "oklch(49% 0.02330 310.71)",
+          "oklch(61% 0.02330 310.71)",
+          "oklch(72% 0.02330 310.71)",
+          "oklch(84% 0.02330 310.71)",
+          "oklch(95% 0.02330 310.71)"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Dark Muted",
+        "tonalRamp": [
+          "oklch(15% 0.03883 307.92)",
+          "oklch(26% 0.03883 307.92)",
+          "oklch(38% 0.03883 307.92)",
+          "oklch(49% 0.03883 307.92)",
+          "oklch(61% 0.03883 307.92)",
+          "oklch(72% 0.03883 307.92)",
+          "oklch(84% 0.03883 307.92)",
+          "oklch(95% 0.03883 307.92)"
+        ]
+      },
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "Dark Accent",
+        "tonalRamp": [
+          "oklch(15% 0.15669 302.51)",
+          "oklch(26% 0.15669 302.51)",
+          "oklch(38% 0.15669 302.51)",
+          "oklch(49% 0.15669 302.51)",
+          "oklch(61% 0.15669 302.51)",
+          "oklch(72% 0.15669 302.51)",
+          "oklch(84% 0.15669 302.51)",
+          "oklch(95% 0.15669 302.51)"
+        ]
+      },
+      "dark-accent-hover": {
+        "role": "primary",
+        "displayName": "Dark Accent Hover",
+        "tonalRamp": [
+          "oklch(15% 0.16977 302.03)",
+          "oklch(26% 0.16977 302.03)",
+          "oklch(38% 0.16977 302.03)",
+          "oklch(49% 0.16977 302.03)",
+          "oklch(61% 0.16977 302.03)",
+          "oklch(72% 0.16977 302.03)",
+          "oklch(84% 0.16977 302.03)",
+          "oklch(95% 0.16977 302.03)"
+        ]
+      },
+      "dark-line": {
+        "role": "neutral",
+        "displayName": "Dark Line",
+        "tonalRamp": [
+          "oklch(15% 0.05509 309.08)",
+          "oklch(26% 0.05509 309.08)",
+          "oklch(38% 0.05509 309.08)",
+          "oklch(49% 0.05509 309.08)",
+          "oklch(61% 0.05509 309.08)",
+          "oklch(72% 0.05509 309.08)",
+          "oklch(84% 0.05509 309.08)",
+          "oklch(95% 0.05509 309.08)"
+        ]
+      },
+      "dark-control": {
+        "role": "neutral",
+        "displayName": "Dark Control",
+        "tonalRamp": [
+          "oklch(15% 0.05918 310.28)",
+          "oklch(26% 0.05918 310.28)",
+          "oklch(38% 0.05918 310.28)",
+          "oklch(49% 0.05918 310.28)",
+          "oklch(61% 0.05918 310.28)",
+          "oklch(72% 0.05918 310.28)",
+          "oklch(84% 0.05918 310.28)",
+          "oklch(95% 0.05918 310.28)"
+        ]
+      },
+      "dark-green": {
+        "role": "secondary",
+        "displayName": "Dark Green",
+        "tonalRamp": [
+          "oklch(15% 0.14297 157.90)",
+          "oklch(26% 0.14297 157.90)",
+          "oklch(38% 0.14297 157.90)",
+          "oklch(49% 0.14297 157.90)",
+          "oklch(61% 0.14297 157.90)",
+          "oklch(72% 0.14297 157.90)",
+          "oklch(84% 0.14297 157.90)",
+          "oklch(95% 0.14297 157.90)"
+        ]
+      },
+      "dark-button-ink": {
+        "role": "neutral",
+        "displayName": "Dark Button Ink",
+        "tonalRamp": [
+          "oklch(15% 0.06244 306.70)",
+          "oklch(26% 0.06244 306.70)",
+          "oklch(38% 0.06244 306.70)",
+          "oklch(49% 0.06244 306.70)",
+          "oklch(61% 0.06244 306.70)",
+          "oklch(72% 0.06244 306.70)",
+          "oklch(84% 0.06244 306.70)",
+          "oklch(95% 0.06244 306.70)"
+        ]
+      },
+      "dark-error": {
+        "role": "secondary",
+        "displayName": "Dark Error",
+        "tonalRamp": [
+          "oklch(15% 0.12007 2.98)",
+          "oklch(26% 0.12007 2.98)",
+          "oklch(38% 0.12007 2.98)",
+          "oklch(49% 0.12007 2.98)",
+          "oklch(61% 0.12007 2.98)",
+          "oklch(72% 0.12007 2.98)",
+          "oklch(84% 0.12007 2.98)",
+          "oklch(95% 0.12007 2.98)"
+        ]
+      },
+      "dark-update-ground": {
+        "role": "secondary",
+        "displayName": "Dark Update Ground",
+        "tonalRamp": [
+          "oklch(15% 0.05253 79.49)",
+          "oklch(26% 0.05253 79.49)",
+          "oklch(38% 0.05253 79.49)",
+          "oklch(49% 0.05253 79.49)",
+          "oklch(61% 0.05253 79.49)",
+          "oklch(72% 0.05253 79.49)",
+          "oklch(84% 0.05253 79.49)",
+          "oklch(95% 0.05253 79.49)"
+        ]
+      },
+      "dark-update-ink": {
+        "role": "secondary",
+        "displayName": "Dark Update Ink",
+        "tonalRamp": [
+          "oklch(15% 0.09112 85.81)",
+          "oklch(26% 0.09112 85.81)",
+          "oklch(38% 0.09112 85.81)",
+          "oklch(49% 0.09112 85.81)",
+          "oklch(61% 0.09112 85.81)",
+          "oklch(72% 0.09112 85.81)",
+          "oklch(84% 0.09112 85.81)",
+          "oklch(95% 0.09112 85.81)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles only; bundled locally."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Panel headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Working content and primary controls; rem values use a fixed 16px root at every viewport width."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Compact actions and supporting labels."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "transfer-added",
+        "value": "transfer-added .35s ease-out",
+        "purpose": "New transfer row background moves from ground to transparent; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile-max",
+        "value": "768px"
+      },
+      {
+        "name": "intermediate-min",
+        "value": "769px"
+      },
+      {
+        "name": "intermediate-max",
+        "value": "1300px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action with the real hover, disabled and keyboard states.",
+      "html": "<button class=\"ds-primary\">Browse files</button>",
+      "css": ".ds-primary{font:1rem/1.45 Arial,Helvetica,sans-serif;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:0.444444rem;background:var(--accent,#7544b7);color:#fff;min-height:2.77778rem;padding:0.666667rem 1.22222rem;cursor:pointer}.ds-primary:hover{background:var(--accent-hover,#63339f)}.ds-primary:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-primary:disabled{opacity:.55;cursor:not-allowed}.ds-primary:disabled:hover{background:var(--accent,#7544b7)}:host-context([data-theme=dark]) .ds-primary{color:#251434}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet supporting action used for Cancel, Refresh and Reconnect.",
+      "html": "<button class=\"ds-secondary\">Cancel</button>",
+      "css": ".ds-secondary{font:1rem/1.45 Arial,Helvetica,sans-serif;font-size:0.888889rem;border:0.0555556rem solid var(--control,#cbcbe0);background:var(--surface,#fcfaff);color:var(--accent,#7544b7);border-radius:0.388889rem;padding:0.444444rem 0.777778rem;min-height:2.33333rem;cursor:pointer}.ds-secondary:hover{border-color:var(--accent,#7544b7);background:var(--ground,#ede7f6)}.ds-secondary:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-secondary:disabled{opacity:.55;cursor:not-allowed}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Underlined supplementary action for notes and breadcrumbs.",
+      "html": "<button class=\"ds-text\">What\u2019s new</button>",
+      "css": ".ds-text{font:1rem/1.45 Arial,Helvetica,sans-serif;font-size:0.888889rem;border:0;background:transparent;color:var(--accent,#7544b7);border-radius:0.388889rem;padding:0.222222rem 0;min-height:2.33333rem;text-decoration:underline;text-underline-offset:0.222222rem;cursor:pointer}.ds-text:hover{color:var(--accent-hover,#63339f)}.ds-text:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-text:disabled{color:var(--ink,#2d1447);text-decoration:none;cursor:not-allowed}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labeled search field with the shared keyboard focus.",
+      "html": "<label class=\"ds-label\">Find in this folder<input class=\"ds-input\" type=\"search\" placeholder=\"Search by filename\"></label>",
+      "css": ".ds-label{font:1rem/1.45 Arial,Helvetica,sans-serif;font-size:0.888889rem;color:var(--ink,#2d1447);display:block;max-width:30.5556rem}.ds-input{font:1rem/1.45 Arial,Helvetica,sans-serif;font-size:0.888889rem;display:block;width:100%;margin-top:0.333333rem;min-height:2.44444rem;padding:0.444444rem 0.666667rem;border:0.0555556rem solid var(--control,#cbcbe0);border-radius:0.333333rem;background:var(--surface,#fcfaff);color:var(--ink,#2d1447);caret-color:var(--accent,#7544b7)}.ds-input:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-input:disabled{opacity:.55;cursor:not-allowed}"
+    },
+    {
+      "name": "Selected navigation",
+      "kind": "nav",
+      "refersTo": "nav-current",
+      "description": "The solid purple current-page tab inside the dark rail.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Example navigation\"><a href=\"#overview\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v11h-6v-7H9v7H3Z\"/></svg><span>Overview</span></a></nav>",
+      "css": ".ds-nav{background:var(--rail,#37184a);padding:0.722222rem}.ds-nav a{font:1rem/1.45 Arial,Helvetica,sans-serif;display:flex;align-items:center;gap:1.55556rem;min-height:3.11111rem;padding:0.666667rem 1.22222rem;border-radius:0.666667rem;text-decoration:none;color:#fff;font-size:1.11111rem}.ds-nav a[aria-current=page]{background:#6c3b9d}.ds-nav a:hover{background:#62378d}.ds-nav a:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-nav svg{width:1.55556rem;height:1.55556rem;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
+    },
+    {
+      "name": "Working panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat content region with a thin lavender border.",
+      "html": "<section class=\"ds-panel\"><h2>Your library</h2><p>Browse and manage content on your PS5</p></section>",
+      "css": ".ds-panel{font:1rem/1.45 Arial,Helvetica,sans-serif;background:var(--surface,#fcfaff);color:var(--ink,#2d1447);border:0.0555556rem solid var(--line,#e0d6ef);border-radius:var(--radius,0.722222rem);padding:1rem 1.05556rem 1.22222rem}.ds-panel h2{font-size:1.38889rem;line-height:1.2;letter-spacing:-.025em;margin:0}.ds-panel p{font-size:1rem;color:var(--muted,#6c6f90);margin:0.166667rem 0 0}"
+    },
+    {
+      "name": "Upload target",
+      "kind": "custom",
+      "refersTo": "dropzone",
+      "description": "Dashed file target; use alongside the primary browse action.",
+      "html": "<button class=\"ds-drop\" type=\"button\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M14 2H5v20h14V7Z M14 2v6h5 M8 12h8 M8 16h8\"/></svg><strong>Drop files here</strong><span>or click to browse</span></button>",
+      "css": ".ds-drop{font:1rem/1.45 Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:7.88889rem;background:transparent;border:0.111111rem dashed #b3b5ce;border-radius:0.444444rem;padding:0.833333rem;color:var(--muted,#6c6f90);cursor:pointer}.ds-drop svg{width:2.11111rem;height:2.11111rem;margin-bottom:0.555556rem;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-drop strong{font-size:1.11111rem;color:var(--ink,#2d1447)}.ds-drop:hover,.ds-drop.ds-dragging{border-color:var(--accent,#7544b7);background:var(--ground,#ede7f6)}.ds-drop:focus-visible{outline:0.166667rem solid var(--focus,#a566ef);outline-offset:0.222222rem}.ds-drop:disabled{opacity:.55;cursor:not-allowed}@media(min-width:769px){.ds-drop{min-height:7rem}}"
+    },
+    {
+      "name": "Settings value row",
+      "kind": "custom",
+      "description": "Guided setting with a plain-language label, explanation and catalog or current runtime choices; installed cores need no first game or saved profile. Advanced adds the exact key. Controls stack beneath descriptions on mobile.",
+      "html": "<div class=\"ds-setting-row\"><div><label class=\"ds-setting-label\" for=\"ds-setting-value\">Console menu style</label><p class=\"ds-setting-description\" id=\"ds-setting-help\">Choose the menu you see on your PS5. This does not change the WebUI theme.</p></div><select id=\"ds-setting-value\" aria-describedby=\"ds-setting-help\"><option>XMB \u2014 horizontal menu</option><option>RGUI \u2014 compact text menu</option></select></div>",
+      "css": ".ds-setting-row{font:.944444rem/1.45 Arial,Helvetica,sans-serif;color:var(--ink,#2d1447);display:grid;grid-template-columns:minmax(0,1fr) minmax(12rem,28%);align-items:center;gap:1.5rem;padding:1.25rem 0;border-bottom:.0555556rem solid var(--line,#e0d6ef)}.ds-setting-label{font-weight:600;display:block}.ds-setting-description{font-size:.875rem;line-height:1.55;max-width:70ch;margin:.4rem 0 0;color:var(--muted,#6c6f90)}.ds-setting-row select{font:inherit;color:inherit;min-height:2.5rem;padding:.388889rem .833333rem;border:.0555556rem solid var(--control,#cbcbe0);border-radius:.333333rem;background:var(--surface,#fcfaff);min-width:0;width:100%}.ds-setting-row select:focus-visible{outline:.166667rem solid var(--focus,#a566ef);outline-offset:.222222rem}.ds-setting-row select:disabled{opacity:.55;cursor:not-allowed}@media(max-width:768px){.ds-setting-row{grid-template-columns:minmax(0,1fr);gap:.85rem;font-size:.833333rem}.ds-setting-row select{font-size:.875rem;min-height:2.75rem;padding:.5rem .75rem}}"
+    },
+    {
+      "name": "Settings mode and categories",
+      "kind": "nav",
+      "description": "Guided/Advanced mode buttons and wrapping category navigation with distinct selected states.",
+      "html": "<div class=\"ds-settings-mode\" role=\"group\" aria-label=\"Settings mode\"><button type=\"button\" aria-pressed=\"true\">Guided</button><button type=\"button\" aria-pressed=\"false\">Advanced</button></div><nav class=\"ds-settings-categories\" aria-label=\"Setting categories\"><button type=\"button\" aria-pressed=\"true\">Video</button><button type=\"button\" aria-pressed=\"false\">Audio</button><button type=\"button\" aria-pressed=\"false\">Input</button></nav>",
+      "css": ".ds-settings-mode{display:flex;width:fit-content;border:1px solid var(--control,#cbcbe0);border-radius:.45rem;padding:.2rem;gap:.2rem}.ds-settings-mode button,.ds-settings-categories button{font:.875rem/1.45 Arial,Helvetica,sans-serif;border:0;background:transparent;color:var(--ink,#2d1447);padding:.65rem 1rem;border-radius:.333333rem;min-height:2.75rem;cursor:pointer}.ds-settings-mode button[aria-pressed=true]{background:var(--accent,#7544b7);color:#fff}.ds-settings-categories{display:flex;flex-wrap:wrap;gap:.35rem;border-bottom:1px solid var(--line,#e0d6ef);padding-bottom:.75rem;margin-top:1.25rem}.ds-settings-categories button[aria-pressed=true]{color:var(--accent,#7544b7);background:var(--ground,#ede7f6);font-weight:700}.ds-settings-mode button:hover,.ds-settings-categories button:hover{background:var(--ground,#ede7f6);color:var(--ink,#2d1447)}.ds-settings-mode button:focus-visible,.ds-settings-categories button:focus-visible{outline:.166667rem solid var(--focus,#a566ef);outline-offset:.222222rem}:host-context([data-theme=dark]) .ds-settings-mode button[aria-pressed=true]{color:#251434}@media(max-width:768px){.ds-settings-mode button{min-width:6rem}.ds-settings-categories{gap:.2rem}.ds-settings-categories button{padding:.55rem .75rem}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Purple Console Workspace",
+    "overview": "An aubergine navigation rail frames a lavender workspace with near-white working surfaces. Purple controls, crisp sans-serif text and quiet corners carry the user-selected visual direction across content, transfers and settings.\n\nThe interface is an operational companion to RetroArch. Its personality comes from the purple palette, the selected navigation tab and the discreet Mihawk portrait; status, filenames and settings remain the main content. The bundled heading face and local assets keep the visual system available without external UI dependencies. A fixed type scale and a centered, width-capped main region keep the workspace compact on large monitors.",
+    "keyCharacteristics": [
+      "Aubergine navigation with a solid purple selected tab.",
+      "Lavender ground and lightly outlined working surfaces.",
+      "Condensed page headings above practical, readable controls.",
+      "Flat surfaces, visible keyboard focus and restrained status feedback."
+    ],
+    "rules": [
+      {
+        "name": "The Purple Action Rule",
+        "body": "Use the purple accent for actions and selection; reserve green and amber for actual status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Heading Contrast Rule",
+        "body": "Use the bundled condensed face for page titles and the body sans-serif for working content.",
+        "section": "typography"
+      },
+      {
+        "name": "The Stable Scale Rule",
+        "body": "Keep the root at 16px across viewport widths; use responsive layout changes rather than viewport-proportional type scaling.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Surface Rule",
+        "body": "Separate regions with tone, spacing and thin borders; the implemented interface has no shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the aubergine navigation, lavender ground and purple action hierarchy.",
+      "Do keep labels beside icons and status text beside status indicators.",
+      "Do use the local heading font, inline SVG icons and the discreet credited portrait.",
+      "Do retain visible keyboard focus and stable Cancel controls while progress changes.",
+      "Do stack working panels and keep release information visible on narrow screens.",
+      "Do keep settings scope, mode, search and save status explicitly labeled; show explanations in Guided and exact configuration keys in Advanced.",
+      "Do preserve the fixed root scale and center main content within its width cap on large monitors."
+    ],
+    "donts": [
+      "Don't present a failed release check or an unversioned development build as up to date.",
+      "Don't introduce external UI fonts, icon packages or framework dependencies into this offline interface.",
+      "Don't expand the credit portrait into a hero image or replace useful content with fabricated metrics.",
+      "Don't remove the reduced-motion override when extending transfer feedback."
+    ]
+  }
+}

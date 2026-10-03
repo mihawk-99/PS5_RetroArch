@@ -1,0 +1,24 @@
+{
+  "step": "webui-settings",
+  "must_contain": [
+    "console: GET global configuration returned 3232 settings",
+    "console: global edits and PPSSPP core options/RetroArch override accepted",
+    "console: stale revision rejected; core edit did not change global setting",
+    "console: running core profile remained unchanged until restart",
+    "[INFO] [Config] Appending override config: \"/app0/config/PPSSPP/PPSSPP.cfg\".",
+    "console: PPSSPP profile saved 1920x1088 after restart; pending .opt and .cfg consumed",
+    "console: later native core edit to 2880x1632 survived another restart",
+    "console: saved runtime global audio_volume=-17; fastforward_ratio=2.5",
+    "console: all three exits normal; WebUI port closed after each exit",
+    "console: original global config, PPSSPP 6x/x8 profile, core override and pending files restored",
+    "console: idle; temporary helper stopped",
+    "host: all five gates PASS; 93 tests",
+    "layout: fixed 16px root at 3440, 1920, 1366 and 390px viewports; no horizontal overflow",
+    "review: declared types, consumed pending edits, updated design contract and bounded width scored resolved; disposition ship"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "AddressSanitizer: stack-buffer-overflow"
+  ],
+  "human_check": "User screenshot identified excessive scaling. Revised desktop/laptop/ultrawide/mobile captures reviewed; original palette and layout retained."
+}

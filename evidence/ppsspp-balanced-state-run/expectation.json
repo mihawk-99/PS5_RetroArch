@@ -1,0 +1,13 @@
+{
+  "step": "ppsspp-balanced-state-run",
+  "note": "Balanced defaults mitigate this reproduction; explicitly retain the failing 10x/8x control.",
+  "must_contain": [
+    "balanced: PASS: 3 loads, 1 save, normal exit at 80s",
+    "10x-msaa8: REPRODUCED SIGSEGV at 0x50 after first state load",
+    "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s",
+    "10x-no-msaa: PASS: 3 loads, 1 save, normal exit at 80s",
+    "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s"
+  ],
+  "must_not_contain": [],
+  "human_check": "Captured screenshots inspected for the restored rendered scene. Other games, firmware 5.02 on the original reporter console, and long-run stability remain outside this test."
+}

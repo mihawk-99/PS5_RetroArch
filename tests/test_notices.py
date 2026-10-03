@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -93,6 +94,17 @@ class Notices(unittest.TestCase):
         readme = (self.title / "licenses/README.txt").read_text()
         self.assertIn("Non-commercial terms", readme)
         self.assertIn("Demo core", readme)
+
+    def test_default_title_lookup_ignores_release_zip(self):
+        self.run_stage()
+        dist = self.repo / "dist"
+        dist.mkdir()
+        self.title.rename(dist / "PPSA99169")
+        (dist / "PPSA99169.zip").write_bytes(b"release archive")
+        with patch.object(check, "__file__", str(self.repo / "tools/check-notices.py")):
+            self.assertEqual(check.main([]), 0)
+            (dist / "PPSA99170").mkdir()
+            self.assertEqual(check.main([]), 2)
 
     def test_a_core_that_is_not_its_build_report_is_refused(self):
         self.report(b"another build")

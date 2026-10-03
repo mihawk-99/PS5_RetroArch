@@ -1,0 +1,14 @@
+{
+  "step": "ppsspp-memory-recovery",
+  "must_contain": [
+    "balanced: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "10x-msaa8: PASS safety: first load recovered, second load closed content on device OOM; menu resumed and normal exit; no crash",
+    "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure"
+  ],
+  "must_not_contain": [
+    "\"crashed\": true",
+    "\"known\": 0"
+  ],
+  "human_check": "Balanced and 6x/8x final screenshots inspected: restored gameplay at about 59.94 fps and a 3840x2160 viewport. High-setting controlled shutdown is confirmed by logs, not a gameplay pass."
+}

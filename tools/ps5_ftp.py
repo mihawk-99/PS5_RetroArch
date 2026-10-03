@@ -31,9 +31,15 @@ def list_names(ftp, path):
 
 
 def ensure_directory(ftp, path):
+    # Collections contain thousands of small files. Validate each ancestor once
+    # per connection, not again for every texture/preset. File readback is unchanged.
+    if not hasattr(ftp, '_ps5_directories'):
+        ftp._ps5_directories = set()
     current = ""
     for component in path.strip("/").split("/"):
         current += f"/{component}"
+        if current in ftp._ps5_directories:
+            continue
         try:
             ftp.mkd(current)
         except error_perm as error:
@@ -44,6 +50,7 @@ def ensure_directory(ftp, path):
                 ftp.cwd(current)
             finally:
                 ftp.cwd(previous)
+        ftp._ps5_directories.add(current)
 
 
 def remove_if_present(ftp, path):

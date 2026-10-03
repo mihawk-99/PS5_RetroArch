@@ -1,226 +1,211 @@
-# PS5 RetroArch 🎮
+<div align="center">
 
-**Native RetroArch for jailbroken PlayStation 5 consoles, rendering through
-[PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan)'s port of Mesa's RADV
-Vulkan driver.**
+# RetroArch for PS5
 
-Maintained by [Mihawk](https://github.com/mihawk-99). Based on
-[RetroArch / libretro](https://github.com/libretro/RetroArch), with a native PS5
-application foundation derived from
-[ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight).
+**Your collection on the console. Your controls in the browser.**
 
-> [!IMPORTANT]
-> **Piracy is not condoned.** This project ships no games, no BIOS files, no
-> console firmware and no decryption keys, and never will. Use only **legally
-> obtained backups of games you own**, made yourself from your own discs,
-> cartridges or digital purchases, and BIOS or firmware files dumped from
-> **hardware you own**. Requests for, or links to, games, BIOS files, firmware
-> or keys are not welcome in this project's issues or discussions.
->
-> **PlayStation 3 (RPCS3) is not in any release.** RPCS3 is licensed
-> GPL-2.0-only and this port is GPL-3.0-or-later: the two cannot be distributed
-> together as one program. Its source is public, and **you must compile it
-> yourself from source** for your own console (see
-> [PlayStation 3 (RPCS3): build it yourself](#playstation-3-rpcs3-build-it-yourself)).
-> Do not share or redistribute the binaries you build.
+Native Vulkan rendering · Fifteen release cores · A local WebUI
 
-The title launches as a homebrew title, presents XMB through RetroArch's Vulkan
-video driver, and runs fifteen native libretro cores in its releases, six of
-them (PSP, GameCube/Wii, PlayStation 2, PlayStation, Nintendo 64 and Nintendo
-3DS) rendering on the PS5's GPU. A sixteenth, RPCS3 (PlayStation 3), is
-available only as source that you build yourself. Input, stereo audio,
-configuration persistence and content browsing have been verified on a
-console. This is an active development project; the tested paths below do not
-imply complete core compatibility or Vulkan conformance.
+[Download a release](https://github.com/mihawk-99/PS5_RetroArch/releases) · [Get started](#get-started) · [Supported systems](#supported-systems) · [Build from source](#build-from-source)
 
-**Latest release: v0.5.7-alpha.5** (a new 4K launcher background; otherwise
-v0.5.6-alpha.5) — see its
-[release notes](https://github.com/mihawk-99/PS5_RetroArch/releases/tag/v0.5.7-alpha.5)
-and [every release](https://github.com/mihawk-99/PS5_RetroArch/releases).
-v0.5.0-alpha.5 was the first release on RADV; v0.4.0-alpha.4 was the last on
-ps5vk, the project's first driver.
+</div>
 
-## Table of contents
+![RetroArch WebUI Overview with content uploads, library folders, recent transfers and quick settings](assets/readme/webui-overview.png)
 
-- [Current status](#current-status)
-- [Available cores](#available-cores)
-- [Graphics and native runtime](#graphics-and-native-runtime)
-- [Roadmap](#roadmap)
-- [Build from source](#build-from-source)
-- [Install and file locations](#install-and-file-locations)
-- [Testing and troubleshooting](#testing-and-troubleshooting)
-- [Documentation](#documentation)
-- [Authors and acknowledgements](#authors-and-acknowledgements)
-- [License and third-party terms](#license-and-third-party-terms)
+<p align="center"><strong>WebUI Overview</strong> · Open <code>http://&lt;PS5-IP&gt;:6769</code> while RetroArch is running.<br><sub>Replace &lt;PS5-IP&gt; with your console’s local address. Use a browser on the same network.</sub></p>
 
-## Current status
+A native RetroArch homebrew title for jailbroken PlayStation 5 consoles, made by
+[Mihawk](https://github.com/mihawk-99). Play through XMB on your TV, then upload
+content, browse your library and adjust settings from your phone or computer.
+The purple WebUI starts with RetroArch and closes with it.
 
-| Feature | Status |
+**v0.6.0-alpha.6** brings the WebUI, guided settings, offline video effects and
+recent stability fixes together. This is an alpha release; compatibility varies
+by core and workload. See the [release notes](https://github.com/mihawk-99/PS5_RetroArch/releases/tag/v0.6.0-alpha.6) for the tested scope.
+
+## Get started
+
+1. **Install the complete title folder.** Extract a release and copy its
+   `PPSA99169` folder to the location used by your homebrew launcher. The tested
+   location is `/data/homebrew/PPSA99169/`. A source build produces the same
+   folder in `dist/`. A compatible jailbreak and launcher must already be set up.
+2. **Open RetroArch.** It creates its writable folders and initial configuration.
+   Existing settings are preserved. XMB is the default menu; RGUI is also available.
+3. **Open the WebUI.** Visit `http://<PS5-IP>:6769` on the same network.
+   Choose a destination and drop your content into **Upload content**, or use FTP.
+4. **Load content on the console.** Select the matching core and your file.
+   Install any required BIOS files first, using the locations below.
+
+No games, BIOS files, firmware or decryption keys are included. Use your own
+legally obtained backups and system files dumped from hardware you own. Piracy
+is not condoned; requests for these files are not welcome in issues or discussions.
+
+## A browser companion, built in
+
+| Page | What you can do |
 | --- | --- |
-| Native title startup and Quit | ✅ Working, including splash dismissal and clean native exit |
-| Vulkan video output | ✅ Menu and software-core frames presented through RADV, Mesa's Vulkan driver, linked into the title (PS5_Vulkan's port, reporting Vulkan 1.4). ps5vk remains a build option |
-| XMB | ✅ Default menu, with icons, fonts and background rendering |
-| RGUI | ✅ Alternative menu |
-| Native controller input | ✅ Buttons, left-stick menu navigation and button/axis binding capture |
-| Native audio | ✅ `audio_ps5` stereo PCM output, audible channel test and buffering diagnostics |
-| Filesystem and configuration | ✅ Directory browsing, configuration loading/saving and FTP-writable application folders |
-| Core loading | ✅ Native shared-core loader, official `.info` discovery and recovery from rejected loads |
-| Content loading | ✅ Tested games and archives with the cores below. Load Content opens two roots: **INTERNAL**, the title's folder, and **EXTERNAL**, the console's `/mnt`, where USB drives and extended storage mount. The title's sandbox hides `/mnt` for now, so EXTERNAL is empty |
-| Colour and menu transitions | ✅ Corrected pixel uploads; Quick Menu/Close Content/next-game transitions I verified on the console |
-| Hardware-rendered cores | ✅ PPSSPP, Dolphin, LRPS2, Beetle PSX HW, Mupen64Plus-Next (ParaLLEl-RDP) and Azahar render on RADV through their Vulkan renderers, with JITs where they have them, at up to 18× internal resolution; PPSSPP's MSAA works |
-| Shader cache | ✅ RADV keeps compiled pipelines in `radv-shader-cache/`: a game's next start reads them back instead of compiling |
-| Save states and fast-forward | ✅ Save/load states (including `--entryslot`) and fast-forward, tested with PPSSPP and mGBA |
-| 120 Hz output | ✅ 120 Hz by default where the display offers it; the refresh is measured, and a display that stays at 60 Hz gets 60 Hz |
-| Stability | ✅ On RADV (v0.5.6-alpha.5): every core in the release with its game through boot, the menu opened and closed twice, Close Content and a reload, at full speed before and after, with no crash (Beetle Saturn without a BIOS, so up to its BIOS check); earlier releases also passed a 10-minute PPSSPP soak with 25 menu toggles |
-| CPU video fallback | ✅ `video_ps5` remains registered and selectable |
-| Development diagnostics | ✅ `retroarch.log`, startup/GPU trace, kernel captures and optional buffered frame timing |
+| **Overview** | Check release status, read what’s new, upload content and reach your library and quick settings. Development builds identify themselves honestly. |
+| **Content** | Browse folders, create subfolders, upload and download files. Uploads stream to storage, can be cancelled and never overwrite an existing filename. |
+| **Transfers** | Follow upload progress and results for this browser session. Downloads use your browser’s download manager. |
+| **Settings** | Edit global preferences or select a core profile. Guided categories explain each setting and offer supported choices; Advanced exposes technical keys and manual values. |
 
-The v0.5.6-alpha.5 checks recorded no crash and no kernel fatal signal, and
-full-speed audio once each game had booted. These results apply to the tested
-games, not every possible workload; the release notes list them, and
-[committed evidence](evidence/) holds earlier captures.
+Guides cover all **15 release cores**, even before their first launch. Global
+preferences cover Video, Audio, Input, Saving, System and Interface. Core
+categories follow each emulator’s options. Runtime-specific choices, including
+BIOS lists and arcade switches, appear when the core registers them.
 
-## Available cores
+**Save settings, then restart RetroArch to apply them.** Global preferences,
+core options and per-core RetroArch overrides are separate. Existing game or
+folder overrides can take precedence. Unsaved edits survive switching categories
+or Guided/Advanced mode. WebUI light/dark appearance changes immediately.
 
-The title build includes these cores and their official metadata. FCEUmm,
-mGBA, Snes9x, FBNeo, Genesis Plus GX, Beetle Saturn, VICE, MAME and DeSmuME
-**render emulated games in software**; RetroArch uploads their frames and presents
-them through Vulkan. PPSSPP, Dolphin, LRPS2, Beetle PSX HW, Mupen64Plus-Next and
-Azahar **render on the GPU** through RADV, with their Vulkan renderers.
+The interface, fonts and artwork are served locally; only release checking needs
+internet access. Updates are announced, not installed automatically. Uploads are
+limited to the content folder and 64 GiB per file. Available storage is not
+reported because the console API does not provide a measured value.
 
-Each core's PS5 defaults are its highest graphical settings that hold full speed
-in the games I tested: the most internal resolution the core offers, unless a
-lower one is the most that keeps full speed (DeSmuME).
+> The WebUI is a local HTTP service without a login. Use a trusted network and
+> do not forward port **6769** to the internet.
 
-| Core | Systems covered by the core | Console verification in this port |
+## Supported systems
+
+Release builds contain the following native cores. “GPU” means the emulator
+renders through Vulkan; “software” means RetroArch presents the core’s frames
+through Vulkan. These are supported systems, not a promise that every title works.
+
+| Systems | Core | Rendering |
 | --- | --- | --- |
-| [FCEUmm](https://github.com/libretro/libretro-fceumm) | NES / Famicom | ✅ Gameplay, audio and input; subsequent shared menu-transition fixes verified. [Evidence](evidence/native-core-loading/) |
-| [mGBA](https://github.com/libretro/mgba) | Game Boy, Game Boy Color, Game Boy Advance | ✅ GB/GBC/GBA loading, corrected colours and clean menu/next-game transitions. [Evidence](evidence/mgba-native/) |
-| [Snes9x](https://github.com/libretro/snes9x) | SNES / Super Famicom | ✅ Tested gameplay, colours, audio/input and menu transitions; not every special chip or video mode. [Evidence](evidence/snes9x-native/) |
-| [FinalBurn Neo](https://github.com/libretro/FBNeo) | Supported arcade boards, including Neo Geo and Sega System 16/32 | ✅ Tested arcade games using both native 32-bit and converted 16-bit output; not every board or ROM set. [Evidence](evidence/fbneo-native/) |
-| [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | Mega Drive / Genesis, Master System, Game Gear, SG-1000, Sega CD | ✅ Genesis gameplay and clean transitions, which I confirmed on the console. Other Sega systems and disc/BIOS paths still need separate acceptance. [Evidence](evidence/genesis-plus-gx-native/) |
-| [PPSSPP](https://github.com/hrydgard/ppsspp) v1.20.4 | PlayStation Portable | ✅ Tested games at 10× internal resolution (4800×2720), 16× anisotropy: correct picture, full speed at 120 Hz, save states, fast-forward, and closing and reopening games. MSAA renders on RADV (it needs render pass 2, which ps5vk lacked). |
-| [Dolphin](https://github.com/libretro/dolphin) 2609 | GameCube, Wii | ✅ GameCube and Wii games tested for up to an hour of play, with the JIT and fast memory, save states and closing and reopening games. One tested game still slows to about 76–85% at some transitions (see the release notes). |
-| [LRPS2](https://github.com/libretro/LRPS2) (PCSX2) | PlayStation 2 | ✅ Tested games at 6× internal resolution on the Vulkan hardware renderer, full speed, with multi-threaded VU1 and save states. Needs your own BIOS in `system/pcsx2/bios/`. |
-| [Beetle PSX HW](https://github.com/libretro/beetle-psx-libretro) | PlayStation | ✅ 16× internal resolution on the Vulkan renderer, 32-bit colour, PGXP (no wobbling polygons), full speed, and closing and reopening the game. The disc image is read into memory at load. It runs with its built-in OpenBIOS; your own BIOS (`scph5501.bin` and the others its metadata lists) in `system/` is used when present. |
-| [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | Nintendo 64 | ✅ ParaLLEl-RDP at 4× upscaling (the default since v0.5.6-alpha.5; 8× stays an option) and ParaLLEl-RSP, both JITs on: 59.9 fps with clean audio in the tested game, and closing and reopening it. A new upscaling factor takes effect when the game is started again (Close Content, then load it). |
-| [Beetle Saturn](https://github.com/libretro/beetle-saturn-libretro) | Sega Saturn | ⚠️ Loads, then needs your own BIOS in `system/`: `mpr-17933.bin` (US/EU) or `sega_101.bin` (JP). Without it the game refuses to load and the menu stays usable. Gameplay not yet tested. |
-| [VICE](https://github.com/libretro/vice-libretro) x64sc | Commodore 64 | ✅ A `.d64` disk game at full speed, and closing and reopening it. |
-| [MAME](https://github.com/libretro/mame) 0.289 | Arcade | ✅ A tested game from a 0.289 non-merged set, BIOS in the same folder: full speed, and closing and reopening it. Raster games render at their native size and are scaled on the GPU. Vector games are drawn at 4K by MAME's alternate renderer (not yet tested on the console). Sets must match 0.289. |
-| [DeSmuME](https://github.com/libretro/desmume) | Nintendo DS | ✅ 5× (1280×960) with the JIT and eight rasterizer threads, full speed, and closing and reopening the game. 6× measured 93–95%. |
-| [Azahar](https://github.com/azahar-emu/azahar) | Nintendo 3DS | ✅ 18× internal resolution (the most Azahar offers) on Vulkan, with asynchronous shader compilation and the JIT, full speed after boot, and closing and reopening the game. Decrypted games only. |
-| [RPCS3](https://github.com/mihawk-99/PS5_RPCS3) (my fork) | PlayStation 3 | ⚠️ **Not in any release: build it yourself from source** ([how](#playstation-3-rpcs3-build-it-yourself); its licence, see [License and third-party terms](#license-and-third-party-terms)). On my console build: 4K at 60 fps in gameplay in one tested game, and 4K held at 30 fps in another (a game with only an "Unlock FPS" patch runs it with RPCS3's frame limit at 30 by default, the "Frame-rate patches" option), steady where the emulation keeps up, with its busiest scenes still at 24–27 fps. Needs your own PS3 system software (`PS3UPDAT.PUP` in `system/RPCS3/`) and your own games; a PSN purchase installs with its `.rap` licence file. |
+| NES / Famicom | FCEUmm | Software |
+| Game Boy / Game Boy Color / Game Boy Advance | mGBA | Software |
+| SNES / Super Famicom | Snes9x | Software |
+| Arcade, including Neo Geo and Sega System 16/32 | FinalBurn Neo | Software |
+| Mega Drive / Genesis, Master System, Game Gear, SG-1000, Sega CD | Genesis Plus GX | Software |
+| PlayStation Portable | PPSSPP | GPU |
+| GameCube / Wii | Dolphin | GPU |
+| PlayStation 2 | LRPS2 | GPU |
+| PlayStation | Beetle PSX HW | GPU |
+| Nintendo 64 | Mupen64Plus-Next | GPU |
+| Sega Saturn | Beetle Saturn | Software |
+| Commodore 64 | VICE x64sc | Software |
+| Arcade | MAME | Software |
+| Nintendo DS | DeSmuME | Software |
+| Nintendo 3DS | Azahar | GPU |
 
-None of the games I tested with is provided.
-**Use only legally obtained backups of games you own**, and BIOS files dumped
-from your own hardware: piracy is not condoned.
+Use matching arcade sets: MAME currently targets **0.289**, and FBNeo requires
+sets compatible with its pinned version. Azahar requires decrypted content.
+Core binaries must be built for this native SDK and loader; desktop cores or
+cores from another PS5 distribution are not interchangeable.
 
-Use **FBNeo for Sega System 16/32 arcade sets**, rather than Genesis Plus GX.
-FBNeo needs compatible arcade sets and receives its ZIP/7z archives intact.
-Archive support and BIOS requirements vary by core.
+RPCS3 is **source-only and excluded from every release**. Its separate build
+instructions and distribution restrictions are below. It is also excluded from
+the WebUI’s guided core catalogs.
 
-Core binaries must be built for **this native pipeline and SDK**. A desktop `.so`
-or a core from a different PS5 RetroArch distribution is not automatically
-compatible. No games or BIOS files are bundled.
+## Balanced graphics for a 4K display
 
-## Graphics and native runtime
+RetroArch presents at the display resolution. Internal rendering is chosen to
+leave room for emulation and memory use; it need not reach native 4K. Saved
+core, folder and game options take priority over these compiled defaults.
 
-```text
-Software core → video callback → RetroArch Vulkan video driver
-                                → RADV, linked into the title → PS5 display
-XMB / RGUI ──────────────────────┘
-Hardware cores (PPSSPP, Dolphin, LRPS2, Beetle PSX HW,
-Mupen64Plus-Next, Azahar) → Vulkan through RetroArch's HW context → RADV
-```
+| Core | Default internal resolution | Anti-aliasing |
+| --- | --- | --- |
+| PPSSPP | 6× · 2880 × 1632 | 8× MSAA |
+| Dolphin | 4× | No MSAA |
+| LRPS2 | 4× · approximately 1440p | Core default |
+| Beetle PSX HW | 8× | MSAA off |
+| Mupen64Plus-Next | 4× | Core default |
+| Azahar | 6× · 2400 × 1440 top screen | Core default |
+| DeSmuME | 4× · 1024 × 768 per screen | Core default |
 
-[PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan), which I also maintain,
-is the separate GPU-driver project used here. Since v0.5.0-alpha.5 the title
-links its port of RADV: Mesa's Vulkan driver and ACO compiler, unchanged but
-where the console differs, over a PS5 winsys, built from my Mesa fork
-[PS5_Mesa](https://github.com/mihawk-99/PS5_Mesa); v0.5.6-alpha.5 links its
-revision `0b2d6d1`. It reports Vulkan 1.4, and its conformance is that
-project's milestone: the full Khronos CTS runs on the console, and its second
-full run ended with no failure. Up to v0.4.0-alpha.4 the title linked ps5vk, the project's first
-driver, which `PS5_VULKAN_DRIVER=ps5vk` still builds.
+Other cores retain native rendering, scaled for the display. MAME uses a 4K
+target for vector output; that path still needs console acceptance.
 
-The driver is **linked into the title**. Updating a driver checkout does not
-update the linked code: rebuild and redeploy the RetroArch title against the
-intended driver artifacts. A `libvulkan.so.1` left in the title folder by an
-earlier release is ps5vk's and is not used.
+PPSSPP’s **6× / 8× MSAA** default passed the recorded save/load checks. At
+10× / 8× MSAA, the tested workload exhausted device memory. Failed framebuffer
+allocations are now cleaned up and retried once; an unrecoverable failure returns
+to the menu instead of using a missing image. This improves recovery, not the
+amount of memory available. Disabling MSAA leaves more headroom.
 
-This repository supplies the frontend/platform integration, native audio and
-input backends, core loader, build scripts and console validation. Core-side
-pixel adapters preserve the renderer's buffers while matching the frontend's
-upload format. The CPU video backend remains available as a fallback; the
-current default is `video_driver = "vulkan"`, `menu_driver = "xmb"`.
+To adopt these defaults on an existing installation, change the listed options
+in the WebUI or **Quick Menu → Core Options**. Reset Core Options resets every
+option for that core, so use individual controls if you want to keep other choices.
 
-PPSSPP's JIT runs: its code memory is mapped read-write and then made
-executable, and its fast-memory fault handler reads the console's own signal
-context layout. The port builds PPSSPP v1.20.4 with one patch
-(`patches/ppsspp/ps5-port.patch`) and FFmpeg 3.0.2 for game videos. It starts
-with the settings I test with (10× internal resolution, 16× anisotropy, auto
-max-quality filtering, hardware transform, software skinning, no frameskip, no
-speed hacks); an existing `PPSSPP.opt` is set aside once as
-`PPSSPP.opt.before-ps5-profile`. The native loader has explicit limits, including
-no TLS or general exception-unwind registration, and it waits for a core's
-threads to finish before unmapping the core.
+## Shaders, filters and bezels
 
-## Roadmap
+Release builds bundle offline Slang shaders, Mega Bezel, koko-aio and
+standard overlays. Load GPU presets through **Quick Menu → Shaders**, choose a
+CPU filter in **Settings → Video**, or choose artwork in **Settings → On-Screen
+Display → On-Screen Overlay**. CPU filters apply to software-rendered cores;
+hardware-rendered cores use GPU shaders.
 
-**✅ = verified for the stated scope. ❌ = pending implementation or acceptance
-in this port, even if upstream RetroArch already offers the feature.**
+The package retains the upstream collections and their notices. Exact versions,
+path corrections and the five upstream file exclusions are recorded in
+`video-assets.json`. Development overlay fixtures are excluded from both the
+staged title and its ZIP. Representative presets and overlay layouts have been tested on PS5. Bundling
+does not imply every preset is verified; see the release notes for limitations.
 
-### Frontend and platform
+## Your files
 
-- ✅ Native startup and clean exit.
-- ✅ GPU presentation through PS5_Vulkan; selectable CPU fallback.
-- ✅ XMB, with RGUI retained.
-- ✅ Native input, analog menu navigation and remapping.
-- ✅ Native stereo audio and buffering diagnostics.
-- ✅ Filesystem browsing, configuration persistence and content loading.
-- ✅ Native core loading, metadata and failed-load recovery.
-- ❌ Save RAM and save-state persistence verified across restarts and core changes.
-- ❌ Core-option persistence and per-game/per-core overrides fully validated.
-- ❌ BIOS/system-file coverage, disc swapping and multi-disc acceptance tests.
-- ❌ RetroAchievements and netplay; networking is disabled in the current frontend build.
-- ❌ User Slang shader presets and multipass effects validated on PS5_Vulkan.
-- ✅ 120 Hz output where the display offers it, with a 60 Hz fallback chosen by measuring the refresh.
-- ❌ No core losing speed while a shader compiles. On RADV (Alpha 5), PPSSPP's compiles on its own threads no longer cost it speed, and a game's second start reads its pipelines from the cache; Dolphin's first start of a game still compiles its ubershaders at a cost (see the release notes).
-- ✅ Save states and fast-forward, including PPSSPP.
-- ❌ 4K output/upscaling, VRR and HDR validated in this application.
-- ❌ Low-latency features, runahead and sustained per-core performance measurements.
-- ❌ Broader compatibility testing and release qualification.
+`/app0` is the running title’s mount. Over FTP, use your installed title folder,
+usually `/data/homebrew/PPSA99169/`.
 
-### Cores
-
-| Status | Core / milestone |
+| Folder or file | Purpose |
 | --- | --- |
-| ✅ | FCEUmm — NES |
-| ✅ | mGBA — GB / GBC / GBA |
-| ✅ | Snes9x — SNES |
-| ✅ | FBNeo — tested arcade games |
-| ✅ | Genesis Plus GX — tested Genesis gameplay |
-| ❌ | Beetle PCE — PC Engine / TurboGrafx-16, SuperGrafx and CD; next proposed addition |
-| ❌ | Stella — Atari 2600; candidate |
-| ❌ | PicoDrive — add Sega 32X coverage; candidate |
-| ✅ | MAME 0.289 — arcade; tested games only |
-| ✅ | Beetle PSX HW — PlayStation, Vulkan renderer at 16× |
-| ✅ | Mupen64Plus-Next — Nintendo 64, ParaLLEl-RDP at 4× (8× selectable) |
-| 🚧 | Beetle Saturn — Sega Saturn; needs a gameplay test with a BIOS |
-| ✅ | VICE x64sc — Commodore 64 |
-| ✅ | DeSmuME — Nintendo DS at 5× |
-| ✅ | Azahar — Nintendo 3DS, Vulkan at 18× |
-| ❌ | EXTERNAL storage (USB, extended storage) readable from inside the title's sandbox |
-| ✅ | PPSSPP — PSP, Vulkan rendering and JIT; tested games only |
-| ✅ | PPSSPP MSAA — render pass 2 and depth/stencil resolve, on RADV |
-| ✅ | Dolphin — GameCube and Wii, Vulkan rendering and JIT; tested games, long play and the enhancement profiles |
-| ✅ | LRPS2 — PlayStation 2, Vulkan hardware renderer at 4K; tested games only |
-| 🚧 | LRPS2 — upstream PCSX2's newer renderer fixes, 8× internal resolution and texture replacement |
-| 🚧 | RPCS3 — PlayStation 3 at 4K; source only, never in a release (build it yourself); the busiest scenes of a 30 fps game still below 30 |
+| `content/` | Your content; available to WebUI uploads and downloads |
+| `content/Saturn/` | Saturn disc images; created automatically |
+| `system/` | General BIOS and system data |
+| `system/Saturn/` | Saturn BIOS files; created automatically |
+| `system/pcsx2/bios/` | PlayStation 2 BIOS |
+| `system/fbneo/` | FinalBurn Neo system files |
+| `cores/` and `info/` | Native cores and their metadata |
+| `config/retroarch.cfg` | Live RetroArch configuration |
+| `config/webui.cfg` | Saved global WebUI preferences |
+| `config/<core>/` | Core options and RetroArch overrides |
+| `savefiles/` and `savestates/` | Save RAM and save states |
+| `shaders/shaders_slang/` | GPU presets, including Mega Bezel and koko-aio |
+| `filters/` | Built-in CPU filter configurations |
+| `overlays/` | Standard overlay artwork and configurations |
+| `radv-shader-cache/` | Reusable compiled graphics pipelines |
 
-Future entries are development targets, not a promised release order. Hardware
-rendering introduces new Vulkan requirements beyond presenting software frames;
-PPSSPP was the first core to exercise them, and six cores do now.
+**Saturn setup:** place `mpr-17933.bin` (US/Europe) or `sega_101.bin` (Japan)
+in `system/Saturn/`. Keep a disc’s `.cue` and all referenced tracks together,
+then load the `.cue`. The default system path is routed to the Saturn folder;
+an explicitly selected custom system directory remains unchanged.
+
+Genesis Plus GX’s Sega CD BIOS files and Beetle PSX HW’s optional BIOS files
+belong in the general system folder, with the filenames listed by their metadata.
+BIOS uploads use FTP; the WebUI only exposes `content/`.
+
+Ordinary scripted updates preserve content and saved settings. Back up your
+files before replacing or removing a title. The file browser has **INTERNAL**
+for the title folder and **EXTERNAL** for `/mnt`; the current title sandbox hides
+external mounts, so EXTERNAL may be empty.
+
+## What has been verified
+
+Saturn now loads its BIOS from `system/Saturn/`. Console testing reached
+controlled gameplay with clean rendering and a normal exit. The fixes cover
+executable memory for its JITs and ownership of cropped video frames. This is
+a short gameplay check, not a full compatibility or long-session guarantee.
+
+Native startup and exit, Vulkan presentation, controller input, stereo audio,
+configuration persistence and representative core loading have console evidence.
+Save-state and memory-pressure results cover the recorded workloads, not every
+core or firmware. Controller rumble uses synthesized DualSense haptics with an
+ordinary-rumble fallback; physical feel still awaits owner confirmation.
+
+The title uses [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan)’s RADV port.
+CPU and GPU allocations share the console’s direct-memory pool; each core does
+not receive a separate 11.65 GiB allowance. A selectable CPU video backend remains
+available. RetroAchievements and netplay remain disabled. Broader BIOS, disc
+swapping, shader-preset and long-session coverage is still in progress.
+
+[Recorded evidence](evidence/) accompanies verified changes. For a bug report,
+include the core, file format, settings and reproduction steps. Preserve
+`retroarch.log` and `trace.txt` **before reopening RetroArch**: the frontend log
+is replaced on each launch. Remove private paths, addresses and credentials
+before sharing captures.
+
+---
 
 ## Build from source
 
@@ -331,83 +316,10 @@ update page) in `system/RPCS3/`, where it installs on the first start, and
 your own games: a disc you own, dumped yourself, or a PSN purchase with its
 `.rap` licence file. Piracy is not condoned.
 
-## Install and file locations
 
-The verified deployment is a **homebrew title folder**, not a retail package.
-Copy the complete `dist/PPSA99169/` tree to the title location used by your
-configured homebrew launcher. The current validation setup uses
-`/data/homebrew/PPSA99169/`. This project does not install a jailbreak or launcher.
+<details>
+<summary><strong>Authors and acknowledgements</strong></summary>
 
-`/app0` is the running application's mount point. Over FTP, use the corresponding
-title folder instead:
-
-| Purpose | Under `/data/homebrew/PPSA99169/` | In RetroArch |
-| --- | --- | --- |
-| Native cores | `cores/` | `/app0/cores/` |
-| Core metadata | `info/`, with compatibility copies in `cores/` | `/app0/info/` |
-| Games | `content/` | `/app0/content/` |
-| BIOS/system data | `system/` | `/app0/system/` |
-| PS2 BIOS (your own dump) | `system/pcsx2/bios/` | `/app0/system/pcsx2/bios/` |
-| PS3 system software, RPCS3's drives (your own build only) | `system/RPCS3/` | `/app0/system/RPCS3/` |
-| Live configuration | `config/retroarch.cfg` | `/app0/config/retroarch.cfg` |
-| Save RAM | `savefiles/` | `/app0/savefiles/` |
-| Save states | `savestates/` | `/app0/savestates/` |
-| RADV shader cache | `radv-shader-cache/` | `/app0/radv-shader-cache/` |
-
-RADV creates `radv-shader-cache/` itself, open to FTP like the other folders;
-deleting it only makes the next start compile again. `ps5vk-shader-cache/` and
-`sce_module/libvulkan.so.1`, left by releases up to v0.4.0-alpha.4, are not used
-since v0.5.0-alpha.5 and can be deleted.
-
-Everything you put in `content/` and `system/` must be **your own legally
-obtained backups**: games you own, and BIOS or firmware dumped from hardware you
-own. Piracy is not condoned.
-
-For FBNeo, use `system/fbneo/` for its system files. Genesis Plus GX's Sega CD BIOS
-filenames belong in the configured `system/` root, as listed by its metadata.
-
-The application creates its managed writable folders and seeds live settings
-only when no live configuration exists. Ordinary scripted updates preserve user
-content and saved settings. Existing settings can therefore keep RGUI selected
-even though XMB is the packaged default. Back up user files before any clean
-removal; `--clean` removes the entire title folder.
-
-`tools/deploy-title.py` publishes a built `dist/PPSA99169/` over FTP and reads
-every file back; console details belong in the ignored `.env`, based on
-`.env.example`.
-
-## Testing and troubleshooting
-
-A successful build proves neither gameplay nor correct rendering. Core acceptance
-includes native loading, gameplay, colour checks, audio/input, Quick Menu →
-Close Content, and loading another game. I record my own visual confirmation on
-the console alongside the logs; a camera can miss refresh-synchronous flicker.
-
-Before each release every core in it runs its game on the console: boot, the
-menu opened and closed twice, Close Content and a reload, with its frame rate,
-audio and a screenshot checked before and after. The release notes give the
-results; they are the tested games, not a core's upstream feature list.
-
-For reports, include the core, game-file format, relevant settings, reproduction
-steps and whether the application was closed manually. Preserve `retroarch.log`
-and `trace.txt` before reopening: the frontend log is replaced on a new launch.
-The test tools retain kernel captures in ignored `klog/`. Redact private paths,
-console addresses and credentials before sharing logs.
-
-Old `gpu-buffers-*.bin`, `gpu-stages-*.bin` and `gpu-tables-*.bin` files are temporary
-rendering diagnostics from earlier investigations. They are not required runtime
-assets and can be removed. Keep the normal development logs when reporting bugs.
-
-## Documentation
-
-Each release's notes on the
-[Releases page](https://github.com/mihawk-99/PS5_RetroArch/releases) are the
-public record of what changed, what was tested and what is known not to work.
-The committed [evidence](evidence/) holds machine-readable captures and their
-expected results. My design notes, logs and procedures are kept locally and are
-not published.
-
-## Authors and acknowledgements
 
 This port builds on substantial upstream and PS5 homebrew work. Credits below
 identify project authors and teams; their repositories retain the full contributor
@@ -449,6 +361,9 @@ lists and original notices.
 | [Azahar](https://github.com/azahar-emu/azahar), [Dynarmic](https://github.com/azahar-emu/dynarmic) | Azahar contributors, building on Citra; Dynarmic by merryhime and contributors |
 | [RPCS3](https://github.com/RPCS3/rpcs3) | RPCS3 Team and contributors |
 | [libretro core-info](https://github.com/libretro/libretro-core-info) | Metadata maintainers and contributors |
+
+
+</details>
 
 ## License and third-party terms
 
@@ -497,3 +412,5 @@ and PS5 are Sony trademarks. Vulkan is a registered trademark of the Khronos Gro
 Inc.; the RADV port this title uses is not a Khronos-conformant product (see
 [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan)). RetroArch is the libretro
 project's name and logo, used here to name the frontend this port is built from.
+
+<p align="center">made by <a href="https://github.com/mihawk-99">Mihawk</a> · Built on the work of the RetroArch, libretro and PS5 homebrew communities.</p>

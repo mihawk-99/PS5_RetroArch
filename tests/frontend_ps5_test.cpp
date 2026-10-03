@@ -99,8 +99,8 @@ int main(int argc, char **argv)
     std::filesystem::create_directories(fixture + "/app0/content");
     assert(__real_chmod((fixture + "/app0/content").c_str(), 0775) == 0);
     frontend_ctx_ps5.init(nullptr);
-    for (const char *name :
-         {"config", "cores", "content", "system", "savefiles", "savestates", "playlists"})
+    for (const char *name : {"config", "cores", "content", "system", "savefiles", "savestates",
+                             "playlists", "content/Saturn", "system/Saturn"})
     {
         struct stat metadata{};
         assert(__real_stat((fixture + "/app0/" + name).c_str(), &metadata) == 0);
@@ -116,6 +116,12 @@ int main(int argc, char **argv)
     frontend_ctx_ps5.init(nullptr);
     assert(read(fixture + "/app0/config/retroarch.cfg") == "user settings\n");
     assert(!std::filesystem::exists(fixture + "/app0/config/retroarch.cfg.tmp"));
+    assert(std::string(ps5_core_system_directory("Beetle Saturn", "/app0/system")) ==
+           "/app0/system/Saturn");
+    assert(std::string(ps5_core_system_directory("Beetle Saturn", "/mnt/usb0/bios")) ==
+           "/mnt/usb0/bios");
+    assert(std::string(ps5_core_system_directory("PPSSPP", "/app0/system")) == "/app0/system");
+    assert(ps5_core_system_directory(nullptr, nullptr) == nullptr);
     // A non-null environment callback prevents task_content's menu fallback from
     // rebuilding the title's startup argv. It must leave these arguments intact.
     int count = argc;

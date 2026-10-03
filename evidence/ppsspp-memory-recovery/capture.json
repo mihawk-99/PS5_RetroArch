@@ -1,0 +1,650 @@
+{
+  "step": "ppsspp-memory-recovery",
+  "build_identity": "8b635e9bb096b97155989f58509cf2bc21e5e73b77f494bf42afccd74725a28e",
+  "sdk_revision": "f674976f48a8c319abd5646079eca284fde790fd",
+  "core_sha256": "b8895534991d734e06fcd7b6d848456be8f6a835e2a9097541c1a9b007afaa00",
+  "command": "PYTHONPATH=tools python3 klog/memory-priorities/console-test.py <profile>",
+  "raw_capture": "klog/memory-priorities/results.txt",
+  "host_checks": {
+    "gates": [
+      "format",
+      "unit",
+      "build",
+      "integration",
+      "evidence"
+    ],
+    "retroarch_tests": 87,
+    "sdk_checks": 318,
+    "injected_gpu_failures": 108,
+    "memory_policy": [
+      "headroom",
+      "fragmentation",
+      "oversized request",
+      "unknown query",
+      "500ms cache"
+    ],
+    "kernel_probe": "Occupied direct-memory span returns 0x8002000c; scanner treats this as an empty branch.",
+    "gate_log_sha256": "07228902a6b75ca8b987825bff35730cd9f7cb4757dc3b4ce83554d89921c562",
+    "sdk_log_sha256": "cbb928a9801381d7ff6843c0b5ff679bad714abdcf1434d1f1c8887601ac9bd3"
+  },
+  "outcomes": [
+    "balanced: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "10x-msaa8: PASS safety: first load recovered, second load closed content on device OOM; menu resumed and normal exit; no crash",
+    "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure"
+  ],
+  "lines": [
+    "balanced: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "10x-msaa8: PASS safety: first load recovered, second load closed content on device OOM; menu resumed and normal exit; no crash",
+    "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+    "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure"
+  ],
+  "runs": [
+    {
+      "folder": "klog/memory-priorities/20261002-082151-balanced",
+      "build": [
+        "8b635e9bb096b97155989f58509cf2bc21e5e73b77f494bf42afccd74725a28e"
+      ],
+      "memory": [
+        {
+          "event": "startup",
+          "result": 0,
+          "request": 0,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 12845056000,
+          "largest": 12845056000,
+          "ranges": 1,
+          "flexible": 419430400,
+          "cpu_heap": 33554432,
+          "gpu": 0,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 11509006336,
+          "largest": 11464933376,
+          "ranges": 43,
+          "flexible": 315621376,
+          "cpu_heap": 335675392,
+          "gpu": 644300800,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 11475451904,
+          "largest": 11464933376,
+          "ranges": 43,
+          "flexible": 315621376,
+          "cpu_heap": 369229824,
+          "gpu": 644300800,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837901312,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 311427072,
+          "cpu_heap": 369229824,
+          "gpu": 1281851392,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837901312,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 311427072,
+          "cpu_heap": 369229824,
+          "gpu": 1281851392,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837884928,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 311427072,
+          "cpu_heap": 369229824,
+          "gpu": 1281867776,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837884928,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 311427072,
+          "cpu_heap": 369229824,
+          "gpu": 1281867776,
+          "gpu_known": 1
+        }
+      ],
+      "load_actions": 3,
+      "save_actions": 1,
+      "ignored_state_actions": 0,
+      "menu_resumed": false,
+      "crashed": false,
+      "shutdown_message": false,
+      "normal_exit": true,
+      "marks": [
+        "input: pad script MARK at 10.008 s: frames=601 worst_ms=30.6 over_40ms=0",
+        "input: pad script MARK at 25.014 s: frames=1498 worst_ms=89.3 over_40ms=1",
+        "input: pad script MARK at 45.009 s: frames=2695 worst_ms=71.0 over_40ms=2",
+        "input: pad script MARK at 75.014 s: frames=4493 worst_ms=49.7 over_40ms=3"
+      ],
+      "sha256": {
+        "trace.txt": "7eeedbbf07aa8166266ed4c3228fb3b06550f45a15639a961af23f23552a5a4d",
+        "retroarch.log": "00921a5a68b45504cd107f2b4e3b17ed9e96ec223ca8c949340ddc7bbf6fc61a",
+        "kernel.log": "69e14bea6f502de7a81d0b44d29bafd69c77e6490d87be9edee5d7e69472bebf"
+      },
+      "profile": "balanced",
+      "outcome": "balanced: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+      "screenshot_sha256": {
+        "ppsspp-memory-test-20261002__balanced-final.png": "3c2ab31296959c3c667d95a1f1ffdbf4644355b03f5b474356b38dbe3052eeda"
+      }
+    },
+    {
+      "folder": "klog/memory-priorities/20261002-082358-10x-msaa8",
+      "build": [
+        "8b635e9bb096b97155989f58509cf2bc21e5e73b77f494bf42afccd74725a28e"
+      ],
+      "memory": [
+        {
+          "event": "startup",
+          "result": 0,
+          "request": 0,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 12845056000,
+          "largest": 12845056000,
+          "ranges": 1,
+          "flexible": 419430400,
+          "cpu_heap": 33554432,
+          "gpu": 0,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 6891995136,
+          "largest": 4140875776,
+          "ranges": 49,
+          "flexible": 303038464,
+          "cpu_heap": 335675392,
+          "gpu": 5261312000,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 6858440704,
+          "largest": 4140875776,
+          "ranges": 49,
+          "flexible": 303038464,
+          "cpu_heap": 369229824,
+          "gpu": 5261312000,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-framebuffer-failed",
+          "result": -2,
+          "request": 940032000,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 1135853568,
+          "largest": 1041285120,
+          "ranges": 66,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 11025907712,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-framebuffer-failed",
+          "result": -2,
+          "request": 940032000,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 150421504,
+          "largest": 82886656,
+          "ranges": 67,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 12011339776,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 3018981376,
+          "largest": 1010827264,
+          "ranges": 66,
+          "flexible": 303038464,
+          "cpu_heap": 369229824,
+          "gpu": 9100771328,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 3018981376,
+          "largest": 1010827264,
+          "ranges": 66,
+          "flexible": 303038464,
+          "cpu_heap": 369229824,
+          "gpu": 9100771328,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-framebuffer-failed",
+          "result": -2,
+          "request": 940032000,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 971653120,
+          "largest": 341901312,
+          "ranges": 67,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 11190108160,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-pressure-reclaim",
+          "result": 0,
+          "request": 1441382400,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 4231643136,
+          "largest": 3140272128,
+          "ranges": 55,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 7930118144,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-pressure-reclaim",
+          "result": 0,
+          "request": 1692057600,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 2409332736,
+          "largest": 1589886976,
+          "ranges": 58,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 9752428544,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-framebuffer-failed",
+          "result": -2,
+          "request": 1692057600,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 2409332736,
+          "largest": 1589886976,
+          "ranges": 58,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 9752428544,
+          "gpu_known": 1
+        },
+        {
+          "event": "ppsspp-framebuffer-failed",
+          "result": -2,
+          "request": 1692057600,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 2409332736,
+          "largest": 1589886976,
+          "ranges": 58,
+          "flexible": 303038464,
+          "cpu_heap": 327221248,
+          "gpu": 9752428544,
+          "gpu_known": 1
+        }
+      ],
+      "load_actions": 2,
+      "save_actions": 0,
+      "ignored_state_actions": 6,
+      "menu_resumed": true,
+      "crashed": false,
+      "shutdown_message": true,
+      "normal_exit": true,
+      "marks": [
+        "input: pad script MARK at 10.007 s: frames=601 worst_ms=30.3 over_40ms=0",
+        "input: pad script MARK at 25.014 s: frames=1498 worst_ms=89.8 over_40ms=1",
+        "input: pad script MARK at 35.572 s: frames=2105 worst_ms=18.6 over_40ms=1",
+        "input: pad script MARK at 35.572 s: frames=2105 worst_ms=0.0 over_40ms=1",
+        "input: pad script MARK at 45.000 s: frames=3236 worst_ms=449.4 over_40ms=2",
+        "input: pad script MARK at 45.000 s: frames=3236 worst_ms=0.0 over_40ms=2",
+        "input: pad script MARK at 75.005 s: frames=6833 worst_ms=10.3 over_40ms=2",
+        "input: pad script MARK at 75.005 s: frames=6833 worst_ms=0.0 over_40ms=2"
+      ],
+      "sha256": {
+        "trace.txt": "121ad5bbcf03a8d08f9f981a439dcdc0c7221c687c16a24f7cc6df0e03c2f950",
+        "retroarch.log": "5151c29893935b1474ee73ce25324deab6b78a1ea9476a9f9c74bba7ce4a3ae2",
+        "kernel.log": "591d070b7e7e73f11d34bd88745e60bc367b0db8ada34e5ca6558dab8cc53619"
+      },
+      "profile": "10x-msaa8",
+      "outcome": "10x-msaa8: PASS safety: first load recovered, second load closed content on device OOM; menu resumed and normal exit; no crash",
+      "screenshot_sha256": {
+        "ppsspp-memory-test-20261002__10x-msaa8-final.png": "52b5f1bd27dbd7423c1cba0c9a8c73c73fe1ab2b27f6ca9169567ba2373303da"
+      }
+    },
+    {
+      "folder": "klog/memory-priorities/20261002-082654-6x-msaa8",
+      "build": [
+        "8b635e9bb096b97155989f58509cf2bc21e5e73b77f494bf42afccd74725a28e"
+      ],
+      "memory": [
+        {
+          "event": "startup",
+          "result": 0,
+          "request": 0,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 12845056000,
+          "largest": 12845056000,
+          "ranges": 1,
+          "flexible": 419430400,
+          "cpu_heap": 33554432,
+          "gpu": 0,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10121199616,
+          "largest": 9269592064,
+          "ranges": 50,
+          "flexible": 305135616,
+          "cpu_heap": 335675392,
+          "gpu": 2032107520,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10087645184,
+          "largest": 9269592064,
+          "ranges": 50,
+          "flexible": 305135616,
+          "cpu_heap": 369229824,
+          "gpu": 2032107520,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 8330395648,
+          "largest": 5654757376,
+          "ranges": 57,
+          "flexible": 305135616,
+          "cpu_heap": 369229824,
+          "gpu": 3789357056,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 8330395648,
+          "largest": 5654757376,
+          "ranges": 57,
+          "flexible": 305135616,
+          "cpu_heap": 369229824,
+          "gpu": 3789357056,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 8019918848,
+          "largest": 3798777856,
+          "ranges": 62,
+          "flexible": 305135616,
+          "cpu_heap": 411238400,
+          "gpu": 4057825280,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 8019918848,
+          "largest": 3798777856,
+          "ranges": 62,
+          "flexible": 305135616,
+          "cpu_heap": 411238400,
+          "gpu": 4057825280,
+          "gpu_known": 1
+        }
+      ],
+      "load_actions": 3,
+      "save_actions": 1,
+      "ignored_state_actions": 0,
+      "menu_resumed": false,
+      "crashed": false,
+      "shutdown_message": false,
+      "normal_exit": true,
+      "marks": [
+        "input: pad script MARK at 10.000 s: frames=601 worst_ms=30.9 over_40ms=0",
+        "input: pad script MARK at 25.007 s: frames=1498 worst_ms=83.3 over_40ms=1",
+        "input: pad script MARK at 45.002 s: frames=2695 worst_ms=70.9 over_40ms=2",
+        "input: pad script MARK at 75.007 s: frames=4493 worst_ms=49.6 over_40ms=3"
+      ],
+      "sha256": {
+        "trace.txt": "c92367fba4a6ce5ed6f457f237ef3e827f98640c611f6a25a7d55800851c957e",
+        "retroarch.log": "8053156c728416825b098c2d4e6b3fce92944a21d16afef7f42f7a5ab63b2dcf",
+        "kernel.log": "e157c729fea5fc17ef10003c01d24fbbb0655ce48375dea77d5c6f91eaf0be4b"
+      },
+      "profile": "6x-msaa8",
+      "outcome": "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+      "screenshot_sha256": {
+        "ppsspp-memory-test-20261002__6x-msaa8-final.png": "721f3c3eb3aceba35e87c43053a947deca443891021a5c06c34e34dab413dc6c"
+      }
+    },
+    {
+      "folder": "klog/memory-priorities/20261002-082904-balanced-saved",
+      "build": [
+        "8b635e9bb096b97155989f58509cf2bc21e5e73b77f494bf42afccd74725a28e"
+      ],
+      "memory": [
+        {
+          "event": "startup",
+          "result": 0,
+          "request": 0,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 12845056000,
+          "largest": 12845056000,
+          "ranges": 1,
+          "flexible": 419430400,
+          "cpu_heap": 33554432,
+          "gpu": 0,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 11509006336,
+          "largest": 11464933376,
+          "ranges": 43,
+          "flexible": 300941312,
+          "cpu_heap": 335675392,
+          "gpu": 644300800,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 11475451904,
+          "largest": 11464933376,
+          "ranges": 43,
+          "flexible": 300941312,
+          "cpu_heap": 369229824,
+          "gpu": 644300800,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837901312,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 300941312,
+          "cpu_heap": 369229824,
+          "gpu": 1281851392,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10837901312,
+          "largest": 10817044480,
+          "ranges": 44,
+          "flexible": 300941312,
+          "cpu_heap": 369229824,
+          "gpu": 1281851392,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-before",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10795859968,
+          "largest": 10733027328,
+          "ranges": 44,
+          "flexible": 300941312,
+          "cpu_heap": 411238400,
+          "gpu": 1281884160,
+          "gpu_known": 1
+        },
+        {
+          "event": "state-load-after",
+          "result": 0,
+          "request": 41943040,
+          "known": 1,
+          "pool": 12884901888,
+          "free": 10795859968,
+          "largest": 10733027328,
+          "ranges": 44,
+          "flexible": 300941312,
+          "cpu_heap": 411238400,
+          "gpu": 1281884160,
+          "gpu_known": 1
+        }
+      ],
+      "load_actions": 3,
+      "save_actions": 1,
+      "ignored_state_actions": 0,
+      "menu_resumed": false,
+      "crashed": false,
+      "shutdown_message": false,
+      "normal_exit": true,
+      "marks": [
+        "input: pad script MARK at 10.005 s: frames=601 worst_ms=30.5 over_40ms=0",
+        "input: pad script MARK at 25.004 s: frames=1498 worst_ms=80.6 over_40ms=1",
+        "input: pad script MARK at 45.015 s: frames=2696 worst_ms=70.8 over_40ms=2",
+        "input: pad script MARK at 75.004 s: frames=4493 worst_ms=48.3 over_40ms=3"
+      ],
+      "sha256": {
+        "trace.txt": "86d7a55ca3f344f5899b6a90508f8b52760a6e65ad52b41ef33bad2254f5e471",
+        "retroarch.log": "e887c6f552583cd074012bf571e5c5d8d435808443997574eb3a5724ce9beee4",
+        "kernel.log": "0b6baa58ef2b86ed4f7ddd4d47806754a12eeee16728def2e4cabfa85ee9b494"
+      },
+      "profile": "balanced-saved",
+      "outcome": "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s, no GPU allocation failure",
+      "screenshot_sha256": {
+        "ppsspp-memory-test-20261002__balanced-saved-final.png": "c46698e8a3a2da67bca6048db6089d164d1d19eada4c58747d884f0e76ce18d4"
+      }
+    }
+  ],
+  "interpretation": "CPU and GPU share the measured 12 GiB pool. At high settings the GPU reached 12011339776 bytes in one snapshot. First load recovered after deferred deletion; a later oversized/fragmented allocation failed after retry and returned to dummy/menu without SIGSEGV.",
+  "limits": [
+    "One Ghost of Sparta state; 80-second runs, no long-soak claim.",
+    "10x with 8x MSAA is not stable gameplay: controlled content shutdown is the intended fallback.",
+    "Original reporter firmware 5.02 Chains of Olympus case not reproduced on their console.",
+    "All cores rebuilt; this console battery exercises PPSSPP only.",
+    "No measured allocator speedup claim.",
+    "High-setting final screenshot shows the dummy video buffer; menu resumption is verified by trace and teardown logs."
+  ],
+  "cleanup": {
+    "console_idle": true,
+    "test_directory_removed": true,
+    "temporary_helper_stopped": true,
+    "original_settings_and_state_unchanged": true,
+    "log_sha256": "a06ddeefd9bdc975e6e411a6bf9fb8d4f72d48f11be1c35159fd956629768d8d"
+  }
+}

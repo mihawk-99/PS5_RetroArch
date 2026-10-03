@@ -131,6 +131,12 @@ def plan(component, root):
     elif kind == "pin" and cid == "zlib":
         tarball = root / f".deps/native/zlib/zlib-{revision}.tar.gz"
         steps.append((tarball.name, ("copy", tarball), source.get("url", "")))
+    elif kind == "pin" and cid == "libmicrohttpd":
+        version = pinned({"file": "tools/build-webui-http.sh", "var": "version"}, root)
+        tarball = root / f".deps/webui/libmicrohttpd-{version}.tar.gz"
+        if sha256(tarball) != revision:
+            raise BundleError("libmicrohttpd: source archive differs from the build pin")
+        steps.append((tarball.name, ("copy", tarball), source.get("url", "")))
     else:
         return []  # a part with no source to archive here (see SOURCES.txt)
     for extra in spec.get("extra", []):

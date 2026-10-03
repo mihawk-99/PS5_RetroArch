@@ -1,0 +1,29 @@
+{
+  "capture": "Unedited PS5 full-frame PNG screenshots",
+  "resolution": [
+    3840,
+    2160
+  ],
+  "files": [
+    {
+      "file": "arcade-mega-advanced-ps5.png",
+      "sha256": "db0ec4369d21f5eef9ca757ba123e0fe85c2b317c62dd6d82564084611892925"
+    },
+    {
+      "file": "arcade-scale2x-ps5.png",
+      "sha256": "758276a22b4c7ba647bd9f1d63af5e01a24b34c8203ad7d3d1ba5edc01c78f74"
+    },
+    {
+      "file": "jojo-koko-aio-ps5.png",
+      "sha256": "67360ffd443a23836420aff563c017fd52e7be247d73e2c01ccc06a2250f1924"
+    },
+    {
+      "file": "metal-slug-mega-bezel-ps5.png",
+      "sha256": "ee7497f372b80c3682860cb44f2931452a2fb47b208d1e130815f6017c024b81"
+    },
+    {
+      "file": "metal-slug-tv-overlay-crt-ps5.png",
+      "sha256": "c695e6e60459030e5461b78cda376fa93995cb848555d24db7cb813f45bef9b6"
+    }
+  ]
+}

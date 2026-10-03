@@ -1,0 +1,31 @@
+{
+  "step": "dualsense-rumble",
+  "build_identity": "a8004c4c1eaad284340e13d7d6d145cb48972af2d9edefd2aab46b8101b64557",
+  "command": "PYTHONPATH=tools python3 klog/dualsense-rumble/console-test.py",
+  "raw_capture": "klog/dualsense-rumble/20261002-091624",
+  "lines": [
+    "native haptics: s16, advanced mode accepted, worker started",
+    "input: haptic stream outputs=2269 active=568 errors=0",
+    "input: pad script RUMBLE_STRONG 32768: 1",
+    "input: pad script RUMBLE_STRONG 0: 1",
+    "input: pad script RUMBLE_WEAK 32768: 1",
+    "input: pad script RUMBLE_WEAK 0: 1",
+    "input: pad script RUMBLE_STRONG 32768: 1",
+    "input: pad script RUMBLE_WEAK 32768: 1",
+    "input: pad script RUMBLE_STRONG 0: 1",
+    "input: pad script RUMBLE_WEAK 0: 1",
+    "rarch_main returned = 0",
+    "host fault injection: s16/f32 buffers, thread failure, mode failure, output failure and motor error propagation PASS"
+  ],
+  "host_gates": "format unit build integration evidence PASS; 87 tests; input test uses AddressSanitizer with leak checking disabled for sandbox compatibility",
+  "raw_sha256": {
+    "pad-script.txt": "3903910d0b8e5b87c85b25591a43a5a504eff384dedab14dec116680ce11a12a",
+    "kernel.log": "e0d14737d7da423cb2192cd44658f93b383b6328b13ebf202077e31b550b32f7",
+    "trace.txt": "338323c8399b8df4f85560fb33b4045715438c01de9687dcd397d52a2686089d",
+    "retroarch.log": "ad055ec6c7875cc48f68102e54063594a6cd5ac6b5d826bbd98bae3f368a9402",
+    "session.txt": "707ddbd4cd180bd3ee3a94ddf71f2007fa9dc51d13386f7a92e89a7de4220e53"
+  },
+  "cleanup": "Title exited normally, test files removed or restored, frontend configuration and PPSSPP profile byte-identical, control helper stopped.",
+  "limitations": "Native service accepted nonzero synthesized PCM. Physical feel was not observed. Float format and failure recovery verified with host mocks, not forced on hardware. Games/cores must request libretro rumble; this does not add authored game haptics or adaptive triggers.",
+  "derived_from": "https://github.com/mihawk-99/PS5_RetroArch/pull/6 at cc0cc0a4755ad4a69321b22ba041eae9e2322b82"
+}

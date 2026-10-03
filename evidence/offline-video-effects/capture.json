@@ -1,0 +1,293 @@
+{
+  "step": "offline-video-effects",
+  "command": "bash tools/verify.sh; python3 tools/deploy-title.py; private console effect cases and screenshot inspection",
+  "raw_capture": "klog/video-effects/console-matrix.json",
+  "lines": [
+    "production: clean offline install exercised all four effect categories before development fixtures",
+    "overlay: triangle-list conversion draws complete artwork; portrait and landscape inspected",
+    "temporal: normalized software input removes static-image sideways history and feedback trails",
+    "persistence: shader global/core/directory/game scopes reloaded after restart",
+    "host: 108 tests pass; format, build, integration and evidence gates pass",
+    "package: pinned dependencies audited; development fixture paths and hashes rejected"
+  ],
+  "development_zip_sha256": "5880eb71017a21756458552b51ff7cb6ab17109185a19959317653a9b0441af2",
+  "selected_runs": [
+    {
+      "case": "baseline",
+      "run_id": "261002-144824",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.937,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "289aa754c51e5b1c07f46c61ed5057197711265ba0e323ab6be21976c3e18c33"
+      ]
+    },
+    {
+      "case": "single",
+      "run_id": "261002-145100",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "ca420c3510e7a5ca3d3d794ae7f0861d54cc15621ae73da6a38e61999977edc6"
+      ]
+    },
+    {
+      "case": "lut",
+      "run_id": "261002-154126",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "6e300275c8849dc86c2e7b59835d8e6f6288a93e241f2fce5d26ba9914a84e8f",
+        "65f9b9e93a3d8520bc01b1c8cad804bbcd4b777976571c39a0d5a0a157632ea4"
+      ]
+    },
+    {
+      "case": "feedback",
+      "run_id": "261002-155429",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "d2b9af0d66b0a9e128eea99a15ea942b873c3bd0dc43e38194011cfacf5f101f"
+      ]
+    },
+    {
+      "case": "response-time",
+      "run_id": "261002-155520",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "b82a16ea4697a13514866840a9c64409066027f9131a7ca27f00f76fa0584a96"
+      ]
+    },
+    {
+      "case": "cpu-Scanline2x",
+      "run_id": "261002-154502",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "c8fa84ce3bf7f19559f4a439cbeed84332f505c4e63c1b3c1ead11c271536049",
+        "91f58dcd6262d5cf06025258da88df075dedd8ba4ea8cd9558b0e3a33abcbd2b"
+      ]
+    },
+    {
+      "case": "cpu-Scale2x",
+      "run_id": "261002-154613",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.942,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "758276a22b4c7ba647bd9f1d63af5e01a24b34c8203ad7d3d1ba5edc01c78f74",
+        "5531795dd6d43b4e075dc5506d82f7aaf7fbb12da3ec1c8b25596795150fc448"
+      ]
+    },
+    {
+      "case": "mega-advanced",
+      "run_id": "261002-154725",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.938,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 42,
+      "capture_sha256": [
+        "db0ec4369d21f5eef9ca757ba123e0fe85c2b317c62dd6d82564084611892925",
+        "f3ec1a1ce7c70d650efe2c64f62e938895ff494d683660b4183c3e16497ac251"
+      ]
+    },
+    {
+      "case": "koko-immersive",
+      "run_id": "261002-154845",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.942,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 17,
+      "capture_sha256": [
+        "902d0b437931db3663de8767fd42bd4683a588a5e4547c0810887e0b043385fa",
+        "6d9a4dc93d4ae866cb6aae0248990cdae878340e773b7108d982fade14d6af27"
+      ]
+    },
+    {
+      "case": "baseline-output60",
+      "run_id": "261002-155004",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.938,
+      "presentation_calls_per_second": 59.94,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "788780cc7f8b543ffc5fe1e140268d92ec730cb1e86f003b5520a1db2f0be264"
+      ]
+    },
+    {
+      "case": "mega-output60",
+      "run_id": "261002-155113",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.938,
+      "presentation_calls_per_second": 59.94,
+      "gpu_api_errors": 0,
+      "compiled_passes": 30,
+      "capture_sha256": [
+        "1b256570cad7eb2a6c13a9a23c6a89324841ebd7bce824ddae1c69ebcc7f9209"
+      ]
+    },
+    {
+      "case": "overlay-production",
+      "run_id": "261002-152019",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "a3631437b0e6763ff93e627c519151c3977b0397b371e6b379a6b550c0aea158"
+      ]
+    },
+    {
+      "case": "overlay-horizontal",
+      "run_id": "261002-153433",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "bdc639d7ed1567d042c26fe4d57a105b36e6e883fe8668eec95a61059692f982"
+      ]
+    },
+    {
+      "case": "overlay-vertical",
+      "run_id": "261002-153546",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.938,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 0,
+      "capture_sha256": [
+        "2d1a2c710465be1004cb67380bea7b91f1e26e7ff6d661b658f18b4cf5f2082b"
+      ]
+    },
+    {
+      "case": "overlay-fixture-shader",
+      "run_id": "261002-153658",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.941,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "f490c84050ab45fb265338f4e6179e29c40820d3228189d2e7d45d04dce563e0"
+      ]
+    },
+    {
+      "case": "parameter-save",
+      "run_id": "261002-152925",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.942,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "45fdad4474072f795feb8e58d9decdc4c6564b0259a212efb90a91ffab5a6e82"
+      ]
+    },
+    {
+      "case": "parameter-restart",
+      "run_id": "261002-153039",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.938,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "45fdad4474072f795feb8e58d9decdc4c6564b0259a212efb90a91ffab5a6e82"
+      ]
+    },
+    {
+      "case": "reload-scope-global",
+      "run_id": "261002-153406",
+      "normal_exit": true,
+      "frame_callbacks_per_second": null,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "2336e9badc061f655de5d69e5c75ba929262ebfb89995274d5ad84b867360a48"
+      ]
+    },
+    {
+      "case": "reload-scope-core",
+      "run_id": "261002-153337",
+      "normal_exit": true,
+      "frame_callbacks_per_second": null,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "2336e9badc061f655de5d69e5c75ba929262ebfb89995274d5ad84b867360a48"
+      ]
+    },
+    {
+      "case": "reload-scope-directory",
+      "run_id": "261002-153310",
+      "normal_exit": true,
+      "frame_callbacks_per_second": null,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "2336e9badc061f655de5d69e5c75ba929262ebfb89995274d5ad84b867360a48"
+      ]
+    },
+    {
+      "case": "reload-scope-game",
+      "run_id": "261002-153242",
+      "normal_exit": true,
+      "frame_callbacks_per_second": null,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "2336e9badc061f655de5d69e5c75ba929262ebfb89995274d5ad84b867360a48"
+      ]
+    },
+    {
+      "case": "hw-single",
+      "run_id": "261002-155612",
+      "normal_exit": true,
+      "frame_callbacks_per_second": 59.875,
+      "presentation_calls_per_second": 119.877,
+      "gpu_api_errors": 0,
+      "compiled_passes": 1,
+      "capture_sha256": [
+        "4aeb37e280e591bdf453e9ca62ff6d8fe37e8f72f213db8d3518b2cfaefca070"
+      ]
+    }
+  ],
+  "limits": [
+    "Representative short tests, not full-preset certification.",
+    "60 pacing and 120 presentation measured separately; physical 4K120 not verified.",
+    "CRT-Royale interrupted; exact-frame PC parity and extended switching/memory soak incomplete.",
+    "CPU RGB565 checked by host harness; console examples emit XRGB8888.",
+    "HW core smoke verifies CRT Easymode only; other HW combinations remain untested.",
+    "Some measurement windows include a screenshot callback; values are approximate."
+  ]
+}

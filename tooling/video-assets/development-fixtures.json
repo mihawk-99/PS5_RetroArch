@@ -1,0 +1,32 @@
+[
+  {
+    "name": "MAME-Horizontal.cfg",
+    "sha256": "b81d2b92db37f04a192e92edb1a7cc72bbfb5cdc99c4dce89ae48a02507caeca",
+    "bytes": 109
+  },
+  {
+    "name": "MAME-Horizontal.png",
+    "sha256": "0954cf8d1f3a10a7e1e3ead5b077f8189db0d4301418bf6f604efbcad5b24353",
+    "bytes": 653322,
+    "size": [
+      1920,
+      1080
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "name": "MAME-Vertical.cfg",
+    "sha256": "5181fd6012c29a6abce3a246d3a2fde17634cf6a7281f88e2cbfea34b4eeb424",
+    "bytes": 107
+  },
+  {
+    "name": "MAME-Vertical.png",
+    "sha256": "ab2af9586136ddd6f3f4f19dacdbe226ed9feb69f59341128ac0e7e28002511a",
+    "bytes": 1928026,
+    "size": [
+      1920,
+      1080
+    ],
+    "mode": "RGBA"
+  }
+]

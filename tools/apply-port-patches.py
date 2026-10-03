@@ -34,6 +34,135 @@ from pathlib import Path
 
 # (file, anchor, inserted-before-anchor, already-present-marker)
 EDITS = [
+    (
+        "Makefile.common",
+        "ifeq ($(HAVE_STATIC_VIDEO_FILTERS), 1)\n"
+        "   OBJ +=",
+        "ifeq ($(HAVE_STATIC_VIDEO_FILTERS), 1)\n"
+        "   # patches/series, 0107: upstream static filter registry on PS5.\n"
+        "   DEFINES += -DHAVE_FILTERS_BUILTIN\n"
+        "   OBJ +=",
+        "patches/series, 0107: upstream static",
+    ),
+    (
+        "configuration.c",
+        "   } else if (string_is_equal(settings->paths.directory_video_shader, \"default\"))\n"
+        "      *settings->paths.directory_video_shader = '\\0';",
+        "   } else if (string_is_equal(settings->paths.directory_video_shader, \"default\"))\n"
+        "      /* patches/series, 0107: packaged directory_video_shader default. */\n"
+        "      configuration_set_string(settings, settings->paths.directory_video_shader,\n"
+        "            g_defaults.dirs[DEFAULT_DIR_SHADER]);",
+        "patches/series, 0107: packaged directory_video_shader",
+    ),
+    (
+        "configuration.c",
+        "   } else if (string_is_equal(settings->paths.directory_video_filter, \"default\"))\n"
+        "      *settings->paths.directory_video_filter = '\\0';",
+        "   } else if (string_is_equal(settings->paths.directory_video_filter, \"default\"))\n"
+        "      /* patches/series, 0107: packaged directory_video_filter default. */\n"
+        "      configuration_set_string(settings, settings->paths.directory_video_filter,\n"
+        "            g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER]);",
+        "patches/series, 0107: packaged directory_video_filter",
+    ),
+    (
+        "configuration.c",
+        "   if (string_is_equal(settings->paths.directory_overlay, \"default\"))\n"
+        "      *settings->paths.directory_overlay = '\\0';",
+        "   if (string_is_equal(settings->paths.directory_overlay, \"default\"))\n"
+        "      /* patches/series, 0107: packaged directory_overlay default. */\n"
+        "      configuration_set_string(settings, settings->paths.directory_overlay,\n"
+        "            g_defaults.dirs[DEFAULT_DIR_OVERLAY]);",
+        "patches/series, 0107: packaged directory_overlay",
+    ),
+
+    ('core_info.c', '   for (i = 0; i < info->firmware_count; i++)\n   {\n      if (string_is_empty(info->firmware[i].path))', '   /* patches/series, 0106: BIOS preflight uses the same core directory. */\n   {\n      extern const char *ps5_core_system_directory(const char *, const char *);\n      systemdir = ps5_core_system_directory(info->core_name, systemdir);\n   }\n   for (i = 0; i < info->firmware_count; i++)\n   {\n      if (string_is_empty(info->firmware[i].path))', 'patches/series, 0106: BIOS preflight'),
+    ('runloop.c', '            const char *dir_system          = settings->paths.directory_system;', '            /* patches/series, 0106: Saturn BIOS default; custom paths stay intact. */\n            extern const char *ps5_core_system_directory(const char *, const char *);\n            const char *dir_system = ps5_core_system_directory(\n                  runloop_st->system.info.library_name, settings->paths.directory_system);', 'patches/series, 0106: Saturn BIOS'),
+    ('runloop.c', 'static core_option_manager_t *runloop_init_core_options(\n', '/* patches/series, 0105: snapshot core descriptions for the WebUI. */\nextern void ps5_webui_core_options(const char *, const struct retro_core_options_v2 *);\nextern void ps5_webui_core_variables(const char *, const struct retro_variable *);\n\nstatic core_option_manager_t *runloop_init_core_options(\n', 'patches/series, 0105: snapshot'),
+    ('runloop.c', '   if (!string_is_empty(options_path))\n      return core_option_manager_new(options_path,', '   /* patches/series, 0105: v1/v2 metadata on the emulator thread. */\n   ps5_webui_core_options(runloop_state.system.info.library_name, options_v2);\n   if (!string_is_empty(options_path))\n      return core_option_manager_new(options_path,', 'patches/series, 0105: v1/v2'),
+    ('runloop.c', '   if (!string_is_empty(options_path))\n      return core_option_manager_new_vars(options_path, src_options_path, vars);', '   /* patches/series, 0105: legacy choices on the emulator thread. */\n   ps5_webui_core_variables(runloop_state.system.info.library_name, vars);\n   if (!string_is_empty(options_path))\n      return core_option_manager_new_vars(options_path, src_options_path, vars);', 'patches/series, 0105: legacy'),
+
+    (
+        "runloop.c",
+        "bool core_unserialize(retro_ctx_serialize_info_t *info)\n{",
+        "/* patches/series, 0103: shared-pool state-load diagnostics. */\n"
+        "extern void ps5_memory_report(const char *, size_t, int);\n\n"
+        "bool core_unserialize(retro_ctx_serialize_info_t *info)\n{",
+        "patches/series, 0103: shared-pool state-load diagnostics",
+    ),
+    (
+        "runloop.c",
+        "   if (!info || !runloop_st->current_core.retro_unserialize(info->data_const, info->size))\n      return false;",
+        "   /* patches/series, 0103: report either state-load result. */\n"
+        "   bool loaded;\n"
+        "   if (!info)\n      return false;\n"
+        "   ps5_memory_report(\"state-load-before\", info->size, 0);\n"
+        "   loaded = runloop_st->current_core.retro_unserialize(info->data_const, info->size);\n"
+        "   ps5_memory_report(\"state-load-after\", info->size, loaded ? 0 : -1);\n"
+        "   if (!loaded)\n      return false;",
+        "patches/series, 0103: report either state-load result",
+    ),
+    (
+        # 0102: choose frontend defaults before saved options are read. All v1,
+        # v2 and translated definitions converge here; legacy variables use
+        # the same helper. Never modify a core's (potentially const) definitions.
+        "core_option_manager.c",
+        "/* Parses a single legacy core options interface",
+        """/* patches/series, 0102: balanced defaults for a 4K output. Internal
+ * resolution leaves headroom for demanding games; saved options still win. */
+static void ps5_core_option_default(struct core_option *option)
+{
+   static const struct { const char *key; const char *value; } defaults[] = {
+      { "ppsspp_internal_resolution", "2880x1632" },
+      { "ppsspp_mulitsample_level", "x8" },
+      { "dolphin_efb_scale", "4" },
+      { "pcsx2_upscale_multiplier", "4x Native (~1440p/2K)" },
+      { "beetle_psx_hw_internal_resolution", "8x" },
+      { "beetle_psx_hw_msaa", "1x" },
+      { "citra_resolution_factor", "6" },
+      { "desmume_internal_resolution", "1024x768" },
+   };
+   size_t i, j;
+   for (i = 0; i < sizeof(defaults) / sizeof(defaults[0]); i++)
+      if (string_is_equal(option->key, defaults[i].key))
+      {
+         for (j = 0; j < option->vals->size; j++)
+            if (string_is_equal(option->vals->elems[j].data, defaults[i].value))
+            {
+               option->default_index = j;
+               option->index = j;
+               return;
+            }
+         /* A different core version may not offer this value. Keep its default. */
+         return;
+      }
+}
+
+/* Parses a single legacy core options interface""",
+        "patches/series, 0102: balanced defaults",
+    ),
+    (
+        # 0104: upgrade a previously patched build tree as well as fresh builds.
+        "core_option_manager.c",
+        '{ "ppsspp_mulitsample_level", "Disabled" }',
+        '{ "ppsspp_mulitsample_level", "x8" }',
+        '{ "ppsspp_mulitsample_level", "x8" }',
+    ),
+    (
+        "core_option_manager.c",
+        "   option->index         = 0;\n\n   if (config_src)",
+        "   option->index         = 0;\n\n"
+        "   /* patches/series, 0102: legacy defaults before saved values. */\n"
+        "   ps5_core_option_default(option);\n\n   if (config_src)",
+        "patches/series, 0102: legacy defaults",
+    ),
+    (
+        "core_option_manager.c",
+        "   }\n\n   if (config_src)\n      entry",
+        "   }\n\n"
+        "   /* patches/series, 0102: v1/v2 defaults before saved values. */\n"
+        "   ps5_core_option_default(option);\n\n   if (config_src)\n      entry",
+        "patches/series, 0102: v1/v2 defaults",
+    ),
     ('libretro-common/file/archive_file_7z.c', '#include <stdlib.h>', '/* patches/series, 0076: archive error diagnostics */\n#include <stdlib.h>\n#include <stdio.h>\n#include <errno.h>', 'patches/series, 0076: archive error diagnostics'),
     ('libretro-common/file/archive_file_7z.c', '   return malloc(len);', '/* patches/series, 0076: checked main allocation */\n   {\n      void *result = malloc(len);\n      if (!result)\n         fprintf(stderr, "archive 7z: allocation failed bytes=%zu errno=%d\\n", len, errno);\n      return result;\n   }', 'patches/series, 0076: checked main allocation'),
     ('libretro-common/file/archive_file_7z.c', 'static void *sevenzip_stream_alloc_tmp_impl(ISzAllocPtr p, size_t len)\n{\n   if (len == 0)\n      return 0;\n   return malloc(len);\n}', '/* patches/series, 0076: checked temporary allocation */\nstatic void *sevenzip_stream_alloc_tmp_impl(ISzAllocPtr p, size_t len)\n{\n   return sevenzip_stream_alloc_impl(p, len);\n}', 'patches/series, 0076: checked temporary allocation'),
@@ -3451,6 +3580,111 @@ EDITS = [
      '   ps5_fix_platform_dirs(config_st);\n'
      '}',
      '0107: platform-fixed directories refill'),
+    (
+        "gfx/drivers/vulkan.c",
+        "   vp->full_height = height;\n"
+        "}",
+        "   vp->full_height = height;\n"
+        "#ifdef __PROSPERO__\n"
+        "   /* patches/series, 0108: capture the whole composition for test evidence. */\n"
+        "   {\n"
+        "      extern bool ps5_test_full_screenshot;\n"
+        "      if (ps5_test_full_screenshot && !(vk->flags & VK_FLAG_READBACK_STREAMED))\n"
+        "      {\n"
+        "         vp->x = vp->y = 0;\n"
+        "         vp->width = width;\n"
+        "         vp->height = height;\n"
+        "      }\n"
+        "   }\n"
+        "#endif\n"
+        "}",
+        "patches/series, 0108: capture the whole composition",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "         vk->vp.width, vk->vp.height,\n"
+        "         VK_FORMAT_B8G8R8A8_UNORM, /* Formats don't matter",
+        "         vp.width, vp.height, /* patches/series, 0108: capture extent */\n"
+        "         VK_FORMAT_B8G8R8A8_UNORM, /* Formats don't matter",
+        "patches/series, 0108: capture extent",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      unsigned caller_width  = vk->vp.width;\n"
+        "      unsigned caller_height = vk->vp.height;",
+        "      /* patches/series, 0108: use the same capture extent as the caller. */\n"
+        "      struct video_viewport capture_vp;\n"
+        "      vulkan_viewport_info(vk, &capture_vp);\n"
+        "      unsigned caller_width  = capture_vp.width;\n"
+        "      unsigned caller_height = capture_vp.height;",
+        "patches/series, 0108: use the same capture extent",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "         int y;\n"
+        "         unsigned vp_width  = (vk->vp.width  > vk->video_width)  ? vk->video_width  : vk->vp.width;\n"
+        "         unsigned vp_height = (vk->vp.height > vk->video_height) ? vk->video_height : vk->vp.height;",
+        "         int y;\n"
+        "         /* patches/series, 0108: readback may include the border outside the game. */\n"
+        "         vulkan_viewport_info(vk, &capture_vp);\n"
+        "         unsigned vp_width  = (capture_vp.width > vk->video_width) ? vk->video_width : capture_vp.width;\n"
+        "         unsigned vp_height = (capture_vp.height > vk->video_height) ? vk->video_height : capture_vp.height;",
+        "patches/series, 0108: readback may include the border",
+    ),
+    (
+        "gfx/common/vulkan_common.c",
+        "                  || (mode_area == best_area && mode->parameters.refreshRate > best_refresh))\n",
+        "                  || (mode_area == best_area && (!best_refresh\n"
+        "                     /* patches/series, 0109: explicit modes honor the requested refresh. */\n"
+        "                     || ((info->width && info->height && info->refresh_rate_x1000)\n"
+        "                        ? abs((int)mode->parameters.refreshRate - (int)info->refresh_rate_x1000)\n"
+        "                           < abs((int)best_refresh - (int)info->refresh_rate_x1000)\n"
+        "                        : mode->parameters.refreshRate > best_refresh))))\n",
+        "patches/series, 0109: explicit modes honor",
+    ),
+    (
+        "gfx/drivers/vulkan.c",
+        "      if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n"
+        "               4 * sizeof(struct vk_vertex), &range))\n"
+        "         break;\n"
+        "\n"
+        "      memcpy(range.data, &vk->overlay.vertex[i * 4],\n"
+        "            4 * sizeof(struct vk_vertex));\n"
+        "\n"
+        "      call.vertices     = 4;",
+        "      /* patches/series, 0110: overlays share the port's triangle-list pipeline.\n"
+        "       * Upstream stores a four-vertex strip; expand both triangles, including\n"
+        "       * every vertex's UV and alpha, just as the menu draw path does. */\n"
+        "      if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,\n"
+        "               6 * sizeof(struct vk_vertex), &range))\n"
+        "         break;\n"
+        "\n"
+        "      {\n"
+        "         static const unsigned order[6] = { 0, 1, 2, 2, 1, 3 };\n"
+        "         struct vk_vertex *dst = (struct vk_vertex*)range.data;\n"
+        "         const struct vk_vertex *src = &vk->overlay.vertex[i * 4];\n"
+        "         unsigned j;\n"
+        "         for (j = 0; j < 6; j++)\n"
+        "            dst[j] = src[order[j]];\n"
+        "      }\n"
+        "\n"
+        "      call.vertices     = 6;",
+        "patches/series, 0110: overlays share",
+    ),
+    (
+        'gfx/drivers_shader/shader_vulkan.cpp',
+        '      vulkan_filter_chain_texture input_texture;',
+        '      vulkan_filter_chain_texture input_texture;\n      /* patches/series, 0111: one normalized upload per in-flight frame. */\n      std::vector<std::unique_ptr<Framebuffer>> ps5_logical_inputs;',
+        'patches/series, 0111: one normalized',
+    ),
+
+    (
+        'gfx/drivers_shader/shader_vulkan.cpp',
+        '   update_history_info();',
+        '   /* patches/series, 0111: all Slang samplers share logical image coordinates.\n    * Cropping the quad alone also crops unpadded history, feedback and LUTs.\n    * Normalize the padded CPU upload once before any shader sees it. */\n   if (input_texture.physical_width > input_texture.width)\n   {\n      if (ps5_logical_inputs.size() <= current_sync_index)\n         ps5_logical_inputs.resize(current_sync_index + 1);\n      auto &logical = ps5_logical_inputs[current_sync_index];\n      VkFormat format = input_texture.format == VK_FORMAT_UNDEFINED\n            ? original_format : input_texture.format;\n      Size2D size = { input_texture.width, input_texture.height };\n      DeferredDisposer disposer(deferred_calls[current_sync_index]);\n      if (!logical)\n         logical.reset(new Framebuffer(device, memory_properties, size, format, 1));\n      else if (logical->get_size().width != size.width\n            || logical->get_size().height != size.height\n            || logical->get_format() != format)\n         logical->set_size(disposer, size, format);\n\n      VkImageLayout layout = input_texture.layout;\n      if (layout != VK_IMAGE_LAYOUT_GENERAL)\n         VULKAN_IMAGE_LAYOUT_TRANSITION_LEVELS(cmd,\n               input_texture.image, VK_REMAINING_MIP_LEVELS, layout,\n               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0,\n               VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,\n               VK_PIPELINE_STAGE_TRANSFER_BIT, VK_QUEUE_FAMILY_IGNORED,\n               VK_QUEUE_FAMILY_IGNORED);\n      vulkan_framebuffer_copy(logical->get_image(), size, cmd,\n            input_texture.image, layout == VK_IMAGE_LAYOUT_GENERAL\n                  ? layout : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);\n      if (layout != VK_IMAGE_LAYOUT_GENERAL)\n         VULKAN_IMAGE_LAYOUT_TRANSITION_LEVELS(cmd,\n               input_texture.image, VK_REMAINING_MIP_LEVELS,\n               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout, 0,\n               VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,\n               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_QUEUE_FAMILY_IGNORED,\n               VK_QUEUE_FAMILY_IGNORED);\n      input_texture.image = logical->get_image();\n      input_texture.view = logical->get_view();\n      input_texture.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;\n      input_texture.format = format;\n      input_texture.physical_width = 0;\n   }\n\n   update_history_info();',
+        'patches/series, 0111: all Slang samplers',
+    ),
+
 ]
 
 # Changes that are withdrawn rather than deleted, by marker.

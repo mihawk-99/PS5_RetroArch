@@ -1,0 +1,13 @@
+{
+  "step": "offline-video-effects",
+  "must_contain": [
+    "production: clean offline install exercised all four effect categories before development fixtures",
+    "overlay: triangle-list conversion draws complete artwork; portrait and landscape inspected",
+    "temporal: normalized software input removes static-image sideways history and feedback trails",
+    "persistence: shader global/core/directory/game scopes reloaded after restart",
+    "host: 108 tests pass; format, build, integration and evidence gates pass",
+    "package: pinned dependencies audited; development fixture paths and hashes rejected"
+  ],
+  "must_not_contain": [],
+  "human_check": "Inspected full-resolution captures for complete overlay geometry and corrected history/feedback alignment; captures identified by SHA256."
+}

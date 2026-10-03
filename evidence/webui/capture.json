@@ -1,0 +1,108 @@
+{
+  "step": "webui",
+  "build_identity": "7ffa6382fcd1df7f48d5abdbb4e1c55b11adfa23bb87ef5a14799b3884d1c080",
+  "command": "python3 tools/deploy-title.py && python3 klog/webui/console-test.py",
+  "raw_capture": "klog/webui/webui-verification-20261002-110146/report.json",
+  "lines": [
+    "webui: listening port=6769",
+    "console: shipped assets served with HTTP 200",
+    "console: folder listing and creation PASS",
+    "console: 262144-byte upload and byte-identical download PASS",
+    "console: duplicate upload, path escape and foreign Host refused",
+    "console: saved settings accepted; explicit launch override volume=-8",
+    "console: next launch applied browser volume=-17",
+    "console: both exits normal; port 6769 closed after each exit",
+    "webui: stopped",
+    "console: original configuration, control files and PPSSPP profile restored",
+    "console: idle; temporary control helper stopped",
+    "host: all five project gates PASS; 92 tests",
+    "PASS: release ordering/current/update/unknown/offline/empty, safe notes, real upload/download, duplicate refusal, keyboard cancellation during upload, settings persistence, folder creation, navigation, mobile overflow and saved theme.",
+    "design: reviewer scored both fixes resolved; isolated identical-source completion ship; no open phases"
+  ],
+  "console": {
+    "runs": [
+      {
+        "http_status": 200,
+        "port": 6769,
+        "free_space_unknown": true,
+        "assets": {
+          "/": "123641287792d8643ba8d000e715e17fc6900d34c99f588872d10d9f24403b4e",
+          "/app.css": "b9c1a255782c1724925ea4e858498aafb9f2f9a0d756926eea2309667d26d139",
+          "/app.js": "230bc5218537118d99debec81dc2e7a56c8c759f5029fa4b07734bb4ffb82b98",
+          "/assets/mihawk.png": "ccef6efbd5757d2c60ab60c002b5790c6cc0d9da9132c274954fc6453b62850d",
+          "/assets/retroarch.svg": "b8bae8ac79ae9c6a5bfce1eb2422ab8e7a386c72b401e20e73fe839ad9c3f5df",
+          "/assets/ui.woff2": "97f60ed6d821c7c476b38c53dde854e14d9ce1c8cc295136a6a9faa2cd243ecb",
+          "/version.json": "792f926c05f81295ca8cfca4fffef20e1f6d497b4772a8f0d09c7ce2dd28fa62"
+        },
+        "upload_bytes": 262144,
+        "upload_sha256": "2312394bd99545d9de131c24efb781e765ac1aec243f2ed9347597a793a415e9",
+        "duplicate_refused": true,
+        "path_escape_refused": true,
+        "host_refused": true,
+        "settings_saved": true,
+        "closed_after_exit": true,
+        "runtime_saved_volume": -8.0,
+        "normal_exit": true
+      },
+      {
+        "http_status": 200,
+        "port": 6769,
+        "free_space_unknown": true,
+        "closed_after_exit": true,
+        "runtime_saved_volume": -17.0,
+        "normal_exit": true
+      }
+    ],
+    "original_files_restored": true
+  },
+  "source_sha256": {
+    "webui/app.css": "b9c1a255782c1724925ea4e858498aafb9f2f9a0d756926eea2309667d26d139",
+    "webui/app.js": "230bc5218537118d99debec81dc2e7a56c8c759f5029fa4b07734bb4ffb82b98",
+    "webui/assets/OFL.txt": "cc8c0c3e81cf543e190f128b83ba7c30959f15865c14dd972fca4917faeceec1",
+    "webui/assets/mihawk.png": "ccef6efbd5757d2c60ab60c002b5790c6cc0d9da9132c274954fc6453b62850d",
+    "webui/assets/retroarch.svg": "b8bae8ac79ae9c6a5bfce1eb2422ab8e7a386c72b401e20e73fe839ad9c3f5df",
+    "webui/assets/source.json": "e029c427534cb392c0d79d6a72d888655eb8b993a3cab1cc332e6a46eb55927a",
+    "webui/assets/ui.woff2": "97f60ed6d821c7c476b38c53dde854e14d9ce1c8cc295136a6a9faa2cd243ecb",
+    "webui/index.html": "123641287792d8643ba8d000e715e17fc6900d34c99f588872d10d9f24403b4e"
+  },
+  "raw_sha256": {
+    "final-retroarch.log": "3fe3698772258d09186897df4d7ec9cb1f6ab96a640c4ab398cd069c08a68409",
+    "final-trace.txt": "165c40c9431cc205b27e9dd4f67c289852a9f9ce7a8456b3465b2433917064cf",
+    "kernel.log": "cf28e303181434ea07f18a713470c3187e1367f94083deb26a31979e0976def8",
+    "report.json": "e1c49daaa7990f1f16f7619f205f4cf5f2d2af6ef37b06e7b8709c0c07e320fb",
+    "run1-effective-config.cfg": "93a58ac5ea424de254b0d59a392aa7ea3b9f13e1968cd0b2e33b6858c8cd2563",
+    "run1-retroarch.log": "3fe3698772258d09186897df4d7ec9cb1f6ab96a640c4ab398cd069c08a68409",
+    "run1-saved-config.cfg": "93a58ac5ea424de254b0d59a392aa7ea3b9f13e1968cd0b2e33b6858c8cd2563",
+    "run1-trace.txt": "e5b005005e8f3a7b7c2b5e1f2083cb03c2350ad0744f6195c3f7cd5f45004423",
+    "run2-effective-config.cfg": "07f9352ea57c918011f814d640fda3688a9fd1f335212786b931a4b082522384",
+    "run2-retroarch.log": "3fe3698772258d09186897df4d7ec9cb1f6ab96a640c4ab398cd069c08a68409",
+    "run2-saved-config.cfg": "07f9352ea57c918011f814d640fda3688a9fd1f335212786b931a4b082522384",
+    "run2-trace.txt": "165c40c9431cc205b27e9dd4f67c289852a9f9ce7a8456b3465b2433917064cf"
+  },
+  "limitations": [
+    "Console verification exercised the menu, file APIs, settings startup and shutdown; no game performance or maximum-size upload soak in this round.",
+    "Browser release states were tested using controlled GitHub responses; release checking needs internet access.",
+    "PS5 storage compatibility API is synthetic; freeBytes is honestly null on console.",
+    "Original project-root design fingerprint failed; normal phase closure and finish ran in an isolated byte-identical WebUI snapshot. Original receipts and root state were not rewritten."
+  ],
+  "design_evidence": {
+    "completion": "build/verification/webui-design-completion.json",
+    "manifest": "build/verification/webui-design-manifest.json",
+    "review": "build/verification/webui-design-review.md",
+    "status": {
+      "tool": "build-completion",
+      "version": 1,
+      "status": "complete",
+      "sessionScope": "other-session",
+      "sessionId": "01a0fc37-2c9d-7ec1-add0-ee94c7e42f15",
+      "buildStartedAt": "2026-10-02T13:45:04.128Z",
+      "artifact": "webui/index.html",
+      "openPhases": [],
+      "disposition": "ship",
+      "artifactUnchangedSinceFinish": true,
+      "canContinue": false,
+      "verificationScope": "local frontend inputs and recorded phase status"
+    }
+  },
+  "dependency": "GNU libmicrohttpd 1.0.10; static HTTP build; source archive and license included by build/source tooling"
+}

@@ -1,5 +1,6 @@
 /* Exercise the real raw joypad callbacks used by the binding screen. */
 #include <cassert>
+#include <cerrno>
 #include <cmath>
 #include <cstring>
 #include <unistd.h>
@@ -16,8 +17,13 @@ unsigned vibrations = 0;
 ScePadVibrationParam last_vibration{};
 unsigned vibration_modes = 0;
 int32_t last_vibration_mode = -1;
+int accepted_format = 1, opened_format = -1;
+bool fail_thread = false, fail_advanced = false;
+std::atomic<bool> fail_output{false}, recovered{false}, nonzero_pcm{false};
+int vibration_result = 0;
 int32_t haptic_open_result = -1;
-unsigned audio_inits = 0, audio_opens = 0, audio_outputs = 0, audio_closes = 0;
+unsigned audio_inits = 0, audio_opens = 0, audio_closes = 0;
+std::atomic<unsigned> audio_outputs{0};
 PadSample sample()
 {
     PadSample p{};
@@ -54,14 +60,14 @@ extern "C"
         assert(handle == 1 && param);
         ++vibrations;
         last_vibration = *param;
-        return 0;
+        return vibration_result;
     }
     int32_t scePadSetVibrationMode(int32_t handle, int32_t mode)
     {
         assert(handle == 1);
         ++vibration_modes;
         last_vibration_mode = mode;
-        return 0;
+        return mode == 1 && fail_advanced ? -1 : 0;
     }
     int32_t scePadRead(int32_t, void *out, int32_t capacity)
     {
@@ -96,8 +102,13 @@ extern "C"
         ++audio_inits;
         return 0;
     }
-    int32_t sceAudioOutOpen(int32_t, int32_t type, int32_t, uint32_t, uint32_t, uint32_t)
+    int32_t sceAudioOutOpen(int32_t, int32_t type, int32_t, uint32_t frames, uint32_t rate,
+                            uint32_t format)
     {
+        assert(frames == 256 && rate == 48000);
+        if (static_cast<int>(format) != accepted_format)
+            return -1;
+        opened_format = format;
         if (haptic_open_result >= 0)
         {
             assert(type == 10);
@@ -105,12 +116,24 @@ extern "C"
         }
         return haptic_open_result;
     }
-    int32_t sceAudioOutOutput(int32_t handle, const void *)
+    int32_t sceAudioOutOutput(int32_t handle, const void *data)
     {
         assert(handle == 77);
+        // Consume every negotiated sample: ASan catches an undersized float buffer.
+        bool nonzero = false;
+        for (unsigned i = 0; i < 256 * 2; ++i)
+        {
+            const float value = opened_format == 4
+                                    ? static_cast<const float *>(data)[i]
+                                    : static_cast<const int16_t *>(data)[i] / 32768.0f;
+            assert(std::isfinite(value) && value >= -1.0f && value <= 1.0f);
+            nonzero |= value != 0.0f;
+        }
+        if (nonzero)
+            nonzero_pcm = true;
         ++audio_outputs;
         usleep(1000);
-        return 256;
+        return fail_output ? -1 : 256;
     }
     int32_t sceAudioOutClose(int32_t handle)
     {
@@ -118,8 +141,14 @@ extern "C"
         ++audio_closes;
         return 0;
     }
-    void ps5_input_trace(const char *) noexcept
+    void ps5_memory_report(const char *, std::size_t, int)
     {
+    }
+
+    void ps5_input_trace(const char *line) noexcept
+    {
+        if (std::strstr(line, "back to motor rumble"))
+            recovered = true;
     }
     bool input_autoconfigure_connect(const char *name, const char *, const char *,
                                      const char *driver, unsigned port, unsigned, unsigned)
@@ -170,6 +199,20 @@ runloop_state_t *runloop_state_get_ptr(void)
 video_driver_state_t *video_state_get_ptr(void)
 {
     return &test_video;
+}
+extern "C" int __real_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *),
+                                     void *);
+extern "C" int __wrap_pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                                     void *(*fn)(void *), void *data)
+{
+    return fail_thread ? EAGAIN : __real_pthread_create(thread, attr, fn, data);
+}
+void wait_for(const std::atomic<bool> &flag)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!flag.load() && std::chrono::steady_clock::now() < deadline)
+        usleep(1000);
+    assert(flag.load());
 }
 int main()
 {
@@ -325,16 +368,52 @@ int main()
     assert(vibration_modes == 2);
     ps5_input_reset_autoconfig(); // Safe before/after driver lifetime.
 
-    // With the vibration audio port answering, the pad picks advanced mode and
-    // the feeder thread streams PCM; destroy joins the thread and closes it.
+    // Both PCM formats, streaming failure with existing motor levels, and restart.
     haptic_open_result = 77;
-    assert(ps5_joypad.init(input));
-    assert(audio_opens == 1 && vibration_modes == 3 && last_vibration_mode == 1);
-    usleep(20000);
-    assert(audio_outputs > 0);
-    ps5_joypad.destroy();
-    assert(audio_closes == 1 && opens == 3 && closes == 3);
+    for (int format : {1, 4})
+    {
+        accepted_format = format;
+        nonzero_pcm = false;
+        recovered = false;
+        assert(ps5_joypad.init(input));
+        assert(opened_format == format && last_vibration_mode == 1);
+        const auto before_motors = vibrations;
+        vibration_result = -1; // The motor API need not work in advanced mode.
+        assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 65535));
+        assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_WEAK, 32768));
+        wait_for(nonzero_pcm);
+        assert(vibrations == before_motors);
+        vibration_result = 0;
+        fail_output = true;
+        wait_for(recovered);
+        assert(last_vibration_mode == 2);
+        assert(last_vibration.largeMotor == 255 && last_vibration.smallMotor == 128);
+        assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 0));
+        assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_WEAK, 0));
+        ps5_joypad.destroy();
+        fail_output = false;
+        assert(audio_closes == audio_opens);
+    }
+    // Either startup failure must close the port and restore motor rumble.
+    for (int failure : {0, 1})
+    {
+        fail_thread = failure == 0;
+        fail_advanced = failure == 1;
+        assert(ps5_joypad.init(input));
+        assert(last_vibration_mode == 2 && audio_closes == audio_opens);
+        assert(!active_pad->haptic_thread_started && active_pad->haptic_port == -1);
+        assert(ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 65535));
+        ps5_joypad.destroy();
+        fail_thread = fail_advanced = false;
+    }
     haptic_open_result = -1;
+    assert(ps5_joypad.init(input));
+    vibration_result = -1;
+    assert(!ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 65535));
+    assert(!ps5_joypad.set_rumble(0, static_cast<retro_rumble_effect>(99), 65535));
+    vibration_result = 0;
+    ps5_joypad.destroy();
+    assert(!ps5_joypad.set_rumble(0, RETRO_RUMBLE_STRONG, 65535));
 
     // STOP ends the run on the next frame, as --max-frames does, and only once.
     test_video.frame_count = 1234;

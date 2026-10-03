@@ -223,3 +223,36 @@
 #       frames and the longest gap between them over exact script times
 #       gfx/video_driver.c
 0101-pad-script-frame-marks
+
+# 0102  balanced internal resolutions for 4K presentation, without forced MSAA;
+#       apply before saved values, so user overrides and Reset to Default work
+#       across legacy, v1, v2 and translated core options
+#       core_option_manager.c
+0102-balanced-core-defaults
+
+# 0103  shared CPU/GPU memory reports before and after state loads
+#       runloop.c
+0103-state-load-memory-reports
+
+# 0104  owner-selected PPSSPP 6x with 8x MSAA; retain saved overrides
+#       core_option_manager.c
+0104-ppsspp-msaa-default
+
+# 0105  snapshot registered core option categories, descriptions and choices
+#       for the WebUI; no HTTP access to live emulator state
+#       runloop.c
+0105-webui-core-metadata
+
+# 0106  route the default Saturn BIOS directory to system/Saturn
+#       runloop.c, core_info.c; explicit user paths remain unchanged
+0106-saturn-system-directory
+
+# 0107  compile upstream static CPU filters and resolve packaged video asset defaults
+#       Makefile.common, configuration.c
+0107-offline-video-effects
+
+0108  Full-composition Vulkan screenshots for gated console tests; preserve the game viewport and ordinary capture behavior.
+0109  Honor requested refresh at explicit fullscreen dimensions; automatic resolution keeps the highest refresh.
+0110  Expand overlay strips to both triangles for the existing list pipeline; retain UVs and alpha.
+
+0111  Normalize padded software frames before Slang sampling so history, feedback, LUTs and multipass Original use consistent coordinates.

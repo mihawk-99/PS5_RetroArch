@@ -1,0 +1,17 @@
+{
+  "font": {
+    "family": "Encode Sans Condensed",
+    "weight": 700,
+    "source": "https://fonts.gstatic.com/s/encodesanscondensed/v13/j8_46_LD37rqfuwxyIuaZhE6cRXOLtm2gfT-PYqpBw.ttf",
+    "modifications": "Lossless WOFF2 container conversion; no glyph changes.",
+    "sha256": "97f60ed6d821c7c476b38c53dde854e14d9ce1c8cc295136a6a9faa2cd243ecb"
+  },
+  "portrait": {
+    "source": "https://avatars.githubusercontent.com/u/163614687?v=4&s=160",
+    "modifications": "User-selected profile image, lossless JPEG-to-PNG decoding and provenance metadata."
+  },
+  "logo": {
+    "source": "vendor/retroarch/media/retroarch-vector_invader-only.svg",
+    "modifications": "Original vector path; white fill and tight viewBox for the sidebar."
+  }
+}

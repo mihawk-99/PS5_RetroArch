@@ -1,0 +1,13 @@
+{
+  "step": "ppsspp-msaa-default",
+  "must_contain": [
+    "compiled-default run: PASS: 6x with 8x MSAA, 3 loads, 1 save, normal exit, no allocation failure",
+    "ppsspp_internal_resolution = \"2880x1632\"",
+    "ppsspp_mulitsample_level = \"x8\""
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "ppsspp-framebuffer-failed"
+  ],
+  "human_check": "Final screenshot inspected: restored scene, 59.94 fps, 3840x2160 viewport. New PPSSPP profile was explicitly selected by the owner."
+}

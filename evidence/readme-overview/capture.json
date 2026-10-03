@@ -1,0 +1,17 @@
+{
+  "step": "readme-overview",
+  "command": "node /tmp/capture-readme.cjs; impeccable embed-prompt --scan assets/readme",
+  "raw_capture": ".impeccable/review/readme/desktop.png",
+  "lines": [
+    "readme: actual console WebUI Overview screenshot leads the page",
+    "readme: URL legend http://<PS5-IP>:6769 and same-network instructions",
+    "readme: current source features distinguished from published releases",
+    "readme: no game names in prose, image, alt text or examples",
+    "readme: desktop 1440 and mobile 390 previews have no horizontal page overflow; image loads",
+    "review: Impeccable finish reviewer ship; final factual delta ship; surface documentation updated",
+    "asset: real screenshot with embedded provenance; no generated UI artwork"
+  ],
+  "readme_sha256": "174f776bd0fab3b6b149263b260c2cbc315f9b363d500942ac74a4ccf838e968",
+  "overview_sha256": "b9df55d7bc7eefeffb974884df8274f599cf429924fbcc941211e10fb47c853c",
+  "preview_scope": "Local GitHub-style Markdown rendering, not exact GitHub website chrome."
+}

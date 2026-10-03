@@ -91,7 +91,8 @@ def main(argv=None):
                         help="also require committed, published source for every part")
     args = parser.parse_args(argv)
     if args.title is None:
-        built = sorted(Path(__file__).resolve().parent.parent.glob("dist/PPSA[0-9]*"))
+        built = sorted(p for p in Path(__file__).resolve().parent.parent.glob("dist/PPSA[0-9]*")
+                       if p.is_dir())
         if len(built) != 1:
             print("error: [notices] name the title folder; dist/ holds "
                   f"{len(built)} of them", file=sys.stderr)

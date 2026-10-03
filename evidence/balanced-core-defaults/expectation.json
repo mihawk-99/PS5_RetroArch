@@ -1,0 +1,14 @@
+{
+  "step": "balanced-core-defaults",
+  "note": "Host-verified defaults and saved-value precedence, not a claim of gameplay stability.",
+  "must_contain": [
+    "test_option_loading_and_reset",
+    "Ran 85 tests",
+    "check-manifest: PASS",
+    "verify: PASS (format unit build integration evidence)"
+  ],
+  "must_not_contain": [
+    "verify: FAIL"
+  ],
+  "human_check": "Pending: firmware 5.02 Chains of Olympus intro/gameplay, close/reload, and representative games in the other changed cores at these defaults."
+}

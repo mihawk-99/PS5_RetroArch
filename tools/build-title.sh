@@ -254,6 +254,13 @@ else
     mapfile -t vulkan_objects <<< "$vulkan_object_list"
 fi
 
+# HTTP parser shared with the websrv reference; bounded streaming avoids whole-game buffers.
+webui_http=$(bash "$root/tools/build-webui-http.sh" ps5)
+webui_http=${webui_http#"$root/"}
+
+# Extract once, before the identity is computed, so catalog changes identify the build.
+python3 "$root/tools/generate-core-metadata.py" "$root/build/webui-core-metadata"
+
 # Bind the running trace and FTP readback to these exact source/archive inputs.
 # The console transforms the SELF container, so its whole-file digest differs.
 CORE_NAMES="${core_names[*]}" python3 - "$root" "$memory_diagnostics" "${vulkan_archives[@]}" "${vulkan_objects[@]}" <<'PY'
@@ -262,12 +269,15 @@ root = pathlib.Path(sys.argv[1])
 inputs = sorted(p for p in (root / "src").rglob("*") if p.is_file())
 inputs += [root / name for name in (
     "build/ra/libretroarch.a", "build/ra-conf/config.h", "tools/build-title.sh",
-    "build/core_imports.inc",
+    "build/core_imports.inc", "tools/build-webui-http.sh",
+    "build/webui-mhd-ps5/src/microhttpd/.libs/libmicrohttpd.a",
     # The SDK fork's revision: its platform layer is linked into the title, and
     # a change there alone changes no other input.
     ".deps/native/ps5-payload-sdk/.ps5-sdk-revision",
     *(f"build/cores/stage/cores/{name}_libretro.so" for name in os.environ["CORE_NAMES"].split()),
     "tools/build.sh", "tools/retroarch-flags.sh")]
+inputs += sorted(p for p in (root / "webui").rglob("*") if p.is_file())
+inputs += sorted(p for p in (root / "build/webui-core-metadata").rglob("*") if p.is_file())
 inputs += [pathlib.Path(name) for name in sys.argv[3:]]
 digest = hashlib.sha256()
 digest.update(b"memory-diagnostics=" + sys.argv[2].encode() + b"\0")
@@ -301,8 +311,8 @@ PS5_PAYLOAD_SDK="$sdk" \
 PS5_CLANG=/usr/bin/clang \
 PYTHONPATH="$root/tooling/pystub${PYTHONPATH:+:$PYTHONPATH}" \
 APP_DEFINITIONS="${title_definition_names[*]}" \
-APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb" \
-APP_STATIC_ARCHIVES="build/ra/libretroarch.a" \
+APP_INCLUDE_PATHS="build/ra-conf build vendor/retroarch build/ra-conf/libretro-common/include vendor/retroarch/deps vendor/retroarch/deps/stb .deps/webui/libmicrohttpd-1.0.10/src/include" \
+APP_STATIC_ARCHIVES="build/ra/libretroarch.a $webui_http" \
 APP_SDK_ARCHIVES="libps5platform.a" \
 APP_VULKAN_ARCHIVES="${vulkan_archives[*]}" \
 APP_EXTRA_OBJECTS="${vulkan_objects[*]}" \
@@ -392,6 +402,22 @@ else
         "$icd" >&2
 fi
 
+# Ship local assets and honest release identity; development builds have no release tag.
+mkdir -p "$dist/webui"
+cp -a "$root/webui/." "$dist/webui/"
+# Core option catalogs are available before the first game is opened.
+mkdir -p "$dist/webui/core-metadata"
+cp -a "$root/build/webui-core-metadata/." "$dist/webui/core-metadata/"
+python3 - "$dist/webui/version.json" "${PS5_RELEASE_TAG:-}" "$root/build/title_build_identity.h" <<'PY_WEBUI'
+import json, pathlib, re, sys
+identity = re.search(r"build identity: ([a-f0-9]+)", pathlib.Path(sys.argv[3]).read_text())[1]
+pathlib.Path(sys.argv[1]).write_text(json.dumps({"release": sys.argv[2], "build": identity,
+    "repository": "mihawk-99/PS5_RetroArch"}) + "\n")
+PY_WEBUI
+
+# Pinned production effects, with dependency and development-fixture checks.
+python3 "$root/tools/video-assets.py" stage "$dist"
+
 # The licences and notices the parts of this folder require, and the source revision
 # of each (tooling/notices/components.json, docs/RELEASING.md), written before the
 # manifest so the manifest covers them. It fails if a staged core is not the file its
@@ -410,6 +436,8 @@ bash "$root/tools/check-manifest.sh" --record
 
 printf '==> [title] built %s (%s files, eboot.bin %s bytes)\n' \
     "$dist" "$(find "$dist" -type f | wc -l)" "$(stat -c %s "$dist/eboot.bin")"
+
+python3 "$root/tools/video-assets.py" package "$dist" --output "$root/dist/PS5_RetroArch.zip"
 
 if $stage; then
     out="$root/handoff/$title_id"

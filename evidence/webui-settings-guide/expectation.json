@@ -1,0 +1,26 @@
+{
+  "step": "webui-settings-guide",
+  "must_contain": [
+    "catalog: 15 cores excluding RPCS3; 846 option definitions available before first game",
+    "catalog: installed-core profiles include unsaved cores; saved values override PS5 defaults",
+    "host: all five gates PASS; 96 tests; final title rebuild PASS",
+    "host: first-use core saves create profiles on restart and preserve PPSSPP/Dolphin migration markers",
+    "host: new catalog/core revision rejects stale runtime choices and defaults; saved settings preserved",
+    "browser: all 15 catalogs expose Guided categories, controls and descriptions",
+    "browser: drafts, exact choices, global/core isolation, pagination, uploads, downloads and release checks PASS",
+    "layout: existing purple layout, 16px scale, desktop/mobile and light/dark controls preserved",
+    "console: deployment readback verifies all 15 catalogs and updated assets; all 4 title markers match",
+    "scope: RPCS3 excluded by user; dynamic BIOS, cartridge and game-specific choices added at registration",
+    "console: owner session ended before testing; menu-only launch loaded the matching final build",
+    "console: all 15 profiles and 846 option keys available through native HTTP before loading content",
+    "console: every native catalog matches its staged JSON; categories and choices present",
+    "console: final run returned zero, WebUI closed, original configuration restored",
+    "review: all frontend material findings resolved; disposition ship",
+    "cleanup: temporary helper and preview stopped; owner reopened RetroArch and was left running"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "AddressSanitizer: stack-buffer-overflow"
+  ],
+  "human_check": "User excluded RPCS3. All15 catalogs verified in browser and native menu-only HTTP run; final trace identity and normal return match. Fresh frontend reviewer resolved all material findings and returned ship. No owner gameplay acceptance claimed."
+}

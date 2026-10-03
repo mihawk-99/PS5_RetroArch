@@ -1,0 +1,66 @@
+{
+  "step": "saturn-runtime",
+  "command": "bash tools/verify.sh; python3 tools/deploy-title.py; python3 klog/saturn-fix/test-final.py",
+  "raw_capture": "klog/saturn-fix/final-20261002-133455/trace-current-run.txt",
+  "build_identity": "b1f7383ea02846dc2bab315a886950860e36ec87cea279fa45abacdbdce72a49",
+  "lines": [
+    "host: all five verification gates pass; 96 tests pass",
+    "paths: startup creates content/Saturn and system/Saturn with FTP-writable permissions",
+    "paths: default BIOS lookup and menu preflight use system/Saturn; custom paths remain unchanged",
+    "runtime: Saturn JITs use SDK executable allocation and matching release",
+    "video: cropped Saturn output uses core-owned storage instead of resized frontend texture",
+    "console: BIOS preflight enabled; regional BIOS found in system/Saturn",
+    "console: clean controlled gameplay in rendering-fix run; final build repeats 100-second boot/demo with normal exit",
+    "console: no new signal fault; native audio reports zero output errors; WebUI stops on exit"
+  ],
+  "frame_window": {
+    "seconds": 35.019000000000005,
+    "frames": 1756,
+    "core_frames_per_second": 50.144,
+    "marks": [
+      [
+        "50.000",
+        "2513",
+        "31.8",
+        "0"
+      ],
+      [
+        "85.019",
+        "4269",
+        "31.9",
+        "0"
+      ]
+    ]
+  },
+  "core_sha256": "c85d47389b962a6b1561f034051bf291daa5228d2181a934b030a8e4cbf71d81",
+  "screenshots": {
+    "pad-shot-1.png": "1954f266b2cd6afdbad8eadb2377c4a8fd70de4cce741f1cf7370297b5e56308",
+    "pad-shot-2.png": "67ea798d6163a2292b4110b7f104c8a55a32f8d1e620458559565f9c14d871cc",
+    "pad-shot-3.png": "7c8726cfdb4449282e2e681b3a5b146490e3f40f5903994fbcae434d5ce83fdc",
+    "pad-shot-4.png": "7d50492a343b22c7d6ef1269b640cff087fc5b26e00adaeb690e599f239ded6f"
+  },
+  "prior_failures": {
+    "missing_bios": "Baseline exited1 because BIOS was searched in general system root.",
+    "jit_execution": "After fixing the BIOS path, executing anonymous non-executable JIT memory raised signal11 in the sound DSP.",
+    "borrowed_frame": "After executable allocation fix, gameplay ran but screenshots showed reused/resized video storage corruption."
+  },
+  "scope": "One PAL disc, short controlled gameplay; not a compatibility sweep or long soak. Raw console data stays ignored.",
+  "controlled_gameplay": {
+    "raw_capture": "klog/saturn-fix/render-20261002-133134/trace.txt",
+    "build_identity": "c846fbfedb42f8fb3c872ee642234e0dc7cd7af43f8aa2e0ee25c5faf0fd487a",
+    "duration_seconds": 100,
+    "gameplay_screenshot_sha256": "fcff50036ecc8e6d052adc8b608ea4d6ba2509fc16eab43fbd30106fa8052554",
+    "difference_from_final": "Final frontend also corrects menu BIOS preflight; Saturn core binary is unchanged."
+  },
+  "preflight": {
+    "raw_capture": "klog/saturn-fix/preflight-20261002-133737/trace.txt",
+    "enabled_verified_in_effective_saved_config": true,
+    "normal_exit": true
+  },
+  "cleanup": {
+    "global_and_core_configs_readback_match_backups": true,
+    "temporary_launch_files_restored": true,
+    "test_screenshots_archived_and_removed_from_console": true,
+    "control_helper_stopped": true
+  }
+}

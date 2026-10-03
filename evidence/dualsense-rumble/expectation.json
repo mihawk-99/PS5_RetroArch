@@ -1,0 +1,22 @@
+{
+  "step": "dualsense-rumble",
+  "must_contain": [
+    "native haptics: s16, advanced mode accepted, worker started",
+    "input: haptic stream outputs=2269 active=568 errors=0",
+    "input: pad script RUMBLE_STRONG 32768: 1",
+    "input: pad script RUMBLE_STRONG 0: 1",
+    "input: pad script RUMBLE_WEAK 32768: 1",
+    "input: pad script RUMBLE_WEAK 0: 1",
+    "input: pad script RUMBLE_STRONG 32768: 1",
+    "input: pad script RUMBLE_WEAK 32768: 1",
+    "input: pad script RUMBLE_STRONG 0: 1",
+    "input: pad script RUMBLE_WEAK 0: 1",
+    "rarch_main returned = 0",
+    "host fault injection: s16/f32 buffers, thread failure, mode failure, output failure and motor error propagation PASS"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "AddressSanitizer: stack-buffer-overflow"
+  ],
+  "human_check": "Physical feel still needs owner confirmation; console output-service acceptance and normal shutdown were verified."
+}

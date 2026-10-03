@@ -1,0 +1,60 @@
+{
+  "collections": [
+    {
+      "name": "slang-shaders",
+      "repository": "libretro/slang-shaders",
+      "revision": "0b3ff0b240f82f4cb5e5d0117f8f2080e2764cf7",
+      "sha256": "4adedc3f15537a528dd5ebe35a722bc0621eca49f9402ce6a5e8666ead6a1386",
+      "destination": "shaders/shaders_slang"
+    },
+    {
+      "name": "common-overlays",
+      "repository": "libretro/common-overlays",
+      "revision": "42c21b99889468a8e77fd7f002229ec16e2f9fa2",
+      "sha256": "9b59b3078845ee5ff3685fc5f89c291b2963fb9511c3e02627e26dee7cfa8ef9",
+      "destination": "overlays/common"
+    },
+    {
+      "name": "overlay-borders",
+      "repository": "libretro/overlay-borders",
+      "revision": "9aceca2dd514c589a57d40086557b804851aafcf",
+      "sha256": "f78ca10f26a960c902440512a4fa790b411551b1710ae64a3a1418af05fede58",
+      "destination": "overlays/borders"
+    }
+  ],
+  "exclusions": {
+    "slang-shaders": {
+      "bezel/Mega_Bezel/shaders/base/phosphor-persistence.slang": "Orphan source, not referenced by any bundled preset; upstream include no longer exists.",
+      "bezel/Mega_Bezel/shaders/easymode/hsm-crt-easymode-halation-basic-border.slang": "Orphan source, not referenced by any bundled preset; upstream include no longer exists.",
+      "bezel/scanline-classic/shaders/phosphor-chroma.slang": "Orphan source, not referenced by any bundled preset; upstream include no longer exists.",
+      "bezel/scanline-classic/shaders/phosphor-luma.slang": "Orphan source, not referenced by any bundled preset; upstream include no longer exists."
+    },
+    "overlay-borders": {
+      "1080 GCE Vectrex/Generic Vectrex Border/Heads-Up_Action_Soccer.cfg": "Upstream omits matching artwork for this variant; other four complete variants retained."
+    }
+  },
+  "corrections": {
+    "slang-shaders": {
+      "bezel/koko-aio/Presets_HiresGames_Fast/Presets_Handhelds-ng/PSP.slangp": {
+        "../textures/": "../../textures/"
+      }
+    },
+    "common-overlays": {
+      "borders/animated-border/nes-border.cfg": {
+        "img-nes/balltop.png": "../../gamepads/arcade-anim/img/balltop.png"
+      },
+      "gamepads/flat/palm.cfg": {
+        "img/\"": "\"img/"
+      },
+      "gamepads/flip_phone/flip_phone.cfg": {
+        "= lines_anim.png": "= img/lines_anim.png"
+      },
+      "ipad/n64-dark/n64_dark.cfg": {
+        "img/ps_next.png": "img/n64_next.png"
+      },
+      "keyboards/commodore/plus4.cfg": {
+        "img/\"plus.png": "img/plus.png"
+      }
+    }
+  }
+}

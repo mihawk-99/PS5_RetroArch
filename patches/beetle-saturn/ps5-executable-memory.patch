@@ -1,0 +1,83 @@
+--- a/mednafen/ss/x86emit.c
++++ b/mednafen/ss/x86emit.c
+@@ -14,6 +14,9 @@
+ #include <assert.h>
+ 
+ #include "x86emit.h"
++#ifdef SATURN_PS5
++#include <ps5platform/exec.h>
++#endif
+ 
+ #if X86EMIT_HOST
+ 
+@@ -41,7 +44,10 @@
+  x86_codegen* cg = (x86_codegen*)calloc(1, sizeof *cg);
+  void* mem;
+  if(!cg) return NULL;
+-#if defined(_WIN32)
++#if defined(SATURN_PS5)
++ mem = ps5_exec_allocate(bytes, (uintptr_t)&x86_codegen_create);
++ if(!mem) { free(cg); return NULL; }
++#elif defined(_WIN32)
+  mem = VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if(!mem) { free(cg); return NULL; }
+ #else
+@@ -57,7 +63,9 @@
+ void x86_codegen_destroy(x86_codegen* cg)
+ {
+  if(!cg) return;
+-#if defined(_WIN32)
++#if defined(SATURN_PS5)
++ ps5_exec_release(cg->base);
++#elif defined(_WIN32)
+  VirtualFree(cg->base, 0, MEM_RELEASE);
+ #else
+  munmap(cg->base, cg->size);
+@@ -839,7 +847,9 @@
+ #if X86EMIT_64
+ static void* rwx_alloc_at(void* hint, size_t bytes)
+ {
+-#if defined(_WIN32)
++#if defined(SATURN_PS5)
++ return ps5_exec_allocate(bytes, (uintptr_t)hint);
++#elif defined(_WIN32)
+  return VirtualAlloc(hint, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+ #else
+  void* p = mmap(hint, bytes, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+@@ -849,7 +859,9 @@
+ 
+ static void rwx_free(void* p, size_t bytes)
+ {
+-#if defined(_WIN32)
++#if defined(SATURN_PS5)
++ (void)bytes; ps5_exec_release(p);
++#elif defined(_WIN32)
+  (void)bytes; VirtualFree(p, 0, MEM_RELEASE);
+ #else
+  munmap(p, bytes);
+--- a/Makefile
++++ b/Makefile
+@@ -74,7 +74,7 @@
+ # PS5 (a homebrew title's libretro core): the console's libraries resolve at
+ # load time, so no --no-undefined; no LTO.
+ ifeq ($(platform), ps5)
+-   FLAGS += -DHAVE_MMAP
++   FLAGS += -DHAVE_MMAP -DSATURN_PS5
+    TARGET := $(TARGET_NAME)_libretro.so
+    fpic := -fPIC
+    SHARED := -shared -Wl,--version-script=link.T
+--- a/libretro.c
++++ b/libretro.c
+@@ -183,6 +183,12 @@
+ {
+    struct retro_framebuffer fb;
+ 
++#ifdef SATURN_PS5
++   /* Vulkan resizes its lent texture to the cropped output dimensions before
++    * upload. A pointer into that old texture would then reference freed storage.
++    * Keep the core-owned surface and let the frontend copy the visible rows. */
++   return NULL;
++#endif
+    if (!surf || !environ_cb)
+       return NULL;
+    if (last_frame_interlaced || PrevInterlaced)

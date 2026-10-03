@@ -79,6 +79,7 @@ void initialize(void *)
                                  "/app0/overlays",  "/app0/autoconfig",
                                  "/app0/database",  "/app0/thumbnails",
                                  "/app0/screenshots", "/app0/remaps",  "/app0/recordings",
+                                 "/app0/content/Saturn", "/app0/system/Saturn",
                                  "/app0/filters",   "/app0/filters/audio",
                                  "/app0/filters/video", "/app0/cache"};
     for (const char *path : directories)
@@ -134,6 +135,9 @@ void initialize(void *)
     set_directory(DEFAULT_DIR_SAVESTATE, "/app0/savestates");
     set_directory(DEFAULT_DIR_PLAYLIST, "/app0/playlists");
     set_directory(DEFAULT_DIR_ASSETS, "/app0/assets");
+    set_directory(DEFAULT_DIR_SHADER, "/app0/shaders");
+    set_directory(DEFAULT_DIR_VIDEO_FILTER, "/app0/filters");
+    set_directory(DEFAULT_DIR_OVERLAY, "/app0/overlays");
     set_directory(DEFAULT_DIR_LOGS, "/app0");
     /* The rest of the PC layout: cheats, shaders, overlays, autoconfig and the
      * database directories a RetroArch asset drop expects to find. */
@@ -202,6 +206,14 @@ int drives(void *data, bool content)
 
 extern "C"
 {
+    const char *ps5_core_system_directory(const char *core, const char *directory)
+    {
+        if (core && directory && std::strcmp(core, "Beetle Saturn") == 0 &&
+            std::strcmp(directory, "/app0/system") == 0)
+            return "/app0/system/Saturn";
+        return directory;
+    }
+
     frontend_ctx_driver_t frontend_ctx_ps5 = []
     {
         frontend_ctx_driver_t driver{};

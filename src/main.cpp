@@ -49,8 +49,10 @@
 
 #include "trace.hpp"
 #include "memory_diagnostics.hpp"
+#include "memory_status.h"
 #include "../build/title_build_identity.h"
 #include "title_threads.hpp"
+#include "webui_ps5.h"
 
 /* RetroArch's entry, in C. */
 extern "C" int rarch_main(int argc, char *argv[], void *data);
@@ -98,6 +100,7 @@ void *log_flusher(void *)
         nanosleep(&interval, nullptr);
         if (tick % 40 == 0 && g_memory_report.load(std::memory_order_relaxed))
         {
+            ps5_memory_report("periodic", 0, 0);
             std::size_t flexible = 0;
             sceKernelAvailableFlexibleMemorySize(&flexible);
             std::fprintf(stderr, "memory: flexible_free=%zu KiB\n", flexible >> 10);
@@ -486,7 +489,7 @@ int main()
         ps5::debug::mark_value("argv extras from /app0/args.txt", extra_count);
     }
 
-    char *argv_with_extras[sizeof(argv) / sizeof(argv[0]) + max_extra_args];
+    char *argv_with_extras[sizeof(argv) / sizeof(argv[0]) + max_extra_args + 2];
     std::size_t base_count = sizeof(argv) / sizeof(argv[0]) - 1;
     for (std::size_t i = 0; i < base_count; i++)
         argv_with_extras[i] = argv[i];
@@ -502,9 +505,33 @@ int main()
         base_count--;
     for (int i = 0; i < extra_count; i++)
         argv_with_extras[base_count + i] = extra_storage[i];
+    // Kept separate so RetroArch's normal config save cannot erase browser edits.
+    static char webui_append[] = "--appendconfig";
+    static char webui_config[] = "/app0/config/webui.cfg";
+    static char combined_configs[max_extra_arg_len + sizeof(webui_config) + 1];
+    if (std::FILE *saved_webui = std::fopen(webui_config, "rb"))
+    {
+        std::fclose(saved_webui);
+        ps5::debug::mark("webui: applying saved settings at startup");
+        // RetroArch uses only the last --appendconfig, with | separating files.
+        // Explicit launch overrides still win over the browser's saved defaults.
+        const char *explicit_config = nullptr;
+        for (int i = 0; i < extra_count; i++)
+        {
+            if (std::strcmp(extra_storage[i], "--appendconfig") == 0 && i + 1 < extra_count)
+                explicit_config = extra_storage[++i];
+            else if (std::strncmp(extra_storage[i], "--appendconfig=", 15) == 0)
+                explicit_config = extra_storage[i] + 15;
+        }
+        std::snprintf(combined_configs, sizeof(combined_configs), "%s%s%s", webui_config,
+                      explicit_config ? "|" : "", explicit_config ? explicit_config : "");
+        argv_with_extras[base_count + extra_count++] = webui_append;
+        argv_with_extras[base_count + extra_count++] = combined_configs;
+    }
     argv_with_extras[base_count + extra_count] = nullptr;
 
     ps5_crash_report_install();
+    ps5_memory_report("startup", 0, 0);
     ps5_core_threads_start();
     ps5_sampler_start();
     ps5_audio_test_if_requested();
@@ -523,8 +550,11 @@ int main()
     }
     else if (ps5vk_display_retain != nullptr)
         ps5vk_display_retain(true);
+    ps5_webui_start("/app0");
     const int status =
         rarch_main(static_cast<int>(base_count + extra_count), argv_with_extras, nullptr);
+
+    ps5_webui_stop();
 
     /* If this line is on the console, the frontend ran and returned by itself. */
     ps5::debug::mark_value("rarch_main returned", status);

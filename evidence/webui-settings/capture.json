@@ -1,0 +1,112 @@
+{
+  "step": "webui-settings",
+  "build_identity": "ed2693f0023bbd8e6c4c44c691b5afcd2d3b3d17ca46fee6524dac042e8df151",
+  "command": "python3 tools/deploy-title.py && python3 klog/webui-settings/console-test.py",
+  "raw_capture": "klog/webui-settings/webui-settings-20261002-113421/report.json",
+  "lines": [
+    "console: GET global configuration returned 3232 settings",
+    "console: global edits and PPSSPP core options/RetroArch override accepted",
+    "console: stale revision rejected; core edit did not change global setting",
+    "console: running core profile remained unchanged until restart",
+    "[INFO] [Config] Appending override config: \"/app0/config/PPSSPP/PPSSPP.cfg\".",
+    "console: PPSSPP profile saved 1920x1088 after restart; pending .opt and .cfg consumed",
+    "console: later native core edit to 2880x1632 survived another restart",
+    "console: saved runtime global audio_volume=-17; fastforward_ratio=2.5",
+    "console: all three exits normal; WebUI port closed after each exit",
+    "console: original global config, PPSSPP 6x/x8 profile, core override and pending files restored",
+    "console: idle; temporary helper stopped",
+    "host: all five gates PASS; 93 tests",
+    "PASS: release ordering/current/update/unknown/offline/empty, safe notes, real upload/download, duplicate refusal, keyboard cancellation during upload, global/core isolation, pagination, settings persistence, folder creation, navigation, mobile overflow and saved theme.",
+    "layout: fixed 16px root at 3440, 1920, 1366 and 390px viewports; no horizontal overflow",
+    "review: declared types, consumed pending edits, updated design contract and bounded width scored resolved; disposition ship"
+  ],
+  "console": {
+    "runs": [
+      {
+        "run": 1,
+        "port": 6769,
+        "http_status": 200,
+        "global_settings_count": 3232,
+        "global_saved": true,
+        "core_options_saved": true,
+        "core_override_saved": true,
+        "global_isolated": true,
+        "stale_write_refused": true,
+        "running_core_profile_untouched": true,
+        "service_closed": true,
+        "normal_exit": true
+      },
+      {
+        "run": 2,
+        "port": 6769,
+        "http_status": 200,
+        "service_closed": true,
+        "core_resolution": "1920x1088",
+        "pending_consumed": true,
+        "normal_exit": true
+      },
+      {
+        "run": 3,
+        "port": 6769,
+        "http_status": 200,
+        "service_closed": true,
+        "core_resolution": "2880x1632",
+        "pending_consumed": true,
+        "runtime_volume": -17,
+        "runtime_fastforward_ratio": 2.5,
+        "later_native_core_edit_preserved": true,
+        "normal_exit": true
+      }
+    ],
+    "original_files_restored": true
+  },
+  "raw_sha256": {
+    "kernel.log": "d4e618318c3524f81b0f30187fb17f6369afd748bbbe4a382f1ab5c13bc6e441",
+    "run1-retroarch.log": "6701417a3e1bd7ed914a7eae7ba5d9f606c6cf6fda2a1f59e7341a1e1e66f2a7",
+    "run1-trace.txt": "23805975ffefd238eac9b9b9079d0ab2d5a0dd9ccb0ef08b6ee23c872420a92d",
+    "run1-config__retroarch.cfg": "8140925cbc5d7baa5130711f52cee9acb7cda1a370ed46cf5a7464ea31e29d2f",
+    "run1-config__PPSSPP__PPSSPP.opt": "edad89cedf3da7d8d90b2c958cb731ff7f27edbc346c0ae6e4e9ecd6b19af925",
+    "run1-config__PPSSPP__PPSSPP.cfg": "6b5fda2c95e5b24c175a25243600c0d4cee7736b14a04c47b543bfe586768e28",
+    "report.json": "115a0c51eeee39eef0225c8b2db4fe636f9570c9d87cd958e47011a56c7ef3bd",
+    "run2-retroarch.log": "bf9687884e108888321a3ac254b7faf927132e6b6f565de1710d07878716e6dc",
+    "run2-trace.txt": "39a5eeded4e4f3e9ee2f92676ad9c2139bc1f02bdf20ef6209e111df216a21e6",
+    "run2-config__retroarch.cfg": "90504d0e7b615b38fd2c352d40ca3ca20b0904b233c1bddd12066ca0f0cf2beb",
+    "run2-config__PPSSPP__PPSSPP.opt": "bb16a94646844eceadb3485d96d48a46915cccc01b7aa470550187f34e14d9f5",
+    "run2-config__PPSSPP__PPSSPP.cfg": "1913aa42bf17078768c7855675e4d5995f6b1b4e07edc4a43ae2422d5bb6cad3",
+    "run3-retroarch.log": "6701417a3e1bd7ed914a7eae7ba5d9f606c6cf6fda2a1f59e7341a1e1e66f2a7",
+    "run3-trace.txt": "283da904add5bfb04be83704214599bedda42297d8b00b81521ff49fddec560c",
+    "run3-config__retroarch.cfg": "90504d0e7b615b38fd2c352d40ca3ca20b0904b233c1bddd12066ca0f0cf2beb",
+    "run3-config__PPSSPP__PPSSPP.opt": "704849392c140fdc43ff60db8a1ea08609368e6d9fddc5bccf4393dc5d7be5b0",
+    "run3-config__PPSSPP__PPSSPP.cfg": "1913aa42bf17078768c7855675e4d5995f6b1b4e07edc4a43ae2422d5bb6cad3",
+    "final-retroarch.log": "6701417a3e1bd7ed914a7eae7ba5d9f606c6cf6fda2a1f59e7341a1e1e66f2a7",
+    "final-trace.txt": "283da904add5bfb04be83704214599bedda42297d8b00b81521ff49fddec560c",
+    "test-output-__data__homebrew__PPSA99169__webui-settings-20261002-113421__PSP__SYSTEM__CACHE__UCUS98737.vkshadercache": "596f0e9ecc5f4c644b9f7a7d187fd0745f350fcde920e239cd8263cd14584bab"
+  },
+  "frontend_sha256": {
+    "webui/index.html": "ceccc18e9c4298e47fd4b196724ba2446dffa19fd53e30d651362408d50cda94",
+    "webui/app.css": "6217654eccfc04bbbf2e3b615aea4ae1ec18b628be5c5271bc3d9249ca59b05d",
+    "webui/app.js": "273497bca6d097137e9d0d495898204ccf0d5013028bade7c312d2921cb3fcf0",
+    "webui/assets/mihawk.png": "ccef6efbd5757d2c60ab60c002b5790c6cc0d9da9132c274954fc6453b62850d",
+    "webui/assets/OFL.txt": "cc8c0c3e81cf543e190f128b83ba7c30959f15865c14dd972fca4917faeceec1",
+    "webui/assets/ui.woff2": "97f60ed6d821c7c476b38c53dde854e14d9ce1c8cc295136a6a9faa2cd243ecb",
+    "webui/assets/retroarch.svg": "b8bae8ac79ae9c6a5bfce1eb2422ab8e7a386c72b401e20e73fe839ad9c3f5df",
+    "webui/assets/source.json": "e029c427534cb392c0d79d6a72d888655eb8b993a3cab1cc332e6a46eb55927a"
+  },
+  "screenshots_sha256": {
+    "ultrawide.png": "a0816886bcf849867d4b6bcfb09805369937d750f71d73030669100e458571fe",
+    "desktop.png": "40c06f37c94be8d6e907eb3fc2aba6929ec63b6e5c6ce5bbaf9e1a9c134657af",
+    "laptop.png": "0d423b57d22c0102e8c82757eab88f8f7bf44ed0e70593ce22f0a0dd8e64af39",
+    "mobile.png": "213620bd930e0b5f77a910e5d76408275f2368d257fdb2bce7894ce433159178",
+    "mobile-content.png": "9157f743aa214fada82019c3f6583fae2dcc222ab5c90219c5968d1c1e7fb3dd",
+    "mobile-settings.png": "6f05167c6722f79d6f6eb33b56fc17fc8e84527291b1cb4911bda21c990e0a6a",
+    "desktop-global-settings.png": "1f5522b910293b71ea87bd009e91c953e06e953d455b265942a75b6d53cd6f6e",
+    "desktop-core-settings.png": "a46410e9cac6c6567b0ec6b6fc95a51a45f8f1a83653d9f731e35e45f7ea4e6e",
+    "mobile-dark.png": "c6d201bcef4e46f60cafa6db50e527d057f76180a54745d01b6eb8409c2e9f39"
+  },
+  "limitations": [
+    "Only settings present in saved global/seed configuration and saved core profiles are exposed. Cores must save a profile before they appear.",
+    "Fields without declared metadata are exact configuration strings, not a complete catalogue of supported choices/ranges.",
+    "Changes apply next RetroArch launch. Core RetroArch overrides require automatic overrides enabled; game/folder overrides may take priority.",
+    "Native PPSSPP boot/profile persistence was exercised; no compatibility sweep or gameplay performance claim. Existing nonfatal PPSSPP guest diagnostics remain in the raw capture."
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "step": "saturn-runtime",
+  "must_contain": [
+    "host: all five verification gates pass; 96 tests pass",
+    "paths: startup creates content/Saturn and system/Saturn with FTP-writable permissions",
+    "paths: default BIOS lookup and menu preflight use system/Saturn; custom paths remain unchanged",
+    "runtime: Saturn JITs use SDK executable allocation and matching release",
+    "video: cropped Saturn output uses core-owned storage instead of resized frontend texture",
+    "console: BIOS preflight enabled; regional BIOS found in system/Saturn",
+    "console: clean controlled gameplay in rendering-fix run; final build repeats 100-second boot/demo with normal exit",
+    "console: no new signal fault; native audio reports zero output errors; WebUI stops on exit"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "rarch_main returned = 1"
+  ],
+  "human_check": "Agent inspected the captured startup and gameplay frames for the prior duplication/corruption; physical audio quality was not independently listened to."
+}

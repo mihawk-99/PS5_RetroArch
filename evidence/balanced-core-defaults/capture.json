@@ -1,0 +1,45 @@
+{
+  "step": "balanced-core-defaults",
+  "scope": "Host option semantics, PS5 cross-build and packaging only; no console run",
+  "console_verified": false,
+  "command": "CCACHE_DIR=\"$PWD/build/verification/ccache\" bash tools/verify.sh",
+  "raw_capture": "build/verification/balanced-defaults-gates.log",
+  "raw_lines": 877,
+  "lines": [
+    "test_option_loading_and_reset (test_balanced_core_defaults.BalancedCoreDefaults.test_option_loading_and_reset) ... ok",
+    "test_default_title_lookup_ignores_release_zip (test_notices.Notices.test_default_title_lookup_ignores_release_zip) ... error: [notices] name the title folder; dist/ holds 2 of them",
+    "Ran 85 tests in 13.515s",
+    "==> [notices] /tmp/tmp2xrxqsz8/repo/dist/PPSA99169/licenses covers every shipped executable",
+    "==> [title] build identity: f4e9de26514bbf41e11fd5dabaf45f12994ddcaa8e9a83cb85b3bb52e5c59013",
+    "test_option_loading_and_reset (test_balanced_core_defaults.BalancedCoreDefaults.test_option_loading_and_reset) ... ok",
+    "test_default_title_lookup_ignores_release_zip (test_notices.Notices.test_default_title_lookup_ignores_release_zip) ... error: [notices] name the title folder; dist/ holds 2 of them",
+    "Ran 85 tests in 14.043s",
+    "==> [notices] /tmp/tmp7yrxbz5q/repo/dist/PPSA99169/licenses covers every shipped executable",
+    "check-manifest: PASS",
+    "==> [notices] /home/mihawk/Desktop/PS5_Homebrews/PS5_RetroArch/dist/PPSA99169/licenses covers every shipped executable",
+    "verify: PASS (format unit build integration evidence)"
+  ],
+  "defaults": {
+    "ppsspp_internal_resolution": "2880x1632",
+    "ppsspp_mulitsample_level": "Disabled",
+    "dolphin_efb_scale": "4",
+    "pcsx2_upscale_multiplier": "4x Native (~1440p/2K)",
+    "beetle_psx_hw_internal_resolution": "8x",
+    "beetle_psx_hw_msaa": "1x",
+    "citra_resolution_factor": "6",
+    "desmume_internal_resolution": "1024x768"
+  },
+  "sha256": {
+    "tools/apply-port-patches.py": "1f815cf299849c7193198153691789b6f9f48377c5e9bdb5a0c4e1cabcaa934f",
+    "patches/series": "6b39c930509c563a40bde2a384d5be4ee2b0a753d8eef53f3e42798629c0b76e",
+    "tests/test_balanced_core_defaults.py": "f93a5d2289da2a41a83af9c89944c92827c09b30e4af7a8de604ddc01132f2d5",
+    "tests/test_frontend.py": "30a77a16dc786cd6d4348385897ba76d289cc15b028669319a05f42e30bb7e75",
+    "tools/check-notices.py": "30b4ebf68c58c48cce4cb0cc4b95fec49dd19f83730b456e2184cc68a430ba51",
+    "tests/test_notices.py": "ce940c12fade6d0e045fb6bf76df5f30f2e7e0fb319fe75ac0f06892da92ac56",
+    "build/ra/obj/core_option_manager.c.o": "c096412be0e1dafc846ec45ec9470c4b2c062e63909cb8c99874e6ff75c3938c",
+    "dist/PPSA99169/eboot.bin": "d97ddc6b9095b6683addd8500e683dccbf1a758d95bfb2489f5bed16cff69063",
+    "dist/PPSA99169/manifest.sha256": "d1b1f48d24521b7d2a8d45e7f1efbd451642add2415f777a34dba7a78d409cac"
+  },
+  "linked_helper": "ps5_core_option_default (build/title.map)",
+  "report_assessment": "User reports 6x works after 10x intro crash on firmware 5.02. Supplied logs show 10x geometry, 8x MSAA pipelines and SIGSEGV at address 0x50. Cause not established."
+}

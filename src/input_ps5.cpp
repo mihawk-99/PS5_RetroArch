@@ -41,7 +41,8 @@
  * thread about 20 s). `<seconds> MARK`
  * prints how many new frames the core has made and the longest gap between
  * two since the last MARK, so a run's frame rate is read over exact script
- * times. Testing only: the file is never shipped.
+ * times. RUMBLE_STRONG and RUMBLE_WEAK take a strength (0..65535) and exercise
+ * controller feedback; send 0 to stop. Testing only: the file is never shipped.
  *
  * Reference: docs/REFERENCE.md, "Input".
  */
@@ -61,10 +62,15 @@
 
 #include <input/input_driver.h>
 #include "content.h"
+#include "memory_status.h"
 #ifdef HAVE_MENU
 #include "command.h"
 #include "configuration.h"
 #include "core_option_manager.h"
+#if defined(HAVE_SLANG)
+#include "gfx/video_shader_parse.h"
+#include "menu/menu_shader.h"
+#endif
 #endif
 #include "gfx/video_driver.h"
 #include "retroarch_types.h"
@@ -84,6 +90,8 @@ struct ScePadVibrationParam
 
 extern "C"
 {
+    // Scoped to synchronous test capture; normal screenshots keep the viewport.
+    bool ps5_test_full_screenshot = false;
     /* The console's pad service. Declarations rather than the SDK's headers: this
      * payload SDK ships no header for these, and ../ProsperoLight declares the same
      * shapes, which the console accepted. */
@@ -108,9 +116,7 @@ extern "C"
      * Port type 10 is the pad's vibration port: PCM written there reaches the
      * DualSense's voice-coil actuators, which is how titles produce real
      * haptic feedback rather than the compatible-mode motor emulation. The
-     * constant comes from the port-type enumeration mirrored in AnyPS5's
-     * libSceAudioOut reimplementation; it is not verified on this title's
-     * hardware yet. */
+     * constant follows PR #6 (rpf16rj), which cites AnyPS5. */
     std::int32_t sceAudioOutInit();
     std::int32_t sceAudioOutOpen(std::int32_t user_id, std::int32_t type, std::int32_t index,
                                  std::uint32_t len, std::uint32_t freq, std::uint32_t param);
@@ -197,6 +203,9 @@ struct PadState
      * -1 / not started when the port could not be opened and rumble falls back
      * to the compatible-mode motor path. */
     std::int32_t haptic_port = -1;
+    bool haptic_float = false;
+    pthread_mutex_t rumble_mutex = PTHREAD_MUTEX_INITIALIZER;
+    bool haptic_active = false; // guarded by rumble_mutex
     pthread_t haptic_thread{};
     bool haptic_thread_started = false;
     std::atomic<bool> haptic_stop{false};
@@ -234,8 +243,12 @@ enum class ScriptActionKind
     save_state,
     load_state,
     screenshot,
+    screenshot_full,
     mark,
     option,
+    effect,
+    rumble_strong,
+    rumble_weak,
 };
 // The core's new frames (gfx/video_driver.c, patches/series 0101), the
 // longest time between two of them since the last MARK and how many came more
@@ -252,9 +265,9 @@ struct ScriptAction
     double at;
     bool done;
     ScriptActionKind kind;
-    int slot;       // SAVE_STATE and LOAD_STATE: the slot given, or -1 for the current one
-    char key[64];   // OPTION: the core option's key
-    char value[32]; // OPTION: the value to set, as the core lists it
+    int slot;        // SAVE_STATE and LOAD_STATE: the slot given, or -1 for the current one
+    char key[64];    // OPTION: the core option's key
+    char value[512]; // OPTION value, or EFFECT preset path
 };
 constexpr int action_capacity = 32;
 ScriptAction actions[action_capacity];
@@ -284,7 +297,7 @@ void load_script() noexcept
     std::FILE *file = std::fopen("/app0/pad-script.txt", "rb");
     if (file == nullptr)
         return;
-    char line[160];
+    char line[640];
     while (script_count < script_capacity && std::fgets(line, sizeof(line), file) != nullptr)
     {
         char *hash = std::strchr(line, '#');
@@ -305,7 +318,10 @@ void load_script() noexcept
                             {"SAVE_STATE", ScriptActionKind::save_state},
                             {"LOAD_STATE", ScriptActionKind::load_state},
                             {"SCREENSHOT", ScriptActionKind::screenshot},
-                            {"MARK", ScriptActionKind::mark}};
+                            {"SCREENSHOT_FULL", ScriptActionKind::screenshot_full},
+                            {"MARK", ScriptActionKind::mark},
+                            {"RUMBLE_STRONG", ScriptActionKind::rumble_strong},
+                            {"RUMBLE_WEAK", ScriptActionKind::rumble_weak}};
         // OPTION key value: set a core option as the Quick Menu does (the core
         // sees it as an update at its next frame)
         if (std::strcmp(buttons, "OPTION") == 0 && action_count < action_capacity)
@@ -313,6 +329,15 @@ void load_script() noexcept
             ScriptAction option{at, false, ScriptActionKind::option, -1, {0}, {0}};
             if (std::sscanf(line, "%lf %*s %63s %31s", &at, option.key, option.value) == 3)
                 actions[action_count++] = option;
+            continue;
+        }
+        // Development scripts share the normal frontend shader/overlay APIs.
+        // EFFECT shader|overlay <absolute path or off>; permits switch stress.
+        if (std::strcmp(buttons, "EFFECT") == 0 && action_count < action_capacity)
+        {
+            ScriptAction effect{at, false, ScriptActionKind::effect, -1, {0}, {0}};
+            if (std::sscanf(line, "%lf %*s %63s %511[^\r\n]", &at, effect.key, effect.value) == 3)
+                actions[action_count++] = effect;
             continue;
         }
         bool is_action = false;
@@ -481,16 +506,18 @@ float haptic_noise(std::uint32_t &rng) noexcept
 void *haptic_worker(void *opaque) noexcept
 {
     auto *state = static_cast<PadState *>(opaque);
-    std::int16_t out[haptic_grain * 2];
+    alignas(16) std::int16_t out[haptic_grain * 2];
+    alignas(16) float float_out[haptic_grain * 2];
     const double two_pi = 6.283185307179586;
     double phase_low = 0.0, phase_high = 0.0, phase_fx = 0.0;
     float env_strong = 0.0f, env_weak = 0.0f, env_fx = 0.0f;
     float lp_left = 0.0f, lp_right = 0.0f, lp_fx = 0.0f;
     std::uint32_t rng = 0x9e3779b9u;
-    int outputs_ok = 0, outputs_failed = 0;
     int failures = 0;
+    unsigned outputs = 0, active_outputs = 0, errors = 0;
     while (!state->haptic_stop.load(std::memory_order_relaxed))
     {
+        bool nonzero = false;
         for (std::uint32_t i = 0; i < haptic_grain; ++i)
         {
             const float strong = state->rumble_large.load(std::memory_order_relaxed) / 255.0f;
@@ -556,6 +583,7 @@ void *haptic_worker(void *opaque) noexcept
                 };
                 out[2 * i] = to_s16_fx(fx);
                 out[2 * i + 1] = to_s16_fx(fx);
+                nonzero = true;
                 continue;
             }
             env_fx += (0.0f - env_fx) * 0.05f;
@@ -571,15 +599,18 @@ void *haptic_worker(void *opaque) noexcept
                 phase_high -= 1.0;
             /* Left and right actuators get decorrelated noise so textures read
              * as surface, not as one monotone buzz. */
-            const float left = env_strong * (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) +
-                                             0.5f * lp_left) +
-                               env_weak * (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) +
-                                           0.45f * lp_right);
-            const float right = env_strong * (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) +
-                                              0.5f * lp_right) +
-                                env_weak * (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) +
-                                            0.45f * lp_left);
-            const auto to_s16 = [](float v) -> std::int16_t {
+            const float left =
+                env_strong *
+                    (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) + 0.5f * lp_left) +
+                env_weak *
+                    (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) + 0.45f * lp_right);
+            const float right =
+                env_strong *
+                    (0.7f * static_cast<float>(std::sin(two_pi * phase_low)) + 0.5f * lp_right) +
+                env_weak *
+                    (0.55f * static_cast<float>(std::sin(two_pi * phase_high)) + 0.45f * lp_left);
+            const auto to_s16 = [](float v) -> std::int16_t
+            {
                 const float scaled = v * 26000.0f;
                 if (scaled > 32767.0f)
                     return 32767;
@@ -589,34 +620,49 @@ void *haptic_worker(void *opaque) noexcept
             };
             out[2 * i] = to_s16(left);
             out[2 * i + 1] = to_s16(right);
+            nonzero |= out[2 * i] != 0 || out[2 * i + 1] != 0;
         }
-        const int out_rc = sceAudioOutOutput(state->haptic_port, out);
-        if (out_rc < 0)
+        const void *buffer = out;
+        if (state->haptic_float)
         {
-            if (++outputs_failed <= 3)
-            {
-                char dbg[128];
-                std::snprintf(dbg, sizeof(dbg),
-                              "input: haptic output rc=%d ok=%d", out_rc, outputs_ok);
-                ps5_input_trace(dbg);
-            }
+            for (unsigned i = 0; i < haptic_grain * 2; ++i)
+                float_out[i] = out[i] / 32768.0f;
+            buffer = float_out;
+        }
+        if (sceAudioOutOutput(state->haptic_port, buffer) < 0)
+        {
+            ++errors;
             if (++failures >= haptic_output_failures_to_quit)
             {
                 /* The port went dead: put the pad back on the motor path so
                  * rumble still works, then let the thread end. */
-                if (state->handle >= 0)
-                    (void)scePadSetVibrationMode(state->handle, 2);
+                pthread_mutex_lock(&state->rumble_mutex);
+                state->haptic_active = false;
+                const int mode = scePadSetVibrationMode(state->handle, 2);
+                const ScePadVibrationParam levels{state->rumble_large.load(),
+                                                  state->rumble_small.load()};
+                const int motor = scePadSetVibration(state->handle, &levels);
+                pthread_mutex_unlock(&state->rumble_mutex);
+                char line[128];
+                std::snprintf(line, sizeof(line), "input: haptic fallback mode=%d motors=%d", mode,
+                              motor);
+                ps5_input_trace(line);
                 ps5_input_trace("input: haptic port stopped answering; back to motor rumble");
-                return nullptr;
+                break;
             }
             (void)sceKernelUsleep(2000);
         }
         else
         {
-            ++outputs_ok;
             failures = 0;
+            ++outputs;
+            active_outputs += nonzero ? 1 : 0;
         }
     }
+    char note[128];
+    std::snprintf(note, sizeof(note), "input: haptic stream outputs=%u active=%u errors=%u",
+                  outputs, active_outputs, errors);
+    ps5_input_trace(note);
     return nullptr;
 }
 
@@ -666,28 +712,46 @@ void *open_pad() noexcept
      * and the motor-level path stays silent, which is fine because the worker
      * synthesizes from the same rumble levels. When the port refuses, the pad
      * keeps compatible mode (2) and scePadSetVibration still moves the motors. */
-    (void)sceAudioOutInit();
-    state->haptic_port =
-        sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain, haptic_rate,
-                        haptic_format_s16_stereo);
-    if (state->haptic_port < 0)
-        state->haptic_port =
-            sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain, haptic_rate,
-                            haptic_format_f32_stereo);
-    const std::int32_t mode_result =
-        scePadSetVibrationMode(state->handle, state->haptic_port >= 0 ? 1 : 2);
-    if (state->haptic_port >= 0)
-        state->haptic_thread_started =
-            create_title_thread(&state->haptic_thread, haptic_worker, state) == 0;
+    const int audio_init = sceAudioOutInit();
+    if (audio_init == 0 || static_cast<std::uint32_t>(audio_init) == 0x8026000eu)
     {
-        char line[224];
+        state->haptic_port = sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain,
+                                             haptic_rate, haptic_format_s16_stereo);
+        if (state->haptic_port < 0)
+        {
+            state->haptic_float = true;
+            state->haptic_port = sceAudioOutOpen(user_id, haptic_port_type, 0, haptic_grain,
+                                                 haptic_rate, haptic_format_f32_stereo);
+        }
+    }
+    int mode_result = -1;
+    int thread_result = -1;
+    if (state->haptic_port >= 0)
+    {
+        mode_result = scePadSetVibrationMode(state->handle, 1);
+        if (mode_result == 0)
+        {
+            state->haptic_active = true;
+            thread_result = create_title_thread(&state->haptic_thread, haptic_worker, state);
+            state->haptic_thread_started = thread_result == 0;
+        }
+        if (!state->haptic_thread_started)
+        {
+            state->haptic_active = false;
+            (void)sceAudioOutClose(state->haptic_port);
+            state->haptic_port = -1;
+        }
+    }
+    if (!state->haptic_thread_started)
+        mode_result = scePadSetVibrationMode(state->handle, 2);
+    {
+        char line[256];
         std::snprintf(line, sizeof(line),
                       "input: pad opened, user=%d handle=%d haptic_port=%d haptic_thread=%d "
-                      "vibration_mode=%d",
-                      static_cast<int>(user_id), state->handle,
-                      static_cast<int>(state->haptic_port),
-                      state->haptic_thread_started ? 1 : 0,
-                      static_cast<int>(mode_result));
+                      "vibration_mode=%d format=%s thread_result=%d",
+                      static_cast<int>(user_id), state->handle, state->haptic_port,
+                      state->haptic_thread_started ? 1 : 0, mode_result,
+                      state->haptic_float ? "f32" : "s16", thread_result);
         ps5_input_trace(line);
     }
     return state;
@@ -744,6 +808,7 @@ void close_pad(void *data) noexcept
         (void)sceUserServiceTerminate();
         state->owns_user_service = false;
     }
+    pthread_mutex_destroy(&state->rumble_mutex);
     delete state;
 }
 
@@ -794,6 +859,8 @@ bool args_paths(char *core, std::size_t core_size, char *content, std::size_t co
 }
 
 /* Runs the script's actions whose time has come. */
+bool joypad_set_rumble(unsigned, enum retro_rumble_effect, std::uint16_t) noexcept;
+
 void run_script_actions() noexcept
 {
     if (action_count == 0)
@@ -811,6 +878,76 @@ void run_script_actions() noexcept
         if (action.done || seconds < action.at)
             continue;
         action.done = true;
+        if (action.kind == ScriptActionKind::effect)
+        {
+            bool ok = false;
+#ifdef HAVE_MENU
+            settings_t *settings = config_get_ptr();
+            const bool off = std::strcmp(action.value, "off") == 0;
+#if defined(HAVE_SLANG)
+            if (std::strcmp(action.key, "shader") == 0)
+                ok = video_shader_apply_shader(settings, RARCH_SHADER_SLANG,
+                                               off ? "" : action.value, true);
+            if (std::strcmp(action.key, "save-shader") == 0)
+            {
+                auto_shader_type scope = SHADER_PRESET_CURRENT;
+                if (std::strcmp(action.value, "global") == 0)
+                    scope = SHADER_PRESET_GLOBAL;
+                else if (std::strcmp(action.value, "core") == 0)
+                    scope = SHADER_PRESET_CORE;
+                else if (std::strcmp(action.value, "directory") == 0)
+                    scope = SHADER_PRESET_PARENT;
+                else if (std::strcmp(action.value, "game") == 0)
+                    scope = SHADER_PRESET_GAME;
+                if (scope != SHADER_PRESET_CURRENT)
+                    ok = menu_shader_manager_save_auto_preset(
+                        menu_shader_get(), scope, settings->paths.directory_video_shader,
+                        settings->paths.directory_menu_config, false);
+            }
+            if (std::strcmp(action.key, "parameter") == 0)
+            {
+                char id[64] = {};
+                float value = 0;
+                video_shader_ctx_t driver{};
+                video_shader *menu = menu_shader_get();
+                if (std::sscanf(action.value, "%63s %f", id, &value) == 2 && menu &&
+                    video_shader_driver_get_current_shader(&driver) && driver.data)
+                {
+                    auto *shader = static_cast<video_shader *>(driver.data);
+                    for (unsigned i = 0; i < shader->num_parameters; ++i)
+                        if (std::strcmp(shader->parameters[i].id, id) == 0)
+                        {
+                            const auto &param = shader->parameters[i];
+                            if (!(value >= param.minimum && value <= param.maximum))
+                                break;
+                            shader->parameters[i].current = value;
+                            for (unsigned j = 0; j < menu->num_parameters; ++j)
+                                if (std::strcmp(menu->parameters[j].id, id) == 0)
+                                    menu->parameters[j].current = value;
+                            menu->flags |= SHDR_FLAG_MODIFIED;
+                            ok = true;
+                            break;
+                        }
+                }
+            }
+#endif
+#ifdef HAVE_OVERLAY
+            if (std::strcmp(action.key, "overlay") == 0)
+            {
+                settings->bools.input_overlay_enable = !off;
+                std::snprintf(settings->paths.path_overlay, sizeof(settings->paths.path_overlay),
+                              "%s", off ? "" : action.value);
+                ok =
+                    command_event(off ? CMD_EVENT_OVERLAY_UNLOAD : CMD_EVENT_OVERLAY_INIT, nullptr);
+            }
+#endif
+#endif
+            char note[640];
+            std::snprintf(note, sizeof(note), "input: EFFECT %s %s result=%d", action.key,
+                          action.value, ok);
+            ps5_input_trace(note);
+            continue;
+        }
         if (action.kind == ScriptActionKind::save_state ||
             action.kind == ScriptActionKind::load_state)
         {
@@ -834,23 +971,39 @@ void run_script_actions() noexcept
             ps5_input_trace(note);
             continue;
         }
-        if (action.kind == ScriptActionKind::screenshot)
+        if (action.kind == ScriptActionKind::screenshot ||
+            action.kind == ScriptActionKind::screenshot_full)
         {
             char path[64];
             std::snprintf(path, sizeof(path), "/app0/pad-shot-%d.png", ++screenshot_count);
 #ifdef HAVE_SCREENSHOTS
+            ps5_test_full_screenshot = action.kind == ScriptActionKind::screenshot_full;
             const video_driver_state_t *video_st = video_state_get_ptr();
             const bool ok =
                 take_screenshot(nullptr, path, false,
                                 video_st->frame_cache_data &&
                                     video_st->frame_cache_data == RETRO_HW_FRAME_BUFFER_VALID,
                                 true, true);
+            ps5_test_full_screenshot = false;
 #else
             const bool ok = false;
 #endif
             char note[128];
             std::snprintf(note, sizeof(note), "input: pad script SCREENSHOT at %.2f s: %s %d",
                           seconds, path, ok ? 1 : 0);
+            ps5_input_trace(note);
+            continue;
+        }
+        if (action.kind == ScriptActionKind::rumble_strong ||
+            action.kind == ScriptActionKind::rumble_weak)
+        {
+            const bool strong = action.kind == ScriptActionKind::rumble_strong;
+            const bool ok = action.slot >= 0 && action.slot <= 65535 &&
+                            joypad_set_rumble(0, strong ? RETRO_RUMBLE_STRONG : RETRO_RUMBLE_WEAK,
+                                              static_cast<std::uint16_t>(action.slot));
+            char note[128];
+            std::snprintf(note, sizeof(note), "input: pad script RUMBLE_%s %d: %d",
+                          strong ? "STRONG" : "WEAK", action.slot, ok ? 1 : 0);
             ps5_input_trace(note);
             continue;
         }
@@ -884,6 +1037,7 @@ void run_script_actions() noexcept
                 static_cast<double>(worst_ns) / 1e6,
                 static_cast<unsigned long long>(new_frames_slow.load(std::memory_order_relaxed)));
             ps5_input_trace(note);
+            ps5_memory_report("pad-mark", 0, 0);
             continue;
         }
         if (action.kind == ScriptActionKind::stop)
@@ -1046,6 +1200,9 @@ bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
 {
     if (joypad != 0 || !active_pad || active_pad->handle < 0)
         return false;
+    if (effect != RETRO_RUMBLE_STRONG && effect != RETRO_RUMBLE_WEAK)
+        return false;
+    pthread_mutex_lock(&active_pad->rumble_mutex);
     const std::uint8_t level = static_cast<std::uint8_t>(strength >> 8);
     switch (effect)
     {
@@ -1056,11 +1213,15 @@ bool joypad_set_rumble(unsigned joypad, enum retro_rumble_effect effect,
         active_pad->rumble_small.store(level, std::memory_order_relaxed);
         break;
     default:
-        return false;
+        break;
     }
     const ScePadVibrationParam param{active_pad->rumble_large.load(std::memory_order_relaxed),
                                      active_pad->rumble_small.load(std::memory_order_relaxed)};
-    return scePadSetVibration(active_pad->handle, &param) == 0;
+    // Advanced mode consumes the levels through PCM, not scePadSetVibration.
+    const bool result =
+        active_pad->haptic_active || scePadSetVibration(active_pad->handle, &param) == 0;
+    pthread_mutex_unlock(&active_pad->rumble_mutex);
+    return result;
 }
 
 void *ps5_input_init(const char *) noexcept
@@ -1143,8 +1304,8 @@ extern "C" void ps5_input_reset_autoconfig() noexcept
 }
 
 extern "C" input_device_driver_t ps5_joypad = {
-    joypad_init, joypad_query, joypad_destroy, joypad_button, joypad_state, joypad_get_buttons,
-    joypad_axis, joypad_poll,  joypad_set_rumble, nullptr,    nullptr,      nullptr,
+    joypad_init, joypad_query, joypad_destroy,    joypad_button, joypad_state, joypad_get_buttons,
+    joypad_axis, joypad_poll,  joypad_set_rumble, nullptr,       nullptr,      nullptr,
     joypad_name, "ps5",
 };
 

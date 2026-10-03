@@ -1,0 +1,50 @@
+{
+  "step": "ppsspp-msaa-default",
+  "build_identity": "541d38f5f06988b76107950ca19a04f7f17fd7ffef56082990fce369dcb1e885",
+  "raw_capture": "klog/ppsspp-msaa-default/20261002-085709-balanced/trace.txt",
+  "command": "PYTHONPATH=tools python3 klog/ppsspp-msaa-default/console-test.py balanced",
+  "lines": [
+    "compiled-default run: PASS: 6x with 8x MSAA, 3 loads, 1 save, normal exit, no allocation failure",
+    "ppsspp_internal_resolution = \"2880x1632\"",
+    "ppsspp_mulitsample_level = \"x8\"",
+    "build identity: 541d38f5f06988b76107950ca19a04f7f17fd7ffef56082990fce369dcb1e885",
+    "input: pad script MARK at 10.016 s: frames=602 worst_ms=30.8 over_40ms=0",
+    "input: pad script LOAD_STATE 0 at 15.00 s: 1",
+    "input: pad script MARK at 25.006 s: frames=1498 worst_ms=88.3 over_40ms=1",
+    "input: pad script LOAD_STATE 0 at 35.02 s: 1",
+    "input: pad script MARK at 45.009 s: frames=2695 worst_ms=71.3 over_40ms=2",
+    "input: pad script SAVE_STATE 99 at 50.01 s: 1",
+    "input: pad script LOAD_STATE 99 at 60.01 s: 1",
+    "input: pad script MARK at 75.014 s: frames=4493 worst_ms=49.6 over_40ms=3",
+    "rarch_main returned = 0"
+  ],
+  "host_gates": "format unit build integration evidence PASS; 87 tests",
+  "scope": "Resolution and MSAA keys absent from isolated input options; saved output confirms compiled defaults. Existing console profile separately updated to 6x/x8 and read-back verified. Other saved profiles remain authoritative.",
+  "effective_defaults_excluding_rpcs3": {
+    "PPSSPP": "6x, 8x MSAA",
+    "Dolphin": "4x",
+    "LRPS2": "4x",
+    "Beetle PSX HW": "8x, MSAA off",
+    "Mupen64Plus-Next": "4x ParaLLEl-RDP",
+    "Azahar": "6x",
+    "DeSmuME": "4x",
+    "FCEUmm": "native",
+    "mGBA": "native",
+    "Snes9x": "native",
+    "Genesis Plus GX": "native",
+    "FBNeo": "native",
+    "Beetle Saturn": "native",
+    "VICE": "native",
+    "MAME": "3840x2160 vector; native raster"
+  },
+  "raw_sha256": {
+    "kernel.log": "790b5ba87f11a93b9b7746cd108e54517083ee39cfc95e888fce8e54184ceec1",
+    "launch.txt": "390e327cc992eac78f0f1c917de24abf145a8d20b581acd650b3b63775ce6eda",
+    "retroarch.log": "966426249f9e7db173af6294f1494a78bc5d057ad797b73acb3b1a8e046113d0",
+    "trace.txt": "3f232a4145b7b76c64d45dac2b094a2f8ce82d0d006474c6a25e177e69c9ac66",
+    "ppsspp-default-test-20261002__options.opt": "edad89cedf3da7d8d90b2c958cb731ff7f27edbc346c0ae6e4e9ecd6b19af925",
+    "ppsspp-default-test-20261002__balanced-final.png": "dda357812a9e973b0f46b9fb30d519c0165535c3848017b87ac1e8da7fc57b7f"
+  },
+  "cleanup": "Console idle; temporary test directory removed and helper stopped; original state and frontend configuration unchanged; requested PPSSPP profile retained.",
+  "limitations": "Short Ghost of Sparta run only. Core starting profiles target 4K presentation, not universal native-4K rendering or per-game performance guarantees."
+}

@@ -1,0 +1,23 @@
+{
+  "step": "webui",
+  "must_contain": [
+    "webui: listening port=6769",
+    "console: shipped assets served with HTTP 200",
+    "console: folder listing and creation PASS",
+    "console: 262144-byte upload and byte-identical download PASS",
+    "console: duplicate upload, path escape and foreign Host refused",
+    "console: saved settings accepted; explicit launch override volume=-8",
+    "console: next launch applied browser volume=-17",
+    "console: both exits normal; port 6769 closed after each exit",
+    "webui: stopped",
+    "console: original configuration, control files and PPSSPP profile restored",
+    "console: idle; temporary control helper stopped",
+    "host: all five project gates PASS; 92 tests",
+    "design: reviewer scored both fixes resolved; isolated identical-source completion ship; no open phases"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "AddressSanitizer: stack-buffer-overflow"
+  ],
+  "human_check": "User approved layout and browser component/hero reviews. Desktop/mobile controls tested in Chromium; console API and settings persistence verified across two native launches. No game performance soak claimed."
+}

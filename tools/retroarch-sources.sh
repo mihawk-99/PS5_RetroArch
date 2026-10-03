@@ -103,7 +103,7 @@ configure_flags=(
     # carry.
     --enable-builtinglslang
     --disable-update_cores --disable-update_core_info
-    --disable-libretrodb --disable-video_filter --disable-dsp_filter
+    --disable-libretrodb --enable-video_filter --disable-dsp_filter
     # The BSV movie recorder compiles against zlib, which this SDK does not ship.
     --disable-bsv_movie
     # RetroArch's built-in test input driver is on by default, and while it is on
@@ -161,7 +161,7 @@ if [[ ! -s $objects ]]; then
         export PS5_PAYLOAD_SDK="$sdk"
         export CC="$sdk/bin/prospero-clang" CXX="$sdk/bin/prospero-clang++"
         export OS=BSD DISTRO=
-        make info >"$work/info.log" 2>&1
+        make HAVE_STATIC_VIDEO_FILTERS=1 info >"$work/info.log" 2>&1
     ) || { echo "error: 'make info' failed; see $work/info.log" >&2; exit 2; }
     grep -oE '[A-Za-z0-9_./-]+\.[oc]+' "$work/info.log" | sort -u > "$objects"
 fi

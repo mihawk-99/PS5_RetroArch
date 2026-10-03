@@ -1,0 +1,333 @@
+{
+  "step": "webui-settings-guide",
+  "build_identity": "a7b399b9f9d9ae4288c36a53daec57410e5343cbb10621250935324a2b1c13ea",
+  "command": "CCACHE_DIR=\"$PWD/build/verification/ccache\" BUILD_JOBS=8 bash tools/verify.sh; python3 tools/deploy-title.py; python3 klog/webui-guide/catalog-console-test.py",
+  "raw_capture": "klog/webui-guide/all-cores-20261002-130144/report.json",
+  "lines": [
+    "catalog: 15 cores excluding RPCS3; 846 option definitions available before first game",
+    "catalog: installed-core profiles include unsaved cores; saved values override PS5 defaults",
+    "host: all five gates PASS; 96 tests; final title rebuild PASS",
+    "host: first-use core saves create profiles on restart and preserve PPSSPP/Dolphin migration markers",
+    "host: new catalog/core revision rejects stale runtime choices and defaults; saved settings preserved",
+    "browser: all 15 catalogs expose Guided categories, controls and descriptions",
+    "browser: drafts, exact choices, global/core isolation, pagination, uploads, downloads and release checks PASS",
+    "layout: existing purple layout, 16px scale, desktop/mobile and light/dark controls preserved",
+    "console: deployment readback verifies all 15 catalogs and updated assets; all 4 title markers match",
+    "scope: RPCS3 excluded by user; dynamic BIOS, cartridge and game-specific choices added at registration",
+    "console: owner session ended before testing; menu-only launch loaded the matching final build",
+    "console: all 15 profiles and 846 option keys available through native HTTP before loading content",
+    "console: every native catalog matches its staged JSON; categories and choices present",
+    "console: final run returned zero, WebUI closed, original configuration restored",
+    "review: all frontend material findings resolved; disposition ship",
+    "cleanup: temporary helper and preview stopped; owner reopened RetroArch and was left running"
+  ],
+  "catalogs": [
+    {
+      "core": "PPSSPP",
+      "options": 76,
+      "categories": 5,
+      "sha256": "3a0d4044fb72a5837dccd60267b54016ef1258918d3f6de096b958472ef20a0b",
+      "binary_sha256": "b8895534991d734e06fcd7b6d848456be8f6a835e2a9097541c1a9b007afaa00"
+    },
+    {
+      "core": "DeSmuME",
+      "options": 33,
+      "categories": 4,
+      "sha256": "9bf2513dd2035ef3e5313cada6ca18e1b139266ae97167b143a92145f09300db",
+      "binary_sha256": "356de5495fc63f44bcca311329fa382e8be7d3b763f17330a92de3f9e0f68541"
+    },
+    {
+      "core": "Beetle PSX HW",
+      "options": 83,
+      "categories": 7,
+      "sha256": "87b91fc0ea74a2e78edc25be208f219cc876a047434ac00a5aa22569058801dd",
+      "binary_sha256": "00652890fc4910666f3e7e9bc64cead96294d368ec108ee23a2c24adb1494b1b"
+    },
+    {
+      "core": "Beetle Saturn",
+      "options": 33,
+      "categories": 5,
+      "sha256": "5f78bb3ea2080c83c06ab24cf9faf63d23a3035ed7fba7d103fca9e590677333",
+      "binary_sha256": "1f97993c9fef02d386e580e0f7d67540521799192ff196bc2a50762fe6ad6460"
+    },
+    {
+      "core": "LRPS2",
+      "options": 78,
+      "categories": 5,
+      "sha256": "4b34e8a955c8bd99396b2a7d844936f997d1cf5b04836298cee27dfddf832917",
+      "binary_sha256": "a73e457d94d96fcbcdd56380c268f0cfefbbced048070f8aec666cbcd7d8094c"
+    },
+    {
+      "core": "MAME",
+      "options": 28,
+      "categories": 4,
+      "sha256": "6d76e6e43a0e593bfe81dea15763c7c09cf147078d0cfe3e645a1d1b18607153",
+      "binary_sha256": "e6789f4491635e1022eb2bf89d3edc0f5a24979fe98019df5303dbaf3553498f"
+    },
+    {
+      "core": "Mupen64Plus-Next",
+      "options": 85,
+      "categories": 4,
+      "sha256": "b01da302ebe219840c44b3a1b7e840ddf48ea5ebfd32fbe5f1a03b8362e7b72c",
+      "binary_sha256": "0d125aa2ceee8c5e318f3882dcd1c12fa5d30314ac67d0650c8b202b261fc30c"
+    },
+    {
+      "core": "FCEUmm",
+      "options": 44,
+      "categories": 6,
+      "sha256": "c42ebd41d6b25f7d4766414da72d49c4f2bb76db2fadc2021b42cf8acb8bf1f4",
+      "binary_sha256": "fec7dc4eb7ec6cae937ae778f0b59365d8bd7570927a73353424345e13589d9c"
+    },
+    {
+      "core": "Genesis Plus GX",
+      "options": 42,
+      "categories": 6,
+      "sha256": "d5ee8bbb64331a87407cfd927d8136ae83dfd73afc586556c60a66f0b514b9fe",
+      "binary_sha256": "881b5118e6afe700d8de21df679b7e51a458c0bb2fe11603b96373d87f6a2fe0"
+    },
+    {
+      "core": "Snes9x",
+      "options": 43,
+      "categories": 3,
+      "sha256": "3d1fb69a268ccd107e9f8f146f60963b531e1107a694b95519111798ff76702e",
+      "binary_sha256": "9e84ec7672bd72e7dc599552ececdba19f368ab425d59c5ccae2b0bb7f04e474"
+    },
+    {
+      "core": "mGBA",
+      "options": 15,
+      "categories": 5,
+      "sha256": "ecd8577dfea74c25e566e61fb000d85f27a20f5f5a507c11f611208c4721b78d",
+      "binary_sha256": "feb1922c9fe9dd3424b42f538a80362d0574b4dfa0134980d3fd14c52593cff6"
+    },
+    {
+      "core": "dolphin-emu",
+      "options": 103,
+      "categories": 12,
+      "sha256": "198804df41d783e30253b5c3b0a01d1feec4d4d0da42cfcf8aed18d0dea89183",
+      "binary_sha256": "91bcbeadad9efc2af32e4685e7069ba08840903d68aeccf2b277b1b346baa990"
+    },
+    {
+      "core": "Azahar",
+      "options": 34,
+      "categories": 7,
+      "sha256": "c10b868d682015be398454bf6e7e813d7e7b6a19c599965339d40fe3929bf714",
+      "binary_sha256": "02985a167c2413645b4dfdd6aa9d8910f57c7df60947849a7b25dbdcdfdace15"
+    },
+    {
+      "core": "VICE x64sc",
+      "options": 113,
+      "categories": 8,
+      "sha256": "4e5158b6e05a00021a2d7e9d72ee4bc21e7db1f9de2c2f66e2f08c9c047fceda",
+      "binary_sha256": "4e559a7e44bfec5e81a688a08597018b21ffce76cfa504146747b3c8c92cf3c9"
+    },
+    {
+      "core": "FinalBurn Neo",
+      "options": 36,
+      "categories": 9,
+      "sha256": "46a925d7dcd5168167fbc5564e91df0cdbea8cd5e9828951ac69645cf79ccc02",
+      "binary_sha256": "3c7a3deb4182ae7793ea00aaa124d0d38b7f12d5b5b960c252848dd2659822d1"
+    }
+  ],
+  "host_tests": 96,
+  "browser_log": "build/verification/webui-catalog-final-browser.log",
+  "gates_log": "build/verification/webui-catalog-final-gates.log",
+  "final_build_log": "build/verification/webui-catalog-release-build.log",
+  "native_restart_validation_pending": false,
+  "previous_native_validation": {
+    "build_identity": "87cf46c17703f7fef8ef6ead31ae88ebe7a59b3fa6d03d7ee7bda1e3dcf1a799",
+    "raw_capture": "klog/webui-guide/webui-guide-20261002-120506/report.json",
+    "console": {
+      "runs": [
+        {
+          "run": 1,
+          "port": 6769,
+          "http_status": 200,
+          "guide_asset_served": true,
+          "global_settings_count": 3232,
+          "global_saved": true,
+          "core_options_saved": true,
+          "core_override_saved": true,
+          "global_isolated": true,
+          "stale_write_refused": true,
+          "running_core_profile_untouched": true,
+          "service_closed": true,
+          "normal_exit": true
+        },
+        {
+          "run": 2,
+          "port": 6769,
+          "http_status": 200,
+          "guide_asset_served": true,
+          "metadata_options": 76,
+          "metadata_categories": 5,
+          "resolution_choices": 10,
+          "msaa_choices": 4,
+          "metadata_survives_restart": false,
+          "service_closed": true,
+          "core_resolution": "1920x1088",
+          "pending_consumed": true,
+          "normal_exit": true
+        },
+        {
+          "run": 3,
+          "port": 6769,
+          "http_status": 200,
+          "guide_asset_served": true,
+          "metadata_options": 76,
+          "metadata_categories": 5,
+          "resolution_choices": 10,
+          "msaa_choices": 4,
+          "metadata_survives_restart": true,
+          "service_closed": true,
+          "core_resolution": "2880x1632",
+          "pending_consumed": true,
+          "runtime_volume": -17,
+          "runtime_fastforward_ratio": 2.5,
+          "later_native_core_edit_preserved": true,
+          "normal_exit": true
+        }
+      ],
+      "original_files_restored": true
+    }
+  },
+  "detector": {
+    "report": "build/verification/webui-guide-layout.json",
+    "exceptions": "Purple is user-pinned; existing compact secondary type and existing palette/radius advisories preserved. Three new line-21 font/radius values changed to incumbent values after scan; reviewer inspected final source. No second detector pass.",
+    "post_scan_fixes": [
+      ".3rem radius -> .333333rem",
+      "1.125rem heading -> 1.11111rem",
+      ".75rem badge -> .777778rem"
+    ]
+  },
+  "limitations": [
+    "RPCS3 excluded at user request. BIOS/cartridge discovery and arcade game-specific options require that core/game to register them.",
+    "Native final check was menu-only with read-only HTTP: all catalog options verified, no game execution or gameplay performance claim.",
+    "Original guided settings save/isolation native tests are retained as previous-build evidence. New first-use folders, profile migration and cache invalidation also have current host HTTP regression coverage."
+  ],
+  "native_validation": {
+    "scope": "15 cores excluding RPCS3",
+    "read_only_http": true,
+    "cores": [
+      {
+        "core": "PPSSPP",
+        "options": 76,
+        "categories": 5,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "DeSmuME",
+        "options": 33,
+        "categories": 4,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Beetle PSX HW",
+        "options": 83,
+        "categories": 7,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Beetle Saturn",
+        "options": 33,
+        "categories": 5,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "LRPS2",
+        "options": 78,
+        "categories": 5,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "MAME",
+        "options": 28,
+        "categories": 4,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Mupen64Plus-Next",
+        "options": 85,
+        "categories": 4,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "FCEUmm",
+        "options": 44,
+        "categories": 6,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Genesis Plus GX",
+        "options": 42,
+        "categories": 6,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Snes9x",
+        "options": 43,
+        "categories": 3,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "mGBA",
+        "options": 15,
+        "categories": 5,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "dolphin-emu",
+        "options": 103,
+        "categories": 12,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "Azahar",
+        "options": 34,
+        "categories": 7,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "VICE x64sc",
+        "options": 113,
+        "categories": 8,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      },
+      {
+        "core": "FinalBurn Neo",
+        "options": 36,
+        "categories": 9,
+        "all_catalog_keys_editable": true,
+        "matches_staged_catalog": true
+      }
+    ],
+    "build_identity": "a7b399b9f9d9ae4288c36a53daec57410e5343cbb10621250935324a2b1c13ea",
+    "port": 6769,
+    "options": 846,
+    "normal_exit": true,
+    "service_closed": true,
+    "passed": true,
+    "original_configuration_restored": true,
+    "trace_build_identity_verified": true,
+    "trace_normal_return": true,
+    "trace_current_run_sha256": "0117ec989ee695b8e457687b1201ffa3297c8660db3c25e8c66b7f63e6b06262"
+  },
+  "cleanup": {
+    "temporary_helper_stopped": true,
+    "local_preview_stopped": true,
+    "owner_reopened_title_left_running": true
+  }
+}

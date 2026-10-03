@@ -1,0 +1,214 @@
+{
+  "step": "ppsspp-balanced-state-run",
+  "build_identity": "f4e9de26514bbf41e11fd5dabaf45f12994ddcaa8e9a83cb85b3bb52e5c59013",
+  "core_sha256": "bc4aab2f981d6a140b61276cd0dd377853baf0b91fe4ce0ec89b3b0bbb7b67f2",
+  "console_run": "2026-10-02 console save-state comparison",
+  "raw_capture": "klog/ppsspp-state-investigation/results.txt",
+  "command": "python3 klog/ppsspp-state-investigation/console-test.py <profile>",
+  "scope": "One affected PSP state; copied state and separate saves/settings; 80-second passing runs, not a long soak or general 8x MSAA fix.",
+  "runs": [
+    {
+      "profile": "balanced",
+      "result": "pass",
+      "resolution": "2880x1632",
+      "msaa": "Disabled",
+      "load_actions": 3,
+      "save_actions": 1,
+      "normal_exit": true,
+      "marks": [
+        {
+          "seconds": 10.008,
+          "frames": 601,
+          "worst_ms": 30.3
+        },
+        {
+          "seconds": 25.014,
+          "frames": 1496,
+          "worst_ms": 97.8
+        },
+        {
+          "seconds": 45.009,
+          "frames": 2693,
+          "worst_ms": 66.6
+        },
+        {
+          "seconds": 75.006,
+          "frames": 4491,
+          "worst_ms": 45.5
+        }
+      ],
+      "geometry": [
+        "2880x1620"
+      ],
+      "raw_capture": "klog/ppsspp-state-investigation/20261002-071510-balanced",
+      "raw_sha256": {
+        "trace.txt": "9719e377c944810e8858074627de433b020c03862bcda0625fc24a4f6b63370a",
+        "retroarch.log": "4833ab78955d10b141ffc37dd403f71d454f98ab1ea05df60c796341dd70650c",
+        "kernel.log": "e573ac4de89864d96a8d0e856b33c7e63d0157e73f7cdd921af13c00d1cd7c20"
+      },
+      "kernel_fatal_signal": false
+    },
+    {
+      "profile": "10x-msaa8",
+      "result": "crash reproduced",
+      "resolution": "4800x2720",
+      "msaa": "x8",
+      "load_actions": 1,
+      "save_actions": 0,
+      "normal_exit": false,
+      "marks": [
+        {
+          "seconds": 10.006,
+          "frames": 601,
+          "worst_ms": 30.3
+        }
+      ],
+      "geometry": [
+        "4800x2700"
+      ],
+      "raw_capture": "klog/ppsspp-state-investigation/20261002-071707-10x-msaa8",
+      "raw_sha256": {
+        "trace.txt": "09190703d3329b8e9c3aa97498471160edb9a6d984f09797ce1f5d8957efb228",
+        "retroarch.log": "3694675f1dc8c92e7396a7383a9cfdac6c000662a76dd80c895912437d2877a8",
+        "kernel.log": "2112ed2bf6c0f292c2a1bfc2cffacf843e0d55636335ecedd116834c2dacffcf"
+      },
+      "kernel_fatal_signal": true
+    },
+    {
+      "profile": "6x-msaa8",
+      "result": "pass",
+      "resolution": "2880x1632",
+      "msaa": "x8",
+      "load_actions": 3,
+      "save_actions": 1,
+      "normal_exit": true,
+      "marks": [
+        {
+          "seconds": 10.002,
+          "frames": 601,
+          "worst_ms": 30.3
+        },
+        {
+          "seconds": 25.0,
+          "frames": 1496,
+          "worst_ms": 92.1
+        },
+        {
+          "seconds": 45.012,
+          "frames": 2694,
+          "worst_ms": 69.4
+        },
+        {
+          "seconds": 75.009,
+          "frames": 4490,
+          "worst_ms": 72.4
+        }
+      ],
+      "geometry": [
+        "2880x1620"
+      ],
+      "raw_capture": "klog/ppsspp-state-investigation/20261002-071803-6x-msaa8",
+      "raw_sha256": {
+        "trace.txt": "98d7ebef21371b38d8812860f9422c5d5d0efc0636d3baa6a9d41d16ecb8284a",
+        "retroarch.log": "10e3043ebb44f4019786f2b7caaceb26634cfae7ba74370c83098ca3bf7fbbcd",
+        "kernel.log": "01ffe973e180542ccc86bb74705eb4b28808a2ae8ee74b1019932f03f45f34e1"
+      },
+      "kernel_fatal_signal": false,
+      "screenshot_sha256": "3a8e61e3b26e3ebb2cd733f427f96671555b7ebda74832ca02f2c59cbd29c45e"
+    },
+    {
+      "profile": "10x-no-msaa",
+      "result": "pass",
+      "resolution": "4800x2720",
+      "msaa": "Disabled",
+      "load_actions": 3,
+      "save_actions": 1,
+      "normal_exit": true,
+      "marks": [
+        {
+          "seconds": 10.002,
+          "frames": 601,
+          "worst_ms": 30.3
+        },
+        {
+          "seconds": 25.001,
+          "frames": 1498,
+          "worst_ms": 79.5
+        },
+        {
+          "seconds": 45.012,
+          "frames": 2696,
+          "worst_ms": 67.8
+        },
+        {
+          "seconds": 75.001,
+          "frames": 4492,
+          "worst_ms": 69.3
+        }
+      ],
+      "geometry": [
+        "4800x2700"
+      ],
+      "raw_capture": "klog/ppsspp-state-investigation/20261002-071956-10x-no-msaa",
+      "raw_sha256": {
+        "trace.txt": "dbc1e71c5684855ca7de34a9db5c19fc831eb2cbb8e3166863ca5839bdc34078",
+        "retroarch.log": "aa3ba99316c9ef90519e13de9bfbe5832c078b419dfda59bef8ae95517ff2ded",
+        "kernel.log": "83988fa24b5d6e69717b2b324cfdd45068e92c7a156dcfe7ca3342007977ee69"
+      },
+      "kernel_fatal_signal": false,
+      "screenshot_sha256": "fa03440537b862dd64309fb2b647389c44de87577cbd0e4c15cfaa7c5a27ced9"
+    },
+    {
+      "profile": "balanced-saved",
+      "result": "pass",
+      "resolution": "2880x1632",
+      "msaa": "Disabled",
+      "load_actions": 3,
+      "save_actions": 1,
+      "normal_exit": true,
+      "marks": [
+        {
+          "seconds": 10.007,
+          "frames": 601,
+          "worst_ms": 30.5
+        },
+        {
+          "seconds": 25.005,
+          "frames": 1498,
+          "worst_ms": 79.0
+        },
+        {
+          "seconds": 45.0,
+          "frames": 2695,
+          "worst_ms": 68.8
+        },
+        {
+          "seconds": 75.013,
+          "frames": 4492,
+          "worst_ms": 75.9
+        }
+      ],
+      "geometry": [
+        "2880x1620"
+      ],
+      "raw_capture": "klog/ppsspp-state-investigation/20261002-072152-balanced-saved",
+      "raw_sha256": {
+        "trace.txt": "1c46b7d3cb64be4ef2d236d561879cc10f70fb456dfacc6f2491d1c63ff34872",
+        "retroarch.log": "cf44ca918d35b3c3d1e86b2e401d86f3a42777fc85f41e1099147368b22a51f8",
+        "kernel.log": "4459c99ef97ff3cd94cf70eae564010f375fa3bd024b80123729d4753301df59"
+      },
+      "kernel_fatal_signal": false,
+      "screenshot_sha256": "8bab1c6c76d84d906af58a4c03bda788e84888779d4531de1cf16064af3c1712"
+    }
+  ],
+  "lines": [
+    "balanced: PASS: 3 loads, 1 save, normal exit at 80s",
+    "10x-msaa8: REPRODUCED SIGSEGV at 0x50 after first state load",
+    "6x-msaa8: PASS: 3 loads, 1 save, normal exit at 80s",
+    "10x-no-msaa: PASS: 3 loads, 1 save, normal exit at 80s",
+    "balanced-saved: PASS: 3 loads, 1 save, normal exit at 80s"
+  ],
+  "observed_fault": "Matching-build map: vk_image_view_init+0xe4 reading null image+0x50 via radv_image_view_init/radv_CreateImageView. Core stack: VKRFramebuffer::CreateImage. Allocation failure result not instrumented; no claim of proven out-of-memory.",
+  "excluded_attempt": "First balanced attempt cleared unarmed test files and opened menu only; excluded from gameplay results.",
+  "raw_line_count": 5
+}

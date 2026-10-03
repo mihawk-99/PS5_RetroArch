@@ -20,3 +20,6 @@ tooling/prospero-clang18 text eol=lf
 *.at9 binary
 *.prx binary
 *.bin binary
+
+# Preserve the upstream font license verbatim, including its original whitespace.
+webui/assets/OFL.txt -text -whitespace

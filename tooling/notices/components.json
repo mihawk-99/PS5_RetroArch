@@ -314,7 +314,7 @@
       "copyright": ["Copyright Mednafen Team and the beetle-saturn-libretro contributors"],
       "texts": [{"from": ".deps/beetle-saturn-src/COPYING", "to": "COPYING"}],
       "source": {"kind": "core", "build": "beetle-saturn", "tree": ".deps/beetle-saturn-src", "remote": "https://github.com/mihawk-99/PS5_BeetleSaturn"},
-      "modifications": "The fork's commits over libretro/beetle-saturn-libretro."
+      "modifications": "The fork's commits over libretro/beetle-saturn-libretro, plus patches/beetle-saturn/ps5-executable-memory.patch for SDK executable memory and core-owned cropped video frames."
     },
     {
       "id": "vice",
@@ -377,6 +377,134 @@
       ],
       "source": {"kind": "core", "build": "rpcs3", "tree": ".deps/rpcs3-src", "extra": [{"git": ".deps/llvm-project", "pin": {"file": "tools/build-llvm.sh", "var": "revision"}, "paths": ["cmake", "llvm", "third-party"], "name": "llvm-project", "remote": "https://github.com/mihawk-99/PS5_LLVM"}, {"tarball": ".deps/downloads/ffmpeg-8.1.1.tar.xz"}, {"tarball": ".deps/downloads/libiconv-1.18.tar.gz"}, {"tarball": ".deps/downloads/vulkan-headers-1.4.354.tar.gz"}, {"tarball": ".deps/downloads/volk-1.4.350.1.tar.gz"}], "remote": "https://github.com/mihawk-99/PS5_RPCS3"},
       "modifications": "The fork's commits over RPCS3/rpcs3; LLVM from mihawk-99/PS5_LLVM (tools/build-llvm.sh), FFmpeg and libiconv release tarballs (tools/build-ffmpeg.sh, tools/build-libiconv.sh). Not in a public release: see the audit's RPCS3 licence finding before shipping it."
+    },
+    {
+      "id": "webui-font",
+      "name": "Encode Sans Condensed (WebUI heading font)",
+      "kind": "asset",
+      "artifacts": [
+        "webui/assets/ui.woff2"
+      ],
+      "licence": "OFL-1.1",
+      "copyright": [
+        "Copyright 2012 The Encode Project Authors (impallari@gmail.com)"
+      ],
+      "texts": [
+        {
+          "from": "webui/assets/OFL.txt",
+          "to": "OFL.txt"
+        },
+        {
+          "from": "webui/assets/source.json",
+          "to": "source.json"
+        }
+      ],
+      "source": {
+        "kind": "fixed",
+        "revision": "97f60ed6d821c7c476b38c53dde854e14d9ce1c8cc295136a6a9faa2cd243ecb",
+        "url": "https://fonts.gstatic.com/s/encodesanscondensed/v13/j8_46_LD37rqfuwxyIuaZhE6cRXOLtm2gfT-PYqpBw.ttf"
+      },
+      "modifications": "Lossless WOFF2 container conversion; no glyph changes."
+    },
+    {
+      "id": "libmicrohttpd",
+      "name": "GNU libmicrohttpd 1.0.10 (WebUI HTTP transport)",
+      "kind": "code",
+      "always": true,
+      "artifacts": [
+        "eboot.bin"
+      ],
+      "licence": "LGPL-2.1-or-later",
+      "texts": [
+        {
+          "from": ".deps/webui/libmicrohttpd-1.0.10/COPYING",
+          "to": "COPYING",
+          "verbatim": true
+        }
+      ],
+      "source": {
+        "kind": "pin",
+        "file": "tools/build-webui-http.sh",
+        "var": "hash",
+        "url": "https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-1.0.10.tar.gz"
+      },
+      "modifications": "Unmodified source; static HTTP-only build, following ps5-payload-dev/websrv. Build flags and source checksum in tools/build-webui-http.sh."
+    },
+    {
+      "id": "slang-shaders",
+      "name": "slang-shaders offline video assets",
+      "kind": "assets",
+      "artifacts": [
+        "shaders/shaders_slang/**"
+      ],
+      "licence": "Mixed; individual shader source headers and collection license files are preserved",
+      "copyright": [
+        "Upstream authors; attribution retained beside assets and in shader source headers"
+      ],
+      "texts": [
+        {
+          "from": ".deps/video-assets/slang-shaders-0b3ff0b240f82f4cb5e5d0117f8f2080e2764cf7/bezel/koko-aio/LICENSE",
+          "to": "GPL-3.0.txt"
+        },
+        {
+          "from": ".deps/video-assets/slang-shaders-0b3ff0b240f82f4cb5e5d0117f8f2080e2764cf7/crt/shaders/crt-royale/LICENSE.TXT",
+          "to": "crt-royale-LICENSE.txt"
+        }
+      ],
+      "source": {
+        "kind": "fixed",
+        "revision": "0b3ff0b240f82f4cb5e5d0117f8f2080e2764cf7",
+        "remote": "https://github.com/libretro/slang-shaders"
+      },
+      "modifications": "Exact path corrections and exclusions recorded in video-assets.json and tooling/video-assets/collections.json. Full source trees and individual notices accompany the assets."
+    },
+    {
+      "id": "common-overlays",
+      "name": "common-overlays offline video assets",
+      "kind": "assets",
+      "artifacts": [
+        "overlays/common/**"
+      ],
+      "licence": "CC-BY-4.0",
+      "copyright": [
+        "Upstream authors; attribution retained beside assets and in shader source headers"
+      ],
+      "texts": [
+        {
+          "from": ".deps/video-assets/common-overlays-42c21b99889468a8e77fd7f002229ec16e2f9fa2/COPYING",
+          "to": "LICENSE.txt"
+        }
+      ],
+      "source": {
+        "kind": "fixed",
+        "revision": "42c21b99889468a8e77fd7f002229ec16e2f9fa2",
+        "remote": "https://github.com/libretro/common-overlays"
+      },
+      "modifications": "Exact path corrections and exclusions recorded in video-assets.json and tooling/video-assets/collections.json. Full source trees and individual notices accompany the assets."
+    },
+    {
+      "id": "overlay-borders",
+      "name": "overlay-borders offline video assets",
+      "kind": "assets",
+      "artifacts": [
+        "overlays/borders/**"
+      ],
+      "licence": "MIT",
+      "copyright": [
+        "Upstream authors; attribution retained beside assets and in shader source headers"
+      ],
+      "texts": [
+        {
+          "from": ".deps/video-assets/overlay-borders-9aceca2dd514c589a57d40086557b804851aafcf/LICENSE",
+          "to": "LICENSE.txt"
+        }
+      ],
+      "source": {
+        "kind": "fixed",
+        "revision": "9aceca2dd514c589a57d40086557b804851aafcf",
+        "remote": "https://github.com/libretro/overlay-borders"
+      },
+      "modifications": "Exact path corrections and exclusions recorded in video-assets.json and tooling/video-assets/collections.json. Full source trees and individual notices accompany the assets."
     }
   ]
 }

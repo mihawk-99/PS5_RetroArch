@@ -1,0 +1,13 @@
+{
+  "step": "readme-overview",
+  "must_contain": [
+    "readme: actual console WebUI Overview screenshot leads the page",
+    "readme: URL legend http://<PS5-IP>:6769 and same-network instructions",
+    "readme: current source features distinguished from published releases",
+    "readme: no game names in prose, image, alt text or examples",
+    "readme: desktop 1440 and mobile 390 previews have no horizontal page overflow; image loads",
+    "review: Impeccable finish reviewer ship; final factual delta ship; surface documentation updated",
+    "asset: real screenshot with embedded provenance; no generated UI artwork"
+  ],
+  "human_check": "Actual Overview screenshot inspected; no private address or game titles. Finish reviewer approved native GitHub Markdown composition."
+}

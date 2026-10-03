@@ -46,7 +46,7 @@ fi
 if [[ ! -s $cache ]]; then
     command=$(cd "$work" && PS5_PAYLOAD_SDK="$sdk" \
         CC="$sdk/bin/prospero-clang" CXX="$sdk/bin/prospero-clang++" \
-        OS=BSD DISTRO= make -n obj-unix/release/retroarch.o 2>/dev/null |
+        OS=BSD DISTRO= make HAVE_STATIC_VIDEO_FILTERS=1 -n obj-unix/release/retroarch.o 2>/dev/null |
         grep -m1 -E '(^| )-c( |$)' || true)
     [[ -n $command ]] || {
         echo "error: could not read the compile flags; see tools/retroarch-sources.sh" >&2
