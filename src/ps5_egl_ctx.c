@@ -163,7 +163,15 @@ static bool ps5_ctx_set_video_mode(void *data,
 
    if (!egl_create_context(&ps5->egl, attribs))
       goto error;
-   if (!egl_create_surface(&ps5->egl, 0))
+   /* egl_create_surface() always passes EGL_RENDER_BUFFER, which the PS5 EGL
+    * rejects with EGL_BAD_ATTRIBUTE; a null attribute list and a null native
+    * window give the fullscreen surface this runtime implements. */
+   ps5->egl.surf = eglCreateWindowSurface(ps5->egl.dpy, ps5->egl.config,
+         (EGLNativeWindowType)0, NULL);
+   if (ps5->egl.surf == EGL_NO_SURFACE)
+      goto error;
+   if (!eglMakeCurrent(ps5->egl.dpy, ps5->egl.surf, ps5->egl.surf,
+            ps5->egl.ctx))
       goto error;
 #endif
 
