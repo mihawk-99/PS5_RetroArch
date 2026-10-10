@@ -238,6 +238,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
     await page.locator('#add-submit').click();
     await page.locator('#add-game').waitFor({state:'hidden'});
     await page.locator('#sheet-title').filter({hasText:'Super Metroid'}).waitFor();
+    // The overlay draws its rows from a second request after the title: waited for, not raced.
+    await page.locator('.media-row-item:not(.missing)').first().waitFor({timeout:10000}).catch(() => {});
     assert.ok(await page.locator('.media-row-item:not(.missing)').count() > 0,'downloaded artwork is visible without reloading');
     await page.locator('#sheet-close').click();
     await page.unroute('**/api/scraper/job?id=*');
