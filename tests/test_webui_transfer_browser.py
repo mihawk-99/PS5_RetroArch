@@ -43,8 +43,11 @@ class TransferBrowser(unittest.TestCase):
             server = subprocess.Popen([str(binary), str(root), str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 time.sleep(0.5)
-                run = subprocess.run(['node', 'tests/webui_transfer_browser.cjs'], cwd=ROOT, capture_output=True, text=True, timeout=600,
-                                     env={**os.environ, 'PLAYWRIGHT_PATH': PLAYWRIGHT, 'WEBUI_TEST_URL': f'http://127.0.0.1:{port}'})
+                try:
+                    run = subprocess.run(['node', 'tests/webui_transfer_browser.cjs'], cwd=ROOT, capture_output=True, text=True, timeout=600,
+                                         env={**os.environ, 'PLAYWRIGHT_PATH': PLAYWRIGHT, 'WEBUI_TEST_URL': f'http://127.0.0.1:{port}'})
+                except subprocess.TimeoutExpired as expired:  # what it printed says where it stopped
+                    self.fail(f'the page engine test hung: {expired.stdout!r} {expired.stderr!r}')
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
                 print(run.stdout.strip())
             finally:
