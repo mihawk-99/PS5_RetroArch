@@ -224,7 +224,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
       await route.fulfill({json:data});
     });
     await page.locator('#add-submit').click();
-    await page.locator('#add-activity').waitFor({state:'visible'});
+    // It shows once the backup, its details and the download start are through (the page
+    // allows the start 60 s); a timeout says what the dialog said instead.
+    await page.locator('#add-activity').waitFor({state:'visible',timeout:90000}).catch(async error => {
+      throw new Error(`Add Game never showed its downloads: ${await page.locator('#add-status').innerText()} (${error.message.split('\n')[0]})`); });
     assert.equal(await page.locator('#game-sheet').isVisible(),false);
     await page.locator('#add-submit').filter({hasText:'Open game'}).waitFor({timeout:30000});
     assert.ok(await page.locator('#add-live-media .add-live-item').count() > 0,JSON.stringify(lastAddJob));

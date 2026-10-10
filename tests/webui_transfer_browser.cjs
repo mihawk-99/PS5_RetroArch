@@ -12,6 +12,8 @@ const base = process.env.WEBUI_TEST_URL;
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://api.github.com/**', route => route.fulfill({ json: [] }));
     const requests = []; page.on('request', r => { if (r.url().includes('/api/upload')) requests.push(new URL(r.url()).pathname); });
+    // A request that fails says which and when (a broken in-memory Blob once showed only so).
+    page.on('requestfailed', r => console.error('request failed:', r.method(), new URL(r.url()).pathname + new URL(r.url()).search, r.failure()?.errorText, new Date().toISOString()));
     await page.goto(base);
     await page.waitForFunction(() => !document.querySelector('#browse-files').disabled);
     // Every wait has a deadline and says what it saw: a stuck transfer fails here with its
@@ -52,9 +54,15 @@ const base = process.env.WEBUI_TEST_URL;
     });
     assert.deepEqual(again.map(x => x.split(':')[0]), ['failed', 'failed']);
     assert.match(again[0], /already exists/); assert.match(again[1], /already exists/);
-    // A large file cancelled mid-way: the session is dropped.
+    // A large file cancelled mid-way: the session is dropped. 64 MiB (the smallest that
+    // goes as parts) sent at 8 MiB/s, so the cancel lands mid-way every time. A bigger
+    // in-memory File beside the earlier ones could exceed Chromium's blob storage, which
+    // then fails every part with ERR_BLOB_REFERENCED_BLOB_BROKEN.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Network.enable');
+    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: 8 * 1024 * 1024 });
     const cancelled = await page.evaluate(async () => {
-      const before = transfers.length; queueFiles([new File([new Uint8Array(200 * 1024 * 1024)], 'cancel.iso')], 'engine');
+      const before = transfers.length; queueFiles([new File([new Uint8Array(64 * 1024 * 1024)], 'cancel.iso')], 'engine');
       const transfer = transfers[before];
       // Until 20 MiB went, or it ended first (then the state says why), or a minute passed.
       const end = Date.now() + 60000;
@@ -67,6 +75,7 @@ const base = process.env.WEBUI_TEST_URL;
       return transfer.state;
     });
     assert.equal(cancelled, 'cancelled');
+    await cdp.detach();
     assert.deepEqual(errors, []);
     console.log(`PASS: 605 files (600 small in ${count('/api/upload/batch')} batches, 3 single, 2 large in ${count('/api/upload/part')} parts) in ${summary.seconds.toFixed(1)} s; duplicates refused; cancel drops the session.`);
   } finally { await browser.close(); }
