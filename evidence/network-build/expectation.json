@@ -1,0 +1,21 @@
+{
+  "step": "network-build",
+  "note": "The title is built with RetroArch's networking, netplay, RetroAchievements and HTTPS; its name lookups go to the console's DNS resolver (libSceNet) through src/net_shims.c, and it imports nothing the console does not export.",
+  "must_contain": [
+    "HAVE_CHEEVOS = 1",
+    "HAVE_NETWORKING = 1",
+    "HAVE_NETPLAYDISCOVERY = 1",
+    "HAVE_SSL = 1",
+    "eboot defines ssl_socket_init",
+    "eboot defines rc_client_begin_login",
+    "eboot defines netplay_driver_ctl",
+    "callers of the console resolver (__wrap_getaddrinfo_retro): 9",
+    "callers of the refusing getaddrinfo: mbedtls_net_bind mbedtls_net_connect (unused by RetroArch)",
+    "sceNetResolverStartNtoa",
+    "null imports: none"
+  ],
+  "must_not_contain": [
+    "HAVE_NETWORKING = 0"
+  ],
+  "human_check": "Console behaviour (sign-in, netplay) is recorded in its own evidence."
+}

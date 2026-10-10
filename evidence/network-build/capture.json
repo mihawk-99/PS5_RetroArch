@@ -1,0 +1,23 @@
+{
+  "step": "network-build",
+  "recorded": "2026-10-10T05:06:08Z",
+  "console_run": "",
+  "revision": "",
+  "command": "tools/console-run.sh <TITLE_ID>",
+  "raw_capture": "klog/network-build/elf.txt",
+  "raw_lines": 11,
+  "raw_bytes": 744,
+  "lines": [
+    "configure: HAVE_BUILTINMBEDTLS = 1 HAVE_CHEEVOS = 1 HAVE_IFINFO = 1 HAVE_NETPLAYDISCOVERY = 1 HAVE_NETWORKING = 1 HAVE_SSL = 1 ",
+    "archive: rcheevos objects 28, mbedtls objects 60, netplay objects 5, cheevos frontend objects 4",
+    "eboot defines ssl_socket_init",
+    "eboot defines rc_client_begin_login",
+    "eboot defines netplay_driver_ctl",
+    "eboot defines net_http_new",
+    "eboot defines task_push_http_transfer",
+    "callers of the console resolver (__wrap_getaddrinfo_retro): 9",
+    "callers of the refusing getaddrinfo: mbedtls_net_bind mbedtls_net_connect (unused by RetroArch)",
+    "imports: connect getifaddrs poll recvfrom sceNetResolverCreate sceNetResolverDestroy sceNetResolverStartNtoa select sendto setsockopt socket ",
+    "null imports: none (tools/build.sh import check passed)"
+  ]
+}

@@ -56,9 +56,14 @@ configure_flags=(
     # /app0/retroarch.log and the next run says which name it searched for.
     --enable-vulkan --disable-opengl --disable-opengl1 --disable-opengl_core
     --disable-sdl2 --disable-sdl --disable-cg
+    # Networking: netplay (with LAN discovery and the lobby), RetroAchievements and
+    # HTTPS. The SDK has FreeBSD's sockets, getaddrinfo and getifaddrs; TLS is
+    # RetroArch's own mbedTLS (deps/mbedtls, with its bundled CA certificates), so
+    # nothing is linked from outside the tree.
+    --enable-networking --enable-netplaydiscovery --enable-cheevos --enable-ssl
     # Libraries this SDK does not carry.
-    --disable-ffmpeg --disable-freetype --disable-flac --disable-networking
-    --disable-cheevos --disable-ssl --disable-cdrom --disable-microphone
+    --disable-ffmpeg --disable-freetype --disable-flac
+    --disable-cdrom --disable-microphone
     --disable-qt --disable-discord --disable-oss --disable-jack --disable-alsa
     --disable-pulse --disable-pipewire --disable-wayland --disable-x11
     --disable-kms --disable-caca --disable-sixel --disable-bluetooth
@@ -92,7 +97,7 @@ configure_flags=(
     # removes the dependency on a system zlib this SDK does not ship.
     --enable-builtinzlib
     --disable-builtinflac --disable-builtinbearssl
-    --disable-builtinmbedtls
+    --enable-builtinmbedtls
     # Vulkan needs a GLSL-to-SPIR-V compiler and configure refuses to build the
     # Vulkan driver without one. RetroArch vendors glslang in deps/glslang, so the
     # built-in copy costs a compile rather than a dependency this SDK does not

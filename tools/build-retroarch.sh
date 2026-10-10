@@ -106,6 +106,12 @@ defines+=(
     # is zstd's own switch for a platform without weak symbols, which is what this
     # is as far as the stub table is concerned.
     -DZSTD_TRACE=0
+    # RetroArch's own mbedTLS (deps/mbedtls) for HTTPS: configure records the choice in
+    # config.h, but libretro-common's net_socket_ssl_mbed.c does not read config.h and
+    # picks the bundled headers only on this define, which upstream's console
+    # makefiles (Makefile.ctr) pass by hand. Without it the file looks for a system
+    # mbedTLS this SDK does not have.
+    -DHAVE_BUILTINMBEDTLS
     # platform_unix appends /assets to ASSETS_DIR, so its prefix must be /app0.
     # Where this title's own files live. configure baked the /user/homebrew
     # prefix from tools/retroarch-sources.sh's --prefix, and tools/retroarch-flags.sh

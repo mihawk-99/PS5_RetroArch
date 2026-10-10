@@ -346,6 +346,11 @@ directory_wrap_flags+=" --wrap=realpath"
 # libc's getcwd resolves to nothing in a title (it calls __getcwd, which only
 # libkernel_sys exports); std::filesystem::current_path is built on it.
 directory_wrap_flags+=" --wrap=getcwd"
+# RetroArch's networking resolves names through libretro-common's getaddrinfo_retro, which
+# would reach a getaddrinfo that refuses every lookup, and formats addresses through
+# getnameinfo_retro, whose getnameinfo no module exports: src/net_shims.c replaces the
+# three, asking the console's DNS resolver (libSceNet) and formatting numerically.
+directory_wrap_flags+=" --wrap=getaddrinfo_retro --wrap=freeaddrinfo_retro --wrap=getnameinfo_retro --wrap=getnameinfo"
 # Folders the title or a core creates are 0777 and files at least 0666, so FTP,
 # which runs as another user, can reach them (src/permissions_ps5.cpp).
 directory_wrap_flags+=" --wrap=mkdir --wrap=open --wrap=fopen"
