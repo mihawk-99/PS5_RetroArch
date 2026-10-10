@@ -1,0 +1,26 @@
+{
+  "step": "installed-paths",
+  "note": "Accept optional startup, matching installation and frontend rendering; preserve online limits rather than claiming all online features work.",
+  "must_contain": [
+    "offline-home-1: elevation=unavailable offline=1 root=/app0",
+    "mixed-esde-1: elevation=ok uid=0",
+    "root=/mnt/sandbox/PPSA99169_000/app0 same_executable=1",
+    "\"run\":\"mixed-esde-1\"",
+    "\"gl_error\":0,\"written\":true",
+    "final-esde: elevation=ok uid=0",
+    "stage=service_complete error=0",
+    "final-offline: elevation=unavailable offline=1 root=/app0",
+    "badge-download-2 badge-before.json: {\"absent\":true}",
+    "\"png_signature\":true",
+    "\"decoded\":true",
+    "pc-path-test has joined as player 2",
+    "[Netplay] Connected to: \"ps5-path-test\"",
+    "API rejected saved credentials=True",
+    "saved and resolved config files identical=True",
+    "\"test_controls_removed\":true"
+  ],
+  "must_not_contain": [
+    "daemon_held"
+  ],
+  "human_check": ""
+}

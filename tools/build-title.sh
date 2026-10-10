@@ -355,7 +355,7 @@ directory_wrap_flags+=" --wrap=getaddrinfo_retro --wrap=freeaddrinfo_retro --wra
 directory_wrap_flags+=" --wrap=mbedtls_platform_entropy_poll"
 # Folders the title or a core creates are 0777 and files at least 0666, so FTP,
 # which runs as another user, can reach them (src/permissions_ps5.cpp).
-directory_wrap_flags+=" --wrap=mkdir --wrap=open --wrap=fopen"
+directory_wrap_flags+=" $(bash "$root/tools/path-wrap-flags.sh")"
 # No module a title loads exports these: each import was null at run time, and
 # RetroArch's menu search (strcasestr) jumped to address 0 from Manual Scan's
 # Content Directory (src/platform_wraps.c). tools/build.sh refuses the title

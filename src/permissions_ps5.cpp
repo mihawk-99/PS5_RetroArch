@@ -49,10 +49,6 @@
 #include "title_threads.hpp"
 #include "webui_link.h"
 
-extern "C" int __real_mkdir(const char *path, mode_t mode);
-extern "C" int __real_open(const char *path, int flags, ...);
-extern "C" std::FILE *__real_fopen(const char *path, const char *mode);
-
 namespace
 {
 constexpr mode_t kFolderMode = 0777;
@@ -60,17 +56,6 @@ constexpr mode_t kFileMode = 0777;
 /* Deeper than any folder the title or a core makes (Dolphin's user folder is
  * the deepest, about six below /app0). */
 constexpr int kRepairDepth = 16;
-
-/* Gives path the bits wanted if it lacks any; true when it has them. */
-bool ensure_mode(const char *path, mode_t wanted)
-{
-    struct stat status{};
-    if (stat(path, &status) != 0)
-        return false;
-    if ((status.st_mode & wanted) == wanted)
-        return true;
-    return chmod(path, (status.st_mode & 07777) | wanted) == 0;
-}
 
 struct RepairCounts
 {
@@ -123,48 +108,6 @@ double now_ms()
     return static_cast<double>(now.tv_sec) * 1000.0 + static_cast<double>(now.tv_nsec) / 1e6;
 }
 } // namespace
-
-extern "C" int __wrap_mkdir(const char *path, mode_t mode)
-{
-    const int result = __real_mkdir(path, mode | kFolderMode);
-    if (result == 0)
-    {
-        const int saved = errno;
-        ensure_mode(path, kFolderMode);
-        errno = saved;
-    }
-    return result;
-}
-
-extern "C" int __wrap_open(const char *path, int flags, ...)
-{
-    if ((flags & O_CREAT) == 0)
-        return __real_open(path, flags);
-    va_list arguments;
-    va_start(arguments, flags);
-    const int mode = va_arg(arguments, int);
-    va_end(arguments);
-    const int fd = __real_open(path, flags, mode | static_cast<int>(kFileMode));
-    if (fd >= 0)
-    {
-        const int saved = errno;
-        ensure_mode(path, kFileMode);
-        errno = saved;
-    }
-    return fd;
-}
-
-extern "C" std::FILE *__wrap_fopen(const char *path, const char *mode)
-{
-    std::FILE *const file = __real_fopen(path, mode);
-    if (file != nullptr && mode != nullptr && std::strpbrk(mode, "wa+") != nullptr)
-    {
-        const int saved = errno;
-        ensure_mode(path, kFileMode);
-        errno = saved;
-    }
-    return file;
-}
 
 namespace
 {

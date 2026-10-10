@@ -1,0 +1,66 @@
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -974,11 +974,11 @@
+     struct lapy_vnode_ref_counts baseline = {0}, final = {0};
+     intptr_t self_cred_before = 0;
+     size_t thread_credential_offset = 0;
+-    int error = 0, acknowledged = 0;
++    int error = 0, acknowledged = 0, readiness_published = 0;
+     const char *stage = "preflight";
+ #if LAPY_SERVICE && !LAPY_MAX_REQUESTS
+     /* Normal use must retain diagnostics without a PC holding stdout open. */
+-    int log_fd = open("/data/ps5proton/logs/lapy-service.log",
++    int log_fd = open("/data/homebrew/PPSA99169/lapy-service.log",
+                       O_WRONLY | O_CREAT | O_APPEND, 0666);
+     if (log_fd < 0) return 2;
+     ps5log_set_mirror_fd(log_fd);
+@@ -1057,6 +1057,23 @@
+     stage = "root_layout";
+     if ((error = validate_root_reference_layout(root, self.fd)))
+         goto done;
++#if !LAPY_ELF_HELPER
++    /* Application readiness, published only after every preflight guard passed.
++     * No descriptor remains open against the daemon's private credential. */
++    {
++        struct timespec now;
++        FILE *ready = fopen("/data/homebrew/PPSA99169/lapy-ready", "w");
++        if (!ready || clock_gettime(CLOCK_MONOTONIC, &now)) {
++            if (ready) fclose(ready);
++            error = EIO;
++            stage = "readiness";
++            goto done;
++        }
++        fprintf(ready, "%ld %ld\n", (long)getpid(), (long)now.tv_sec);
++        if (fclose(ready)) { error = EIO; stage = "readiness"; goto done; }
++        readiness_published = 1;
++    }
++#endif
+ #if LAPY_ELF_HELPER
+     stage = "helper_request";
+     error = run_helper_request(root, thread_credential_offset) ? EIO : 0;
+@@ -1103,6 +1120,8 @@
+         if ((error = await_client_result(result_path))) goto done;
+ #endif
+         if (LAPY_MAX_REQUESTS && completed >= LAPY_MAX_REQUESTS) {
++            unlink("/data/homebrew/PPSA99169/lapy-ready");
++            readiness_published = 0;
+             /* A finite validation service must observe teardown after the
+              * last request, not report success while roots remain owned. */
+             stage = "service_wait_exit";
+@@ -1135,6 +1154,8 @@
+         if (polls == 599) { error = ETIMEDOUT; goto done; }
+         usleep(100000);
+     }
++    unlink("/data/homebrew/PPSA99169/lapy-ready");
++    readiness_published = 0;
+     stage = "request";
+     if ((error = client_result_path(path, result_path))) goto done;
+     error = run_one(pid, root, &baseline, thread_credential_offset);
+@@ -1166,6 +1187,7 @@
+     stage = "complete";
+ #endif
+ done:
++    if (readiness_published) unlink("/data/homebrew/PPSA99169/lapy-ready");
+     ps5log_printf(error ? PS5LOG_ERR : PS5LOG_MARK,
+                   "daemon_result build=%s stage=%s error=%d pid=%d acknowledged=%d root_balanced=%d",
+                   LAPY_OWNED_ID, stage, error, pid, acknowledged,

@@ -322,8 +322,12 @@ void on_terminate()
 }
 } // namespace
 
+#include "ps5_paths.h"
+
 int main(int process_argc, char **process_argv)
 {
+    if (ps5_paths_start() != 0)
+        return 1;
     /* A session's trace is its own (src/frontend_mode_ps5.cpp): a launch from the home
      * screen keeps the last session's as trace.1.txt before this one writes a line. */
     ps5_frontend_session_logs(process_argc, process_argv);
