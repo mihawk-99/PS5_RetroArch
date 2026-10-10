@@ -190,7 +190,8 @@ def package(folder, output):
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
         for p in sorted(folder.rglob('*')):
-            if p.is_file():
+            # An empty folder is kept too (content/'s system folders, issue 33).
+            if p.is_file() or (p.is_dir() and not any(p.iterdir())):
                 z.write(p, folder.name+'/'+p.relative_to(folder).as_posix())
     # Audit the actual extracted archive, independently of the staged tree.
     import tempfile

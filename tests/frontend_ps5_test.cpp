@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     assert(__real_chmod((fixture + "/app0/content").c_str(), 0775) == 0);
     frontend_ctx_ps5.init(nullptr);
     for (const char *name : {"config", "cores", "content", "system", "savefiles", "savestates",
-                             "playlists", "content/Saturn", "system/Saturn"})
+                             "playlists", "system/Saturn"})
     {
         struct stat metadata{};
         assert(__real_stat((fixture + "/app0/" + name).c_str(), &metadata) == 0);
@@ -118,6 +118,8 @@ int main(int argc, char **argv)
     assert(std::string(g_defaults.dirs[DEFAULT_DIR_MENU_CONTENT]) == "/app0");
     assert(std::string(g_defaults.dirs[DEFAULT_DIR_REMAP]) == "/app0/config/remaps");
     assert(std::filesystem::is_directory(fixture + "/app0/content"));
+    /* The old bare name: content's system folders are made in main.cpp (src/ps5_library.c). */
+    assert(!std::filesystem::exists(fixture + "/app0/content/Saturn"));
     std::ofstream(fixture + "/app0/config/retroarch.cfg") << "user settings\n";
     std::ofstream(fixture + "/app0/retroarch.cfg") << "updated seed\n";
     frontend_ctx_ps5.init(nullptr);

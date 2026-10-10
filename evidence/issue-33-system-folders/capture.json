@@ -1,0 +1,19 @@
+{
+  "step": "issue-33-system-folders",
+  "recorded": "2026-10-10T02:28:58Z",
+  "console_run": "base PS5 13.40 (192.168.50.237), owner launched from the home screen, picker then ES-DE; then a restart",
+  "revision": "working tree on bb709b5 (this commit)",
+  "command": "FTP listings of /data/homebrew/PPSA99169/content and es-de/ES-DE/settings, es-de/es-de-ps5.log; zipfile listing of dist/PS5_RetroArch.zip",
+  "raw_capture": "klog/issue-33/",
+  "raw_lines": 7,
+  "raw_bytes": 729,
+  "lines": [
+    "es-de settings before: ROMDirectory=\"\" (ES-DE reads it as ~/ROMs = /app0/es-de/ROMs)",
+    "first es-de start without settings: ROMDirectory=/app0/content MediaDirectory=/app0/library",
+    "after es-de exit: ROMDirectory=/app0/content",
+    "es-de start: start: library from RetroArch's playlists: 36 systems, 3461 games (3461 with ES-DE's details kept), 33 cores, 0 favourites, 41 played, 0 failures",
+    "content folders before: 45; after a home-screen restart: 52; added: Atomiswave, Bandai - WonderSwan, Nintendo - Family Computer Disk System, SNK - Neo Geo Pocket, Sega - Mega-CD - Sega CD, Sega - Naomi, Sega - SG-1000",
+    "dist/PPSA99169/content: 46 folders; release zip content folders: 46",
+    "owner settings restored: only ROMDirectory changed, to /app0/content"
+  ]
+}

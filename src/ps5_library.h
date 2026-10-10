@@ -125,6 +125,14 @@ extern "C"
     /* A platform's RetroArch database name ("Sony - PlayStation"), or NULL. */
     const char *ps5_library_platform_database(const char *id);
 
+    /* A folder in content for each system the installed cores run, named as RetroArch
+     * names it ("Nintendo - Nintendo Entertainment System"), so games have a place to go
+     * and every frontend knows their system. A system the content folder already has a
+     * folder for, whatever its name ("PS1", "Genesis"), gets none: nothing is renamed or
+     * moved. A database no platform here stands for (Satellaview, CD32...) gets none.
+     * Returns how many folders it made, or -1 when content cannot be read. */
+    int ps5_library_make_system_folders(const char *content, const char *info, const char *cores);
+
     /* Game mode's launch command for a game (src/ps5_game.h): RetroArch's command line
      * with its system's core, shell-quoted. 0, or -1 when it does not fit. */
     int ps5_library_command(const struct ps5_library *library, const struct ps5_library_game *game,

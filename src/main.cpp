@@ -55,6 +55,7 @@
 #include "display_modes_ps5.h"
 #include "relaunch_ps5.h"
 #include "frontend_mode_ps5.h"
+#include "ps5_library.h"
 #include "webui_ps5.h"
 #include "webui_update.h"
 #include "webui_link.h"
@@ -399,6 +400,12 @@ int main(int process_argc, char **process_argv)
     /* Which frontend this launch is for (src/frontend_mode_ps5.cpp): from the home
      * screen the picker, which restarts the title as RetroArch or EmulationStation;
      * those two are their own executables, started through LoadExec. */
+    /* A folder in content for each system the installed cores run, before any frontend:
+     * a launch from the home screen goes to the picker from here (issue 33). */
+    const int system_folders =
+        ps5_library_make_system_folders("/app0/content", "/app0/info", "/app0/cores");
+    if (system_folders > 0)
+        ps5::debug::mark_value("startup: system folders made in content", system_folders);
     ps5_frontend_dispatch(process_argc, process_argv);
     ps5_webui_link_frontend("retroarch");
 

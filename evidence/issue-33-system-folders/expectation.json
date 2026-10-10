@@ -1,0 +1,15 @@
+{
+  "step": "issue-33-system-folders",
+  "note": "Issue 33: ES-DE's ROM folder is the title's content folder from its first start; content/ has a folder for each system the cores run (46 in a fresh install), made at each title start before any frontend, the user's own folders kept.",
+  "must_contain": [
+    "first es-de start without settings: ROMDirectory=/app0/content",
+    "after es-de exit: ROMDirectory=/app0/content",
+    "added: Atomiswave, Bandai - WonderSwan, Nintendo - Family Computer Disk System, SNK - Neo Geo Pocket, Sega - Mega-CD - Sega CD, Sega - Naomi, Sega - SG-1000",
+    "dist/PPSA99169/content: 46 folders; release zip content folders: 46",
+    "0 failures"
+  ],
+  "must_not_contain": [
+    "ROMDirectory=/app0/es-de"
+  ],
+  "human_check": "The owner saw the systems in ES-DE on its first start (2026-10-09)."
+}

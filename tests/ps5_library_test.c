@@ -366,7 +366,68 @@ int main(int argc, char **argv)
     /* A game a playlist lists is not listed twice, and keeps its playlist's place. */
     assert(system_of(&library, "snes")->game_count == 2);
     ps5_library_free(&library);
+
+    /* A folder for each system the installed cores run, named as RetroArch names it; a
+     * system with a folder already (any name) gets none, and nothing is renamed. */
+    {
+        char root[1024], content[1100], info[1100], cores[1100], path[2048];
+        snprintf(root, sizeof(root), "%s/folders", dir);
+        snprintf(content, sizeof(content), "%s/content", root);
+        snprintf(info, sizeof(info), "%s/info", root);
+        snprintf(cores, sizeof(cores), "%s/cores", root);
+        const char *folders[] = {root, content, info, cores};
+        for (size_t i = 0; i < sizeof(folders) / sizeof(folders[0]); i++)
+            assert(mkdir(folders[i], 0755) == 0);
+        snprintf(path, sizeof(path), "%s/PS1", content);
+        assert(mkdir(path, 0755) == 0); /* the user's PlayStation folder */
+        snprintf(path, sizeof(path), "%s/.hidden-snes", content);
+        assert(mkdir(path, 0755) == 0); /* hidden: not a system folder */
+        snprintf(path, sizeof(path), "%s/Genesis", content);
+        write_text(path, "a file, not a folder");
+        core(root, "mednafen_psx_hw", "Sony - PlayStation", "cue");
+        core(root, "genesis_plus_gx",
+             "Sega - Game Gear|Sega - Master System - Mark III|Sega - Mega-CD - Sega CD|"
+             "Sega - Mega Drive - Genesis|Sega - PICO|Sega - SG-1000",
+             "md");
+        core(root, "snes9x",
+             "Nintendo - Super Nintendo Entertainment System|Nintendo - Sufami Turbo|"
+             "Nintendo - Satellaview",
+             "sfc");
+        core(root, "dolphin", "Nintendo - GameCube|Nintendo - Wii|Nintendo - Wii (Digital)", "iso");
+        core(root, "puae", "Commodore - Amiga|Commodore - CD32|Commodore - CDTV", "adf");
+        core(root, "fbneo", "FBNeo - Arcade Games", "zip");
+        snprintf(path, sizeof(path), "%s/stella_libretro.info", info);
+        write_text(path, "database = \"Atari - 2600\"\n"); /* no core beside it: not installed */
+        assert(ps5_library_make_system_folders(content, info, cores) == 10);
+        const char *expected[] = {
+            "Sega - Game Gear",         "Sega - Master System - Mark III",
+            "Sega - Mega-CD - Sega CD", "Sega - Mega Drive - Genesis",
+            "Sega - SG-1000",           "Nintendo - Super Nintendo Entertainment System",
+            "Nintendo - GameCube",      "Nintendo - Wii",
+            "Commodore - Amiga",        "FBNeo - Arcade Games"};
+        for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
+        {
+            struct stat st;
+            snprintf(path, sizeof(path), "%s/%s", content, expected[i]);
+            assert(stat(path, &st) == 0 && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0777);
+            /* Each one is its system's to every frontend. */
+            assert(ps5_library_platform(expected[i]));
+        }
+        const char *absent[] = {"Sony - PlayStation",      "Nintendo - Sufami Turbo",
+                                "Nintendo - Satellaview",  "Sega - PICO",
+                                "Commodore - CD32",        "Atari - 2600",
+                                "Nintendo - Wii (Digital)"};
+        for (size_t i = 0; i < sizeof(absent) / sizeof(absent[0]); i++)
+        {
+            struct stat st;
+            snprintf(path, sizeof(path), "%s/%s", content, absent[i]);
+            assert(stat(path, &st) != 0);
+        }
+        assert(ps5_library_make_system_folders(content, info, cores) == 0); /* once */
+        snprintf(path, sizeof(path), "%s/missing", root);
+        assert(ps5_library_make_system_folders(path, info, cores) == -1);
+    }
     puts("ps5_library: platforms, playlists, systems, cores, folders, labels, favourites, history, "
-         "runtime logs, game mode commands and content folders PASS");
+         "runtime logs, game mode commands, content folders and system folders PASS");
     return 0;
 }

@@ -82,11 +82,10 @@ void set_directory(default_dirs slot, const char *path)
 
 void initialize(void *)
 {
-    const char *directories[] = {
-        "/app0/config",        "/app0/cores",      "/app0/content",   "/app0/system",
-        "/app0/savefiles",     "/app0/savestates", "/app0/playlists", "/app0/content/Saturn",
-        "/app0/system/Saturn", "/app0/shaders",    "/app0/filters",   "/app0/overlays",
-        "/app0/config/remaps"};
+    const char *directories[] = {"/app0/config",    "/app0/cores",         "/app0/content",
+                                 "/app0/system",    "/app0/savefiles",     "/app0/savestates",
+                                 "/app0/playlists", "/app0/system/Saturn", "/app0/shaders",
+                                 "/app0/filters",   "/app0/overlays",      "/app0/config/remaps"};
     for (const char *path : directories)
     {
         if (mkdir(path, 0777) != 0 && errno != EEXIST)

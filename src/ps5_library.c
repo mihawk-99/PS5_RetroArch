@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -1465,6 +1466,56 @@ int ps5_library_load_content_at(struct ps5_library *library, const char *playlis
     finish_systems(library);
     read_play(library, playlists);
     return 0;
+}
+
+int ps5_library_make_system_folders(const char *content, const char *info, const char *cores)
+{
+    /* The systems content already has a folder for (top level), by platform. */
+    char **names = folder_names(content, "");
+    if (!names)
+        return -1;
+    char has[sizeof(platforms) / sizeof(platforms[0])] = {0};
+    for (size_t i = 0; names[i]; i++)
+    {
+        char path[PS5_LIBRARY_PATH_MAX];
+        struct stat st;
+        if (names[i][0] == '.' ||
+            snprintf(path, sizeof(path), "%s/%s", content, names[i]) >= (int)sizeof(path) ||
+            stat(path, &st) != 0 || !S_ISDIR(st.st_mode))
+            continue;
+        const struct platform *platform = platform_by_id(ps5_library_platform(names[i]));
+        if (platform)
+            has[platform - platforms] = 1;
+    }
+    free_names(names);
+    /* Each installed core's databases: a folder for each system not there yet. */
+    struct ps5_library library;
+    memset(&library, 0, sizeof(library));
+    load_cores(&library, info, cores);
+    int made = 0;
+    for (size_t c = 0; c < library.core_count; c++)
+        for (const char *at = library.cores[c].databases; at && *at;)
+        {
+            const char *bar = strchr(at, '|');
+            char database[256];
+            snprintf(database, sizeof(database), "%.*s",
+                     (int)(bar ? (size_t)(bar - at) : strlen(at)), at);
+            at = bar ? bar + 1 : NULL;
+            const struct platform *platform = platform_by_id(ps5_library_platform(database));
+            if (!platform || !platform->database || has[platform - platforms])
+                continue;
+            char path[PS5_LIBRARY_PATH_MAX];
+            if (snprintf(path, sizeof(path), "%s/%s", content, platform->database) >=
+                (int)sizeof(path))
+                continue;
+            has[platform - platforms] = 1;
+            const int created = mkdir(path, 0777) == 0;
+            if (created || errno == EEXIST)
+                chmod(path, 0777); /* FTP's reach: the title's folders are 0777 */
+            made += created;
+        }
+    ps5_library_free(&library);
+    return made;
 }
 
 void ps5_library_free(struct ps5_library *library)

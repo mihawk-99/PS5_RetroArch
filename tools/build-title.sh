@@ -385,6 +385,16 @@ for core_name in "${core_names[@]}"; do
     cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/cores/"
 done
 
+# A folder in content/ for each system the staged cores run, named as RetroArch names
+# it ("Nintendo - Nintendo Entertainment System"), so a fresh install has a place for
+# every system's games (issue 33). The title makes the same ones at each start
+# (src/ps5_library.c, ps5_library_make_system_folders): this is that code, on the host.
+cc -std=c11 -O2 -Wall -Wextra -Werror -I"$root/src" "$root/tools/system-folders.c" \
+    "$root/src/ps5_library.c" -o "$root/build/system-folders"
+rm -rf -- "$dist/content"
+printf '==> [title] staged %s system folders in %s/content\n' \
+    "$("$root/build/system-folders" "$dist")" "$dist"
+
 # PPSSPP resolves its assets as <system>/PPSSPP, and RetroArch's system directory in
 # this title is /app0/system. Without the tree a game boots with "Core system files
 # missing, expect bugs": no flash0 fonts, no language files, no shaders. Only the
