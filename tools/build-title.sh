@@ -353,6 +353,8 @@ directory_wrap_flags+=" --wrap=getcwd"
 directory_wrap_flags+=" --wrap=getaddrinfo_retro --wrap=freeaddrinfo_retro --wrap=getnameinfo_retro --wrap=getnameinfo"
 # HTTPS seeds mbedTLS from /dev/urandom; src/net_shims.c gives it the libc arc4random_buf.
 directory_wrap_flags+=" --wrap=mbedtls_platform_entropy_poll"
+# Diagnostics of the HTTPS steps in retroarch.log (src/net_shims.c).
+directory_wrap_flags+=" --wrap=ssl_socket_init --wrap=ssl_socket_connect --wrap=socket_connect_with_timeout --wrap=mbedtls_ssl_handshake"
 # Folders the title or a core creates are 0777 and files at least 0666, so FTP,
 # which runs as another user, can reach them (src/permissions_ps5.cpp).
 directory_wrap_flags+=" $(bash "$root/tools/path-wrap-flags.sh")"

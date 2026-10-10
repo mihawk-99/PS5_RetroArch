@@ -267,3 +267,5 @@
 0115  Runtime-IP WebUI QR: XMB tab immediately left of Settings, RGUI first main-menu entry, modal drawing and input; shared encoder in src/ps5_webui_qr.c.
 
 0116  Bind the WebUI action in the common entry initializer; 0115 placed it in the custom-keyboard branch, unreachable from XMB/RGUI WebUI entries.
+
+0117  Netplay debug logging records local and remote state CRCs at upstream check frames, so a completed handshake can be distinguished from synchronized emulation. No protocol or synchronization behavior changes.

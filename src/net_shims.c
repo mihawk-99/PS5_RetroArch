@@ -41,6 +41,11 @@ int sceNetResolverStartNtoa(int resolver, const char *host, uint32_t *address, i
                             int retries, int flags);
 int sceNetResolverDestroy(int resolver);
 
+void RARCH_LOG(const char *fmt, ...);
+void RARCH_ERR(const char *fmt, ...);
+#define NET_LOG RARCH_LOG
+#define NET_ERR RARCH_ERR
+
 static int net_pool = -1;
 static void make_net_pool(void)
 {
@@ -54,13 +59,26 @@ static int resolve_name(const char *host, uint32_t *address)
     static pthread_once_t once = PTHREAD_ONCE_INIT;
     pthread_once(&once, make_net_pool);
     if (net_pool < 0)
+    {
+        NET_ERR("[PS5 net] DNS for %s: no net pool (0x%08x)\n", host, (unsigned)net_pool);
         return -1;
+    }
     const int resolver = sceNetResolverCreate("retroarch", net_pool, 0);
     if (resolver < 0)
+    {
+        NET_ERR("[PS5 net] DNS for %s: sceNetResolverCreate 0x%08x\n", host, (unsigned)resolver);
         return -1;
+    }
     const int status = sceNetResolverStartNtoa(resolver, host, address, 10 * 1000 * 1000, 2, 0);
     sceNetResolverDestroy(resolver);
-    return status < 0 ? -1 : 0;
+    if (status < 0)
+    {
+        NET_ERR("[PS5 net] DNS for %s: sceNetResolverStartNtoa 0x%08x\n", host, (unsigned)status);
+        return -1;
+    }
+    const unsigned char *b = (const unsigned char *)address;
+    NET_LOG("[PS5 net] DNS %s -> %u.%u.%u.%u\n", host, b[0], b[1], b[2], b[3]);
+    return 0;
 }
 #else
 /* The host test supplies the resolver. */
@@ -209,5 +227,54 @@ int __wrap_mbedtls_platform_entropy_poll(void *data, unsigned char *output, size
     arc4random_buf(output, length);
     *written = length;
     return 0;
+}
+#endif
+
+#ifdef __PROSPERO__
+/* What each step of an HTTPS request returned, in retroarch.log: RetroArch itself only
+ * says "http_task returned -1". Bound by --wrap (tools/build-title.sh). */
+#include <errno.h>
+#include <stdbool.h>
+void *__real_ssl_socket_init(int fd, const char *domain);
+int __real_ssl_socket_connect(void *state, void *address, bool timeout, bool nonblock);
+bool __real_socket_connect_with_timeout(int fd, void *address, int timeout);
+int __real_mbedtls_ssl_handshake(void *ssl);
+void *__wrap_ssl_socket_init(int fd, const char *domain);
+int __wrap_ssl_socket_connect(void *state, void *address, bool timeout, bool nonblock);
+bool __wrap_socket_connect_with_timeout(int fd, void *address, int timeout);
+int __wrap_mbedtls_ssl_handshake(void *ssl);
+
+void *__wrap_ssl_socket_init(int fd, const char *domain)
+{
+    void *state = __real_ssl_socket_init(fd, domain);
+    if (!state)
+        NET_ERR("[PS5 net] TLS setup for %s failed (random seed or certificates)\n",
+                domain ? domain : "?");
+    return state;
+}
+int __wrap_ssl_socket_connect(void *state, void *address, bool timeout, bool nonblock)
+{
+    errno = 0;
+    const int result = __real_ssl_socket_connect(state, address, timeout, nonblock);
+    if (result < 0)
+        NET_ERR("[PS5 net] TLS connect returned %d (errno %d)\n", result, errno);
+    else
+        NET_LOG("[PS5 net] TLS connected\n");
+    return result;
+}
+bool __wrap_socket_connect_with_timeout(int fd, void *address, int timeout)
+{
+    errno = 0;
+    const bool connected = __real_socket_connect_with_timeout(fd, address, timeout);
+    if (!connected)
+        NET_ERR("[PS5 net] connect failed (errno %d)\n", errno);
+    return connected;
+}
+int __wrap_mbedtls_ssl_handshake(void *ssl)
+{
+    const int result = __real_mbedtls_ssl_handshake(ssl);
+    if (result < 0 && result != -0x6900 && result != -0x6880) /* WANT_READ, WANT_WRITE */
+        NET_ERR("[PS5 net] TLS handshake -0x%04x\n", (unsigned)-result);
+    return result;
 }
 #endif

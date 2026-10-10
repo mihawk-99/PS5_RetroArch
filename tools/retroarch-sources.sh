@@ -103,7 +103,9 @@ configure_flags=(
     # built-in copy costs a compile rather than a dependency this SDK does not
     # carry.
     --enable-builtinglslang
-    --disable-update_cores --disable-update_core_info
+    # No Online Updater (owner's decision, 2026-10-10): the title ships its cores, info,
+    # assets and shaders, and updates arrive as a whole release through the WebUI.
+    --disable-update_cores --disable-update_core_info --disable-online_updater
     --disable-libretrodb --enable-video_filter --disable-dsp_filter
     # The BSV movie recorder compiles against zlib, which this SDK does not ship.
     --disable-bsv_movie

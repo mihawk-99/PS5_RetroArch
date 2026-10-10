@@ -257,7 +257,7 @@ and **EXTERNAL** (`/mnt`) may be empty.
 Startup, controller input, audio, saved settings, and representative games have been tested on PS5. Compatibility and long-session testing are ongoing.
 
 - **Azahar:** a crash when closing content, switching to Azahar, and starting a game remains under investigation.
-- **RetroAchievements and netplay** are disabled.
+- **RetroAchievements and NetPlay** require the separately started, qualified Lapy elevation service before launching RetroArch. Without it, RetroArch starts normally but outgoing online features remain unavailable. Files stay in their installation folder; existing `/app0` settings continue to work. See [online setup and verification](evidence/online-features/README.txt).
 - Shader presets, disc swapping, and rumble still need broader testing.
 
 [Recorded evidence](evidence/) accompanies verified changes. For a bug report,

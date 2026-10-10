@@ -35,6 +35,15 @@ from pathlib import Path
 # (file, anchor, inserted-before-anchor, already-present-marker)
 EDITS = [
     (
+        "network/netplay/netplay_frontend.c",
+        "               /* Problem! */\n               if (buffer[1] != local_crc)\n",
+        "               /* patches/series, 0117: trace received state comparisons. */\n"
+        "               RARCH_DBG(\"[Netplay] State check frame %u: local=%08x remote=%08x match=%d\\n\",\n"
+        "                     buffer[0], local_crc, buffer[1], local_crc == buffer[1]);\n"
+        "               /* Problem! */\n               if (buffer[1] != local_crc)\n",
+        "patches/series, 0117: trace received state comparisons",
+    ),
+    (
         "Makefile.common",
         "ifeq ($(HAVE_STATIC_VIDEO_FILTERS), 1)\n"
         "   OBJ +=",

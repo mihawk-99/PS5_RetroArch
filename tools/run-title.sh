@@ -40,6 +40,10 @@
 #   tools/run-title.sh --pad-monitor --watch 120
 #                                       trace each controller port's buttons as they change, to
 #                                       tell several controllers apart in the trace
+#   tools/run-title.sh --game=fceumm:/app0/tests/netplay-test.nes --retroarch-arg=--host --watch 60
+#                                       one more RetroArch argument a time (repeatable), after the
+#                                       game in /app0/args.txt: netplay (--host, --connect=IP),
+#                                       an --appendconfig=FILE for a test's settings
 #
 # Why this exists. Every earlier round of the console loop was four hand-driven
 # steps that needed a person: build, upload, launch, read. Two things went wrong
@@ -86,6 +90,7 @@ pad_script=
 pad_monitor=0
 menu_capture=0
 home_launch=0
+retroarch_args=
 while (( $# )); do
     case "$1" in
         --no-build)  build=0 ;;
@@ -112,7 +117,8 @@ while (( $# )); do
         --pad-monitor) pad_monitor=1 ;;
         --menu-capture=*) menu_capture=${1#*=} ;;
         --home-launch) home_launch=1 ;;
-        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test[=fceumm|mgba|snes9x|fbneo|genesis_plus_gx|ppsspp]] [--relaunch-test[=1..20] [--relaunch-image=PATH]] [--display-modes-test[=frames]] [--frontend-capture=SECONDS[,SECONDS...] [--frontend-scroll] [--frontend-profile] [--frontend-quit] [--frontend-launch]] [--picker-test=FRAMES:retroarch|es-de|none] [--retroarch-frames=N] [--game=CORE:PATH] [--pad-script=FILE] [--pad-monitor] [--menu-capture=FRAMES] [--home-launch]" >&2; exit 2 ;;
+        --retroarch-arg=*) retroarch_args+="${1#*=}"$'\n' ;;
+        *) echo "usage: ${0##*/} [--no-build] [--no-deploy] [--watch SECONDS] [--gpu-profile 1..60] [--audio-test] [--core-test[=fceumm|mgba|snes9x|fbneo|genesis_plus_gx|ppsspp]] [--relaunch-test[=1..20] [--relaunch-image=PATH]] [--display-modes-test[=frames]] [--frontend-capture=SECONDS[,SECONDS...] [--frontend-scroll] [--frontend-profile] [--frontend-quit] [--frontend-launch]] [--picker-test=FRAMES:retroarch|es-de|none] [--retroarch-frames=N] [--game=CORE:PATH] [--pad-script=FILE] [--pad-monitor] [--menu-capture=FRAMES] [--home-launch] [--retroarch-arg=ARG ...]" >&2; exit 2 ;;
     esac
     shift
 done
@@ -287,7 +293,7 @@ fi
 # appeared. A run that does not ask for extras must not inherit them, so the file
 # is removed on every run - before the launch, because deleting it afterwards
 # would leave it for the next one if this run dies.
-python3 - "$title_id" "$profile" "$audio_test" "$core_test" "$relaunch_test" "$relaunch_run" "$display_modes_test" "$relaunch_image" "$frontend_capture" "$capture_run" "$frontend_scroll" "$picker_test" "$retroarch_frames" "$pad_script" "$pad_monitor" "$home_launch" "$game" "$menu_capture" <<'PY'
+python3 - "$title_id" "$profile" "$audio_test" "$core_test" "$relaunch_test" "$relaunch_run" "$display_modes_test" "$relaunch_image" "$frontend_capture" "$capture_run" "$frontend_scroll" "$picker_test" "$retroarch_frames" "$pad_script" "$pad_monitor" "$home_launch" "$game" "$menu_capture" "$retroarch_args" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dt", "tools/deploy-title.py")
 dt = importlib.util.module_from_spec(spec); spec.loader.exec_module(dt)
@@ -374,6 +380,10 @@ with connect(**dt.load_settings()) as ftp:
         lines.append(f"--ps5-capture={sys.argv[18]}")
         remove_if_present(ftp, f"/data/homebrew/{sys.argv[1]}/shot.ppm")
         print(f"    the frame at {sys.argv[18]} is captured, menu included")
+    # --retroarch-arg: each as given, after the game (netplay, an appended config).
+    for extra in sys.argv[19].splitlines():
+        lines.append(extra)
+        print(f"    RetroArch argument {extra}")
     if int(sys.argv[13]):
         lines.append(f"--max-frames={sys.argv[13]}")
         if sys.argv[17]:

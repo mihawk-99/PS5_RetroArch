@@ -1,0 +1,572 @@
+{
+  "step": "online-features",
+  "recorded": "2026-10-10T14:51:36.757182+00:00",
+  "revision": "39ad097e6df0fee07554b5bef1055cdf042a4f95 plus changes committed with this capture",
+  "console_run": "base PS5 firmware 13.40; qualified one-shot external Lapy; PC RetroArch 1.22.2 and FCEUmm diagnostic NROM",
+  "command": "Reproduction and prerequisites: evidence/online-features/README.txt; console_netplay.py followed by analyse_netplay.py for relay-join and lan-host",
+  "raw_capture": "/tmp/ps5-online-final",
+  "deployed": {
+    "eboot.bin": {
+      "size": 40089724,
+      "sha256": "dfcf6f29ed05aecb7e61cc98908d05d5e2a109ffb3331f62014447e4fa8218bd"
+    },
+    "picker/picker.bin": {
+      "size": 29608493,
+      "sha256": "411e2b6f604878bd00b8d2b67e797b2ae91f1682ad046719464d04c57fa9fe04"
+    },
+    "es-de/es-de.bin": {
+      "size": 48156541,
+      "sha256": "595b66caf2bb6b8344ca1e398bf24c148d63e308f5cad3091eea6048f063d1ac"
+    }
+  },
+  "sources_sha256": {
+    "src/net_shims.c": "056099f8f38855338f86bdaf4c863bf19486429479376b454c24d3c457b5e3a3",
+    "tools/build-title.sh": "dcb987cebd06ae1dbf1434abfb7cb10d414e3ed6a2b4d0f366916ec83f597dfc",
+    "tools/retroarch-sources.sh": "080b19334d04f0f6ae85eb3b3f753f7200db05ce2cb182723de2bb7b6680f325",
+    "tools/run-title.sh": "94661eb878dfbefc3490bdf40a8a0ac8b3b6a58f0429b6e895bf999fb3faf465",
+    "tools/apply-port-patches.py": "6cdbad119a55f7597c9337bbe957402659bf4f36a5692cda9cdd00f33c4e44b1",
+    "patches/series": "d77bba46f8226b5c2c2f7bb44eb82574e9f43138a0ac93baad0bbe2217124ed7",
+    "tests/test_frontend.py": "4218f86c6bdc64a2eacd001066b6c1456d3ef0ccb578cefa74f500c00dc36514"
+  },
+  "netplay": {
+    "netplay-join-final": {
+      "mode": "relay-join",
+      "wire": [
+        {
+          "file": "wire-1-0.bin",
+          "commands": {
+            "0020": 1,
+            "0022": 1,
+            "0023": 1,
+            "2000": 1,
+            "2001": 1,
+            "0003": 3857,
+            "0042": 2,
+            "0026": 1,
+            "0040": 57,
+            "0045": 1,
+            "1101": 9,
+            "1100": 9
+          },
+          "first_frame": 24466,
+          "last_frame": 28322,
+          "input_packets": 3857,
+          "nonzero_input_packets": 0,
+          "button_values": [
+            0
+          ],
+          "incomplete_tail_bytes": 0
+        },
+        {
+          "file": "wire-1-1.bin",
+          "commands": {
+            "0020": 1,
+            "0022": 1,
+            "0025": 1,
+            "0041": 1,
+            "0003": 3397,
+            "1100": 9,
+            "1101": 9
+          },
+          "first_frame": 24867,
+          "last_frame": 28263,
+          "input_packets": 3397,
+          "nonzero_input_packets": 689,
+          "button_values": [
+            0,
+            1,
+            128,
+            256
+          ],
+          "incomplete_tail_bytes": 0
+        }
+      ],
+      "raw_sha256": {
+        "wire-0-0.bin": "dd6887a64b528c4fc0fac189b5d47ee29c7ffa6793e852121501271d88f27c2d",
+        "wire-0-1.bin": "4e1e6a60f7d641a7f77b5dd7bb3b8dcd5f7e9742a09d9b99eaf208e71910a160",
+        "wire-1-0.bin": "4ba94bc447da6312d8d65ee3bc1dfc4241a81fe81483ce048300d546e9a3873d",
+        "wire-1-1.bin": "38f4385bc5ad9b45dccaf6ab366c73a04382f1ab24b92aa2f9181a74cf797016",
+        "retroarch.log": "b66b7238c49f04f65215954ca6be64256096aa4cc1983e151a4b8c5c9d1fa4e0",
+        "pc.log": "b16e2c01fc56d140dd25653c0090a342d61bed065cf59d5fd0e207b051a0c75d",
+        "trace.txt": "e15b1816faa1722ff3e99091998c644451ee1e25406f54536f619853231c6d28",
+        "startup-paths.log": "d90df0eebe2150f21c872b20e4d8fcbde71c9314a8487f7304581d78b4cf921c",
+        "tests_lapy-elevation.log": "025add2461c1b1d5c259e9847905ab038030f87965294672703bb68500fb3637"
+      },
+      "state_checks": [
+        {
+          "frame": 24900,
+          "local": "05682d9a",
+          "remote": "05682d9a",
+          "match": true
+        },
+        {
+          "frame": 24960,
+          "local": "da43af30",
+          "remote": "da43af30",
+          "match": true
+        },
+        {
+          "frame": 25020,
+          "local": "e0faa5c0",
+          "remote": "e0faa5c0",
+          "match": true
+        },
+        {
+          "frame": 25080,
+          "local": "e2b591c0",
+          "remote": "e2b591c0",
+          "match": true
+        },
+        {
+          "frame": 25140,
+          "local": "81db57cc",
+          "remote": "81db57cc",
+          "match": true
+        },
+        {
+          "frame": 25200,
+          "local": "9ca275f0",
+          "remote": "9ca275f0",
+          "match": true
+        },
+        {
+          "frame": 25260,
+          "local": "ff77e751",
+          "remote": "ff77e751",
+          "match": true
+        },
+        {
+          "frame": 25320,
+          "local": "094588f2",
+          "remote": "094588f2",
+          "match": true
+        },
+        {
+          "frame": 25380,
+          "local": "47ab8725",
+          "remote": "47ab8725",
+          "match": true
+        },
+        {
+          "frame": 25440,
+          "local": "cd2bbd01",
+          "remote": "cd2bbd01",
+          "match": true
+        },
+        {
+          "frame": 25500,
+          "local": "005b4141",
+          "remote": "005b4141",
+          "match": true
+        },
+        {
+          "frame": 25560,
+          "local": "58f13e40",
+          "remote": "58f13e40",
+          "match": true
+        },
+        {
+          "frame": 25620,
+          "local": "1ac9c458",
+          "remote": "1ac9c458",
+          "match": true
+        },
+        {
+          "frame": 25680,
+          "local": "feef753f",
+          "remote": "feef753f",
+          "match": true
+        },
+        {
+          "frame": 25740,
+          "local": "567a8bc4",
+          "remote": "567a8bc4",
+          "match": true
+        },
+        {
+          "frame": 25800,
+          "local": "4740d762",
+          "remote": "4740d762",
+          "match": true
+        },
+        {
+          "frame": 25860,
+          "local": "5bef30e1",
+          "remote": "5bef30e1",
+          "match": true
+        },
+        {
+          "frame": 25920,
+          "local": "33bc2cda",
+          "remote": "33bc2cda",
+          "match": true
+        },
+        {
+          "frame": 25980,
+          "local": "49f4642b",
+          "remote": "49f4642b",
+          "match": true
+        },
+        {
+          "frame": 26040,
+          "local": "71aa5cb7",
+          "remote": "71aa5cb7",
+          "match": true
+        },
+        {
+          "frame": 26100,
+          "local": "fd54c668",
+          "remote": "fd54c668",
+          "match": true
+        },
+        {
+          "frame": 26160,
+          "local": "74f71f6a",
+          "remote": "74f71f6a",
+          "match": true
+        },
+        {
+          "frame": 26220,
+          "local": "62f52d59",
+          "remote": "62f52d59",
+          "match": true
+        },
+        {
+          "frame": 26280,
+          "local": "51d2ec8d",
+          "remote": "51d2ec8d",
+          "match": true
+        },
+        {
+          "frame": 26340,
+          "local": "b5f2e346",
+          "remote": "b5f2e346",
+          "match": true
+        },
+        {
+          "frame": 26400,
+          "local": "d3f14cf9",
+          "remote": "d3f14cf9",
+          "match": true
+        },
+        {
+          "frame": 26460,
+          "local": "5d9a85f0",
+          "remote": "5d9a85f0",
+          "match": true
+        },
+        {
+          "frame": 26520,
+          "local": "9609c814",
+          "remote": "9609c814",
+          "match": true
+        },
+        {
+          "frame": 26640,
+          "local": "14572bb6",
+          "remote": "14572bb6",
+          "match": true
+        },
+        {
+          "frame": 26700,
+          "local": "0ffc345e",
+          "remote": "0ffc345e",
+          "match": true
+        },
+        {
+          "frame": 26760,
+          "local": "d3c0a18a",
+          "remote": "d3c0a18a",
+          "match": true
+        },
+        {
+          "frame": 26820,
+          "local": "9fb1e8e8",
+          "remote": "9fb1e8e8",
+          "match": true
+        },
+        {
+          "frame": 26880,
+          "local": "afe95d79",
+          "remote": "afe95d79",
+          "match": true
+        },
+        {
+          "frame": 26940,
+          "local": "924268a6",
+          "remote": "924268a6",
+          "match": true
+        },
+        {
+          "frame": 27000,
+          "local": "71ef8351",
+          "remote": "71ef8351",
+          "match": true
+        },
+        {
+          "frame": 27060,
+          "local": "5b7d8b3f",
+          "remote": "5b7d8b3f",
+          "match": true
+        },
+        {
+          "frame": 27120,
+          "local": "5389b5c2",
+          "remote": "5389b5c2",
+          "match": true
+        },
+        {
+          "frame": 27180,
+          "local": "df8421d2",
+          "remote": "df8421d2",
+          "match": true
+        },
+        {
+          "frame": 27240,
+          "local": "78eb3db5",
+          "remote": "78eb3db5",
+          "match": true
+        },
+        {
+          "frame": 27300,
+          "local": "c2e7f868",
+          "remote": "c2e7f868",
+          "match": true
+        },
+        {
+          "frame": 27360,
+          "local": "df50b92b",
+          "remote": "df50b92b",
+          "match": true
+        },
+        {
+          "frame": 27420,
+          "local": "f4067a46",
+          "remote": "f4067a46",
+          "match": true
+        },
+        {
+          "frame": 27480,
+          "local": "630319d3",
+          "remote": "630319d3",
+          "match": true
+        },
+        {
+          "frame": 27540,
+          "local": "72d0f681",
+          "remote": "72d0f681",
+          "match": true
+        },
+        {
+          "frame": 27600,
+          "local": "60eb44bb",
+          "remote": "60eb44bb",
+          "match": true
+        },
+        {
+          "frame": 27660,
+          "local": "07fe0ddf",
+          "remote": "07fe0ddf",
+          "match": true
+        },
+        {
+          "frame": 27720,
+          "local": "8ec0fb52",
+          "remote": "8ec0fb52",
+          "match": true
+        },
+        {
+          "frame": 27780,
+          "local": "76ede26c",
+          "remote": "76ede26c",
+          "match": true
+        },
+        {
+          "frame": 27840,
+          "local": "2d258acf",
+          "remote": "2d258acf",
+          "match": true
+        },
+        {
+          "frame": 27900,
+          "local": "306a7069",
+          "remote": "306a7069",
+          "match": true
+        },
+        {
+          "frame": 27960,
+          "local": "538bff44",
+          "remote": "538bff44",
+          "match": true
+        },
+        {
+          "frame": 28020,
+          "local": "80818f50",
+          "remote": "80818f50",
+          "match": true
+        },
+        {
+          "frame": 28080,
+          "local": "b2108e94",
+          "remote": "b2108e94",
+          "match": true
+        },
+        {
+          "frame": 28140,
+          "local": "16de4eb3",
+          "remote": "16de4eb3",
+          "match": true
+        },
+        {
+          "frame": 28200,
+          "local": "c4e220c1",
+          "remote": "c4e220c1",
+          "match": true
+        }
+      ],
+      "console_connected": true,
+      "netplay_errors": [],
+      "pc_connected": true,
+      "daemon_balanced": true
+    },
+    "netplay-host-final": {
+      "mode": "lan-host",
+      "wire": [
+        {
+          "file": "wire-0-0.bin",
+          "commands": {
+            "0020": 1,
+            "0022": 1,
+            "0025": 1,
+            "0041": 1,
+            "0003": 1549,
+            "1100": 8,
+            "1101": 8
+          },
+          "first_frame": 313,
+          "last_frame": 1861,
+          "input_packets": 1549,
+          "nonzero_input_packets": 0,
+          "button_values": [
+            0
+          ],
+          "incomplete_tail_bytes": 0
+        },
+        {
+          "file": "wire-0-1.bin",
+          "commands": {
+            "0020": 1,
+            "0022": 1,
+            "0023": 1,
+            "2000": 1,
+            "2001": 1,
+            "0003": 1490,
+            "0042": 2,
+            "0026": 1,
+            "0045": 13,
+            "0040": 25,
+            "1101": 8,
+            "1100": 8
+          },
+          "first_frame": 311,
+          "last_frame": 1800,
+          "input_packets": 1490,
+          "nonzero_input_packets": 360,
+          "button_values": [
+            0,
+            1,
+            128,
+            256
+          ],
+          "incomplete_tail_bytes": 0
+        }
+      ],
+      "raw_sha256": {
+        "wire-0-0.bin": "1788657d204cbe8e1a98652822b2acf44a9e3129464a76fd2004f4b4ee10e6bc",
+        "wire-0-1.bin": "cd00268bc6333c7447350456af794c0bc2eb9ba4f616c2c737db334c8be0ab20",
+        "retroarch.log": "2884ef9e3ad17a2e19111598a8d3a6223da40df5ca21be609d65b001e30fc8e7",
+        "pc.log": "ce7de36ed7afe5586ee27936f9e9a0c0ab2258616b187a50ae1a00fcbdef8ce6",
+        "trace.txt": "d028b9d017d6bf48396fd58d5e182b95b805f47c4b9f7d99257046cf7bea2702",
+        "startup-paths.log": "d90df0eebe2150f21c872b20e4d8fcbde71c9314a8487f7304581d78b4cf921c",
+        "tests_lapy-elevation.log": "942cdddad6d51ac5a3f35d00e16422af2be8534a69fba4e264dcf54375f90d42"
+      },
+      "state_checks": [],
+      "console_connected": true,
+      "netplay_errors": [],
+      "pc_connected": true,
+      "daemon_balanced": true
+    }
+  },
+  "achievements": {
+    "login_success": true,
+    "session_started": true,
+    "achievement_set_loaded": true,
+    "invalid_credentials": false,
+    "raw_sha256": "f8e5814a275b38d0f0d527d59362a061e927c21535a1762df523b0fbc8cca0e7"
+  },
+  "badge": {
+    "fresh_badge": true,
+    "bytes": 3725,
+    "size": [
+      64,
+      64
+    ],
+    "png_verified": true,
+    "sha256": "abe37ac44ce3f25efd6361d6ba31fe51fb8897eceea39437bf41157713777370",
+    "daemon_balanced": true,
+    "temporary_controls_removed": true,
+    "console_idle": true
+  },
+  "lines": [
+    "RetroAchievements authenticated=true session_started=true achievement_set_loaded=true invalid_credentials=false",
+    "Account username/password fields unchanged in both console configs; no account values captured in this evidence",
+    "Fresh badge absent_before=true downloaded_bytes=3725 PNG=64x64 decoded=true",
+    "NetPlay relay join: connected=true peer_connected=true state_checks=55 matching=55 mismatching=0",
+    "NetPlay relay join: input_packets=3857/3397 nonzero_console_inputs=689 button_values=0,1,128,256",
+    "NetPlay LAN host: connected=true peer_connected=true input_packets=1549/1490 nonzero_console_inputs=360",
+    "NetPlay LAN host: state_checks_sent=25 button_values=0,1,128,256",
+    "Normal quit: final online runs completed with root_balanced=1 and error=0",
+    "Final executables uploaded and stored SHA-256 verified; standard SDK socket API retained",
+    "No router/firewall changes; no public lobby announcement; no autoload or resident service installed",
+    "Full gates: format PASS; unit 193 PASS; all shipped targets build PASS; integration 193 PASS; evidence 125 PASS",
+    "After moving debug-only CRC trace: 24 focused tests PASS; format and all shipped targets build PASS; console tests repeated",
+    "Earlier force-close host runs: wait_title_exit error=60 root_balanced=0; subsequent baseline 73/72; normal quit passes",
+    "Earlier sandboxed unit attempt: 13 local-server setup errors; rerun with local networking resolved them",
+    "Earlier patch-count check: 254 versus expected 253; expected count updated for one diagnostic hook",
+    "Earlier relay trace: connection and inputs passed, state-check count zero because only deferred path was traced; corrected before final runs",
+    "No-service launch: elevation=unavailable offline=1 root=/app0; remembered ask opens picker; active before test close",
+    "Final checks: evidence 126 PASS; manifest and notices PASS; account data absent from staged diff; executable hashes still match; console idle and controls absent"
+  ],
+  "limits": [
+    "Qualified external service required before each elevated launch; no autoload installed",
+    "FCEUmm frame synchronization and scripted inputs verified; other cores and long sessions not covered",
+    "Public lobby, NAT traversal and direct PS5-to-PC LAN joining not qualified",
+    "Force-close teardown observation timed out in earlier trials; normal quit and later original baselines passed"
+  ],
+  "offline": {
+    "normal_startup": true,
+    "offline": true,
+    "selected_frontend": "picker",
+    "active_before_close": true,
+    "retroarch_log_stale_from_previous_run": true,
+    "raw_sha256": {
+      "startup-paths.log": "912506b0705e710c3ce33090b03a2a9fe11b55fd44147da85a34b20973904f00",
+      "trace.txt": "6b5f7e94eb112e4e5e832c43438e8ba804f8b04ed602163b79c9e4ed9e1aa12a",
+      "final-procs.txt": "800109deaab12ed68f9f43ffea275e9b14b12f796be69a7fb7613f4a7a3a50ec"
+    }
+  },
+  "final_check": {
+    "staged_account_values_absent": true,
+    "staged_console_address_absent": true,
+    "temporary_controls_absent": true,
+    "console_idle": true,
+    "final_executables_match": true,
+    "readme_warnings_preserved": true
+  },
+  "gate_log_sha256": {
+    "ps5-online-gates-verified.log": "de03bdcf31f7654c5aae876e63508bd65abd3a16a9e73ff2229de3dde957b5eb",
+    "ps5-online-trace-build.log": "794bb7216c0e3def48a47da17579c2673969a578de0300344032f395b73696be",
+    "ps5-online-patch-final.log": "a565f7c0cfa8d1ba14afcfb97ca4be56d3aa29722d3de1e885049a2c851da73c",
+    "ps5-online-final-checks.log": "e219af656f789454401ec219bf9c8db82d507e3ea6b662dc971b20ca091213af"
+  }
+}

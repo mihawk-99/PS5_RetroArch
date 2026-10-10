@@ -1,0 +1,24 @@
+{
+  "step": "online-features",
+  "note": "Final console binary: authenticated RetroAchievements plus fresh PNG, FCEUmm LAN hosting and relay joining with input/state checks, and normal-quit cleanup. External service is an explicit prerequisite.",
+  "must_contain": [
+    "RetroAchievements authenticated=true session_started=true achievement_set_loaded=true invalid_credentials=false",
+    "Account username/password fields unchanged in both console configs; no account values captured in this evidence",
+    "Fresh badge absent_before=true downloaded_bytes=3725 PNG=64x64 decoded=true",
+    "NetPlay relay join: connected=true peer_connected=true state_checks=55 matching=55 mismatching=0",
+    "NetPlay relay join: input_packets=3857/3397 nonzero_console_inputs=689 button_values=0,1,128,256",
+    "NetPlay LAN host: connected=true peer_connected=true input_packets=1549/1490 nonzero_console_inputs=360",
+    "NetPlay LAN host: state_checks_sent=25 button_values=0,1,128,256",
+    "Normal quit: final online runs completed with root_balanced=1 and error=0",
+    "Final executables uploaded and stored SHA-256 verified; standard SDK socket API retained",
+    "No router/firewall changes; no public lobby announcement; no autoload or resident service installed",
+    "No-service launch: elevation=unavailable offline=1 root=/app0; remembered ask opens picker; active before test close"
+  ],
+  "must_not_contain": [
+    "Invalid user/password",
+    "State checks: 0 matching: 0"
+  ],
+  "human_check": [
+    "Compare limitations and raw hashes; no claim of public lobby, all-core or long-session coverage."
+  ]
+}
