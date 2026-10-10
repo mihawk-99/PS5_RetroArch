@@ -1,0 +1,11 @@
+# The ES-DE themes shipped beside Alekfull NX (the default), each pinned by commit:
+# <variable>=<commit> <repository>. tools/build-esde.sh fetches them into
+# .deps/esde-themes/<repository name>, frontends/es-de/stage.sh copies them into
+# es-de/themes, and tooling/notices/components.json credits each one (its variable).
+# All are on ES-DE's own theme list (gitlab.com/es-de/themes/themes-list).
+theme_colorful_simplified=669e7f6a2de57c5ab69fd865e70d1cd357dbabbb https://github.com/anthonycaccese/colorful-simplified-es-de
+theme_colorful_revisited=5eb0a020e3819dbc1d13d02f65a1d657d1d1f4ca https://github.com/anthonycaccese/colorful-revisited-es-de
+theme_playstation_x=78a6517bc75502951182442b136e0dc50b0ec432 https://github.com/RobZombie9043/playstation-x-es-de
+theme_art_book_next=d772d07109701d9bd7c9fda305bfef6601105ab8 https://github.com/anthonycaccese/art-book-next-es-de
+theme_retrofix_revisited=b43c09da23211cb7a96f0e813db64ad661c78347 https://github.com/anthonycaccese/retrofix-revisited-es-de
+theme_artflix_revisited=7bed36c284435a62acb6a9a37c1a6c4ab64f62d0 https://github.com/TheGrizzMD/artflix-revisited-es-de

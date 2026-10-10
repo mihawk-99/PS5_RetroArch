@@ -72,6 +72,20 @@ fi
 [[ $(git -C "$alekfull" rev-parse HEAD) == "$alekfull_commit" ]] ||
     { echo "error: $alekfull is not the Alekfull NX theme at $alekfull_commit" >&2; exit 1; }
 
+# The other shipped themes (frontends/es-de/themes.list), each at its pinned commit.
+while read -r pin repository; do
+    [[ $pin == theme_* ]] || continue
+    commit=${pin#*=}
+    theme="$root/.deps/esde-themes/$(basename "$repository")"
+    if [[ ! -d $theme/.git ]]; then
+        git init --quiet "$theme"
+        git -C "$theme" fetch --quiet --depth 1 "$repository.git" "$commit"
+        git -C "$theme" checkout --quiet FETCH_HEAD
+    fi
+    [[ $(git -C "$theme" rev-parse HEAD) == "$commit" ]] ||
+        { echo "error: $theme is not $repository at $commit" >&2; exit 1; }
+done < "$root/frontends/es-de/themes.list"
+
 port="$root/frontends/es-de"
 patches=()
 while read -r patch; do

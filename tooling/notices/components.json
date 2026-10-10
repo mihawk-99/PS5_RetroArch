@@ -690,6 +690,78 @@
       "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign); the picker's EmulationStation card is a picture of it on the console."
     },
     {
+      "id": "colorful-simplified-es-de",
+      "name": "Colorful (Simplified) for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/colorful-simplified-es-de/**"],
+      "licence": "CC-BY-NC-SA-2.0",
+      "noncommercial": true,
+      "copyright": ["ant (anthonycaccese) and viking, and the authors its README credits"],
+      "texts": [{"from": ".deps/esde-themes/colorful-simplified-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_colorful_simplified", "url": "https://github.com/anthonycaccese/colorful-simplified-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf)."
+    },
+    {
+      "id": "colorful-revisited-es-de",
+      "name": "Colorful (Revisited) for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/colorful-revisited-es-de/**"],
+      "licence": "CC-BY-NC-SA-2.0",
+      "noncommercial": true,
+      "copyright": ["ant (anthonycaccese) and viking, and the authors its README credits"],
+      "texts": [{"from": ".deps/esde-themes/colorful-revisited-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_colorful_revisited", "url": "https://github.com/anthonycaccese/colorful-revisited-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf)."
+    },
+    {
+      "id": "playstation-x-es-de",
+      "name": "PlayStation-X for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/playstation-x-es-de/**"],
+      "licence": "CC-BY-NC-SA-4.0",
+      "noncommercial": true,
+      "copyright": ["Rob Zombie (RobZombie9043) and pajarorrojo, and the authors its README credits"],
+      "texts": [{"from": ".deps/esde-themes/playstation-x-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_playstation_x", "url": "https://github.com/RobZombie9043/playstation-x-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf)."
+    },
+    {
+      "id": "art-book-next-es-de",
+      "name": "Art Book Next for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/art-book-next-es-de/**"],
+      "licence": "CC-BY-NC-SA-2.0",
+      "noncommercial": true,
+      "copyright": ["ant (anthonycaccese), and the authors its README credits"],
+      "texts": [{"from": ".deps/esde-themes/art-book-next-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_art_book_next", "url": "https://github.com/anthonycaccese/art-book-next-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf)."
+    },
+    {
+      "id": "retrofix-revisited-es-de",
+      "name": "Retrofix (Revisited) for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/retrofix-revisited-es-de/**"],
+      "licence": "CC-BY-NC-SA-2.0",
+      "noncommercial": true,
+      "copyright": ["ant (anthonycaccese) and 20GotoTen, and the authors its README credits"],
+      "texts": [{"from": ".deps/esde-themes/retrofix-revisited-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_retrofix_revisited", "url": "https://github.com/anthonycaccese/retrofix-revisited-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf)."
+    },
+    {
+      "id": "artflix-revisited-es-de",
+      "name": "Artflix (Revisited) for ES-DE (a theme EmulationStation offers)",
+      "kind": "asset",
+      "artifacts": ["es-de/themes/artflix-revisited-es-de/**"],
+      "licence": "CC-BY-NC-SA-2.0",
+      "noncommercial": true,
+      "copyright": ["TheGrizzMD and Alekfull (fagnerpc), after ARTFLIX by Alekfull and ARTFLIX-Cobalto by Galisteo"],
+      "texts": [{"from": ".deps/esde-themes/artflix-revisited-es-de/README.md", "to": "README.md"}],
+      "source": {"kind": "pin", "file": "frontends/es-de/themes.list", "var": "theme_artflix_revisited", "url": "https://github.com/TheGrizzMD/artflix-revisited-es-de/tree/{rev}"},
+      "modifications": "Shipped as it is, without the artwork sources (.psd, .afdesign, .xcf). Its repository states no licence of its own; it derives from Alekfull's ARTFLIX, whose CC BY-NC-SA terms are applied here."
+    },
+    {
       "id": "sdl2",
       "name": "SDL 2.30.12 (ps5-payload-dev's PS5 fork), as ES-DE's window, input and sound",
       "kind": "code",
