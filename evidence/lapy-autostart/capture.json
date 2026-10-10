@@ -1,0 +1,507 @@
+{
+  "step": "lapy-autostart",
+  "recorded": "2026-10-10T15:23:56.934694+00:00",
+  "revision": "56ecbf367f7d84660e024af60ede5acd2212236e plus changes committed with this capture",
+  "console_run": "base PS5 firmware 13.40; bundled resident service started by the title; existing local ELF loader",
+  "command": "See evidence/lapy-autostart/README.txt; no host-injected payload for accepted runs",
+  "lines": [
+    "First launch: no prestarted service; bundled ELF sent=155752 size=155752 errno=0",
+    "First launch: elevation=ok uid=0 same_executable=1; RetroAchievements login/session/achievement_set=true",
+    "Second launch: same service identity; no payload resend; RetroAchievements login/session/achievement_set=true",
+    "Both achievement runs: normal_exit=true account_fields_unchanged=true",
+    "Resident service: successful_requests=3 client_data_rw_proofs=3; all before_request root counts=73/72",
+    "NetPlay relay join: both peers connected; 3837/3361 input packets; 581 nonzero console input packets",
+    "NetPlay relay join: state_checks=52 matching=52 mismatching=0; normal exit; no new service launch",
+    "Final console: idle=true service_ready=true temporary_controls_absent=true",
+    "Payload Manager config and autoload list unchanged; mistaken payload upload removed",
+    "Installed eboot, bundled service, picker and ES-DE hashes match the complete build",
+    "Qualified external runtime source unchanged; no kernel preflight or transaction guards disabled",
+    "Gates: 194 unit tests and 194 integration tests passed; all shipped targets built with pinned picker checkout"
+  ],
+  "first": {
+    "label": "achievements-autostart",
+    "autostart": true,
+    "elevated": true,
+    "same_executable": true,
+    "login": true,
+    "session": true,
+    "achievement_set": true,
+    "ready": true,
+    "normal_exit": true,
+    "account_unchanged": true
+  },
+  "second": {
+    "label": "achievements-reuse",
+    "autostart": false,
+    "elevated": true,
+    "same_executable": true,
+    "login": true,
+    "session": true,
+    "achievement_set": true,
+    "ready": true,
+    "normal_exit": true,
+    "account_unchanged": true
+  },
+  "final": {
+    "idle": true,
+    "same_service": true,
+    "successful_requests": 3,
+    "successful_client_proofs": 3,
+    "request_baselines": [
+      [
+        "73",
+        "72"
+      ],
+      [
+        "73",
+        "72"
+      ],
+      [
+        "73",
+        "72"
+      ]
+    ],
+    "payload_manager_unchanged": true,
+    "mistaken_upload_absent": true,
+    "temporary_controls_absent": true,
+    "installed": {
+      "eboot.bin": {
+        "bytes": 40090812,
+        "sha256": "7067b750a657b267e70a606a757b9aa888d3fcef4caa17c8387508de70e82c66"
+      },
+      "lapy-root-daemon.elf": {
+        "bytes": 155752,
+        "sha256": "5ffac59aa640bc8ce7c34b9cdefc909ddc0f1044913a0485e44b39b84f2bb661"
+      },
+      "picker/picker.bin": {
+        "bytes": 29608493,
+        "sha256": "411e2b6f604878bd00b8d2b67e797b2ae91f1682ad046719464d04c57fa9fe04"
+      },
+      "es-de/es-de.bin": {
+        "bytes": 48156541,
+        "sha256": "595b66caf2bb6b8344ca1e398bf24c148d63e308f5cad3091eea6048f063d1ac"
+      }
+    }
+  },
+  "netplay": {
+    "mode": "relay-join",
+    "wire": [
+      {
+        "file": "wire-1-0.bin",
+        "commands": {
+          "0020": 1,
+          "0022": 1,
+          "0023": 1,
+          "2000": 1,
+          "2001": 1,
+          "0003": 3837,
+          "0042": 2,
+          "0026": 1,
+          "0040": 55,
+          "1101": 9,
+          "1100": 9
+        },
+        "first_frame": 19943,
+        "last_frame": 23779,
+        "input_packets": 3837,
+        "nonzero_input_packets": 0,
+        "button_values": [
+          0
+        ],
+        "incomplete_tail_bytes": 0
+      },
+      {
+        "file": "wire-1-1.bin",
+        "commands": {
+          "0020": 1,
+          "0022": 1,
+          "0025": 1,
+          "0041": 1,
+          "0003": 3361,
+          "1100": 9,
+          "1101": 9
+        },
+        "first_frame": 20359,
+        "last_frame": 23719,
+        "input_packets": 3361,
+        "nonzero_input_packets": 581,
+        "button_values": [
+          0,
+          1,
+          128,
+          256
+        ],
+        "incomplete_tail_bytes": 0
+      }
+    ],
+    "raw_sha256": {
+      "wire-0-0.bin": "aabea61abf591fffc96a25ec7eec547b9ea1a23d906f2d11853d49ac14f57cc8",
+      "wire-0-1.bin": "b833773092679ecd523c6dc6c41ddf4895f573019185b62d8903e24abc399b2a",
+      "wire-1-0.bin": "25cd2c01dedb4cbdac26555f23cebfa17d58b991cc27a4085880b203df634f10",
+      "wire-1-1.bin": "32ec3fa66f626af5f324bb4525167952aec8a80e32951c6bebefb496229091c0",
+      "retroarch.log": "dd9d6380b18b46cf8744d64cdc4ddb2767a066036ccda43e352691324ba5beb2",
+      "pc.log": "174154de073210a1e7d045d76a0dbf06e981c3ada973f3702ceb39c0bf029a1a",
+      "trace.txt": "01362ab33b3f0fddda116b08730d18dad3ed2738fabb7aa8f739eea9b9541152",
+      "startup-paths.log": "d90df0eebe2150f21c872b20e4d8fcbde71c9314a8487f7304581d78b4cf921c",
+      "lapy-service.log": "595a57a0e1babd3749d6d0de0d0b04696ab569afc5047b6709b2f58b81564717"
+    },
+    "state_checks": [
+      {
+        "frame": 20460,
+        "local": "df817338",
+        "remote": "df817338",
+        "match": true
+      },
+      {
+        "frame": 20520,
+        "local": "67777f78",
+        "remote": "67777f78",
+        "match": true
+      },
+      {
+        "frame": 20580,
+        "local": "c7800aea",
+        "remote": "c7800aea",
+        "match": true
+      },
+      {
+        "frame": 20700,
+        "local": "bac05a61",
+        "remote": "bac05a61",
+        "match": true
+      },
+      {
+        "frame": 20760,
+        "local": "145d5105",
+        "remote": "145d5105",
+        "match": true
+      },
+      {
+        "frame": 20820,
+        "local": "0c7659bb",
+        "remote": "0c7659bb",
+        "match": true
+      },
+      {
+        "frame": 20880,
+        "local": "2f548d21",
+        "remote": "2f548d21",
+        "match": true
+      },
+      {
+        "frame": 20940,
+        "local": "50282f2b",
+        "remote": "50282f2b",
+        "match": true
+      },
+      {
+        "frame": 21000,
+        "local": "6f8fc9c1",
+        "remote": "6f8fc9c1",
+        "match": true
+      },
+      {
+        "frame": 21060,
+        "local": "49d64384",
+        "remote": "49d64384",
+        "match": true
+      },
+      {
+        "frame": 21120,
+        "local": "60d03120",
+        "remote": "60d03120",
+        "match": true
+      },
+      {
+        "frame": 21180,
+        "local": "8767cfae",
+        "remote": "8767cfae",
+        "match": true
+      },
+      {
+        "frame": 21240,
+        "local": "70deef4e",
+        "remote": "70deef4e",
+        "match": true
+      },
+      {
+        "frame": 21300,
+        "local": "970b1038",
+        "remote": "970b1038",
+        "match": true
+      },
+      {
+        "frame": 21360,
+        "local": "2ce73dd9",
+        "remote": "2ce73dd9",
+        "match": true
+      },
+      {
+        "frame": 21420,
+        "local": "6b4a68a9",
+        "remote": "6b4a68a9",
+        "match": true
+      },
+      {
+        "frame": 21480,
+        "local": "deee89fc",
+        "remote": "deee89fc",
+        "match": true
+      },
+      {
+        "frame": 21540,
+        "local": "fee2edef",
+        "remote": "fee2edef",
+        "match": true
+      },
+      {
+        "frame": 21600,
+        "local": "94decf7d",
+        "remote": "94decf7d",
+        "match": true
+      },
+      {
+        "frame": 21660,
+        "local": "0381616c",
+        "remote": "0381616c",
+        "match": true
+      },
+      {
+        "frame": 21720,
+        "local": "e249bd35",
+        "remote": "e249bd35",
+        "match": true
+      },
+      {
+        "frame": 21780,
+        "local": "0e844910",
+        "remote": "0e844910",
+        "match": true
+      },
+      {
+        "frame": 21840,
+        "local": "936c3412",
+        "remote": "936c3412",
+        "match": true
+      },
+      {
+        "frame": 21960,
+        "local": "aa20cc13",
+        "remote": "aa20cc13",
+        "match": true
+      },
+      {
+        "frame": 22020,
+        "local": "0d7c23cf",
+        "remote": "0d7c23cf",
+        "match": true
+      },
+      {
+        "frame": 22080,
+        "local": "c90b98fe",
+        "remote": "c90b98fe",
+        "match": true
+      },
+      {
+        "frame": 22140,
+        "local": "2b646017",
+        "remote": "2b646017",
+        "match": true
+      },
+      {
+        "frame": 22200,
+        "local": "846fffd2",
+        "remote": "846fffd2",
+        "match": true
+      },
+      {
+        "frame": 22260,
+        "local": "22effecb",
+        "remote": "22effecb",
+        "match": true
+      },
+      {
+        "frame": 22320,
+        "local": "9bf3613c",
+        "remote": "9bf3613c",
+        "match": true
+      },
+      {
+        "frame": 22380,
+        "local": "576f163c",
+        "remote": "576f163c",
+        "match": true
+      },
+      {
+        "frame": 22440,
+        "local": "c3237c7b",
+        "remote": "c3237c7b",
+        "match": true
+      },
+      {
+        "frame": 22500,
+        "local": "cc59d933",
+        "remote": "cc59d933",
+        "match": true
+      },
+      {
+        "frame": 22560,
+        "local": "d9af4d71",
+        "remote": "d9af4d71",
+        "match": true
+      },
+      {
+        "frame": 22620,
+        "local": "0e8b1698",
+        "remote": "0e8b1698",
+        "match": true
+      },
+      {
+        "frame": 22680,
+        "local": "c257be8c",
+        "remote": "c257be8c",
+        "match": true
+      },
+      {
+        "frame": 22740,
+        "local": "4bc206af",
+        "remote": "4bc206af",
+        "match": true
+      },
+      {
+        "frame": 22800,
+        "local": "dd4230df",
+        "remote": "dd4230df",
+        "match": true
+      },
+      {
+        "frame": 22860,
+        "local": "df19c08f",
+        "remote": "df19c08f",
+        "match": true
+      },
+      {
+        "frame": 22920,
+        "local": "d73d2fcc",
+        "remote": "d73d2fcc",
+        "match": true
+      },
+      {
+        "frame": 22980,
+        "local": "fdb20321",
+        "remote": "fdb20321",
+        "match": true
+      },
+      {
+        "frame": 23040,
+        "local": "824ad7af",
+        "remote": "824ad7af",
+        "match": true
+      },
+      {
+        "frame": 23100,
+        "local": "058835d1",
+        "remote": "058835d1",
+        "match": true
+      },
+      {
+        "frame": 23160,
+        "local": "e65f7be7",
+        "remote": "e65f7be7",
+        "match": true
+      },
+      {
+        "frame": 23220,
+        "local": "9c8c0375",
+        "remote": "9c8c0375",
+        "match": true
+      },
+      {
+        "frame": 23280,
+        "local": "893f27c1",
+        "remote": "893f27c1",
+        "match": true
+      },
+      {
+        "frame": 23340,
+        "local": "28324918",
+        "remote": "28324918",
+        "match": true
+      },
+      {
+        "frame": 23400,
+        "local": "2d6df212",
+        "remote": "2d6df212",
+        "match": true
+      },
+      {
+        "frame": 23460,
+        "local": "a4d9555e",
+        "remote": "a4d9555e",
+        "match": true
+      },
+      {
+        "frame": 23520,
+        "local": "eefbbd2c",
+        "remote": "eefbbd2c",
+        "match": true
+      },
+      {
+        "frame": 23580,
+        "local": "85ac52e2",
+        "remote": "85ac52e2",
+        "match": true
+      },
+      {
+        "frame": 23700,
+        "local": "99004720",
+        "remote": "99004720",
+        "match": true
+      }
+    ],
+    "console_connected": true,
+    "netplay_errors": [],
+    "pc_connected": true,
+    "resident_client_proof": true
+  },
+  "raw_sha256": {
+    "/tmp/ps5-autostart-console/achievements-autostart/startup-paths.log": "20f21d21261262b1d2129536c63f36a2814f08791d13a4da12f0a8ba74c3dfca",
+    "/tmp/ps5-autostart-console/achievements-autostart/retroarch.log": "dc6dcffa0c05c982063bee095af02b782adb74a83ccdd51f0b53fe5c7dfbf146",
+    "/tmp/ps5-autostart-console/achievements-autostart/kernel.log": "1fa6cd4a07adfa73df100f248b55054b585b20e6cc2a4215e678a81517a18323",
+    "/tmp/ps5-autostart-console/achievements-autostart/lapy-service.log": "dba55db6033ddbaa3aecb10b607821da313422cf4875982d1b19f1a34c3fa493",
+    "/tmp/ps5-autostart-console/achievements-autostart/result.json": "452ef577af588473ea20f1919e72ede3e074cded8d6c66200a8e762ba46c7173",
+    "/tmp/ps5-autostart-console/achievements-reuse/startup-paths.log": "d90df0eebe2150f21c872b20e4d8fcbde71c9314a8487f7304581d78b4cf921c",
+    "/tmp/ps5-autostart-console/achievements-reuse/retroarch.log": "255f2d287f5200245863cbf908f1714a661074a433d5f47a26bb23001eafa584",
+    "/tmp/ps5-autostart-console/achievements-reuse/kernel.log": "8bcb0215ead20185b3e8d1933f061634e9dbf7a4b9f45e9449f8f5f69db988f0",
+    "/tmp/ps5-autostart-console/achievements-reuse/lapy-service.log": "aa3b401ad803663db5209732a4c298923fe743f8f0cb829d858fc4dafd6de9c2",
+    "/tmp/ps5-autostart-console/achievements-reuse/result.json": "0f7ed0e67a6749eaaf565783e68fcb9fb740e07f127d0ad7182df57bfd2b5247",
+    "/tmp/ps5-autostart-console/resident-final.log": "595a57a0e1babd3749d6d0de0d0b04696ab569afc5047b6709b2f58b81564717",
+    "/tmp/ps5-autostart-console/final-check.json": "7736a664e6ba445db6af18da54b87611032eb05d8c02faafe1427c940201e3b4"
+  },
+  "service_build_id": "6b834c253c699925b6c1c0aa20abf35c6be86747c5e633c1145ad511e7ef4425",
+  "qualified_runtime_source_sha256": "0998568b260a585d1e6fe0d0cc53ea9841f535fe786f14eaf0d3eefd48015d32",
+  "sources_sha256": {
+    "src/ps5_paths.c": "6512594e3a3392f6572a1a885fe662f726a02798b9e05e29604b253ddb716540",
+    "tools/build-lapy.py": "8c133179e8c0642e5186701dc7ed39eaece194be6f33a088736e682ed0448aba",
+    "tools/build-title.sh": "44d4d7618633fb89bfce7a3ad6522315e801b8cec8f55736eede118bd7b61056",
+    "tests/test_installed_paths.py": "0ae3f6dd88e61333cf3260536e530642c8d239e7f189ac8160362337911a9d0c"
+  },
+  "gate_logs_sha256": {
+    "/tmp/ps5-autostart-gates.log": "6eee451c60b2160467ebbe594800e290bcacf465e5914d845913e04958a18867",
+    "/tmp/ps5-autostart-gates-rebuild.log": "207bc5aecd57dd3e2e4d1ebf514fadeaf93fcab4ab909d7a3ca280c2395ca0f0",
+    "/tmp/ps5-autostart-all-targets.log": "f0b0c76338d7db8560baacb8fc2f707515b8fd6f66a30aab08be173e86eb313f",
+    "/tmp/ps5-autostart-all-targets-pinned.log": "c6b0867641578a95256c9de42c74865076033600db8e9ccbe616bf70247ad0a2"
+  },
+  "failures": [
+    "Initial sandbox host run could not create local sockets; network-enabled run passed.",
+    "First cross-build missed netinet/in.h; explicit include fixed it.",
+    "First console build fell back offline before payload delivery. Replaced inline fileno/native FILE use with path stat; accepted build auto-started and elevated.",
+    "All-target build initially used a moved sibling checkout; rerun used the existing pinned build/picker-template checkout.",
+    "Initial interpretation of autoload uploaded and started an unused service through Payload Manager. Removed upload, stopped the identified unused process and removed readiness. Config and autoload list never changed."
+  ],
+  "limits": [
+    "The console-local ELF loader remains a jailbreak prerequisite; no boot hook was installed.",
+    "Service remains resident after normal title quit. Before-request root counts establish recovery between runs; no final service-exit/root-balance claim.",
+    "No reboot, public lobby, all-core or long-session qualification in this step."
+  ]
+}

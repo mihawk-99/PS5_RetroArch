@@ -1,13 +1,72 @@
 """Exercise saved /app0 names through the wrappers linked into RetroArch."""
 import pathlib
+import socket
 import subprocess
 import tempfile
+import threading
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class InstalledPaths(unittest.TestCase):
+    def test_bundled_service_delivery_and_readiness(self):
+        with tempfile.TemporaryDirectory() as directory, socket.socket() as server:
+            work = pathlib.Path(directory)
+            server.bind(('127.0.0.1', 0))
+            server.listen()
+            server.settimeout(10)
+            payload = b'\x7fELF' + bytes(range(256)) * 512
+            (work / 'lapy-root-daemon.elf').write_bytes(payload)
+            (work / 'test.c').write_text(r'''
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#define PS5_PATHS_START_TEST
+enum ps5_elevation_status { PS5_ELEVATION_OK };
+#define PS5_ELEVATION_FILESYSTEM 1
+static enum ps5_elevation_status ps5_elevation_request(int c) { (void)c; abort(); }
+static const char *ps5_elevation_status_name(enum ps5_elevation_status s) {
+    (void)s; return "unexpected";
+}
+#include "ps5_paths.c"
+int main(int argc, char **argv) {
+    (void)argc;
+    strcpy(install_root, argv[1]);
+    assert(!service_ready());
+    assert(start_service(NULL));
+    assert(service_ready());
+    return 0;
+}
+''')
+            flags = subprocess.check_output(
+                ['bash', str(ROOT / 'tools/path-wrap-flags.sh')], text=True).split()
+            subprocess.run(['cc', '-DPS5_PATHS_HOST_TEST',
+                            '-DPS5_LAPY_LOADER_PORT=' + str(server.getsockname()[1]),
+                            '-I' + str(ROOT / 'src'), str(work / 'test.c'),
+                            str(ROOT / 'src/ps5_paths_io.c'),
+                            *['-Wl,' + f for f in flags], '-o', str(work / 'test')], check=True)
+            received = bytearray()
+
+            def loader():
+                with server.accept()[0] as connection:
+                    connection.settimeout(10)
+                    while block := connection.recv(4096):
+                        received.extend(block)
+                    # Existing host PID plus uptime zero is a live readiness marker.
+                    import os
+                    (work / 'lapy-ready').write_text(f'{os.getpid()} 0\n')
+
+            thread = threading.Thread(target=loader)
+            thread.start()
+            try:
+                subprocess.run([str(work / 'test'), str(work)], check=True, timeout=10)
+            finally:
+                thread.join(timeout=10)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(received, payload)
+
     def test_legacy_files_and_two_path_operations(self):
         with tempfile.TemporaryDirectory() as directory:
             work = pathlib.Path(directory)

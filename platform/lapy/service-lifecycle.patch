@@ -1,0 +1,50 @@
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -1050,6 +1050,8 @@
+     stage = "helper_request";
+     error = run_helper_request(root, thread_credential_offset) ? EIO : 0;
+ #elif LAPY_SERVICE
++    struct lapy_vnode_ref_counts service_baseline = {0};
++    if ((error = sample_root(root, "service_baseline", &service_baseline))) goto done;
+     for (unsigned completed = 0;;) {
+         path[0] = 0;
+         pid = -1;
+@@ -1062,7 +1064,10 @@
+             if (found) break;
+             usleep(100000);
+         }
+-        if (!found) continue;
++        if (!found) {
++            if (LAPY_MAX_REQUESTS) { error = ETIMEDOUT; goto done; }
++            continue;
++        }
+         stage = "request_baseline";
+         if ((error = sample_root(root, "before_request", &baseline)))
+             goto done;
+@@ -1087,7 +1092,25 @@
+         if ((error = await_client_result(result_path))) goto done;
+ #endif
+         if (LAPY_MAX_REQUESTS && completed >= LAPY_MAX_REQUESTS) {
+-            stage = "service_limit";
++            /* A finite validation service must observe teardown after the
++             * last request, not report success while roots remain owned. */
++            stage = "service_wait_exit";
++            baseline = service_baseline;
++            int settled = 0;
++            for (unsigned i = 0; i < 600; ++i) {
++                errno = 0;
++                if (kill(pid, 0) < 0 && errno == ESRCH) {
++                    if ((error = read_root_counts(root, &final))) goto done;
++                    if (final.hold == baseline.hold && final.use == baseline.use) {
++                        settled = 1;
++                        break;
++                    }
++                }
++                usleep(100000);
++            }
++            if ((error = sample_root(root, settled ? "service_exited" : "service_exit_timeout", &final))) goto done;
++            if (!settled) { error = ETIMEDOUT; goto done; }
++            stage = "service_complete";
+             goto done;
+         }
+     }

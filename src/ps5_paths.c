@@ -11,6 +11,10 @@
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #ifndef PS5_PATHS_HOST_TEST
 #include <ps5platform/elevation.h>
 #endif
@@ -37,6 +41,96 @@ const char *ps5_installed_path(const char *path, char *buffer, size_t capacity)
 }
 
 #if !defined(PS5_PATHS_HOST_TEST) || defined(PS5_PATHS_START_TEST)
+#ifndef PS5_LAPY_LOADER_PORT
+#define PS5_LAPY_LOADER_PORT 9021
+#endif
+static int service_ready(void)
+{
+    long pid = -1, started = 0;
+    struct timespec uptime;
+    FILE *file = fopen("/app0/lapy-ready", "r");
+    int ready = file && fscanf(file, "%ld %ld", &pid, &started) == 2;
+    if (file)
+        fclose(file);
+    if (!ready || pid <= 1 || started < 0 || clock_gettime(CLOCK_MONOTONIC, &uptime) ||
+        uptime.tv_sec < started)
+        return 0;
+    errno = 0;
+    return kill((pid_t)pid, 0) == 0 || errno == EPERM;
+}
+
+/* The same local ELF loader used by the WebUI, before any worker threads exist.
+ * Send once only: an uncertain delivery must never trigger a second daemon. */
+static int start_service(FILE *log)
+{
+    FILE *file = fopen("/app0/lapy-root-daemon.elf", "rb");
+    struct stat info;
+    if (!file)
+    {
+        if (log)
+            fprintf(log, "lapy_autostart open_failed errno=%d\n", errno);
+        return 0;
+    }
+    /* Do not use the SDK's inline fileno macro on the native libc's FILE. */
+    if (stat("/app0/lapy-root-daemon.elf", &info) || info.st_size < 64 || info.st_size > (4 << 20))
+    {
+        if (log)
+            fprintf(log, "lapy_autostart invalid_size errno=%d\n", errno);
+        fclose(file);
+        return 0;
+    }
+    const size_t size = (size_t)info.st_size;
+    char *elf = malloc(size);
+    int valid = elf && fread(elf, 1, size, file) == size && !memcmp(elf, "\177ELF", 4);
+    fclose(file);
+    if (!valid)
+    {
+        if (log)
+            fprintf(log, "lapy_autostart invalid_elf errno=%d\n", errno);
+        free(elf);
+        return 0;
+    }
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct timeval timeout = {5, 0};
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = htons(PS5_LAPY_LOADER_PORT);
+    size_t sent = 0;
+    if (fd >= 0 && setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == 0 &&
+        connect(fd, (struct sockaddr *)&address, sizeof(address)) == 0)
+    {
+        while (sent < size)
+        {
+            ssize_t count = send(fd, elf + sent, size - sent, MSG_NOSIGNAL);
+            if (count < 0 && errno == EINTR)
+                continue;
+            if (count <= 0)
+                break;
+            sent += (size_t)count;
+        }
+        shutdown(fd, SHUT_WR);
+    }
+    const int error = sent == size ? 0 : errno;
+    if (fd >= 0)
+        close(fd);
+    free(elf);
+    if (log)
+    {
+        fprintf(log, "lapy_autostart sent=%zu size=%zu errno=%d\n", sent, size, error);
+        fflush(log);
+    }
+    if (!sent)
+        return 0;
+    for (unsigned i = 0; i < 100; i++)
+    {
+        if (service_ready())
+            return 1;
+        usleep(50000);
+    }
+    return 0;
+}
+
 int ps5_paths_start(void)
 {
     /* Keep the log descriptor across the root transition. Open before the
@@ -60,22 +154,9 @@ int ps5_paths_start(void)
         if (!((id[i] >= 'A' && id[i] <= 'Z') || (id[i] >= '0' && id[i] <= '9')))
             goto failed;
 
-    /* A qualified daemon publishes readiness after its preflight and removes it
-     * on exit. Do not publish a request at all on an ordinary offline launch.
-     * A stale PID or a marker from a later uptime (before a reboot) is not ready. */
-    long daemon_pid = -1, daemon_started = 0;
-    struct timespec uptime;
-    file = fopen("/app0/lapy-ready", "r");
-    int ready = file && fscanf(file, "%ld %ld", &daemon_pid, &daemon_started) == 2;
-    if (file)
-        fclose(file);
-    ready = ready && daemon_pid > 1 && clock_gettime(CLOCK_MONOTONIC, &uptime) == 0 &&
-            uptime.tv_sec >= daemon_started;
-    if (ready)
-    {
-        errno = 0;
-        ready = kill((pid_t)daemon_pid, 0) == 0 || errno == EPERM;
-    }
+    /* Reuse a ready service, otherwise start the bundled one. A service publishes
+     * readiness only after preflight; no request is made before that proof. */
+    int ready = service_ready() || start_service(log);
     if (!ready)
     {
         if (log)

@@ -1,0 +1,11 @@
+--- a/tools/build_owned_daemon.py
++++ b/tools/build_owned_daemon.py
+@@ -66,7 +66,7 @@
+                   for path in sorted((sdk / "target").rglob("*"))
+                   if path.is_file()}
+     flags = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+-             f'-DTARGET_TITLE="{title}"',
++             "-Wl,--build-id=sha1", f'-DTARGET_TITLE="{title}"',
+              f'-DLAPY_SERVICE={int(args.service)}',
+              f'-DLAPY_ELF_HELPER={int(args.elf_helper)}',
+              f'-DLAPY_REQUIRE_CLIENT_RESULT={int(require_client_result)}',

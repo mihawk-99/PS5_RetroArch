@@ -1,0 +1,42 @@
+--- console_netplay.py
++++ console_netplay.py
+@@ -60,11 +60,8 @@
+ try:
+  assert 'count=0' in c.ctl('procs'),'Title not idle'
+  with c.deploy.connect(**c.settings) as ftp:
+-  try: marker=c.deploy.remote_bytes(ftp,BASE+'lapy-ready')
+-  except Exception:marker=b''
+-  assert not marker,'Existing daemon readiness marker; inspect first'
+-  last=c.deploy.remote_bytes(ftp,BASE+'tests/lapy-elevation.log')
+-  assert any(b'daemon_result' in line and b'root_balanced=1' in line and (b'stage=complete error=0' in line or b'stage=service_complete error=0' in line) for line in last.splitlines()),'Previous daemon not complete'
++  marker=c.deploy.remote_bytes(ftp,BASE+'lapy-ready')
++  assert len(marker.split())==2,'Resident service not ready'
+   for n in ['test-run.txt','args.txt','picker/picker-test.txt','es-de/capture-test.txt','startup-paths.log','pad-script.txt']:
+    c.deploy.remove_if_present(ftp,BASE+n)
+   ftp.storbinary('STOR '+BASE+'pad-script.txt',io.BytesIO(b'8 B 2\n14 A 2\n20 RIGHT 2\n30 STOP\n'))
+@@ -85,7 +82,7 @@
+  else:netarg='--host'
+  args=['--appendconfig=/app0/tests/installed-paths.cfg','--max-frames=6000','-L','/app0/cores/fceumm_libretro.so','/app0/tests/netplay-test.nes',netarg,'--port=55435','--nick=ps5-online-test']
+  with c.deploy.connect(**c.settings) as ftp:ftp.storbinary('STOR '+BASE+'args.txt',io.BytesIO(('\n'.join(args)+'\n').encode()))
+- r.start_daemon(OUT,ROOT/'build/network-elevation/lapy/build/owned_root_daemon/lapy-root-daemon.elf')
++ # RetroArch reuses its own automatically started service; no injected payload.
+  (OUT/'launch.txt').write_text(c.ctl('launch PPSA99169'))
+  if mode!='relay-join':
+   time.sleep(6)
+@@ -99,13 +96,10 @@
+  if 'count=0' not in c.ctl('procs'):
+   (OUT/'close.txt').write_text(c.ctl('kill PPSA99169'))
+  time.sleep(2)
+- for name in ['retroarch.log','trace.txt','startup-paths.log','tests/lapy-elevation.log']:r.fetch(name,OUT)
+- for _ in range(120):
+-  data=r.fetch('tests/lapy-elevation.log',OUT)
+-  if b'daemon_result' in data:break
+-  time.sleep(.5)
++ for name in ['retroarch.log','trace.txt','startup-paths.log','lapy-service.log']:r.fetch(name,OUT)
++ data=r.fetch('lapy-service.log',OUT)
+  print('Console idle='+str('count=0' in c.ctl('procs')),flush=True)
+- print('Daemon balanced='+str(b'root_balanced=1' in data),flush=True)
++ print('Resident service client proof='+str(b'data_rw=1' in data),flush=True)
+  for name in ['pc.log','retroarch.log']:
+   log=(OUT/name).read_text(errors='replace')
+   print(name, 'connected='+str('Connected to:' in log or 'has joined as player 2' in log),'netplay_errors='+str(sum('[Netplay]' in line and '[ERROR]' in line for line in log.splitlines())),flush=True)

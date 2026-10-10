@@ -25,9 +25,9 @@ import json
 import sys
 from pathlib import Path
 
-COVERED = ("eboot.bin", "es-de/*.bin", "picker/*.bin", "sce_module/*.prx", "cores/*.so", "cores/*.info",
+COVERED = ("lapy-root-daemon.elf", "eboot.bin", "es-de/*.bin", "picker/*.bin", "sce_module/*.prx", "cores/*.so", "cores/*.info",
            "info/*.info")
-EXECUTABLE = ("eboot.bin", "es-de.bin", "picker.bin", "*.prx", "*.so")
+EXECUTABLE = ("eboot.bin", "es-de.bin", "picker.bin", "lapy-root-daemon.elf", "*.prx", "*.so")
 
 
 def sha256(path):

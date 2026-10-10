@@ -1,0 +1,13 @@
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -304,7 +304,9 @@
+     /* waitpid(WUNTRACED) is the readiness acknowledgement. The handler is
+      * installed before this stop, so an early release signal is safe. */
+     if (kill(getpid(), SIGSTOP)) _exit(4);
+-    for (;;) pause();
++    /* FW 10.01 resolves pause to an invalid address (0x1b0). Keep the
++     * SIGUSR1 exit handler and wait using the already exercised SDK call. */
++    for (;;) usleep(100000);
+ }
+ 
+ static int start_child(struct child *self)

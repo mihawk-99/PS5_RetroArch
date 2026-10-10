@@ -1,0 +1,52 @@
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -284,28 +284,12 @@
+ #endif
+ #endif /* !LAPY_ELF_HELPER */
+ 
+-static void donor_release_signal(int signal_number)
+-{
+-    (void)signal_number;
+-    _exit(0);
+-}
+-
+ static void child_main(void)
+ {
+-    struct sigaction action;
+-    sigset_t release_signal;
+-    memset(&action, 0, sizeof(action));
+-    action.sa_handler = donor_release_signal;
+-    sigemptyset(&action.sa_mask);
+-    if (sigaction(SIGUSR1, &action, 0)) _exit(2);
+-    sigemptyset(&release_signal);
+-    sigaddset(&release_signal, SIGUSR1);
+-    if (sigprocmask(SIG_UNBLOCK, &release_signal, 0)) _exit(3);
+-    /* waitpid(WUNTRACED) is the readiness acknowledgement. The handler is
+-     * installed before this stop, so an early release signal is safe. */
++    /* FW 10.01's payload signal trampoline faults on SIGUSR1 delivery.
++     * Release these disposable native donors with default SIGKILL teardown;
++     * the kernel still releases their filedesc references. No user handler. */
+     if (kill(getpid(), SIGSTOP)) _exit(4);
+-    /* FW 10.01 resolves pause to an invalid address (0x1b0). Keep the
+-     * SIGUSR1 exit handler and wait using the already exercised SDK call. */
+     for (;;) usleep(100000);
+ }
+ 
+@@ -366,12 +350,15 @@
+         if (kill(self->pid, SIGCONT)) return errno ? errno : EIO;
+         self->stopped = 0;
+     }
+-    if (kill(self->pid, SIGUSR1)) return errno ? errno : EIO;
++    if (kill(self->pid, SIGKILL)) return errno ? errno : EIO;
+     for (unsigned i = 0; i < 100; ++i) {
+         pid_t result = waitpid(self->pid, &status, WNOHANG);
+         if (result == self->pid) {
+             self->reaped = 1;
+-            return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : EPROTO;
++            ps5log_printf(PS5LOG_MARK,
++                          "donor_reaped build=%s pid=%d status=%d expected_signal=%d",
++                          LAPY_OWNED_ID, self->pid, status, SIGKILL);
++            return WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL ? 0 : EPROTO;
+         }
+         if (result < 0) return errno ? errno : ECHILD;
+         usleep(50000);

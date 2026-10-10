@@ -1,0 +1,10 @@
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -986,6 +986,7 @@
+     size_t thread_credential_offset = 0;
+     int error = 0, acknowledged = 0;
+     const char *stage = "preflight";
++    ps5log_set_mirror_fd(STDOUT_FILENO);
+     int logging_ready = ps5log_init_default("LAPYOWN", "lapy-owned-root-daemon") == 0;
+ #if !LAPY_ELF_HELPER
+     if (!logging_ready) return 2;

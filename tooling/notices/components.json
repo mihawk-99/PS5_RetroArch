@@ -956,6 +956,43 @@
         "remote": "https://github.com/mihawk-99/PS5_RetroArch"
       },
       "modifications": "Relative contact tracking adapted in src/input_ps5.cpp; original revision and files in third_party/proton_touchpad/source.json."
+    },
+    {
+      "id": "lapy",
+      "name": "Lapy owned-root service (with ps5log client)",
+      "kind": "code",
+      "artifacts": [
+        "lapy-root-daemon.elf"
+      ],
+      "licence": "MIT AND LGPL-2.1-or-later",
+      "copyright": [
+        "Copyright (c) 2026 Arksama (Team PHU)"
+      ],
+      "texts": [
+        {
+          "from": "platform/lapy/LICENSE",
+          "to": "LICENSE-Lapy"
+        },
+        {
+          "from": "../prospero-win-main/LICENSE",
+          "to": "LICENSE-ps5log"
+        }
+      ],
+      "source": {
+        "kind": "fixed",
+        "revision": "5b8397b9f2b5f12a7bc2f9c8745a00d1c2dd01ad",
+        "remote": "https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon",
+        "extra": [
+          {"tarball": "build/lapy/ps5log-source.tar.gz"},
+          {
+            "name": "PS5-Lapy-JB-Daemon",
+            "git": "../PS5-Lapy-JB-Daemon",
+            "revision": "5b8397b9f2b5f12a7bc2f9c8745a00d1c2dd01ad",
+            "remote": "https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon"
+          }
+        ]
+      },
+      "modifications": "Title-specific resident service; qualified patches in platform/lapy and evidence; tools/build-lapy.py pins the ps5log header by SHA-256. No preflight or transaction guards disabled."
     }
   ]
 }

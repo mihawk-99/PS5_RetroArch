@@ -1,0 +1,24 @@
+{
+  "step": "lapy-autostart",
+  "note": "Automatic bundled-service startup, reuse, authenticated achievements and relay netplay on the console.",
+  "must_contain": [
+    "First launch: no prestarted service; bundled ELF sent=155752 size=155752 errno=0",
+    "First launch: elevation=ok uid=0 same_executable=1; RetroAchievements login/session/achievement_set=true",
+    "Second launch: same service identity; no payload resend; RetroAchievements login/session/achievement_set=true",
+    "Both achievement runs: normal_exit=true account_fields_unchanged=true",
+    "Resident service: successful_requests=3 client_data_rw_proofs=3; all before_request root counts=73/72",
+    "NetPlay relay join: both peers connected; 3837/3361 input packets; 581 nonzero console input packets",
+    "NetPlay relay join: state_checks=52 matching=52 mismatching=0; normal exit; no new service launch",
+    "Final console: idle=true service_ready=true temporary_controls_absent=true",
+    "Payload Manager config and autoload list unchanged; mistaken payload upload removed",
+    "Installed eboot, bundled service, picker and ES-DE hashes match the complete build",
+    "Qualified external runtime source unchanged; no kernel preflight or transaction guards disabled",
+    "Gates: 194 unit tests and 194 integration tests passed; all shipped targets built with pinned picker checkout"
+  ],
+  "must_not_contain": [
+    "elevation=unavailable offline=1"
+  ],
+  "human_check": [
+    "Review failure and limitation records; do not infer final resident-service teardown or reboot testing."
+  ]
+}
