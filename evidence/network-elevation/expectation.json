@@ -1,0 +1,23 @@
+{
+  "step": "network-elevation",
+  "note": "Accept the measured same-process public TCP difference and restoration only. No TLS/login, netplay or LAN success claim. PS5SX2 comparison is source-based by owner instruction.",
+  "must_contain": [
+    "privileges before: uid=1 ruid=1 svuid=1",
+    "privileges after: uid=0 ruid=0 svuid=0",
+    "authid=4801000000000013",
+    "caps=ffffffffffffffffffffffffffffffff",
+    "elevation_status=0 name=ok",
+    "phase=after snapshot uid=0 euid=0 gid=0 egid=1 app0=-1 data=0",
+    "after: four public TCP connections succeeded",
+    "root_balanced=1",
+    "Restoration: original installed executable SHA-256 matched",
+    "phase=after target=achievements api=socket connected=1",
+    "phase=after target=achievements api=sceNetSocket connected=1",
+    "phase=after target=media api=socket connected=1",
+    "phase=after target=media api=sceNetSocket connected=1"
+  ],
+  "must_not_contain": [
+    "phase=before target=achievements api=socket connected=1"
+  ],
+  "human_check": ""
+}

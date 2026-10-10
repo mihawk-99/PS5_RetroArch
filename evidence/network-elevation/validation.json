@@ -1,0 +1,26 @@
+{
+  "command": "bash tools/verify.sh",
+  "result": "PASS",
+  "gates": [
+    "format",
+    "unit",
+    "build",
+    "integration",
+    "evidence"
+  ],
+  "unit_tests": 192,
+  "integration_tests": 192,
+  "evidence_captures": 122,
+  "log": "build/network-elevation/gates.log",
+  "log_sha256": "6b6fd23909e4206d8ee2092c05708f05f51bcf9ab32c112e63a2639400ebffd3",
+  "normal_rebuild": {
+    "source_hook_removed": true,
+    "normal_elf_contains_probe": false,
+    "normal_staged_eboot_sha256": "b303d5f0ab367d744edf24ba3c4867d52ded9866447af571747c2119b2d7c2e3"
+  },
+  "limitations": [
+    "LAN-listener attempts timed out; no LAN/netplay acceptance",
+    "No TLS/account sign-in tested",
+    "PS5SX2 reference is documented source, not a live process"
+  ]
+}

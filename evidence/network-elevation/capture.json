@@ -1,0 +1,86 @@
+{
+  "step": "network-elevation",
+  "recorded": "2026-10-10T12:24:05.546019+00:00",
+  "revision": "5e1b956a371462c24387a04e4b94f99b29bafa13",
+  "working_tree": "Existing networking edits plus temporary early-main probe; hook removed after test. This is a diagnostic, not a release build.",
+  "console_run": "base PS5 firmware 13.40; isolated baseline then one same-process before/after elevation run",
+  "command": "python3 build/network-elevation/run.py baseline; python3 build/network-elevation/run.py elevate (preparation and restoration: evidence/network-elevation/README.txt)",
+  "raw_capture": "klog/network-elevation/",
+  "raw_sha256": {
+    "baseline/probe.log": "ccfb9e7c017ee4ad0e225a9227289ddf96e8378fb53076793d158089d64564cb",
+    "baseline/inventory-before.txt": "039c434823810996950bcf293d35b646a56a1e566fc35fe44db483eb63592c35",
+    "elevate/probe.log": "99cc380177b5b5e1e7ae52a631ec80aedc9109366dbbb706586525b798a2bdc0",
+    "elevate/inventory-before.txt": "8544386970c44560a7bf31327ba707d832ee18be57abcbc0b3446f7ba72945f4",
+    "elevate/inventory-after.txt": "61180c1640c2801e0261cc821b7be48a69df15b897b4cbeb55cd54240886fd57",
+    "elevate/lapy.log": "19a51102d5698af9debcede2bc0641f1180b2cfff53400287c8647dce7f88be2",
+    "restoration.json": "410d34de8ba7f22489b19a81b15c13f442ce53f23f3420c61e3cc74b3e5e5342",
+    "final-cleanup.json": "11fb47cb92281b3400ea775d4a31429d44d7524f92b182044bad72999565efde"
+  },
+  "probe_binary": {
+    "size": 40087692,
+    "sha256": "f0b8306bd2ffd2285d0bb20f93e4e1325d9844c02f4cf3eb5de4cb11db549acb"
+  },
+  "restoration": {
+    "original_eboot_restored": true,
+    "size": 40083628,
+    "sha256": "5e2fe13dad4fde95b8781ea34d5f0df1ab0d7917ad467606833f345b76516b74",
+    "console_idle": true,
+    "test_controls_removed": true
+  },
+  "daemon_binary": {
+    "build_id": "257260dc97ca4ec4abdf7540fe2c46c0a855996a01bf5cfec88ce00eac7a0a47",
+    "elf_sha256": "8c4aace4935bbf51717f9d4d2edc723f9db650bd070a2a2bd2162010e4ed170b",
+    "mode": "one-shot",
+    "target_title": "PPSA99169"
+  },
+  "lines": [
+    "privileges before: uid=1 ruid=1 svuid=1 rgid=1 jail_id=0 threads=1 authid=4400001084c2052d caps_rc=0 caps=000000008003002000ff000000000000 root_system=0 jail_null=0",
+    "privileges after: uid=0 ruid=0 svuid=0 rgid=0 jail_id=0 threads=1 authid=4801000000000013 caps_rc=0 caps=ffffffffffffffffffffffffffffffff root_system=1 jail_null=0",
+    "phase=before snapshot uid=1 euid=1 gid=1 egid=1 app0=0 data=0",
+    "phase=before target=lan nonblock=-1 errno=13",
+    "phase=before target=achievements nonblock=-1 errno=13",
+    "phase=before target=media nonblock=-1 errno=13",
+    "phase=before target=lan nonblock=-1 errno=13",
+    "phase=before target=achievements nonblock=-1 errno=13",
+    "phase=before target=media nonblock=-1 errno=13",
+    "elevation_status=0 name=ok",
+    "phase=after snapshot uid=0 euid=0 gid=0 egid=1 app0=-1 data=0",
+    "phase=after target=lan nonblock=0 errno=0",
+    "phase=after target=lan api=socket connected=0",
+    "phase=after target=achievements nonblock=0 errno=0",
+    "phase=after target=achievements api=socket connected=1",
+    "phase=after target=media nonblock=0 errno=0",
+    "phase=after target=media api=socket connected=1",
+    "phase=after target=lan nonblock=0 errno=0",
+    "phase=after target=lan api=sceNetSocket connected=0",
+    "phase=after target=achievements nonblock=0 errno=0",
+    "phase=after target=achievements api=sceNetSocket connected=1",
+    "phase=after target=media nonblock=0 errno=0",
+    "phase=after target=media api=sceNetSocket connected=1",
+    "before: all six socket nonblocking setup calls failed with EACCES; connect was not reached",
+    "after: four public TCP connections succeeded, SO_ERROR=0 (two endpoints, two socket APIs)",
+    "LAN listener: both elevated attempts timed out after 3000 ms; reachability unqualified, excluded from public TCP acceptance",
+    "Lapy: request complete error=0 detached=1 donors_reaped=1 client_data_rw=1 root_balanced=1",
+    "Lapy root counters: baseline hold=73 use=72; title_exited hold=73 use=72",
+    "Old SDK attempt: payload startup SIGILL at CRT ud2 before daemon main; no elevation request executed; corrected by compatible SDK and attribute API adaptation",
+    "PS5SX2: not installed; comparison uses documented Lapy path at 6ccf48047a1221b518dd2dbd2535b53d1f10a108",
+    "Restoration: original installed executable SHA-256 matched; diagnostic controls removed; console idle"
+  ],
+  "reference": {
+    "application": "PS5SX2",
+    "revision": "6ccf48047a1221b518dd2dbd2535b53d1f10a108",
+    "comparison": "documented source only; not installed on this console",
+    "elevation": "Lapy owned-root cooperative request during single-threaded startup",
+    "matched_observations": [
+      "UID/real UID/saved UID zero",
+      "system authid 4801000000000013",
+      "all 16 capability bytes ff",
+      "system filesystem root"
+    ]
+  },
+  "cleanup": {
+    "console_idle": true,
+    "own_control_payload_stopped": true,
+    "probe_files_remaining": 0
+  }
+}

@@ -1,0 +1,14 @@
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -322,8 +322,11 @@
+ }
+ } // namespace
+ 
++#include "../build/network-elevation/probe.hpp"
++
+ int main(int process_argc, char **process_argv)
+ {
++    if (network_elevation_probe()) return 0;
+     /* A session's trace is its own (src/frontend_mode_ps5.cpp): a launch from the home
+      * screen keeps the last session's as trace.1.txt before this one writes a line. */
+     ps5_frontend_session_logs(process_argc, process_argv);
