@@ -2030,6 +2030,23 @@ std::string current_frontend()
     std::lock_guard<std::mutex> guard(frontend_lock);
     return quote(frontend_name);
 }
+// The WebUI's language (webui/i18n.js): kept on the console, so every device opening the
+// page shows the one chosen last. Empty until a language is chosen.
+bool webui_language_known(const std::string &code)
+{
+    static const char *const known[] = {"en", "es",    "fr",    "de", "it", "pt-BR", "ru", "ja",
+                                        "ko", "zh-CN", "zh-TW", "vi", "tr", "pl",    "nl", "id"};
+    for (const char *name : known)
+        if (code == name)
+            return true;
+    return false;
+}
+std::string webui_language()
+{
+    const auto values = read_config(root_path + "/config/webui-preferences.cfg");
+    const auto found = values.find("webui_language");
+    return found != values.end() && webui_language_known(found->second) ? found->second : "";
+}
 MHD_Result route(MHD_Connection *c, const std::string &url, const std::string &method, Request &r)
 {
     if (method == "GET" && url == "/api/status")
@@ -2042,7 +2059,18 @@ MHD_Result route(MHD_Connection *c, const std::string &url, const std::string &m
                 ",\"port\":" + std::to_string(listen_port) + ",\"token\":" + quote(token) +
                 ",\"uploadLimit\":" + std::to_string(upload_limit) + ",\"freeBytes\":" +
                 (space_known ? std::to_string(uint64_t(fs.f_bavail) * fs.f_frsize) : "null") +
-                ",\"build\":" + quote(started_build) + '}');
+                ",\"build\":" + quote(started_build) + ",\"language\":" + quote(webui_language()) +
+                '}');
+    }
+    if (method == "POST" && url == "/api/preferences")
+    {
+        const std::string language = arg(c, "language");
+        if (!webui_language_known(language))
+            return error(c, 400, "Choose a supported language.");
+        if (!write_config(root_path + "/config/webui-preferences.cfg",
+                          {{"webui_language", language}}))
+            return error(c, 500, "The language could not be saved. Try again.");
+        return respond(c, 200, "{\"language\":" + quote(language) + '}');
     }
     if (method == "GET" && url == "/api/alerts")
         return respond(c, 200, bios_alerts());
@@ -2162,6 +2190,27 @@ MHD_Result route(MHD_Connection *c, const std::string &url, const std::string &m
         {"/assets/flags/ru.svg", "image/svg+xml"},
         {"/assets/flags/tw.svg", "image/svg+xml"},
         {"/assets/flags/us.svg", "image/svg+xml"},
+        {"/assets/flags/vn.svg", "image/svg+xml"},
+        {"/assets/flags/tr.svg", "image/svg+xml"},
+        {"/assets/flags/pl.svg", "image/svg+xml"},
+        {"/assets/flags/nl.svg", "image/svg+xml"},
+        {"/assets/flags/id.svg", "image/svg+xml"},
+        {"/i18n.js", "text/javascript; charset=utf-8"},
+        {"/i18n/es.json", "application/json"},
+        {"/i18n/fr.json", "application/json"},
+        {"/i18n/de.json", "application/json"},
+        {"/i18n/it.json", "application/json"},
+        {"/i18n/pt-BR.json", "application/json"},
+        {"/i18n/ru.json", "application/json"},
+        {"/i18n/ja.json", "application/json"},
+        {"/i18n/ko.json", "application/json"},
+        {"/i18n/zh-CN.json", "application/json"},
+        {"/i18n/zh-TW.json", "application/json"},
+        {"/i18n/vi.json", "application/json"},
+        {"/i18n/tr.json", "application/json"},
+        {"/i18n/pl.json", "application/json"},
+        {"/i18n/nl.json", "application/json"},
+        {"/i18n/id.json", "application/json"},
         {"/assets/systems/3do.webp", "image/webp"},
         {"/assets/systems/LICENSE", "text/plain; charset=utf-8"},
         {"/assets/systems/amiga.webp", "image/webp"},

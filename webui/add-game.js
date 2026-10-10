@@ -16,7 +16,7 @@ function setAddDownloads(enabled) {
 function addMessage(text, error = false) { $('#add-status').textContent = text; $('#add-status').classList.toggle('inline-error', error); }
 function closeAdd() {
   if (!addGame || addGame.busy) return;
-  if ((addGame.file || addGame.dirty) && !confirm(addGame.uploaded ? 'The game backup is already in your library. Close without finishing the remaining details and media?' : 'Discard this new game draft?')) return;
+  if ((addGame.file || addGame.dirty) && !confirm(i18n.t(addGame.uploaded ? 'The game backup is already in your library. Close without finishing the remaining details and media?' : 'Discard this new game draft?'))) return;
   disposeAdd(); $('#add-game').close();
 }
 function disposeAdd() { if (addGame) { for (const item of addGame.media.values()) URL.revokeObjectURL(item.url); addGame.searchController?.abort(); } addGame = null; }
@@ -126,7 +126,7 @@ $('#add-search-form').addEventListener('submit', async e => {
       text.append(element('strong',match.name),element('small',[match.released,match.developer].filter(Boolean).join(' · ')),element('p',match.description,'add-result-description'));
       const choose = element('button','Use these details','secondary'); choose.type = 'button';
       choose.addEventListener('click', () => {
-        if (context.dirty && !confirm('Replace the current details with this LaunchBox match? You can edit them afterward.')) return;
+        if (context.dirty && !confirm(i18n.t('Replace the current details with this LaunchBox match? You can edit them afterward.'))) return;
         for (const [key] of ADD_FIELDS) $('#add-' + key).value = key === 'rating' && match[key] ? Math.round(Number(match[key])*1000)/10 : match[key] || '';
         context.launchboxId = match.id; context.dirty = true; $('#add-match').textContent = 'LaunchBox match: ' + match.name;
         $('#add-results').replaceChildren(); $('#add-search-status').textContent = ''; $('#add-name').focus();

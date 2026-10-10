@@ -70,6 +70,7 @@ async function reconnect() {
       const recovered = !connected || token !== state.token;
       token = state.token; freeBytes = state.freeBytes; uploadLimit = state.uploadLimit; frontend = state.frontend ?? 'retroarch';
       setConnection(true);
+      i18n.follow(state.language);
       checkServerBuild(state.build);
       $('#storage-info').textContent = freeBytes === null ? 'Games and files stored on your PS5' : `${bytes(freeBytes)} free on the console`;
       if (recovered) await Promise.all([loadLibrary(), loadSettings(), loadContent(currentPath), loadAlerts(), loadUpdate()]);
@@ -473,7 +474,7 @@ function renderSettings() {
   });
   const pages = Math.max(1, Math.ceil(matched.length / pageSize)); editorPage = Math.min(editorPage, pages - 1);
   const fields = $('#settings-fields'); fields.replaceChildren();
-  $('#settings-count').textContent = `${matched.length} settings${query ? ' matching your search' : ''}`;
+  $('#settings-count').textContent = query ? `${matched.length} settings match your search` : `${matched.length} settings`;
   for (const setting of matched.slice(editorPage * pageSize, (editorPage + 1) * pageSize)) {
     const meta = settingGuide(setting), value = editorDraft[setting.key] ?? setting.value;
     const row = element('div', undefined, 'setting-row'), details = element('div', undefined, 'setting-details');
@@ -740,6 +741,10 @@ $('#refresh-content').addEventListener('click', () => loadContent(currentPath));
 $('#file-search').addEventListener('input', renderContent);
 window.addEventListener('hashchange', navigate);
 setInterval(() => { if (!document.hidden) reconnect(); }, 10000);
+// The language: the one this browser used last at once, then the console's (webui/i18n.js).
+languagePicker($('#language-header'), { compact: true });
+languagePicker($('#language-settings'), { inline: true });
+if (i18n.remembered() && i18n.remembered() !== 'en') i18n.use(i18n.remembered());
 navigate(); drawTransfers(); reconnect(); checkRelease();
 
 
@@ -1185,7 +1190,7 @@ function uploadMedia(kind, file, row) {
   request.send(file);
 }
 function closeSheet() {
-  if (sheetBusy || (sheetGame?.draft && !confirm('Discard unsaved game details?'))) return;
+  if (sheetBusy || (sheetGame?.draft && !confirm(i18n.t('Discard unsaved game details?')))) return;
   $('#game-sheet').close();
 }
 $('#sheet-close').addEventListener('click', closeSheet);
