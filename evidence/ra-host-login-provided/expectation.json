@@ -4,7 +4,9 @@
   "must_contain": [
     "HTTP status=200",
     "authenticated=true",
-    "Console settings unchanged"
+    "Console settings unchanged",
+    "Saved password matches provided password exactly",
+    "Saved main username differs; WebUI username override absent"
   ],
   "must_not_contain": [
     "authenticated=false"

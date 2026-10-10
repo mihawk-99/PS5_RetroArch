@@ -10,6 +10,21 @@
     "HTTP status=200 content_type=application/json",
     "Success=true token_received=true authenticated=true",
     "Credentials and token not saved by the diagnostic or displayed in its result",
-    "Console settings unchanged; console authentication not tested by this PC request"
-  ]
+    "Console settings unchanged; console authentication not tested by this PC request",
+    "Saved password matches provided password exactly in both main and WebUI configs",
+    "Saved main username differs; WebUI username override absent",
+    "Username difference is not fixed by whitespace trim, case folding or Unicode normalization",
+    "Read-only comparison; console settings unchanged"
+  ],
+  "format_comparison": {
+    "recorded_utc": "2026-10-10T14:11:51.327495+00:00",
+    "main_username_matches_provided": false,
+    "main_password_matches_provided": true,
+    "webui_username_present": false,
+    "webui_password_matches_provided": true,
+    "effective_username_matches_after_trim_casefold_or_normalization": false,
+    "effective_username_has_controls_or_non_ascii": false,
+    "token_present": false,
+    "console_settings_changed": false
+  }
 }
