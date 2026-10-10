@@ -1,0 +1,19 @@
+{
+  "step": "ra-host-login",
+  "recorded": "2026-10-10T14:07:24.566506+00:00",
+  "revision": "b9260ae; no code changes",
+  "console_run": "PC-only login POST; console settings read without modification",
+  "command": "python3 stdin: FTP read current main/WebUI configs, apply WebUI overrides, urllib.request POST https://retroachievements.org/dorequest.php with r=login2 and form-encoded u/p; redirects disabled; exactly one request; HTTPError JSON parsed; no raw response/token retained",
+  "raw_capture": "klog/installed-paths/user-updated/host-login-fresh-result.json",
+  "raw_sha256": "8a175e12243a4ffcc15d60fcb8973aef232ec8e9225f2288d7a3b7cabccc19fe",
+  "authorization": "Owner explicitly requested this fresh PC sign-in; not a retry under the earlier one-attempt authorization.",
+  "lines": [
+    "PC login attempts=1",
+    "HTTP status=401 content_type=application/json",
+    "Success=false token_received=false authenticated=false",
+    "Code=invalid_credentials",
+    "Error=Invalid user/password combination. Please try again.",
+    "Current console credentials used with WebUI overrides; values and tokens not displayed or committed.",
+    "Owner reports website login works; this result shows emulator API rejection also occurs on PC, not its cause."
+  ]
+}

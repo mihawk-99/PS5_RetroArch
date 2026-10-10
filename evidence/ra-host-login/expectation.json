@@ -1,0 +1,14 @@
+{
+  "step": "ra-host-login",
+  "note": "Accept recorded diagnostic rejection, not successful authentication.",
+  "must_contain": [
+    "PC login attempts=1",
+    "HTTP status=401 content_type=application/json",
+    "Code=invalid_credentials",
+    "authenticated=false"
+  ],
+  "must_not_contain": [
+    "authenticated=true"
+  ],
+  "human_check": ""
+}
