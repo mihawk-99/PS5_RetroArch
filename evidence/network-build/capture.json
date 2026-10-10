@@ -1,12 +1,12 @@
 {
   "step": "network-build",
-  "recorded": "2026-10-10T05:06:08Z",
+  "recorded": "2026-10-10T05:41:17Z",
   "console_run": "",
   "revision": "",
   "command": "tools/console-run.sh <TITLE_ID>",
   "raw_capture": "klog/network-build/elf.txt",
-  "raw_lines": 11,
-  "raw_bytes": 744,
+  "raw_lines": 12,
+  "raw_bytes": 893,
   "lines": [
     "configure: HAVE_BUILTINMBEDTLS = 1 HAVE_CHEEVOS = 1 HAVE_IFINFO = 1 HAVE_NETPLAYDISCOVERY = 1 HAVE_NETWORKING = 1 HAVE_SSL = 1 ",
     "archive: rcheevos objects 28, mbedtls objects 60, netplay objects 5, cheevos frontend objects 4",
@@ -18,6 +18,7 @@
     "callers of the console resolver (__wrap_getaddrinfo_retro): 9",
     "callers of the refusing getaddrinfo: mbedtls_net_bind mbedtls_net_connect (unused by RetroArch)",
     "imports: connect getifaddrs poll recvfrom sceNetResolverCreate sceNetResolverDestroy sceNetResolverStartNtoa select sendto setsockopt socket ",
-    "null imports: none (tools/build.sh import check passed)"
+    "null imports: none (tools/build.sh import check passed)",
+    "mbedTLS entropy source registered: <__wrap_mbedtls_platform_entropy_poll> -> arc4random_buf (000000000009c490 = ps5_arc4random_buf 000000000009c490)"
   ]
 }

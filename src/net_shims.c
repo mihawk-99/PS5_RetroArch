@@ -193,3 +193,21 @@ int __wrap_getnameinfo(const struct sockaddr *address, socklen_t length, char *h
                                                service, (socklen_t)service_length, flags);
 }
 #endif
+
+#ifdef __PROSPERO__
+/* HTTPS (RetroArch's mbedTLS 2.6) seeds its random generator from /dev/urandom, which a
+ * title is not shown to be able to open, and one failing source fails every TLS
+ * connection. The title's libc arc4random_buf is what the WebUI already draws its
+ * session tokens from; --wrap=mbedtls_platform_entropy_poll (tools/build-title.sh)
+ * makes it mbedTLS's platform source. */
+int __wrap_mbedtls_platform_entropy_poll(void *data, unsigned char *output, size_t length,
+                                         size_t *written);
+int __wrap_mbedtls_platform_entropy_poll(void *data, unsigned char *output, size_t length,
+                                         size_t *written)
+{
+    (void)data;
+    arc4random_buf(output, length);
+    *written = length;
+    return 0;
+}
+#endif

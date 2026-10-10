@@ -351,6 +351,8 @@ directory_wrap_flags+=" --wrap=getcwd"
 # getnameinfo_retro, whose getnameinfo no module exports: src/net_shims.c replaces the
 # three, asking the console's DNS resolver (libSceNet) and formatting numerically.
 directory_wrap_flags+=" --wrap=getaddrinfo_retro --wrap=freeaddrinfo_retro --wrap=getnameinfo_retro --wrap=getnameinfo"
+# HTTPS seeds mbedTLS from /dev/urandom; src/net_shims.c gives it the libc arc4random_buf.
+directory_wrap_flags+=" --wrap=mbedtls_platform_entropy_poll"
 # Folders the title or a core creates are 0777 and files at least 0666, so FTP,
 # which runs as another user, can reach them (src/permissions_ps5.cpp).
 directory_wrap_flags+=" --wrap=mkdir --wrap=open --wrap=fopen"
