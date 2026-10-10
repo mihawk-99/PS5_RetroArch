@@ -44,6 +44,9 @@ async function openAddGame() {
   $('#add-file-name').textContent = 'Choose a game backup'; $('#add-file-hint').textContent = 'Drop one file here, or browse your device';
   setAddDownloads(true); $('#add-layout').hidden = false; $('#add-activity').hidden = true; $('#add-submit').hidden = false; $('#add-progress').hidden = true; $('#add-submit').disabled = true;
   $('#add-system').disabled = $('#add-drop').disabled = false; $('#add-fetch-details').checked = true;
+  // The systems of the last session are not offered while the new list loads: a choice
+  // made on them was lost when the list arrived.
+  $('#add-system').replaceChildren(new Option('Loading your installed systems…', ''));
   addMessage('Loading your installed systems…');
   $('#add-fields').replaceChildren(...ADD_FIELDS.map(([key, title]) => {
     const label = element('label', title, key === 'name' || key === 'description' ? 'wide-field' : '');
