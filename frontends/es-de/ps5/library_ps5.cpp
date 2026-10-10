@@ -167,29 +167,55 @@ void enable_collections(const std::string &data)
         std::fclose(file);
 }
 
-/* ES-DE's media folder is the shared media library (src/ps5_library.h): the same files
- * RetroArch's thumbnails and every frontend read, never a copy. Set before each start,
- * as ES-DE keeps its settings in this file. */
-void use_shared_media(const std::string &data, const char *media)
+/* ES-DE's folders, set in its settings before each start (it keeps them in this file):
+ * - ROMDirectory: the title's content folder, where games go (issue 33). ES-DE's own
+ *   default, ~/ROMs, is /app0/es-de/ROMs: its no-games screen pointed there. A folder the
+ *   user chose stays; only an empty one or ES-DE's default is replaced.
+ * - MediaDirectory: the shared media library (src/ps5_library.h), the same files
+ *   RetroArch's thumbnails and every frontend read, never a copy.
+ * A first start has no settings yet: a file with just these is written, which ES-DE
+ * reads and completes with its defaults when it saves (Settings::loadFile). */
+void use_title_folders(const std::string &data, const char *roms, const char *media)
 {
-    const std::string settings = data + "/settings/es_settings.xml";
+    const std::string folder = data + "/settings", settings = folder + "/es_settings.xml";
     pugi::xml_document document;
-    if (!document.load_file(settings.c_str()))
-        return; /* ES-DE's first start writes it; the next start sets the folder */
-    pugi::xml_node node;
-    for (pugi::xml_node entry : document.children("string"))
-        if (std::strcmp(entry.attribute("name").value(), "MediaDirectory") == 0)
-            node = entry;
-    if (node && std::strcmp(node.attribute("value").value(), media) == 0)
-        return;
-    if (!node)
+    struct stat status;
+    if (stat(settings.c_str(), &status) == 0 && !document.load_file(settings.c_str()))
+        return; /* a file ES-DE cannot read either: left as it is */
+    bool changed = false;
+    auto set = [&](const char *name, const char *value, bool keep_users)
     {
-        node = document.append_child("string");
-        node.append_attribute("name").set_value("MediaDirectory");
-        node.append_attribute("value");
-    }
-    node.attribute("value").set_value(media);
-    document.save_file(settings.c_str()); // as ES-DE saves it (Settings::saveFile)
+        if (!value)
+            return;
+        pugi::xml_node node;
+        for (pugi::xml_node entry : document.children("string"))
+            if (std::strcmp(entry.attribute("name").value(), name) == 0)
+                node = entry;
+        if (node)
+        {
+            const std::string now = node.attribute("value").value();
+            if (now == value ||
+                (keep_users && !now.empty() && now != "~/ROMs" && now != "~/ROMs/" &&
+                 now != "/app0/es-de/ROMs" && now != "/app0/es-de/ROMs/"))
+                return;
+        }
+        else
+        {
+            node = document.append_child("string");
+            node.append_attribute("name").set_value(name);
+            node.append_attribute("value");
+        }
+        node.attribute("value").set_value(value);
+        changed = true;
+    };
+    set("ROMDirectory", roms, true);
+    set("MediaDirectory", media, false);
+    if (!changed)
+        return;
+    mkdir(folder.c_str(), 0777);
+    chmod(folder.c_str(), 0777); /* FTP's reach: the title's folders are 0777 */
+    if (document.save_file(settings.c_str())) // as ES-DE saves it (Settings::saveFile)
+        chmod(settings.c_str(), 0777);
 }
 
 /* A game's scraped metadata (library/<system>/metadata/<key>.meta, key = "value"). */
@@ -287,8 +313,7 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
         chmod((data + folder).c_str(), 0777);
     }
     enable_collections(data);
-    if (paths->media)
-        use_shared_media(data, paths->media);
+    use_title_folders(data, paths->content ? paths->content[0] : nullptr, paths->media);
     /* RetroArch's favourites as they were at the last start. */
     const std::string favorites_record = data + "/ps5-favorites.txt";
     const std::set<std::string> were_favorites = read_lines(favorites_record);

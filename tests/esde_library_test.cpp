@@ -216,7 +216,39 @@ int main(int argc, char **argv)
                            .attribute("value")
                            .value())
                .empty());
+    /* Issue 33: ES-DE's ROM folder is the title's content folder, from the very first
+     * start (no settings file yet), not its own ~/ROMs (/app0/es-de/ROMs). */
+    {
+        const std::string first = dir + "/first", rom = dir + "/content-first";
+        mkdir(first.c_str(), 0755);
+        mkdir(rom.c_str(), 0755);
+        const char *const roots[] = {rom.c_str(), nullptr};
+        const struct ps5_esde_library_paths fresh = {
+            playlists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
+            first.c_str(),     roots,        media.c_str()};
+        auto value = [&](const char *name)
+        {
+            pugi::xml_document file;
+            assert(file.load_file((first + "/settings/es_settings.xml").c_str()));
+            return std::string(
+                file.find_child_by_attribute("string", "name", name).attribute("value").value());
+        };
+        ps5_esde_write_library_to(&fresh, summary, sizeof(summary));
+        assert(value("ROMDirectory") == rom && value("MediaDirectory") == media);
+        /* ES-DE's own default, as an older start left it: replaced. */
+        write_text(first + "/settings/es_settings.xml",
+                   "<?xml version=\"1.0\"?>\n<string name=\"ROMDirectory\" value=\"~/ROMs\" />\n");
+        ps5_esde_write_library_to(&fresh, summary, sizeof(summary));
+        assert(value("ROMDirectory") == rom);
+        /* A folder the user chose: kept. */
+        write_text(
+            first + "/settings/es_settings.xml",
+            "<?xml version=\"1.0\"?>\n<string name=\"ROMDirectory\" value=\"/mnt/usb0/roms\" />\n");
+        ps5_esde_write_library_to(&fresh, summary, sizeof(summary));
+        assert(value("ROMDirectory") == "/mnt/usb0/roms" && value("MediaDirectory") == media);
+    }
     std::puts("esde_library: systems, full names, themes, commands, merged game lists, favourites "
-              "from both frontends, RetroArch's play records and the collections PASS");
+              "from both frontends, RetroArch's play records, the collections and the ROM and "
+              "media folders PASS");
     return 0;
 }
