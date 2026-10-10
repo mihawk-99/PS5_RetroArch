@@ -31,10 +31,57 @@ CORES = [
     ('azahar', 'Azahar', '.deps/azahar-src/src/citra_libretro/core_settings.cpp', ['ENABLE_VULKAN']),
     ('vice_x64sc', 'VICE x64sc', '.deps/vice-src/libretro/libretro-core.c', ['__X64SC__','HAVE_RESID33','ARCHDEP_PRINTER_DEFAULT_DEV1="vice_printer.txt"']),
     ('fbneo', 'FinalBurn Neo', 'build/cores/fbneo/src/burner/libretro/retro_common.cpp', ['BUILD_NEOGEO']),
+    # The cores added 2026-10-06; library names as each core reports them (its settings'
+    # folder), tables found by name in each source (option_tables).
+    ('a5200', 'a5200', '.deps/a5200-src/libretro/libretro_core_options.h', []),
+    ('mednafen_ngp', 'Beetle NeoPop', '.deps/beetle-ngp-src/libretro_core_options.h', []),
+    ('mednafen_pce', 'Beetle PCE', '.deps/beetle-pce-src/libretro_core_options.h', []),
+    ('mednafen_pcfx', 'Beetle PC-FX', '.deps/beetle-pcfx-src/libretro_core_options.h', []),
+    ('mednafen_vb', 'Beetle VB', '.deps/beetle-vb-src/libretro_core_options.h', []),
+    ('mednafen_wswan', 'Beetle WonderSwan', '.deps/beetle-wswan-src/libretro_core_options.h', []),
+    ('dosbox_pure', 'DOSBox-pure', '.deps/dosbox-pure-src/core_options.h', ['DBP_DEFAULT_SAMPLERATE_STRING="48000"']),
+    ('flycast', 'Flycast', '.deps/flycast-src/shell/libretro/libretro_core_options.h', ['CORE_OPTION_NAME="reicast"']),
+    ('handy', 'Handy', '.deps/handy-src/libretro/libretro_core_options.h', []),
+    ('neocd', 'NeoCD', '.deps/neocd-src/src/libretro_variables.cpp', []),
+    ('opera', 'Opera', '.deps/opera-src/libretro_core_options.c', ['THREADED_DSP=1']),  # its Makefile's default, kept for ps5
+    ('picodrive', 'PicoDrive', '.deps/picodrive-src/platform/libretro/libretro_core_options.h', []),
+    ('pokemini', 'PokeMini', '.deps/pokemini-src/libretro/libretro_core_options.h', []),
+    ('prosystem', 'ProSystem', '.deps/prosystem-src/core/libretro_core_options.h', []),
+    ('puae', 'PUAE', '.deps/puae-src/libretro/libretro-core.c', []),
+    ('scummvm', 'ScummVM', '.deps/scummvm-src/backends/platform/libretro/include/libretro-core-options.h', ['USE_HIGHRES']),  # Makefile.common's default, kept for ps5
+    ('stella', 'Stella', '.deps/stella-src/src/os/libretro/libretro.cxx', []),
+    ('virtualjaguar', 'Virtual Jaguar', '.deps/virtualjaguar-src/libretro_core_options.h', []),
 ]
+# Cores whose tables are found by name (the English ones), not named in extract().
+NAMED = {'fbneo', 'dolphin', 'azahar', 'fceumm', 'ppsspp', 'desmume', 'mednafen_psx_hw',
+         'mednafen_saturn', 'pcsx2', 'mame', 'mupen64plus_next', 'genesis_plus_gx', 'snes9x',
+         'mgba', 'vice_x64sc'}
+
+def blocks(text, opening):
+    """Each block a pattern opens, to its matching brace (strings skipped)."""
+    out = []
+    for match in re.finditer(opening, text, re.M):
+        depth = 1
+        for token in re.finditer(r'"(?:\\.|[^"\\])*"|[{}]', text[match.end():]):
+            depth += 1 if token[0] == '{' else -1 if token[0] == '}' else 0
+            if not depth:
+                out.append(text[match.start():match.end() + token.end()])
+                break
+    return out
+
+def option_tables(text):
+    """The English category and definition tables of a source, and whether they are v1."""
+    v2 = re.findall(r'retro_core_option_v2_definition\s+(\w+)\s*\[', text)
+    v1 = re.findall(r'retro_core_option_definition\s+(\w+)\s*\[', text)
+    cats = re.findall(r'retro_core_option_v2_category\s+(\w+)\s*\[', text)
+    pick = lambda names: next((n for n in names if n in ('option_defs_us_v2', 'option_defs_us', 'option_defs')), names[0] if names else None)
+    defs = pick(v2)
+    if defs:
+        return next((c for c in cats if c in ('option_cats_us', 'option_cats')), cats[0] if cats else None), defs, False
+    return None, pick(v1), True
 
 def declaration(text, name):
-    match = re.search(r'(?:static\s+)?(?:constexpr\s+|const\s+)?(?:struct\s+)?retro_core_option_v2_(?:category|definition)\s+'+re.escape(name)+r'\s*(?:\[\])?\s*=\s*\{', text)
+    match = re.search(r'(?:static\s+)?(?:constexpr\s+|const\s+)?(?:struct\s+)?retro_core_option_(?:v2_category|v2_definition|definition)\s+'+re.escape(name)+r'\s*(?:\[[^\]]*\])?\s*=\s*\{', text)
     if not match:
         raise ValueError('Option declaration missing: '+name)
     # Tokenize strings so braces in help text cannot terminate an initializer.
@@ -50,9 +97,42 @@ def preprocess(text, flags):
     text = re.sub(r'^\s*#\s*include[^\n]*', '', text, flags=re.M)
     return subprocess.check_output(['c++','-E','-P','-x','c++','-DHAVE_NO_LANGEXTRA','-D__PROSPERO__', *['-D'+v for v in flags], '-'], input=text, text=True, cwd=ROOT, stderr=subprocess.PIPE)
 
+def neocd_tables(source):
+    """NeoCD builds its table at run time (its BIOS choices are the files found): its
+    builder, compiled here with no BIOS, gives every other option; the BIOS one is the
+    console's, from the runtime snapshot once the core runs."""
+    text = source.read_text()
+    names = text.split('// Variable names and descriptions for the settings', 1)[1].split('// All core variables', 1)[0]
+    cats = re.search(r'static retro_core_option_v2_category coreOptionCategories\[\] = \{.*?\};', text, re.S)[0]
+    builders = ''.join(re.search(r'static void '+name+r'\(.*?\n\}\n', text, re.S)[0]
+                       for name in ('fillBasicOption', 'fillBiosOption', 'buildCoreOptionsV2'))
+    stub = ('#include <cstring>\n#include <string>\n#include <vector>\n'
+            'struct BiosEntry { std::string description; };\n'
+            'static struct { std::vector<BiosEntry> biosList; std::string biosChoices; } globals;\n'
+            'static std::vector<retro_core_option_v2_definition> coreOptionDefinitions;\n'
+            'static struct { retro_core_option_v2_category *categories; '
+            'retro_core_option_v2_definition *definitions; } coreOptionsV2;\n')
+    tail = ('static const retro_core_option_v2_definition *neocd_defs() '
+            '{ buildCoreOptionsV2(); return coreOptionDefinitions.data(); }\n')
+    return stub+names+cats+'\n'+builders+tail, 'coreOptionCategories', 'neocd_defs()'
+
+def stella_data(source):
+    """Stella declares legacy variables, "Label; first|second": no descriptions, and the
+    first choice is the default (libretro's rule for them)."""
+    settings = []
+    for key, value in re.findall(r'\{\s*"(stella_\w+)",\s*"([^"]+)"\s*\}', source.read_text()):
+        label, choices = value.split(';', 1)
+        values = [c.strip() for c in choices.split('|')]
+        settings.append({'key': key, 'label': label.strip(), 'description': '', 'category': '',
+                         'default': values[0], 'choices': [[v, v] for v in values]})
+    return {'categories': [], 'settings': settings}
+
 def extract(stem, source, flags):
+    if stem == 'neocd':
+        return neocd_tables(source)
     text = source.read_text()
     if stem == 'vice_x64sc': text = (source.parent/'libretro-core.h').read_text()+'\n'+text
+    if stem == 'puae': text = (source.parent/'libretro-core.h').read_text()+'\n'+text
     if stem == 'fbneo':
         text = (source.parent/'retro_common.h').read_text()+'\n'+text
         strings = re.findall(r'"(?:\\.|[^"\\])*"', (source.parent/'retro_string.cpp').read_text().split('= {', 1)[1])[:171]
@@ -83,6 +163,18 @@ def extract(stem, source, flags):
         # General definitions are already English; game-specific DIP switches
         # and cheats are appended by the runtime snapshot when a game loads.
         return prefix+'\n'+declaration(text, cats)+'\nretro_core_option_v2_definition option_defs_us[] = {'+','.join(names)+', {}};', cats, defs
+    if stem not in NAMED:
+        cats, defs, v1 = option_tables(text)
+        if not defs:
+            raise ValueError(stem+': no option table found')
+        # A table sized or keyed by the source's own enums and namespaces
+        # (DOSBox Pure's DBP_Option, DBP_OptionCat): those kept whole.
+        prefix = '\n'.join(re.findall(r'^\s*enum\b[^{;]*\{[^}]*\};', text, re.M | re.S) +
+                           blocks(text, r'^\s*namespace\s+\w+\s*\{'))
+        if stem == 'dosbox_pure':
+            prefix = 'class Section;\n' + prefix  # declared by DBP_Option's helpers, never used here
+        body = (declaration(text, cats)+'\n' if cats else '')+declaration(text, defs)
+        return prefix+'\n'+body, (cats or 'nullptr') if not v1 else 'nullptr', defs
     return prefix+'\n'+declaration(text, cats)+'\n'+declaration(text, defs), cats, defs
 
 
@@ -124,21 +216,26 @@ def prepare(stem, source, data):
         option['default'] = value if value in values else values[0] if values else ''
     return data
 
+def compile_tables(stem, source, flags, helper):
+    """A core's option tables, compiled with the host helper and dumped as JSON."""
+    tables, cats, defs = extract(stem, source, flags)
+    with tempfile.TemporaryDirectory() as folder:
+        cpp = Path(folder)/'options.cpp'; exe = Path(folder)/'options'
+        cpp.write_text(helper+'\n'+tables+f'\nint main() {{ dump({cats}, {defs}); }}\n')
+        result = subprocess.run(['c++', '-std=c++17', '-I'+str(ROOT/'vendor/retroarch/libretro-common/include'),
+                                 str(cpp), '-o', str(exe)], capture_output=True, text=True)
+        if result.returncode:
+            (ROOT/'build/webui-catalog-error.cpp').write_text(cpp.read_text())
+            raise RuntimeError(stem+': '+result.stderr[:4000])
+        return json.loads(subprocess.check_output([str(exe)], text=True))
+
 def generate(output):
     output.mkdir(parents=True, exist_ok=True)
     helper = (ROOT/'tooling/webui/dump-options.cpp').read_text()
     records=[]
     for stem,name,source,flags in CORES:
         source=ROOT/source
-        tables,cats,defs=extract(stem,source,flags)
-        with tempfile.TemporaryDirectory() as folder:
-            cpp=Path(folder)/'options.cpp'; exe=Path(folder)/'options'
-            cpp.write_text(helper+'\n'+tables+f'\nint main() {{ dump({cats}, {defs}); }}\n')
-            result=subprocess.run(['c++','-std=c++17','-I'+str(ROOT/'vendor/retroarch/libretro-common/include'),str(cpp),'-o',str(exe)],capture_output=True,text=True)
-            if result.returncode:
-                (ROOT/'build/webui-catalog-error.cpp').write_text(cpp.read_text())
-                raise RuntimeError(stem+': '+result.stderr[:4000])
-            data=json.loads(subprocess.check_output([str(exe)],text=True))
+        data = stella_data(source) if stem == 'stella' else compile_tables(stem, source, flags, helper)
         data = prepare(stem, source, data)
         data['core']=name
         data['binary_sha256'] = hashlib.sha256((ROOT/'build/cores/stage/cores'/(stem+'_libretro.so')).read_bytes()).hexdigest()

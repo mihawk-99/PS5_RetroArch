@@ -293,6 +293,13 @@ webui_daemon=$(bash "$root/tools/build-webui-daemon.sh")
 
 # Extract once, before the identity is computed, so catalog changes identify the build.
 python3 "$root/tools/generate-core-metadata.py" "$root/build/webui-core-metadata"
+# Every shipped core has its guided Settings catalog (rpcs3 aside: never released). A
+# core added without one would show no options in the WebUI, as 18 did until 2026-10-09.
+for core_name in "${core_names[@]}"; do
+    [[ $core_name == rpcs3 ]] && continue
+    grep -q "^${core_name}_libretro.so = " "$root/build/webui-core-metadata/index.cfg" ||
+        { echo "error: $core_name has no WebUI Settings catalog (tools/generate-core-metadata.py CORES)" >&2; exit 1; }
+done
 
 # Bind the running trace and FTP readback to these exact source/archive inputs.
 # The console transforms the SELF container, so its whole-file digest differs.

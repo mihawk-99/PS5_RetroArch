@@ -44,3 +44,22 @@ static void dump(const retro_core_option_v2_category *cats,
     }
     std::puts("]}");
 }
+// The v1 tables (no categories) of older cores: the same settings, in no category.
+static void dump(std::nullptr_t, const retro_core_option_definition *defs)
+{
+    std::printf("{\"categories\":[],\"settings\":[");
+    for (auto *s = defs; s->key; ++s)
+    {
+        std::printf("%s{\"key\":%s,\"label\":%s,\"description\":%s,\"category\":\"\",\"default\":%s,"
+                    "\"choices\":[",
+                    s == defs ? "" : ",", quoted(s->key).c_str(), quoted(s->desc).c_str(),
+                    quoted(s->info).c_str(), quoted(s->default_value).c_str());
+        for (size_t i = 0; i < RETRO_NUM_CORE_OPTION_VALUES_MAX && s->values[i].value; ++i)
+            std::printf(
+                "%s[%s,%s]", i ? "," : "", quoted(s->values[i].value).c_str(),
+                quoted(s->values[i].label ? s->values[i].label : s->values[i].value).c_str());
+        std::printf("]}");
+    }
+    std::puts("]}");
+}
+
