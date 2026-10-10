@@ -63,6 +63,29 @@ const Setting settings[] = {
     {"menu_show_advanced_settings", "Show advanced settings", "bool", "false", 0, 0},
     {"menu_driver", "Console menu", "menu", "xmb", 0, 0},
 };
+// RetroArch's online settings the guided editor offers before RetroArch has written them
+// to its configuration (RetroAchievements, netplay): RetroArch's own defaults.
+const Setting online_settings[] = {
+    {"cheevos_enable", "RetroAchievements", "bool", "false", 0, 0},
+    {"cheevos_username", "RetroAchievements user name", "text", "", 0, 0},
+    {"cheevos_password", "RetroAchievements password", "text", "", 0, 0},
+    {"cheevos_hardcore_mode_enable", "Hardcore mode", "bool", "false", 0, 0},
+    {"netplay_nickname", "Netplay nickname", "text", "", 0, 0},
+    {"netplay_public_announce", "Announce netplay games", "bool", "true", 0, 0},
+    {"netplay_use_mitm_server", "Netplay relay server", "bool", "false", 0, 0},
+};
+// A password or token in RetroArch's configuration (cheevos_password, cheevos_token,
+// netplay_password...): never sent to a browser. A password can be set, not read; an
+// empty one leaves the saved one as it is. A token is RetroArch's own to write.
+bool secret_setting(const std::string &key)
+{
+    const auto ends = [&](const char *suffix)
+    {
+        const size_t n = std::strlen(suffix);
+        return key.size() >= n && key.compare(key.size() - n, n, suffix) == 0;
+    };
+    return ends("_password") || ends("_token");
+}
 // The server answers on a pool of threads (ps5_webui_start). Transfers write on
 // their own; everything else (settings, folders, the updater) runs under this lock,
 // as it did on the one thread before.
@@ -426,6 +449,8 @@ Config global_values()
     Config values;
     for (const auto &s : settings)
         values[s.key] = s.initial;
+    for (const auto &s : online_settings)
+        values[s.key] = s.initial;
     overlay(values, read_config(root_path + "/retroarch.cfg"));
     overlay(values, read_config(root_path + "/config/retroarch.cfg"));
     overlay(values, read_config(root_path + "/config/webui.cfg"));
@@ -687,9 +712,14 @@ const char *value_kind(const std::string &value)
 const char *setting_kind(const std::string &key, bool core_option)
 {
     if (!core_option)
+    {
         for (const auto &s : settings)
             if (key == s.key)
                 return std::strcmp(s.kind, "menu") == 0 ? "text" : s.kind;
+        for (const auto &s : online_settings)
+            if (key == s.key)
+                return s.kind;
+    }
     // Config files do not carry type metadata. Numeric-looking bindings and
     // enum choices remain strings, so changing their value cannot change type.
     return "text";
@@ -736,8 +766,14 @@ MHD_Result config_editor(MHD_Connection *c, const std::string &method, const std
         {
             if (out.back() != '[')
                 out += ',';
-            out += "{\"key\":" + quote(entry.first) + ",\"value\":" + quote(entry.second) +
-                   ",\"kind\":" + quote(setting_kind(entry.first, options)) + '}';
+            const bool secret = secret_setting(entry.first);
+            out += "{\"key\":" + quote(entry.first) +
+                   ",\"value\":" + quote(secret ? std::string() : entry.second) +
+                   ",\"kind\":" + quote(setting_kind(entry.first, options)) +
+                   (secret ? std::string(",\"secret\":true,\"set\":") +
+                                 (entry.second.empty() ? "false" : "true")
+                           : std::string()) +
+                   '}';
         }
         return respond(c, 200, out + "],\"apply\":\"next_launch\"}");
     }
@@ -757,6 +793,17 @@ MHD_Result config_editor(MHD_Connection *c, const std::string &method, const std
         auto key = body.substr(start, eq - start);
         auto value = body.substr(eq + 1, end == std::string::npos ? end : end - eq - 1);
         auto original = baseline.find(key);
+        if (secret_setting(key) && key.size() > 6 && key.compare(key.size() - 6, 6, "_token") == 0)
+            return error(
+                c, 400, "RetroArch writes its sign-in tokens itself; they cannot be changed here.");
+        if (secret_setting(key) && value.empty())
+        {
+            // A password left empty: the saved one stays.
+            if (end == std::string::npos)
+                break;
+            start = end + 1;
+            continue;
+        }
         if (original == baseline.end() || !valid_setting_value(value, setting_kind(key, options)))
             return error(
                 c, 400, "Use an existing setting and a valid value without quotes or line breaks.");

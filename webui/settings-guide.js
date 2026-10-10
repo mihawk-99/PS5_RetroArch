@@ -8,7 +8,8 @@ function guide(category, key, label, description, control = 'toggle', choices = 
 const globalCategories = [
   ['video', 'Video', 'Shape the picture on your TV.'], ['audio', 'Audio', 'Volume and sound playback.'],
   ['input', 'Input', 'Controller feel and response.'], ['saving', 'Saving', 'Game saves, save states and resuming play.'],
-  ['system', 'System', 'Playback speed and configuration behavior.'], ['interface', 'Interface', 'The RetroArch menu on your console.']
+  ['system', 'System', 'Playback speed and configuration behavior.'], ['interface', 'Interface', 'The RetroArch menu on your console.'],
+  ['achievements', 'Achievements', 'Earn RetroAchievements in the games that have them.'], ['netplay', 'Netplay', 'Play together over the network.']
 ].map(([key, label, description]) => ({ key, label, description }));
 guide('video', 'video_smooth', 'Smooth image scaling', 'Soften pixels when the picture is enlarged. Turn off for crisp pixel art.');
 guide('video', 'video_vsync', 'Vertical sync', 'Match frame presentation to the display refresh to reduce tearing.');
@@ -198,3 +199,10 @@ function coreHelp(key) {
   if (key.startsWith('vice_mapper_')) return 'Choose the Commodore key or emulator action assigned to this control. The unmapped choice removes its assignment.';
   return otherCoreHelp[key] || pspCoreHelp(key);
 }
+guide('achievements', 'cheevos_enable', 'RetroAchievements', 'Earn achievements in supported games with your retroachievements.org account. RetroArch signs in when a game starts.');
+guide('achievements', 'cheevos_username', 'User name', 'Your retroachievements.org user name.', 'text');
+guide('achievements', 'cheevos_password', 'Password', 'Your retroachievements.org password. It is kept on your PS5 and never shown here; RetroArch keeps a sign-in token after the first sign-in.', 'text');
+guide('achievements', 'cheevos_hardcore_mode_enable', 'Hardcore mode', 'Earn hardcore achievements: save states, rewind, slow motion and cheats are turned off while playing.');
+guide('netplay', 'netplay_nickname', 'Nickname', 'The name other players see in netplay games.', 'text');
+guide('netplay', 'netplay_public_announce', 'Announce games publicly', 'List the netplay games you host in the public lobby, so others can find and join them.');
+guide('netplay', 'netplay_use_mitm_server', 'Use a relay server', 'Host through a libretro relay server, for networks where other players cannot reach your PS5 directly.');

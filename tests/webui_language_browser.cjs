@@ -64,6 +64,12 @@ function untranslated(page, catalog) {
     // A count the script writes ("{0} settings").
     await page.waitForFunction(() => /^\d+ réglages$/.test(document.querySelector('#settings-count').textContent));
     assert.deepEqual(await untranslated(page, french), [], 'the settings page is all French');
+    // The online settings: RetroAchievements with a password field that shows nothing saved.
+    await page.locator('#settings-categories button', { hasText: 'Succès' }).click();
+    assert.equal(await page.locator('#setting-cheevos_password').getAttribute('type'), 'password');
+    assert.equal(await page.locator('#setting-cheevos_password').inputValue(), '');
+    assert.equal(await page.locator('#setting-cheevos_password').getAttribute('placeholder'), 'Non défini');
+    assert.deepEqual(await untranslated(page, french), [], 'the achievements settings are all French');
     // Every other page, as the scripts fill it.
     for (const name of ['content', 'games', 'media', 'transfers']) {
       await page.locator(`[data-page=${name}]`).click();

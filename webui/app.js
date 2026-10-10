@@ -493,6 +493,9 @@ function renderSettings() {
     } else {
       input = document.createElement('input');
       input.type = guided && ['volume', 'rumble'].includes(meta.control) ? 'range' : (guided && meta.control === 'toggle') || setting.kind === 'bool' ? 'checkbox' : setting.kind;
+      // A password the console keeps is never sent here (src/webui_ps5.cpp): it can be
+      // replaced, not read; left empty, the saved one stays.
+      if (setting.secret) { input.type = 'password'; input.autocomplete = 'new-password'; input.placeholder = setting.set ? 'Saved on your PS5' : 'Not set'; }
       if (input.type === 'checkbox') input.checked = value === 'true';
       else { input.value = value; input.maxLength = 4096; if (setting.kind === 'number') { input.step = 'any'; input.required = true; } }
       if (input.type === 'range') { input.min = meta.control === 'volume' ? -80 : 0; input.max = meta.control === 'volume' ? 12 : 100; input.step = meta.control === 'volume' ? '0.1' : '1'; input.value = value; }
