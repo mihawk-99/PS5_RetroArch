@@ -1,0 +1,13 @@
+{
+  "step": "ra-host-login-provided",
+  "note": "Successful PC API authentication of the supplied pair; no console authentication claim.",
+  "must_contain": [
+    "HTTP status=200",
+    "authenticated=true",
+    "Console settings unchanged"
+  ],
+  "must_not_contain": [
+    "authenticated=false"
+  ],
+  "human_check": ""
+}
