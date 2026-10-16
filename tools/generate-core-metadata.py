@@ -8,6 +8,7 @@ from pathlib import Path
 import ast
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -53,6 +54,9 @@ CORES = [
     # PS5SX2 (tools/build-ps5sx2.sh): its options are in the fork's libretro layer.
     ('ps5sx2', 'PS5SX2', '.deps/ps5sx2-src/ps5/libretro/libretro_core_options.h', []),
 ]
+if os.environ.get('PS5_WITH_MELONDSDS') == '1':
+    CORES.append(('melondsds', 'melonDS DS',
+                  'build/cores/melondsds/source/src/libretro/config/definitions.hpp', []))
 # Cores whose tables are found by name (the English ones), not named in extract().
 NAMED = {'fbneo', 'dolphin', 'azahar', 'fceumm', 'ppsspp', 'desmume', 'mednafen_psx_hw',
          'mednafen_saturn', 'mame', 'mupen64plus_next', 'genesis_plus_gx', 'snes9x',
@@ -129,6 +133,14 @@ def stella_data(source):
     return {'categories': [], 'settings': settings}
 
 def extract(stem, source, flags):
+    if stem == 'melondsds':
+        # Compile only the pinned constexpr option tables, never the emulator.
+        text = ('#define JIT_ENABLED 1\n#define HAVE_THREADS 1\n'
+                '#define HAVE_THREADED_RENDERER 1\n#define HAVE_NETWORKING 1\n#define NDEBUG 1\n'
+                '#include '+json.dumps(str(source))+'\n'
+                '#include '+json.dumps(str(source.parent/'definitions/categories.hpp'))+'\n')
+        return (text, 'MelonDsDs::config::definitions::OptionCategories.data()',
+                'MelonDsDs::config::definitions::CoreOptionDefinitions.data()')
     if stem == 'neocd':
         return neocd_tables(source)
     text = source.read_text()
@@ -223,7 +235,11 @@ def compile_tables(stem, source, flags, helper):
     with tempfile.TemporaryDirectory() as folder:
         cpp = Path(folder)/'options.cpp'; exe = Path(folder)/'options'
         cpp.write_text(helper+'\n'+tables+f'\nint main() {{ dump({cats}, {defs}); }}\n')
-        result = subprocess.run(['c++', '-std=c++17', '-I'+str(ROOT/'vendor/retroarch/libretro-common/include'),
+        includes = []
+        if stem == 'melondsds':
+            includes = ['-I'+str(source.parent.parent),
+                        '-I'+str(ROOT/'build/cores/melondsds/deps/melonds-src/src')]
+        result = subprocess.run(['c++', '-std=c++17', '-I'+str(ROOT/'vendor/retroarch/libretro-common/include'), *includes,
                                  str(cpp), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             (ROOT/'build/webui-catalog-error.cpp').write_text(cpp.read_text())

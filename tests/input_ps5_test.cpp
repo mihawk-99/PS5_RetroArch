@@ -552,7 +552,7 @@ int main()
         return input_ps5.input_state(input, &ps5_joypad, nullptr, nullptr, nullptr, false, port,
                                      RETRO_DEVICE_MOUSE, 0, id);
     };
-    for (const char *core : {"DeSmuME", "Azahar"})
+    for (const char *core : {"DeSmuME", "Azahar", "melonDS DS"})
     {
         test_runloop.system.info.library_name = core;
         test_runloop.flags |= RUNLOOP_FLAG_CORE_RUNNING;

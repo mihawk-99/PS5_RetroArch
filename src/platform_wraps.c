@@ -15,11 +15,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <netinet/in.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <ps5platform/libc.h>
+
+/* Bind the IPv6 constant without importing a second socket runtime. */
+const struct in6_addr ps5_in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
 
 int __wrap_openat(int directory, const char *name, int flags, ...)
 {

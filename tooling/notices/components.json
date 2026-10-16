@@ -480,6 +480,103 @@
       "modifications": "The fork's commits over libretro/desmume; tooling/desmume/touchpad-stylus.patch adds the PS5 touchpad scale and stylus cursor."
     },
     {
+      "id": "melondsds",
+      "name": "melonDS DS (Nintendo DS)",
+      "kind": "code",
+      "artifacts": [
+        "cores/melondsds_libretro.so",
+        "cores/melondsds_libretro.info",
+        "info/melondsds_libretro.info",
+        "info/melondsds-LICENSE.txt"
+      ],
+      "licence": "GPL-3.0-or-later; bundled dependencies under their included licences",
+      "copyright": [
+        "Copyright Jesse Talavera, the melonDS team and contributors; dependency notices in melondsds-LICENSE.txt"
+      ],
+      "texts": [
+        {
+          "from": "build/cores/stage/info/melondsds-LICENSE.txt",
+          "to": "melondsds-LICENSE.txt",
+          "verbatim": true
+        }
+      ],
+      "source": {
+        "kind": "core",
+        "build": "melondsds",
+        "tree": ".deps/melondsds-cache/melondsds",
+        "remote": "https://github.com/JesseTG/melonds-ds",
+        "extra": [
+          {
+            "name": "melondsds-melonds",
+            "git": ".deps/melondsds-cache/melonds",
+            "revision": "16f127dbb587a73371827ce79689c5d237c4b59b",
+            "remote": "https://github.com/JesseTG/melonDS"
+          },
+          {
+            "name": "melondsds-libretro-common",
+            "git": ".deps/melondsds-cache/libretro-common",
+            "revision": "fa8a1b572a444fcb552007019f8caf68281108aa",
+            "remote": "https://github.com/libretro/libretro-common"
+          },
+          {
+            "name": "melondsds-embed-binaries",
+            "git": ".deps/melondsds-cache/embed-binaries",
+            "revision": "078b62beba97e8192c99bfb16d5e17220cfc7598",
+            "remote": "https://github.com/andoalon/embed-binaries"
+          },
+          {
+            "name": "melondsds-glm",
+            "git": ".deps/melondsds-cache/glm",
+            "revision": "6f14f4792a0cde5d0cf2c910506724d61cb95834",
+            "remote": "https://github.com/g-truc/glm"
+          },
+          {
+            "name": "melondsds-libslirp",
+            "git": ".deps/melondsds-cache/libslirp",
+            "revision": "e61dbd459c8c06607b3a84694489427e8ec60f17",
+            "remote": "https://github.com/JesseTG/libslirp-mirror"
+          },
+          {
+            "name": "melondsds-pntr",
+            "git": ".deps/melondsds-cache/pntr",
+            "revision": "a47fe167703b0ac3bfad00785b20b0dce6712509",
+            "remote": "https://github.com/robloach/pntr"
+          },
+          {
+            "name": "melondsds-fmt",
+            "git": ".deps/melondsds-cache/fmt",
+            "revision": "1be298e1bd68957e4cd352e1f676f00e07dcfb57",
+            "remote": "https://github.com/fmtlib/fmt"
+          },
+          {
+            "name": "melondsds-yamc",
+            "git": ".deps/melondsds-cache/yamc",
+            "revision": "4e015a7e8eb0d61c34e6928676c8c78881a72d73",
+            "remote": "https://github.com/yohhoy/yamc"
+          },
+          {
+            "name": "melondsds-span-lite",
+            "git": ".deps/melondsds-cache/span-lite",
+            "revision": "f63fe2974943b5f555b928b10d910e457fbb93d4",
+            "remote": "https://github.com/martinmoene/span-lite"
+          },
+          {
+            "name": "melondsds-date",
+            "git": ".deps/melondsds-cache/date",
+            "revision": "179a6b921ccd6179b5b04dce812a89f71a51b4df",
+            "remote": "https://github.com/HowardHinnant/date"
+          },
+          {
+            "name": "melondsds-zlib",
+            "git": ".deps/melondsds-cache/zlib",
+            "revision": "da607da739fa6047df13e66a2af6b8bec7c2a498",
+            "remote": "https://github.com/madler/zlib"
+          }
+        ]
+      },
+      "modifications": "Pinned PS5 port and build recipe in tooling/melondsds and tools/build-melondsds.sh; native executable-memory JIT and software renderer."
+    },
+    {
       "id": "azahar",
       "name": "Azahar (Nintendo 3DS), with Dynarmic",
       "kind": "code",

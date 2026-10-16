@@ -63,7 +63,7 @@ configure_flags=(
     --enable-networking --enable-netplaydiscovery --enable-cheevos --enable-ssl
     # Libraries this SDK does not carry.
     --disable-ffmpeg --disable-freetype --disable-flac
-    --disable-cdrom --disable-microphone
+    --disable-cdrom --enable-microphone
     --disable-qt --disable-discord --disable-oss --disable-jack --disable-alsa
     --disable-pulse --disable-pipewire --disable-wayland --disable-x11
     --disable-kms --disable-caca --disable-sixel --disable-bluetooth

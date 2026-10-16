@@ -218,9 +218,10 @@ build_system_link_stub() {
 
 agc_stub=$(build_system_link_stub libSceAgc tooling/ps5-stubs/agc_link_stub.c)
 agc_driver_stub=$(build_system_link_stub libSceAgcDriver tooling/ps5-stubs/agc_driver_link_stub.c)
+audio_in_stub=$(build_system_link_stub libSceAudioIn tooling/ps5-stubs/audio_in_link_stub.c)
 
 link_inputs=("$build/obj/app_crt.o" "$build/obj/app_cpp_runtime.o" "${objects[@]}")
-link_inputs+=("$agc_stub" "$agc_driver_stub")
+link_inputs+=("$agc_stub" "$agc_driver_stub" "$audio_in_stub")
 # The Vulkan driver, linked whole. These archives are the reason this title does
 # not dlopen: a PS5 title cannot (../PS5_Vulkan measured ENOEXEC/ENOENT/NULL from
 # sceKernelLoadStartModule and dlopen, and ESRCH from sceKernelDlsym), so the
@@ -306,7 +307,7 @@ fi
 mapfile -t null_imports < <(comm -23 \
     <("$sdk_root/bin/llvm-nm" -D --undefined-only "$build/llvm-pie.elf" |
         awk '$1 == "U" { sub(/@.*/, "", $2); print $2 }' | sort -u) \
-    <(for stub in "$sdk_root"/target/lib/*.so "$agc_stub" "$agc_driver_stub"; do
+    <(for stub in "$sdk_root"/target/lib/*.so "$agc_stub" "$agc_driver_stub" "$audio_in_stub"; do
         case $(basename "$stub") in libkernel_sys.so | libScePosixForWebKit.so) continue ;; esac
         "$sdk_root/bin/llvm-nm" -D --defined-only "$stub" 2>/dev/null | awk '{ print $NF }'
     done | sort -u))
@@ -316,7 +317,7 @@ mapfile -t null_imports < <(comm -23 \
 }
 "$tool" link --in "$build/llvm-pie.elf" --out "$build/eboot.elf" \
     --stub-dir "$sdk_root/target/lib" --stub "$agc_stub" \
-    --stub "$agc_driver_stub" --module-sdk "$module_sdk" \
+    --stub "$agc_driver_stub" --stub "$audio_in_stub" --module-sdk "$module_sdk" \
     --companion-sdk "$companion_sdk" --file-name eboot.elf
 
 app="$dist/$title_id"

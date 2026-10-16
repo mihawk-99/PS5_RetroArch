@@ -344,7 +344,7 @@ class PortPatches(unittest.TestCase):
         change deliberately, in a commit that says why.
         """
         self.assertEqual(
-            len(self.blocks()), 257,
+            len(self.blocks()), 259,
             "the patch count changed: if a block was added or removed on purpose, "
             "update this number in the same commit and say why in its message")
 
@@ -354,8 +354,8 @@ class PortPatches(unittest.TestCase):
         for edit in edits:
             per_file[edit[0]] = per_file.get(edit[0], 0) + 1
         self.assertEqual(
-            per_file.get("configuration.c"), 10,
-            f"configuration.c should carry ten distinct edits (audio, asset path, input and joypad defaults, "
+            per_file.get("configuration.c"), 11,
+            f"configuration.c should carry eleven distinct edits (audio and microphone, asset path, input and joypad defaults, "
             f"the video default, three offline effect paths, the remap and thumbnails folders); counts are {per_file}")
         self.assertEqual(
             per_file.get("input/input_driver.c"), 4,

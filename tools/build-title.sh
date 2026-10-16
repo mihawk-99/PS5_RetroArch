@@ -62,6 +62,10 @@ core_names=(fceumm mgba snes9x fbneo genesis_plus_gx ppsspp dolphin
     mednafen_psx_hw mupen64plus_next mednafen_saturn vice_x64sc desmume azahar mame flycast
     picodrive mednafen_pce mednafen_pcfx mednafen_vb mednafen_ngp mednafen_wswan pokemini
     handy virtualjaguar stella a5200 prosystem dosbox_pure opera puae neocd scummvm ps5sx2)
+# Keep the established DS default; owners can opt into the new microphone core.
+if [[ ${PS5_WITH_MELONDSDS:-0} == 1 ]]; then
+    core_names+=(melondsds)
+fi
 # RPCS3 is not part of the title by default, console builds included: PS3 is no
 # longer a target (2026-10-04), so no deployment puts it on a console.
 # tools/build-rpcs3.sh still builds the core on this machine, and PS5_WITH_RPCS3=1
@@ -405,6 +409,9 @@ for core_name in "${core_names[@]}"; do
     cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/info/"
     # Older saved configs have an empty info path: upstream then searches cores/.
     cp -- "$root/build/cores/stage/info/${core_name}_libretro.info" "$dist/cores/"
+    if [[ $core_name == melondsds ]]; then
+        cp -- "$root/build/cores/stage/info/melondsds-LICENSE.txt" "$dist/info/"
+    fi
 done
 
 # A folder in content/ for each system the staged cores run, named as RetroArch names

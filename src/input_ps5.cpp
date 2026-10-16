@@ -252,7 +252,8 @@ bool stylus_enabled() noexcept
     const auto *runloop = runloop_state_get_ptr();
     const char *name = runloop->system.info.library_name;
     return (runloop->flags & RUNLOOP_FLAG_CORE_RUNNING) && name &&
-           (!std::strcmp(name, "DeSmuME") || !std::strcmp(name, "Azahar"));
+           (!std::strcmp(name, "DeSmuME") || !std::strcmp(name, "Azahar") ||
+            !std::strcmp(name, "melonDS DS"));
 }
 
 struct PadState
@@ -1559,6 +1560,15 @@ extern "C" input_driver_t input_ps5 = {
     nullptr, /* grab_stdin */
     nullptr, /* keypress_vibrate */
 };
+
+// Microphone capture follows the first controller's user and shares this
+// driver's UserService lifetime rather than initializing another owner.
+extern "C" int ps5_input_user_id(unsigned port)
+{
+    if (!joypad_ready)
+        joypad_init(nullptr);
+    return port < max_pads && pads[port] != nullptr ? pads[port]->user_id : -1;
+}
 
 // Defaults clear RetroArch's auto-binds without recreating the pad driver.
 // Reannounce once on the next poll, after all default settings have been applied.

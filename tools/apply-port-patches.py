@@ -35,6 +35,23 @@ from pathlib import Path
 # (file, anchor, inserted-before-anchor, already-present-marker)
 EDITS = [
     (
+        "audio/audio_driver.c",
+        "microphone_driver_t *microphone_drivers[] = {",
+        "/* patches/series, 0134: native user-routed PS5 microphone. */\n"
+        "extern microphone_driver_t microphone_ps5;\n"
+        "microphone_driver_t *microphone_drivers[] = {\n"
+        "   &microphone_ps5,",
+        "patches/series, 0134: native user-routed PS5 microphone",
+    ),
+    (
+        "configuration.c",
+        "const char *config_get_default_microphone(void)\n{",
+        "const char *config_get_default_microphone(void)\n{\n"
+        "   /* patches/series, 0134: PS5 microphone default. */\n"
+        "   return \"ps5\";",
+        "patches/series, 0134: PS5 microphone default",
+    ),
+    (
         "libretro-common/net/net_socket_ssl_mbed.c",
         "   mbedtls_ssl_conf_authmode(&state->conf, MBEDTLS_SSL_VERIFY_OPTIONAL);\n",
         "   /* patches/series, 0129: a server whose certificate does not chain to the bundled\n"

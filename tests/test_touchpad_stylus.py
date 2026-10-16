@@ -1,6 +1,7 @@
 """Exercise patched core input/cursor code without a console or game image."""
 from pathlib import Path
 import os
+import json
 import subprocess
 import tempfile
 import unittest
@@ -20,13 +21,14 @@ def function(source, signature):
 
 
 class TouchpadStylus(unittest.TestCase):
-    def compile_run(self, source):
+    def compile_run(self, source, includes=()):
         with tempfile.TemporaryDirectory() as td:
             cpp = Path(td, 'test.cpp')
             cpp.write_text(source)
             binary = str(Path(td, 'test'))
             subprocess.run(['c++', '-std=c++17', '-fsanitize=address,undefined',
-                            '-fno-omit-frame-pointer', str(cpp), '-o', binary], check=True)
+                            '-fno-omit-frame-pointer', *['-I'+str(p) for p in includes],
+                            str(cpp), '-o', binary], check=True)
             subprocess.run([binary], check=True, env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'))
 
     def patched(self, core, path):
@@ -67,12 +69,76 @@ int main() {
   menu.flags = 0;
   runloop.system.info.library_name = "DeSmuME";
   assert(stylus_enabled());
+  runloop.system.info.library_name = "melonDS DS";
+  assert(stylus_enabled());
   runloop.system.info.library_name = "Other";
   assert(!stylus_enabled());
   runloop.system.info.library_name = nullptr;
   assert(!stylus_enabled());
 }
 ''')
+
+    def test_melonds_relative_mouse(self):
+        cache = ROOT / '.deps/melondsds-cache/melondsds'
+        glm = ROOT / 'build/cores/melondsds/deps/glm-src'
+        if not cache.exists() or not glm.exists():
+            self.skipTest('requires the pinned melonDS DS source cache and GLM headers')
+        pin = json.loads((ROOT/'tooling/melondsds/sources.json').read_text())['melondsds'][1]
+        with tempfile.TemporaryDirectory() as td:
+            for name in ('cursor.cpp', 'cursor.hpp'):
+                path = 'src/libretro/input/'+name
+                target = Path(td, path); target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(subprocess.check_output(['git', '-C', str(cache), 'show', pin+':'+path]))
+            subprocess.run(['patch', '-s', '--fuzz=0', '-p1', '-d', td, '-i',
+                            str(ROOT/'tooling/melondsds/touchpad-stylus.patch')], check=True)
+            method = function(Path(td,'src/libretro/input/cursor.cpp').read_text(),
+                              'void CursorState::UpdateRelativeMouse()')
+        self.compile_run(r'''
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <glm/vec2.hpp>
+#include <glm/common.hpp>
+using glm::vec2; using glm::clamp;
+template<typename T> const glm::vec<2,T> NDS_SCREEN_SIZE{256,192};
+enum {RETRO_DEVICE_MOUSE, RETRO_DEVICE_ID_MOUSE_X=0, RETRO_DEVICE_ID_MOUSE_Y=1,
+      RETRO_DEVICE_ID_MOUSE_LEFT=2};
+int16_t mouse[3]{};
+namespace retro { int16_t input_state(unsigned,unsigned,unsigned,unsigned id) {return mouse[id];} }
+uint64_t ticks=100;
+uint64_t cpu_features_get_perf_counter() {return ++ticks;}
+class CursorState {
+public:
+  bool _mouseTouching=false, _isTouchReleased=false, _joypadCursorTouching=false;
+  uint64_t _pointerCursorLastUpdate=0, _joypadCursorLastUpdate=0;
+  vec2 _joystickCursorPosition{128,96}; glm::ivec2 _pointerCursorPosition{40,30};
+  unsigned resets=0;
+  void ResetCursorTimeout() {++resets;}
+  void UpdateRelativeMouse() noexcept;
+};
+''' + method + r'''
+int main() {
+  CursorState c; c.UpdateRelativeMouse(); assert(c.resets==0);
+  mouse[0]=192; mouse[1]=108; c.UpdateRelativeMouse();
+  assert(std::fabs(c._joystickCursorPosition.x-153.6f)<0.001f);
+  assert(std::fabs(c._joystickCursorPosition.y-115.2f)<0.001f);
+  float before=c._joystickCursorPosition.x; mouse[0]=1; mouse[1]=0;
+  for(int i=0;i<8;++i) c.UpdateRelativeMouse();
+  assert(c._joystickCursorPosition.x>before+1); // Preserve subpixel motion.
+  mouse[0]=mouse[1]=32767; c.UpdateRelativeMouse();
+  assert(c._joystickCursorPosition==vec2(255,191));
+  mouse[0]=mouse[1]=-32767; c.UpdateRelativeMouse();
+  assert(c._joystickCursorPosition==vec2(0,0));
+  mouse[0]=mouse[1]=0; mouse[2]=1; c.UpdateRelativeMouse();
+  assert(c._joypadCursorTouching && !c._isTouchReleased);
+  c._joypadCursorTouching=false; mouse[2]=0; c.UpdateRelativeMouse();
+  assert(c._isTouchReleased && !c._joypadCursorTouching);
+  c._isTouchReleased=false; c._joypadCursorTouching=true; c.UpdateRelativeMouse();
+  assert(c._joypadCursorTouching && !c._isTouchReleased); // R2 remains independent.
+  c._pointerCursorLastUpdate=500; mouse[0]=1; c.UpdateRelativeMouse();
+  assert(c._joystickCursorPosition.x>40 && c._joystickCursorPosition.y==30);
+}
+''', includes=[glm])
 
     def test_desmume_stylus_pixels_and_clipping(self):
         source = self.patched('desmume', 'desmume/src/frontend/libretro/libretro.cpp')

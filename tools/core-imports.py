@@ -79,6 +79,7 @@ def generate(imports):
                # No system module exports them (RPCS3's wolfSSL, asmjit and network).
                'accept4': 'ps5_accept4', 'getpagesizes': 'ps5_getpagesizes',
                'in6addr_any': 'ps5_in6addr_any',
+               'in6addr_loopback': 'ps5_in6addr_loopback',
                # The console refuses FreeBSD's cpuset_t (ERANGE); the platform
                # layer answers through the exported 64-bit mask.
                'pthread_getaffinity_np': 'ps5_pthread_getaffinity_np',

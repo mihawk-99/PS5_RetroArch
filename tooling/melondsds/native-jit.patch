@@ -1,0 +1,145 @@
+diff --git a/src/ARMJIT_Global.cpp b/src/ARMJIT_Global.cpp
+index e4aa42f9..35e7e6cf 100644
+--- a/src/ARMJIT_Global.cpp
++++ b/src/ARMJIT_Global.cpp
+@@ -1,5 +1,9 @@
+ #include "ARMJIT_Global.h"
+ #include "ARMJIT_Memory.h"
++#ifdef __PROSPERO__
++#include <ps5platform/exec.h>
++#include <new>
++#endif
+ 
+ #ifdef _WIN32
+ #include <windows.h>
+@@ -25,7 +29,7 @@ std::mutex globalMutex;
+ #define APPLE_AARCH64
+ #endif
+ 
+-#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__)
++#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__PROSPERO__)
+ static constexpr size_t NumCodeMemSlices = 4;
+ static constexpr size_t CodeMemoryAlignedSize = NumCodeMemSlices * CodeMemorySliceSize;
+ 
+@@ -46,7 +50,7 @@ void* AllocateCodeMem()
+ {
+     std::lock_guard guard(globalMutex);
+ 
+-#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__)
++#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__PROSPERO__)
+     if (AvailableCodeMemSlices)
+     {
+         int slice = __builtin_ctz(AvailableCodeMemSlices);
+@@ -56,8 +60,13 @@ void* AllocateCodeMem()
+     }
+ #endif
+ 
+-    // allocate
+-#ifdef _WIN32
++    // PS5: the platform owns executable memory; anonymous/heap memory cannot run.
++#ifdef __PROSPERO__
++    void* code = ps5_exec_allocate(CodeMemorySliceSize, reinterpret_cast<uintptr_t>(&AllocateCodeMem));
++    if (!code)
++        throw std::bad_alloc();
++    return code;
++#elif defined(_WIN32)
+     return VirtualAlloc(nullptr, CodeMemorySliceSize, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+ #elif defined(APPLE_AARCH64)
+     return mmap(NULL, CodeMemorySliceSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT,-1, 0);
+@@ -73,7 +82,7 @@ void FreeCodeMem(void* codeMem)
+ {
+     std::lock_guard guard(globalMutex);
+ 
+-#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__)
++#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__PROSPERO__)
+     for (int i = 0; i < NumCodeMemSlices; i++)
+     {
+         if (codeMem == &GetAlignedCodeMemoryStart()[CodeMemorySliceSize * i])
+@@ -85,7 +94,9 @@ void FreeCodeMem(void* codeMem)
+     }
+ #endif
+ 
+-#ifdef _WIN32
++#ifdef __PROSPERO__
++    ps5_exec_release(codeMem);
++#elif defined(_WIN32)
+     VirtualFree(codeMem, CodeMemorySliceSize, MEM_RELEASE|MEM_DECOMMIT);
+ #else
+     munmap(codeMem, CodeMemorySliceSize);
+@@ -102,7 +113,7 @@ void Init()
+         #ifdef _WIN32
+             DWORD dummy;
+             VirtualProtect(GetAlignedCodeMemoryStart(), CodeMemoryAlignedSize, PAGE_EXECUTE_READWRITE, &dummy);
+-        #elif defined(APPLE_AARCH64) || defined(__NetBSD__) || defined(__OpenBSD__)
++        #elif defined(APPLE_AARCH64) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__PROSPERO__)
+             // Apple aarch64 always uses dynamic allocation
+         #else
+             mprotect(GetAlignedCodeMemoryStart(), CodeMemoryAlignedSize, PROT_EXEC | PROT_READ | PROT_WRITE);
+diff --git a/src/ARMJIT_Memory.cpp b/src/ARMJIT_Memory.cpp
+index c64bad1f..25a46a74 100644
+--- a/src/ARMJIT_Memory.cpp
++++ b/src/ARMJIT_Memory.cpp
+@@ -36,6 +36,9 @@
+ 
+ #include "ARMJIT.h"
+ #include "ARMJIT_Memory.h"
++#ifdef __PROSPERO__
++#include <new>
++#endif
+ 
+ #include "ARMJIT_Internal.h"
+ #include "ARMJIT_Compiler.h"
+@@ -743,7 +746,7 @@ u32 ARMJIT_Memory::PageShift = 0;
+ 
+ bool ARMJIT_Memory::IsFastMemSupported()
+ {
+-#if defined(__APPLE__) || defined(__OpenBSD__)
++#if defined(__APPLE__) || defined(__OpenBSD__) || defined(__PROSPERO__)
+     return false;
+ #else
+     static bool initialised = false;
+@@ -769,7 +772,9 @@ bool ARMJIT_Memory::IsFastMemSupported()
+ 
+ void ARMJIT_Memory::RegisterFaultHandler()
+ {
+-#ifdef _WIN32
++#ifdef __PROSPERO__
++    // PS5 uses checked memory accesses; no title fault handler is installed.
++#elif defined(_WIN32)
+     ExceptionHandlerHandle = AddVectoredExceptionHandler(1, ExceptionHandler);
+ 
+     KernelBaseDll = LoadLibrary("KernelBase.dll");
+@@ -798,7 +803,8 @@ void ARMJIT_Memory::RegisterFaultHandler()
+ 
+ void ARMJIT_Memory::UnregisterFaultHandler()
+ {
+-#ifdef _WIN32
++#ifdef __PROSPERO__
++#elif defined(_WIN32)
+     if (ExceptionHandlerHandle)
+     {
+         RemoveVectoredExceptionHandler(ExceptionHandlerHandle);
+@@ -887,6 +893,11 @@ ARMJIT_Memory::ARMJIT_Memory(melonDS::NDS& nds) : NDS(nds)
+         // old Windows version
+         MemoryBase = new u8[MemoryTotalSize];
+     }
++#elif defined(__PROSPERO__)
++    MemoryBase = static_cast<u8*>(aligned_alloc(16*1024, MemoryTotalSize));
++    if (!MemoryBase)
++        throw std::bad_alloc();
++    memset(MemoryBase, 0, MemoryTotalSize);
+ #else
+     MemoryBase = (u8*)mmap(nullptr, VirtmemAreaSize, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
+ 
+@@ -971,6 +982,11 @@ ARMJIT_Memory::~ARMJIT_Memory() noexcept
+     {
+         delete[] MemoryBase;
+     }
++#elif defined(__PROSPERO__)
++    free(MemoryBase);
++    MemoryBase = nullptr;
++    FastMem9Start = nullptr;
++    FastMem7Start = nullptr;
+ #else
+     if (MemoryBase)
+     {

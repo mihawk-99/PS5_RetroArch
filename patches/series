@@ -281,3 +281,5 @@
 0129  HTTPS refuses a server whose certificate does not chain to the bundled roots (cacert.h): MBEDTLS_SSL_VERIFY_REQUIRED instead of upstream's optional check whose result was ignored, so nobody on the network path can stand in for RetroAchievements.
 
 0130  A RetroAchievements sign-in that returns a token also removes the password from /app0/config/webui.cfg (with the empty token the WebUI put beside it) and from retroarch.cfg, which keeps its token (src/ps5_cheevos.c).
+
+0134  Native user-routed AudioIn microphone backend and default. Capture is opt-in, respects hardware mute, and keeps PCM only in a bounded in-memory queue; cores use the standard libretro microphone interface.

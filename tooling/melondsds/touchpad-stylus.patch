@@ -1,0 +1,73 @@
+diff --git a/src/libretro/input/cursor.cpp b/src/libretro/input/cursor.cpp
+index 98b8766..b396ea6 100644
+--- a/src/libretro/input/cursor.cpp
++++ b/src/libretro/input/cursor.cpp
+@@ -24,6 +24,9 @@
+ #include "config/config.hpp"
+ #include "environment.hpp"
+ #include "screenlayout.hpp"
++#ifdef __PROSPERO__
++#include <features/features_cpu.h>
++#endif
+ 
+ using MelonDsDs::CursorState;
+ using glm::ivec2;
+@@ -158,6 +161,9 @@ void CursorState::Update(const CoreConfig& config, const ScreenLayoutData& layou
+             // If the player moved, pressed, or released the joystick within the past frame...
+             ResetCursorTimeout();
+         }
++#ifdef __PROSPERO__
++        UpdateRelativeMouse();
++#endif
+     }
+ 
+     _consoleTouchPosition = ConsoleTouchPosition(layout);
+@@ -169,6 +175,26 @@ void CursorState::Update(const CoreConfig& config, const ScreenLayoutData& layou
+     _cursorSettingsDirty = false;
+ }
+ 
++#ifdef __PROSPERO__
++void CursorState::UpdateRelativeMouse() noexcept {
++    const int16_t dx = retro::input_state(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
++    const int16_t dy = retro::input_state(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
++    const bool wasTouching = _mouseTouching;
++    _mouseTouching = retro::input_state(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) != 0;
++    _isTouchReleased |= wasTouching && !_mouseTouching;
++    if (!dx && !dy && !wasTouching && !_mouseTouching) return;
++
++    if (_pointerCursorLastUpdate > _joypadCursorLastUpdate)
++        _joystickCursorPosition = _pointerCursorPosition;
++    // The native driver reports DualSense coordinates, as for DeSmuME's stylus.
++    _joystickCursorPosition += vec2(dx * 256.0f / 1920.0f, dy * 192.0f / 1080.0f);
++    _joystickCursorPosition = clamp(_joystickCursorPosition, vec2(0.0f), NDS_SCREEN_SIZE<float> - 1.0f);
++    _joypadCursorTouching |= _mouseTouching;
++    _joypadCursorLastUpdate = cpu_features_get_perf_counter();
++    ResetCursorTimeout();
++}
++#endif
++
+ void CursorState::Apply(melonDS::NDS& nds) const noexcept {
+     if (IsTouching()) {
+         nds.TouchScreen(_consoleTouchPosition.x, _consoleTouchPosition.y);
+diff --git a/src/libretro/input/cursor.hpp b/src/libretro/input/cursor.hpp
+index 774b10b..f437565 100644
+--- a/src/libretro/input/cursor.hpp
++++ b/src/libretro/input/cursor.hpp
+@@ -51,6 +51,10 @@ namespace MelonDsDs {
+         [[nodiscard]] bool TouchReleased() const noexcept { return _isTouchReleased; }
+         [[nodiscard]] bool CursorVisible() const noexcept;
+     private:
++#ifdef __PROSPERO__
++        void UpdateRelativeMouse() noexcept;
++        bool _mouseTouching = false;
++#endif
+         [[nodiscard]] bool IsCursorInputInBounds() const noexcept;
+         [[nodiscard]] glm::uvec2 ConsoleTouchPosition(const ScreenLayoutData& layout) const noexcept;
+         bool _cursorSettingsDirty = true;
+@@ -74,4 +78,4 @@ namespace MelonDsDs {
+         /// Only relevant if a hybrid layout is active
+         glm::ivec2 _hybridTouchPosition;
+     };
+-}
+\ No newline at end of file
++}
