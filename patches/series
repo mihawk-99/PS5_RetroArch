@@ -281,3 +281,5 @@
 0129  HTTPS refuses a server whose certificate does not chain to the bundled roots (cacert.h): MBEDTLS_SSL_VERIFY_REQUIRED instead of upstream's optional check whose result was ignored, so nobody on the network path can stand in for RetroAchievements.
 
 0130  A RetroAchievements sign-in that returns a token also removes the password from /app0/config/webui.cfg (with the empty token the WebUI put beside it) and from retroarch.cfg, which keeps its token (src/ps5_cheevos.c).
+
+0131  Build graphical widgets and restore Vulkan's upstream widget capability (withdraw 0042). The real gfx_widgets_init initializes the display context before loading notification fonts and textures; menu initialization still selects the ordinary display path when widgets are disabled.

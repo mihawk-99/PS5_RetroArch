@@ -324,12 +324,15 @@ class PortPatches(unittest.TestCase):
         frame upload and 0077's menu colour and cached-frame ownership were all
         answers to a B8G8R8A8 entry that was not sampled. Withdrawing another block means
         re-checking that claim. 0019's debug-utils block is withdrawn for 0095's,
-        which does the same with its extension list on the heap.
+        which does the same with its extension list on the heap. 0042's widget
+        refusal is withdrawn now that gfx_widgets_init is compiled in and
+        initializes the display context itself.
         """
         self.assertEqual(
             sorted(self.withdrawn()),
             sorted([
                 'VK_EXT_debug_utils, when the',
+                'patches/series, 0042',
                 'patches/series, 0075: matching',
                 'patches/series, 0075: libretro XRGB',
                 'patches/series, 0077: decode menu images for sampled RGBA',

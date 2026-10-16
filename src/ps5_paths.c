@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "ps5_paths.h"
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,6 +132,83 @@ static int start_service(FILE *log)
     return 0;
 }
 
+/* The sandbox instance belongs to a launch, not to the title ID. In particular,
+ * closing and opening a title need not reuse _000. Keep the executable identity
+ * check for every discovered alias, including copies with the same title ID. */
+static int sandbox_instance(const char *name, const char *id)
+{
+    if (strlen(name) != 13 || strncmp(name, id, 9) || name[9] != '_')
+        return 0;
+    for (unsigned i = 10; i < 13; i++)
+        if (name[i] < '0' || name[i] > '9')
+            return 0;
+    return 1;
+}
+
+/* 1 accepted, 0 a missing/different executable, -1 an unusable matching root. */
+static int try_install_root(const char *root, const struct stat *original, FILE *log)
+{
+    char image[PATH_MAX];
+    struct stat candidate;
+    const int length = snprintf(image, sizeof(image), "%s/eboot.bin", root);
+    if (length < 0 || (size_t)length >= sizeof(image))
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    if (stat(image, &candidate) != 0)
+    {
+        if (log)
+            fprintf(log, "candidate=%s stat_errno=%d\n", root, errno);
+        return 0;
+    }
+    const int same = candidate.st_ino == original->st_ino && candidate.st_dev == original->st_dev;
+    if (log)
+        fprintf(log, "candidate=%s dev=%llu ino=%llu same_executable=%d\n", root,
+                (unsigned long long)candidate.st_dev, (unsigned long long)candidate.st_ino, same);
+    if (!same)
+        return 0;
+    if (chdir(root) != 0)
+        return -1;
+    strcpy(install_root, root);
+    return 1;
+}
+
+static int resolve_install_root(const char *id, const struct stat *original, FILE *log)
+{
+    const char *formats[] = {"/data/homebrew/%s", "/mnt/sandbox/%s_000/app0", "/system_ex/app/%s"};
+    for (unsigned i = 0; i < sizeof(formats) / sizeof(formats[0]); i++)
+    {
+        char root[PATH_MAX];
+        snprintf(root, sizeof(root), formats[i], id);
+        const int accepted = try_install_root(root, original, log);
+        if (accepted)
+            return accepted;
+    }
+
+    DIR *sandbox = opendir("/mnt/sandbox");
+    if (!sandbox)
+    {
+        if (log)
+            fprintf(log, "sandbox_scan open_errno=%d\n", errno);
+        return -1;
+    }
+    int accepted = 0;
+    struct dirent *entry;
+    while (!accepted && (entry = readdir(sandbox)) != NULL)
+    {
+        if (!sandbox_instance(entry->d_name, id))
+            continue;
+        char root[PATH_MAX];
+        snprintf(root, sizeof(root), "/mnt/sandbox/%s/app0", entry->d_name);
+        accepted = try_install_root(root, original, log);
+    }
+    const int error = errno;
+    closedir(sandbox);
+    errno = error;
+    return accepted ? accepted : -1;
+}
+
 int ps5_paths_start(void)
 {
     /* Keep the log descriptor across the root transition. Open before the
@@ -153,6 +231,12 @@ int ps5_paths_start(void)
     for (unsigned i = 0; i < 9; i++)
         if (!((id[i] >= 'A' && id[i] <= 'Z') || (id[i] >= '0' && id[i] <= '9')))
             goto failed;
+    if (log)
+    {
+        fprintf(log, "original=/app0/eboot.bin dev=%llu ino=%llu\n",
+                (unsigned long long)original.st_dev, (unsigned long long)original.st_ino);
+        fflush(log);
+    }
 
     /* Reuse a ready service, otherwise start the bundled one. A service publishes
      * readiness only after preflight; no request is made before that proof. */
@@ -179,33 +263,20 @@ int ps5_paths_start(void)
     if (status != PS5_ELEVATION_OK || getuid() != 0)
         goto failed;
 
-    const char *formats[] = {"/data/homebrew/%s", "/mnt/sandbox/%s_000/app0", "/system_ex/app/%s"};
-    for (unsigned i = 0; i < sizeof(formats) / sizeof(formats[0]); i++)
+    if (resolve_install_root(id, &original, log) != 1)
+        goto failed;
+    if (log)
     {
-        char root[PATH_MAX], image[PATH_MAX];
-        struct stat candidate;
-        snprintf(root, sizeof(root), formats[i], id);
-        snprintf(image, sizeof(image), "%s/eboot.bin", root);
-        /* Do not select a different installation just because its title ID
-         * matches. These aliases must name the very same executable. */
-        if (stat(image, &candidate) != 0 || candidate.st_ino != original.st_ino ||
-            candidate.st_dev != original.st_dev)
-            continue;
-        strcpy(install_root, root);
-        if (chdir(root) != 0)
-            goto failed;
-        if (log)
-        {
-            fprintf(log, "root=%s same_executable=1\n", root);
-            fclose(log);
-        }
-        /* Drivers also consume paths without going through RetroArch's settings. */
-        snprintf(image, sizeof(image), "%s/radv-shader-cache", root);
-        setenv("MESA_SHADER_CACHE_DIR", image, 1);
-        snprintf(image, sizeof(image), "%s/sce_sys/param.json", root);
-        setenv("PS5VK_PARAM_JSON", image, 1);
-        return 0;
+        fprintf(log, "root=%s same_executable=1\n", install_root);
+        fclose(log);
     }
+    /* Drivers also consume paths without going through RetroArch's settings. */
+    char image[PATH_MAX + sizeof("/sce_sys/param.json")];
+    snprintf(image, sizeof(image), "%s/radv-shader-cache", install_root);
+    setenv("MESA_SHADER_CACHE_DIR", image, 1);
+    snprintf(image, sizeof(image), "%s/sce_sys/param.json", install_root);
+    setenv("PS5VK_PARAM_JSON", image, 1);
+    return 0;
 failed:
     if (log)
     {
