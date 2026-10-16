@@ -62,7 +62,7 @@ configure_flags=(
     # nothing is linked from outside the tree.
     --enable-networking --enable-netplaydiscovery --enable-cheevos --enable-ssl
     # Libraries this SDK does not carry.
-    --disable-ffmpeg --disable-freetype --disable-flac
+    --disable-ffmpeg --disable-freetype
     --disable-cdrom --disable-microphone
     --disable-qt --disable-discord --disable-oss --disable-jack --disable-alsa
     --disable-pulse --disable-pipewire --disable-wayland --disable-x11
@@ -96,7 +96,9 @@ configure_flags=(
     # RetroArch vendors zlib in deps/libz, so baking it in costs nothing and
     # removes the dependency on a system zlib this SDK does not ship.
     --enable-builtinzlib
-    --disable-builtinflac --disable-builtinbearssl
+    # CHD headers can list CD FLAC even for data-only discs. The frontend's
+    # achievement reader must support every declared codec before opening one.
+    --enable-builtinflac --disable-builtinbearssl
     --enable-builtinmbedtls
     # Vulkan needs a GLSL-to-SPIR-V compiler and configure refuses to build the
     # Vulkan driver without one. RetroArch vendors glslang in deps/glslang, so the

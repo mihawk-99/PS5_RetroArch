@@ -144,6 +144,8 @@ mapfile -t title_defines < <("$root/tools/retroarch-flags.sh" | tr ' ' '\n' | gr
 title_definition_names=()
 for define in "${title_defines[@]}"; do
     [[ $define == -D*_DIR=* ]] && continue
+    # Used only by bundled libFLAC sources, already compiled into the archive.
+    [[ $define == -DFLAC_PACKAGE_VERSION=* ]] && continue
     title_definition_names+=("${define#-D}")
 done
 (( ${#title_definition_names[@]} > 0 )) || { echo "error: no feature defines to pass" >&2; exit 2; }
