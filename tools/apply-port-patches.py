@@ -35,6 +35,22 @@ from pathlib import Path
 # (file, anchor, inserted-before-anchor, already-present-marker)
 EDITS = [
     (
+        "audio/audio_driver.c",
+        "      /* Otherwise, advance the counters. We're not gonna get new data,\n"
+        "       * but we still need to finish this loop */\n"
+        "      frames_remaining -= frames_read;",
+        "      /* patches/series, 0133: a missing or failed capture block must not\n"
+        "       * spin the emulation thread forever. Silence belongs in the frontend. */\n"
+        "      if (!frames_read)\n"
+        "      {\n"
+        "         memset(frames, 0, num_frames * sizeof(*frames));\n"
+        "         return (int)num_frames;\n"
+        "      }\n"
+        "      frames_remaining = frames_read < frames_remaining\n"
+        "            ? frames_remaining - frames_read : 0;",
+        "patches/series, 0133: a missing or failed capture block",
+    ),
+    (
         "libretro-common/net/net_socket_ssl_mbed.c",
         "   mbedtls_ssl_conf_authmode(&state->conf, MBEDTLS_SSL_VERIFY_OPTIONAL);\n",
         "   /* patches/series, 0129: a server whose certificate does not chain to the bundled\n"
