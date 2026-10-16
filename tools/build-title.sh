@@ -316,6 +316,8 @@ inputs += [root / name for name in (
     # The SDK fork's revision: its platform layer is linked into the title, and
     # a change there alone changes no other input.
     ".deps/native/ps5-payload-sdk/.ps5-sdk-revision",
+    ".deps/native/ps5-payload-sdk/.ps5-elevation-proof-sha256",
+    ".deps/native/ps5-payload-sdk/target/lib/libps5platform.a",
     *(f"build/cores/stage/cores/{name}_libretro.so" for name in os.environ["CORE_NAMES"].split()),
     "tools/build.sh", "tools/retroarch-flags.sh")]
 inputs += sorted(p for p in (root / "third_party/qrcodegen").rglob("*") if p.is_file())

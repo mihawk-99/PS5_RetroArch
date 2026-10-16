@@ -26,4 +26,5 @@ webui/assets/OFL.txt -text -whitespace
 
 # Unified patches require a space on otherwise blank context lines.
 platform/lapy/*.patch -whitespace
+platform/sdk/*.patch -whitespace
 evidence/lapy-autostart/*.patch -whitespace

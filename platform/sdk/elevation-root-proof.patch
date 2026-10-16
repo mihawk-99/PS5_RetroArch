@@ -1,0 +1,19 @@
+--- a/platform/src/elevation.c
++++ b/platform/src/elevation.c
+@@ -104,6 +104,16 @@
+ wait_for_elevation(const struct ps5_elevation_config *config, pid_t pid, int *open_error, bool *proof_failed)
+ {
+    for (unsigned poll = 0; poll < config->polls; ++poll) {
++      /* /data may already be visible through the launcher. Do not open its
++       * proof file before Lapy has applied the credential transition: the
++       * open temporarily retains the target credential and can race Lapy's
++       * private-credential preflight. Access alone must not report success. */
++      if (getuid() != 0) {
++         *open_error = EACCES;
++         (void)usleep(config->poll_interval_us);
++         continue;
++      }
++
+       if (verify_data(config, pid, open_error))
+          return true;
+       if (*open_error == 0) {
