@@ -1034,6 +1034,34 @@
         ]
       },
       "modifications": "Title-specific resident service; qualified patches in platform/lapy and evidence; tools/build-lapy.py pins the ps5log header by SHA-256. No preflight or transaction guards disabled."
+    },
+    {
+      "id": "swanstation",
+      "name": "SwanStation (PlayStation)",
+      "kind": "code",
+      "artifacts": [
+        "cores/swanstation_libretro.so",
+        "cores/swanstation_libretro.info",
+        "info/swanstation_libretro.info",
+        "info/swanstation-LICENSE.txt"
+      ],
+      "licence": "GPL-3.0; bundled dependencies under their included licences",
+      "copyright": [
+        "Copyright the DuckStation, SwanStation and libretro contributors; PS5 portability adaptations from AngelXex (darkxex)"
+      ],
+      "texts": [
+        {
+          "from": "build/cores/stage/info/swanstation-LICENSE.txt",
+          "to": "swanstation-LICENSE.txt",
+          "verbatim": true
+        }
+      ],
+      "source": {
+        "kind": "core",
+        "build": "swanstation",
+        "remote": "https://github.com/libretro/swanstation"
+      },
+      "modifications": "Optional pinned PS5 shared-core build in tooling/swanstation and tools/build-swanstation.sh; platform executable-memory allocation and LUT fastmem."
     }
   ]
 }

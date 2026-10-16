@@ -1,0 +1,77 @@
+PS5 portability changes adapted from AngelXex / darkxex, SwanStationPS5 1.3.4.
+https://github.com/darkxex/SwanStationPS5/tree/1.3.4
+GPL-3.0-or-later. Only JIT allocation, static-buffer exclusion and VFS access hint.
+
+diff --git a/src/common/file_system.cpp b/src/common/file_system.cpp
+index 014ebdbc..bec5f55e 100644
+--- a/src/common/file_system.cpp
++++ b/src/common/file_system.cpp
+@@ -591,7 +591,7 @@ bool FindFiles(const char* Path, const char* Pattern, uint32_t Flags, FindResult
+ RFILE* OpenMappableRFile(const char* filename)
+ {
+    return filestream_open(filename, RETRO_VFS_FILE_ACCESS_READ,
+-         RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS);
++         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+ }
+ 
+ const uint8_t* GetMappedView(RFILE* fp, int64_t* size)
+diff --git a/src/common/jit_code_buffer.cpp b/src/common/jit_code_buffer.cpp
+index f768a570..e0d62134 100644
+--- a/src/common/jit_code_buffer.cpp
++++ b/src/common/jit_code_buffer.cpp
+@@ -10,6 +10,10 @@
+ #include <sys/mman.h>
+ #endif
+ 
++#if defined(__PROSPERO__)
++#include <ps5platform/exec.h>
++#endif
++
+ #if defined(__APPLE__) && defined(__aarch64__)
+ // pthread_jit_write_protect_np()
+ #include <pthread.h>
+@@ -36,6 +40,11 @@ bool JitCodeBuffer::Allocate(uint32_t size /* = 64 * 1024 * 1024 */, uint32_t fa
+   m_code_ptr = static_cast<uint8_t*>(VirtualAlloc(nullptr, m_total_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+   if (!m_code_ptr)
+     return false;
++#elif defined(__PROSPERO__)
++  static const char jit_anchor = 0;
++  m_code_ptr = static_cast<uint8_t*>(ps5_exec_allocate(m_total_size, (uintptr_t)&jit_anchor));
++  if (!m_code_ptr)
++    return false;
+ #elif defined(__linux__) || defined(__ANDROID__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__FreeBSD__)
+   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+ #if defined(__APPLE__) && defined(__aarch64__)
+@@ -129,6 +138,9 @@ void JitCodeBuffer::Destroy()
+   {
+ #if defined(_WIN32)
+     VirtualFree(m_code_ptr, 0, MEM_RELEASE);
++#elif defined(__PROSPERO__)
++    if (m_code_ptr)
++      ps5_exec_release(m_code_ptr);
+ #elif defined(__linux__) || defined(__ANDROID__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__FreeBSD__)
+     munmap(m_code_ptr, m_total_size);
+ #endif
+@@ -138,7 +150,7 @@ void JitCodeBuffer::Destroy()
+ #if defined(_WIN32)
+     DWORD old_protect = 0;
+     VirtualProtect(m_code_ptr, m_total_size, m_old_protection, &old_protect);
+-#else
++#elif !defined(__PROSPERO__)
+     mprotect(m_code_ptr, m_total_size, m_old_protection);
+ #endif
+   }
+diff --git a/src/core/cpu_code_cache.cpp b/src/core/cpu_code_cache.cpp
+index fb62e9db..2037349f 100644
+--- a/src/core/cpu_code_cache.cpp
++++ b/src/core/cpu_code_cache.cpp
+@@ -24,8 +24,7 @@ static constexpr uint32_t INVALIDATE_THRESHOLD_TO_DISABLE_LINKING = 10;
+ 
+ #ifdef WITH_RECOMPILER
+ 
+-// Currently remapping the code buffer doesn't work in macOS or Haiku.
+-#if !defined(__HAIKU__) && !defined(__APPLE__)
++#if !defined(__HAIKU__) && !defined(__APPLE__) && !defined(__PROSPERO__)
+ #define USE_STATIC_CODE_BUFFER 1
+ #endif
+ 

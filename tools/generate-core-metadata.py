@@ -8,6 +8,7 @@ from pathlib import Path
 import ast
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -53,6 +54,10 @@ CORES = [
     # PS5SX2 (tools/build-ps5sx2.sh): its options are in the fork's libretro layer.
     ('ps5sx2', 'PS5SX2', '.deps/ps5sx2-src/ps5/libretro/libretro_core_options.h', []),
 ]
+if os.environ.get('PS5_WITH_SWANSTATION') == '1':
+    CORES.append(('swanstation', 'SwanStation',
+                  'build/cores/swanstation/source/src/libretro/libretro_core_options.h',
+                  ['HAVE_NO_LANGEXTRA']))
 # Cores whose tables are found by name (the English ones), not named in extract().
 NAMED = {'fbneo', 'dolphin', 'azahar', 'fceumm', 'ppsspp', 'desmume', 'mednafen_psx_hw',
          'mednafen_saturn', 'mame', 'mupen64plus_next', 'genesis_plus_gx', 'snes9x',
