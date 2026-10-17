@@ -142,8 +142,9 @@ void ps5_fg_menu_step(const char *label, int direction)
     settings->uints.video_framegen_size = now.size;
     settings->bools.video_framegen_osd = now.osd != 0;
     ps5_fg_save(&now);
-    /* The rate is read when the video output starts: its timing follows it */
-    if (now.target != before.target)
+    /* The rate and the presents per game frame are read when the video output starts: its timing
+     * follows them */
+    if (now.target != before.target || now.enable != before.enable)
         command_event(CMD_EVENT_REINIT,
                       NULL); /* (Auto picks its rate as the video output starts) */
 }

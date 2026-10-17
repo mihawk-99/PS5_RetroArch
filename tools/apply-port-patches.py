@@ -4439,33 +4439,29 @@ EDITS += [('configuration.h',
   '   if (settings->bools.video_framegen && settings->bools.video_framegen_auto && input_fps > 20.0)\n'
   '   {\n'
   '      extern unsigned vulkan_ps5_display_refresh_x1000;\n'
+  '      /* The driver reports the mode the output really runs in (patches/series, 0084/0085): 59.94 Hz on a\n'
+  '       * display without the high-frame-rate mode, 119.88 Hz where it is offered. Pacing on a rate the output\n'
+  '       * does not run at makes every present wait for a vsync the display does not have at that rate, and a\n'
+  '       * 60 FPS core is then called 30 times a second. */\n'
   '      float display = vulkan_ps5_display_refresh_x1000 ? vulkan_ps5_display_refresh_x1000 / 1000.0f : '
   'video_refresh_rate;\n'
-  '      /* The title declares high-frame-rate output (sce_sys/param.json attribute3 0x80040): the console '
-  'sends\n'
-  '       * 119.88 Hz even where the Vulkan mode list shows its 3840x2160 mode at 59.94, and RetroArch must '
-  'pace\n'
-  '       * on the real rate or its vsync and audio timing are those of half the display. */\n'
-  '      if (display < 100.0f)\n'
-  '      {\n'
-  '         display = 119.88f;\n'
-  '         video_refresh_rate = display;\n'
-  '         settings->floats.video_refresh_rate = display;\n'
-  '      }\n'
   '      float n       = display / (float)input_fps;\n'
   '      unsigned s    = n < 1.5f ? 1 : n < 2.5f ? 2 : n < 3.5f ? 3 : 4;\n'
   '      RARCH_LOG("[FrameGen] Output Rate Auto: display %.3f Hz, game %.3f fps -> %ux\\n", display, '
   'input_fps, s);\n'
   '      settings->uints.video_shader_subframes = s;\n'
   '   }\n'
+  '   else if (!settings->bools.video_framegen || !settings->bools.video_framegen_auto)\n'
+  '      settings->uints.video_shader_subframes = 1; /* the presents a generated frame was shown at, left behind */\n'
   '   unsigned shader_subframes              = settings->uints.video_shader_subframes;\n'
   '   bool vrr_runloop_enable                = settings->bools.vrr_runloop_enable;\n'
   '   bool video_adaptive_vsync              = settings->bools.video_adaptive_vsync;\n',
   'Output Rate Auto: the presents per game frame')]
 
-# Frame generation, Target Framerate (patches/series, 0121): the rate of the pictures the display gets, 60 or 120. The
-# display runs at its own rate (119.88 Hz on this console); a target below it shows each picture "dup" times, the
-# presents of one picture being copies. shader_subframes is the presents per game frame: pictures x dup.
+# Frame generation, Target Framerate (patches/series, 0121): the rate of the pictures the display gets, 60 or
+# 120. The display runs at its own rate (119.88 Hz where the output offers it, 59.94 Hz otherwise); a target
+# below it shows each picture "dup" times, the presents of one picture being copies. shader_subframes is the
+# presents per game frame: pictures x dup, never more than the display runs at.
 EDITS += [('configuration.h',
   '      unsigned video_framegen_cadence; /* patches/series, 0120: 0 measured, else core frames per new frame */\n',
   '      unsigned video_framegen_cadence; /* patches/series, 0120: 0 measured, else core frames per new frame */\n'
@@ -4550,7 +4546,7 @@ EDITS += [('gfx/drivers/vulkan.c',
   '!(vk->framegen_presents > 1) /* patches/series, 0121 */'),
  ('retroarch.c',
   '      /* patches/series, 0121: Target Framerate. The pictures the display gets per second are the target (60 or\n       * 120); a display at a multiple of it shows each picture that many times (dup). */\n      {\n         extern unsigned ps5_fg_dup;\n         const float target = settings->uints.video_framegen_target == 60 ? 59.94f : 119.88f;\n         unsigned dup       = (unsigned)(display / target + 0.5f);\n         float n;\n         unsigned s;\n         if (dup < 1)\n            dup = 1;\n         n = (display / (float)dup) / (float)input_fps;\n         s = n < 1.5f ? 1 : n < 2.5f ? 2 : n < 3.5f ? 3 : 4;\n         if (s * dup > 4)\n            s = 4 / dup > 0 ? 4 / dup : 1;\n         ps5_fg_dup = dup;\n         RARCH_LOG("[FrameGen] Target Framerate %.0f: display %.3f Hz, game %.3f fps -> %ux, each shown %ux\\n", target, display, input_fps, s, dup);\n         settings->uints.video_shader_subframes = s * dup;\n      }\n',
-  '      /* patches/series, 0121: Target Framerate. The pictures the display gets per second are the target (60 or\n       * 120); a display at a multiple of it shows each picture that many times (dup). The game\'s rate is never\n       * changed to fit: the number of pictures per game frame varies (the driver places each at its instant), and\n       * the presents set here are the nominal ones, the pacing the runloop assumes. */\n      {\n         extern unsigned ps5_fg_dup;\n         extern float ps5_fg_target_fps;\n         const float target = settings->uints.video_framegen_target == 60 ? 59.94f : 119.88f;\n         unsigned dup       = (unsigned)(display / target + 0.5f);\n         unsigned s;\n         if (dup < 1)\n            dup = 1;\n         s = (unsigned)(target / (float)input_fps + 0.5f);\n         if (input_fps > target * 1.06f || s < 1)\n         {\n            /* the game is already faster than the target: nothing to make */\n            s   = 1;\n            dup = 1;\n         }\n         if (s * dup > 8)\n            s = 8 / dup > 0 ? 8 / dup : 1;\n         /* the nominal rate must not be below the game\'s, or the runloop would not sync to the display */\n         if (s > 1 && display / (float)(s * dup) < (float)input_fps * 0.95f)\n            s--;\n         ps5_fg_dup        = dup;\n         ps5_fg_target_fps = target;\n         RARCH_LOG("[FrameGen] Target Framerate %.0f: display %.3f Hz, game %.3f fps -> %.2f pictures per game frame, "\n               "each shown %ux\\n", target, display, input_fps, (double)target / (double)input_fps, dup);\n         settings->uints.video_shader_subframes = s * dup;\n      }\n',
+  '      /* patches/series, 0121: Target Framerate. The pictures the display gets per second are the target (60 or\n       * 120), but never more than the display runs at: a 60 Hz output shown 120 presents a second waits two\n       * vsyncs for each game frame, and the core runs at half its rate (its audio starves). A display at a\n       * multiple of the target shows each picture that many times (dup). The game\'s rate is never changed to\n       * fit: the number of pictures per game frame varies (the driver places each at its instant), and the\n       * presents set here are the nominal ones, the pacing the runloop assumes. */\n      {\n         extern unsigned ps5_fg_dup;\n         extern float ps5_fg_target_fps;\n         const float target = settings->uints.video_framegen_target == 60 ? 59.94f : 119.88f;\n         const float shown  = target < display ? target : display;\n         unsigned dup       = (unsigned)(display / target + 0.5f);\n         unsigned s;\n         if (dup < 1)\n            dup = 1;\n         s = (unsigned)(shown / (float)input_fps + 0.5f);\n         if (input_fps > shown * 1.06f || s < 1)\n         {\n            /* the game is already faster than the target: nothing to make */\n            s   = 1;\n            dup = 1;\n         }\n         if (s * dup > 8)\n            s = 8 / dup > 0 ? 8 / dup : 1;\n         /* the nominal rate must not be below the game\'s, or the runloop would not sync to the display */\n         if (s > 1 && display / (float)(s * dup) < (float)input_fps * 0.95f)\n            s--;\n         ps5_fg_dup        = dup;\n         ps5_fg_target_fps = target;\n         RARCH_LOG("[FrameGen] Target Framerate %.0f: display %.3f Hz, game %.3f fps -> %.2f pictures per game frame, "\n               "each shown %ux\\n", target, display, input_fps, (double)shown / (double)input_fps, dup);\n         settings->uints.video_shader_subframes = s * dup;\n      }\n',
   'the nominal ones, the pacing the runloop assumes'),
  ('retroarch.c',
   '                  shader_subframes,\n                  audio_max_timing_skew);\n',
