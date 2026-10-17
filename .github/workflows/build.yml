@@ -1,0 +1,498 @@
+# PS5 RetroArch - the title (README's "Build from source") and a ready-to-install PPSA99169 bundle,
+# on GitHub-hosted runners.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# README's workspace, made from public sources at their pins, with this checkout as PS5_RetroArch:
+#
+#   PS5_Vulkan       mihawk-99/PS5_Vulkan at PS5_VULKAN_REVISION below: its RADV release archive
+#                    (tools/build-radv.sh release), its link recipe (tools/radv-link.sh)
+#   PS5_Mesa         the Mesa fork at the revision PS5_Vulkan pins, which RADV is built from
+#   PS5_PayloadSDK   the payload SDK fork at the revision each of the two projects pins
+#
+# The jobs:
+#
+#   plan    the cores tools/build-title.sh builds (.github/scripts/core-plan.py), but for those
+#           CI_SKIP_CORES names
+#   radv    RADV, as PS5_Vulkan builds it (LLVM 18, Mesa's host needs), cached by its pins
+#   core    one job per core: its tools/build-<core>.sh, as build-title.sh runs it. A core is
+#           cached with its stamp (tools/core-stamp.sh: the script, its patches, the SDK and the
+#           loader), so a core whose inputs did not change is not built again; MAME, the longest
+#           build, also keeps its ccache, so a build cut short by the time limit carries on
+#   title   tools/build-title.sh, with every core in place and up to date (each script finds its
+#           stamp and skips), RADV from the radv job, and its output folder zipped as
+#           dist/PPSA99169.zip: the PPSA99169 folder, ready for /data/homebrew or a folder
+#           ShadowMountPlus scans
+#
+# What a development build here leaves out, as tools/build-title.sh does without PS5_RELEASE_TAG:
+# the frontends (EmulationStation and the picker, PS5_FRONTENDS), which need PS5_OpenGL's SDK,
+# its SDL2 build and PS5_VulkanTemplate. Without them the title opens RetroArch, as it always has,
+# and a forwarder (--rom, --core) works the same.
+#
+# The cores, the frontend and the title are built in Ubuntu 26.04 with LLVM 22, the toolchain
+# README's /usr/bin/clang is: the core ABI check (tools/check-core.py) wants FreeBSD/PS5
+# libraries, which the SDK's clang links from LLVM 20, and the title's link takes
+# -z nodynamic-undefined-weak, which LLD has from 21 (.github/scripts/install-host-tools.sh).
+# Host steps README's environment had from elsewhere:
+#   - RetroArch's configure links a vkCreateInstance test with the console's compiler, against a
+#     libvulkan the SDK does not carry: a stub archive answers it (the driver is RADV, linked
+#     into eboot.bin later; nothing links the stub)
+#   - tools/fetch-retroarch.sh checks for libretro-common/include/retroarch.h, which the pinned
+#     tag does not have; it takes the tree pinned in place instead, a clone at the pinned commit
+#   - tools/build-title.sh checks ps5vk's four archives are there before it links either
+#     driver; a RADV link does not read them, so empty archives stand in for them
+#   - zlib (zlib.net), Mesa's zlib wrap (wrapdb) and libmicrohttpd (ftp.gnu.org) from GitHub or
+#     Ubuntu's archive, checked against each script's own pin (.github/scripts/seed-*.sh)
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: ['**.md', 'evidence/**', 'releases/**']
+  pull_request:
+    paths-ignore: ['**.md', 'evidence/**', 'releases/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Cores left out of this build (space-separated libretro names, as in tools/build-title.sh's
+  # core_names): no job builds them and the title does not carry them. MAME, the longest build by
+  # far, is left out for now; empty this to build it again.
+  CI_SKIP_CORES: ''
+  # PS5_Vulkan main when the beta.1 release was built (radv-link.sh binds strcasestr, mkstemp,
+  # readlink, link and symlink, which tools/build-title.sh's wraps expect)
+  PS5_VULKAN_REVISION: 5b5e4fc2d80fdb67a4f61ba9e6a8a424026bb8a5
+
+jobs:
+  plan:
+    name: Plan the cores
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        run: |
+          # shellcheck disable=SC2086 # a list of names
+          python3 .github/scripts/core-plan.py skip $CI_SKIP_CORES
+          matrix=$(python3 .github/scripts/core-plan.py matrix)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          python3 -c 'import json, sys; [print(c["core"], c["script"]) for c in json.loads(sys.argv[1])]' "$matrix"
+
+  radv:
+    name: RADV (PS5_Vulkan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: ubuntu:24.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the build tools
+        run: |
+          apt-get update
+          # PS5_Vulkan's: LLVM 18 with Clang, its runtime builtins and development files, libclc, the
+          # SPIR-V translator, glslangValidator, meson from pip (Mesa needs 1.4; Ubuntu 24.04 has 1.3),
+          # rsync for build-radv.sh's source tree, rev and flock for the SDK's scripts
+          apt-get install --yes --no-install-recommends \
+            ca-certificates git curl wget unzip zip xz-utils file make build-essential pkgconf patch \
+            bsdextrautils util-linux rsync ccache binutils cmake ninja-build bison flex glslang-tools \
+            spirv-tools python3 python3-pip \
+            clang-18 lld-18 llvm-18 libclang-rt-18-dev llvm-18-dev libclang-18-dev libclc-18-dev \
+            libllvmspirvlib-18-dev llvm-spirv-18 zlib1g-dev
+          python3 -m pip install --break-system-packages --no-cache-dir meson mako packaging pyyaml
+          git config --global --add safe.directory '*'
+          for tool in clang-18 ld.lld-18 llvm-config-18 meson ninja rsync rev flock; do
+            command -v "$tool" >/dev/null || { echo "missing $tool" >&2; exit 2; }
+          done
+
+      - uses: actions/checkout@v7
+        with:
+          path: PS5_RetroArch
+
+      - name: Fetch the pinned sources
+        run: |
+          fetch_at() { # fetch_at <dir> <url> <commit>: just that commit, checked out
+            rm -rf "$1"
+            git init -q "$1"
+            git -C "$1" remote add origin "$2"
+            git -C "$1" fetch -q --depth 1 origin "$3"
+            git -C "$1" checkout -q --detach FETCH_HEAD
+          }
+          fetch_at PS5_Vulkan https://github.com/mihawk-99/PS5_Vulkan.git "$PS5_VULKAN_REVISION"
+          sdk=$(sed -n 's/^sdk_revision=\([0-9a-f]\{40\}\).*/\1/p' PS5_Vulkan/tools/setup-native-dependencies.sh)
+          mesa=$(sed -n 's/^mesa_revision=\([0-9a-f]\{40\}\).*/\1/p' PS5_Vulkan/tools/build-radv.sh)
+          [[ -n $sdk && -n $mesa ]] || { echo "PS5_Vulkan's SDK or Mesa pin was not found" >&2; exit 2; }
+          fetch_at PS5_PayloadSDK https://github.com/mihawk-99/PS5_PayloadSDK.git "$sdk"
+          fetch_at PS5_Mesa https://github.com/mihawk-99/PS5_Mesa.git "$mesa"
+          {
+            echo "RADV_KEY=ps5ra-radv-$mesa-$sdk-$PS5_VULKAN_REVISION"
+            echo "CI_DOWNLOADS=$GITHUB_WORKSPACE/ci-downloads"
+          } >> "$GITHUB_ENV"
+          echo "PS5_Vulkan ${PS5_VULKAN_REVISION:0:12}: SDK fork ${sdk:0:12}, Mesa ${mesa:0:12}"
+
+      - name: Restore the RADV driver
+        id: radv
+        uses: actions/cache/restore@v6
+        with:
+          path: PS5_Vulkan/.deps/native/radv-release
+          key: ${{ env.RADV_KEY }}
+
+      - name: Build RADV (PS5_Vulkan tools/build-radv.sh release)
+        if: steps.radv.outputs.cache-hit != 'true'
+        run: |
+          bash PS5_RetroArch/.github/scripts/seed-zlib.sh PS5_Vulkan
+          BUILD_JOBS=$(nproc) bash PS5_Vulkan/tools/setup-native-dependencies.sh
+          bash PS5_RetroArch/.github/scripts/seed-mesa-wrap.sh PS5_Vulkan PS5_Mesa
+          if ! bash PS5_Vulkan/tools/build-radv.sh release; then
+            for log in PS5_Vulkan/.deps/work/*.log; do
+              [[ -f $log ]] && { echo "::group::$log"; tail -n 60 "$log"; echo "::endgroup::"; }
+            done
+            exit 1
+          fi
+
+      - name: Save the RADV driver
+        if: steps.radv.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: PS5_Vulkan/.deps/native/radv-release
+          key: ${{ env.RADV_KEY }}
+
+      - run: cat PS5_Vulkan/.deps/native/radv-release/PROVENANCE.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: radv-release
+          path: PS5_Vulkan/.deps/native/radv-release
+          retention-days: 3
+
+  core:
+    name: Core ${{ matrix.core }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    container:
+      image: ubuntu:26.04
+      # SDKs preinstalled on the runner, mounted so the job can delete them for disk space
+      volumes:
+        - /usr/share/dotnet:/host-free/dotnet
+        - /usr/local/lib/android:/host-free/android
+        - /opt/ghc:/host-free/ghc
+        - /usr/local/.ghcup:/host-free/ghcup
+        - /opt/hostedtoolcache:/host-free/toolcache
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      CORE: ${{ matrix.core }}
+      CORE_CACHE: ps5ra-core-${{ matrix.core }}
+      # ccache for MAME alone (tools/build-mame.sh sets its base directory): the other cores
+      # are cached whole by their stamps, and every ccache would not fit the repository's cache
+      PS5_DISABLE_CCACHE: ${{ matrix.core == 'mame' && '0' || '1' }}
+      CCACHE_MAXSIZE: 5G
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free disk space
+        run: |
+          find /host-free -mindepth 2 -maxdepth 2 -exec rm -rf {} + 2>/dev/null || true
+          df -h "$GITHUB_WORKSPACE"
+
+      # git before the checkout, so it is a repository (tools/stage-notices.py reads its revision)
+      - name: Install git
+        run: apt-get update && apt-get install --yes --no-install-recommends ca-certificates git
+
+      - uses: actions/checkout@v7
+        with:
+          path: PS5_RetroArch
+
+      - name: Install the build tools
+        run: bash PS5_RetroArch/.github/scripts/install-host-tools.sh
+
+      - name: The payload SDK and zlib (tools/setup-native-dependencies.sh)
+        run: |
+          echo "CI_DOWNLOADS=$GITHUB_WORKSPACE/ci-downloads" >> "$GITHUB_ENV"
+          export CI_DOWNLOADS=$GITHUB_WORKSPACE/ci-downloads
+          bash PS5_RetroArch/.github/scripts/fetch-sdk-fork.sh
+          bash PS5_RetroArch/.github/scripts/seed-zlib.sh PS5_RetroArch
+          BUILD_JOBS=$(nproc) bash PS5_RetroArch/tools/setup-native-dependencies.sh
+
+      - name: Restore the core
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: ci-core
+          key: ${{ env.CORE_CACHE }}-${{ github.run_id }}
+          restore-keys: ${{ env.CORE_CACHE }}-
+
+      - name: Restore ccache
+        if: matrix.core == 'mame'
+        uses: actions/cache/restore@v6
+        with:
+          path: ci-ccache
+          key: ps5ra-ccache-mame-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ps5ra-ccache-mame-
+
+      - name: Fetch the fork's pinned commit
+        if: matrix.fork
+        run: python3 PS5_RetroArch/.github/scripts/core-plan.py prefetch "$CORE"
+
+      - name: Build ${{ matrix.core }} (tools/${{ matrix.script }})
+        timeout-minutes: 330
+        working-directory: PS5_RetroArch
+        run: |
+          # the last build of this core, which its script keeps when its stamp still matches
+          [[ ! -d ../ci-core ]] || cp -a ../ci-core/. .
+          JOBS=$(nproc)
+          export CCACHE_DIR=$GITHUB_WORKSPACE/ci-ccache JOBS
+          [[ $PS5_DISABLE_CCACHE == 1 ]] || ccache --zero-stats
+          bash "tools/${{ matrix.script }}"
+          # a cache entry from before the collected set grew (LRPS2's build report) passes the
+          # stamp but lacks what the title needs: that core is built again, once
+          if ! python3 .github/scripts/core-plan.py check "$CORE"; then
+            echo "::warning::$CORE: the cached build lacks what the title needs; building it again"
+            PS5_FORCE_CORES=1 bash "tools/${{ matrix.script }}"
+            python3 .github/scripts/core-plan.py check "$CORE"
+          fi
+          [[ $PS5_DISABLE_CCACHE == 1 ]] || ccache --show-stats
+
+      - name: Save ccache
+        if: always() && matrix.core == 'mame'
+        uses: actions/cache/save@v6
+        with:
+          path: ci-ccache
+          key: ps5ra-ccache-mame-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Collect what the title needs
+        id: collect
+        run: |
+          rm -rf ci-core
+          python3 PS5_RetroArch/.github/scripts/core-plan.py collect "$CORE" ci-core
+          stamp=$(<"PS5_RetroArch/build/cores/stamps/${{ matrix.stamp }}")
+          # the stamp, and the version of what collect keeps (a new one saves an entry again)
+          echo "key=$CORE_CACHE-$stamp-c2" >> "$GITHUB_OUTPUT"
+
+      - name: Save the core
+        if: steps.collect.outputs.key != steps.restore.outputs.cache-matched-key
+        uses: actions/cache/save@v6
+        with:
+          path: ci-core
+          key: ${{ steps.collect.outputs.key }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: core-${{ matrix.core }}
+          path: ci-core
+          include-hidden-files: true
+          retention-days: 3
+
+  title:
+    name: Title (PPSA99169)
+    needs: [radv, core]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      # a development build: no release tag, and no frontends (see the top of this file)
+      PS5_FRONTENDS: ''
+      CCACHE_MAXSIZE: 1G
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # git before the checkout, so it is a repository (tools/stage-notices.py reads its revision)
+      - name: Install git
+        run: apt-get update && apt-get install --yes --no-install-recommends ca-certificates git
+
+      - uses: actions/checkout@v7
+        with:
+          path: PS5_RetroArch
+
+      - name: Install the build tools
+        run: bash PS5_RetroArch/.github/scripts/install-host-tools.sh
+
+      - name: Fetch the pinned sources
+        run: |
+          fetch_at() { # fetch_at <dir> <url> <commit>: just that commit, checked out
+            rm -rf "$1"
+            git init -q "$1"
+            git -C "$1" remote add origin "$2"
+            git -C "$1" fetch -q --depth 1 origin "$3"
+            git -C "$1" checkout -q --detach FETCH_HEAD
+          }
+          fetch_at PS5_Vulkan https://github.com/mihawk-99/PS5_Vulkan.git "$PS5_VULKAN_REVISION"
+          bash PS5_RetroArch/.github/scripts/fetch-sdk-fork.sh
+          # PS5_Mesa's licence texts, which tools/stage-notices.py copies for RADV
+          mesa=$(sed -n 's/^mesa_revision=\([0-9a-f]\{40\}\).*/\1/p' PS5_Vulkan/tools/build-radv.sh)
+          git init -q PS5_Mesa
+          git -C PS5_Mesa remote add origin https://github.com/mihawk-99/PS5_Mesa.git
+          git -C PS5_Mesa sparse-checkout set --no-cone /docs/license.rst '/licenses/'
+          git -C PS5_Mesa fetch -q --depth 1 --filter=blob:none origin "$mesa"
+          git -C PS5_Mesa checkout -q --detach FETCH_HEAD
+          # LLVM's licence, for the SDK's LLVM runtime (stage-notices.py looks in ../PS5_LLVM)
+          mkdir -p PS5_LLVM/llvm
+          curl --fail --location --retry 3 --silent --show-error -o PS5_LLVM/llvm/LICENSE.TXT \
+            https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-18.1.8/llvm/LICENSE.TXT
+          # RetroArch at tools/fetch-retroarch.sh's pin, as a clone it pins in place
+          revision=$(sed -n 's/^revision="\([0-9a-f]\{40\}\)".*/\1/p' PS5_RetroArch/tools/fetch-retroarch.sh)
+          fetch_at PS5_RetroArch/vendor/retroarch https://github.com/libretro/RetroArch.git "$revision"
+          bash PS5_RetroArch/tools/fetch-retroarch.sh
+          # ES-DE at tools/build-esde.sh's pin, for the certificates the WebUI's daemon verifies
+          # HTTPS against (resources/certificates/curl-ca-bundle.crt)
+          version=$(sed -n 's/^esde_version=\(v[0-9.]*\)$/\1/p' PS5_RetroArch/tools/build-esde.sh)
+          commit=$(sed -n 's/^esde_commit=\([0-9a-f]\{40\}\)$/\1/p' PS5_RetroArch/tools/build-esde.sh)
+          git clone -q --depth 1 --branch "$version" https://gitlab.com/es-de/emulationstation-de.git \
+            PS5_RetroArch/.deps/es-de
+          [[ $(git -C PS5_RetroArch/.deps/es-de rev-parse HEAD) == "$commit" ]] ||
+            { echo "ES-DE $version is not $commit" >&2; exit 2; }
+
+      - name: Restore downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ci-downloads
+            PS5_RetroArch/.deps/downloads
+          key: ps5ra-downloads-${{ hashFiles('PS5_RetroArch/tools/video-assets.py', 'PS5_RetroArch/assets/**/source.json', 'PS5_RetroArch/tools/build-curl.sh') }}
+          restore-keys: ps5ra-downloads-
+
+      - name: The payload SDK, zlib and libmicrohttpd
+        run: |
+          export CI_DOWNLOADS=$GITHUB_WORKSPACE/ci-downloads
+          bash PS5_RetroArch/.github/scripts/seed-zlib.sh PS5_RetroArch
+          BUILD_JOBS=$(nproc) bash PS5_RetroArch/tools/setup-native-dependencies.sh
+          bash PS5_RetroArch/.github/scripts/seed-microhttpd.sh
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: radv-release
+          path: PS5_Vulkan/.deps/native/radv-release
+
+      - name: Stand-ins for ps5vk's archives
+        run: |
+          # build-title.sh requires them before it links either driver; RADV's link replaces them
+          for archive in build/driver/ps5/libps5vk.ps5.a .deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a \
+              build/driver/ps5/libpsbc_driver.ps5.a .deps/native/psbc/lib/libpsbc_support.ps5.a; do
+            mkdir -p "PS5_Vulkan/$(dirname "$archive")"
+            printf '!<arch>\n' > "PS5_Vulkan/$archive"
+          done
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: core-*
+          merge-multiple: true
+          path: PS5_RetroArch
+
+      - name: Check the cores are the ones built
+        working-directory: PS5_RetroArch
+        run: |
+          # shellcheck disable=SC2086 # a list of names
+          python3 .github/scripts/core-plan.py skip $CI_SKIP_CORES
+          # every core's library, stamp, build report and licence texts, before anything is built
+          python3 .github/scripts/core-plan.py check all
+          # each script finds its stamp and outputs and skips; one that would build again means
+          # the core jobs and this one differ in an input, which this stops before it builds
+          python3 .github/scripts/core-plan.py matrix |
+            python3 -c 'import json, sys; [print(c["script"]) for c in json.load(sys.stdin)]' |
+            while read -r script; do
+              output=$(PS5_DISABLE_CCACHE=1 timeout 120 bash "tools/$script" 2>&1 | head -n 5) || true
+              grep -q 'up to date' <<<"$output" ||
+                { echo "tools/$script did not find its core up to date:" >&2; echo "$output" >&2; exit 1; }
+              echo "$output"
+            done
+
+      # What the title builds besides the cores, kept from the last run: RetroArch's configured tree
+      # and objects (build-retroarch.sh rebuilds what its fingerprint and patch stamps say moved),
+      # the WebUI's libmicrohttpd, updater and curl (each stamped by its script), and the title's
+      # own compiles (ccache)
+      - name: Restore the title's builds
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ci-ccache
+            PS5_RetroArch/build/ra
+            PS5_RetroArch/build/ra-conf
+            PS5_RetroArch/build/webui-mhd-ps5
+            PS5_RetroArch/build/webui-update-ps5
+            PS5_RetroArch/.deps/native/curl-ps5
+          key: ps5ra-title-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ps5ra-title-
+
+      - name: Build the frontend (tools/build-retroarch.sh)
+        working-directory: PS5_RetroArch
+        run: |
+          sdk=$PWD/.deps/native/ps5-payload-sdk
+          stub=$GITHUB_WORKSPACE/ci-vulkan-stub
+          mkdir -p "$stub"
+          # configure's vkCreateInstance link test (see the top of this file)
+          printf 'int vkCreateInstance(void *a, void *b, void *c) { (void)a; (void)b; (void)c; return -9; }\n' \
+            > "$stub/vulkan_stub.c"
+          "$sdk/bin/prospero-clang" -c "$stub/vulkan_stub.c" -o "$stub/vulkan_stub.o"
+          "$sdk/bin/prospero-ar" rcs "$stub/libvulkan.a" "$stub/vulkan_stub.o"
+          PS5_PAYLOAD_SDK=$sdk PS5_CLANG=/usr/bin/clang LDFLAGS="-L$stub" bash tools/build-retroarch.sh
+
+      - name: Build the title (tools/build-title.sh)
+        working-directory: PS5_RetroArch
+        env:
+          # the WebUI's ScreenScraper developer account, when the repository has one
+          PS5_SCREENSCRAPER_DEVID: ${{ secrets.PS5_SCREENSCRAPER_DEVID }}
+          PS5_SCREENSCRAPER_DEVPASSWORD: ${{ secrets.PS5_SCREENSCRAPER_DEVPASSWORD }}
+        run: |
+          export PS5_PAYLOAD_SDK=$PWD/.deps/native/ps5-payload-sdk PS5_CLANG=/usr/bin/clang
+          JOBS=$(nproc)
+          export CCACHE_DIR=$GITHUB_WORKSPACE/ci-ccache JOBS
+          bash tools/build-title.sh
+          ccache --show-stats || true
+
+      - name: Save the title's builds
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ci-ccache
+            PS5_RetroArch/build/ra
+            PS5_RetroArch/build/ra-conf
+            PS5_RetroArch/build/webui-mhd-ps5
+            PS5_RetroArch/build/webui-update-ps5
+            PS5_RetroArch/.deps/native/curl-ps5
+          key: ps5ra-title-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Stage the bundle (dist/PPSA99169.zip)
+        working-directory: PS5_RetroArch
+        run: |
+          # tools/build-title.sh's package: the PPSA99169 folder, checked after extraction
+          mv dist/PS5_RetroArch.zip dist/PPSA99169.zip
+          python3 - dist/PPSA99169.zip <<'PY'
+          import json, sys, zipfile
+          names = set(zipfile.ZipFile(sys.argv[1]).namelist())
+          for required in ("PPSA99169/eboot.bin", "PPSA99169/sce_sys/param.json",
+                           "PPSA99169/sce_module/libc.prx", "PPSA99169/retroarch.cfg"):
+              if required not in names:
+                  sys.exit(f"{required} is not in the bundle")
+          cores = sorted(n for n in names if n.startswith("PPSA99169/cores/") and n.endswith(".so"))
+          print(f"{len(names)} files, {len(cores)} cores")
+          PY
+          (cd dist && sha256sum PPSA99169.zip > PPSA99169.zip.sha256 && cat PPSA99169.zip.sha256)
+          echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          # the artifact downloads as a zip itself: PPSA99169.zip is inside it
+          name: PS5_RetroArch-PPSA99169-${{ env.SHORT_SHA }}
+          path: |
+            PS5_RetroArch/dist/PPSA99169.zip
+            PS5_RetroArch/dist/PPSA99169.zip.sha256
+          retention-days: 14
