@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -131,6 +132,39 @@ static int start_service(FILE *log)
     return 0;
 }
 
+static int is_same_executable(const char *path1, const struct stat *st1,
+                             const char *path2, const struct stat *st2)
+{
+    /* Direct match on the same filesystem */
+    if (st1->st_dev == st2->st_dev && st1->st_ino == st2->st_ino)
+        return 1;
+
+    /* Across nullfs loopback mounts (such as /app0), st_dev differs between
+     * the nullfs mount and the underlying storage. Verify matching size and inode,
+     * or check binary header content as a fallback. */
+    if (st1->st_size != st2->st_size || st1->st_size <= 0)
+        return 0;
+
+    if (st1->st_ino == st2->st_ino)
+        return 1;
+
+    /* Fallback: verify executable header (first 4KB) matches */
+    char buf1[4096], buf2[4096];
+    FILE *f1 = fopen(path1, "rb");
+    FILE *f2 = fopen(path2, "rb");
+    int match = 0;
+    if (f1 && f2)
+    {
+        size_t n1 = fread(buf1, 1, sizeof(buf1), f1);
+        size_t n2 = fread(buf2, 1, sizeof(buf2), f2);
+        if (n1 > 0 && n1 == n2 && memcmp(buf1, buf2, n1) == 0)
+            match = 1;
+    }
+    if (f1) fclose(f1);
+    if (f2) fclose(f2);
+    return match;
+}
+
 int ps5_paths_start(void)
 {
     /* Keep the log descriptor across the root transition. Open before the
@@ -179,17 +213,41 @@ int ps5_paths_start(void)
     if (status != PS5_ELEVATION_OK || getuid() != 0)
         goto failed;
 
-    const char *formats[] = {"/data/homebrew/%s", "/mnt/sandbox/%s_000/app0", "/system_ex/app/%s"};
-    for (unsigned i = 0; i < sizeof(formats) / sizeof(formats[0]); i++)
+    char dynamic_sandbox[PATH_MAX] = {0};
+    DIR *dir = opendir("/mnt/sandbox");
+    if (dir)
     {
-        char root[PATH_MAX], image[PATH_MAX];
+        struct dirent *entry;
+        size_t id_len = strlen(id);
+        while ((entry = readdir(dir)) != NULL)
+        {
+            if (strncmp(entry->d_name, id, id_len) == 0 && entry->d_name[id_len] == '_')
+            {
+                snprintf(dynamic_sandbox, sizeof(dynamic_sandbox), "/mnt/sandbox/%s/app0", entry->d_name);
+                break;
+            }
+        }
+        closedir(dir);
+    }
+
+    char candidate_roots[3][PATH_MAX];
+    snprintf(candidate_roots[0], sizeof(candidate_roots[0]), "/data/homebrew/%s", id);
+    if (dynamic_sandbox[0])
+        strncpy(candidate_roots[1], dynamic_sandbox, sizeof(candidate_roots[1]) - 1);
+    else
+        snprintf(candidate_roots[1], sizeof(candidate_roots[1]), "/mnt/sandbox/%s_000/app0", id);
+    snprintf(candidate_roots[2], sizeof(candidate_roots[2]), "/system_ex/app/%s", id);
+
+    for (unsigned i = 0; i < 3; i++)
+    {
+        char *root = candidate_roots[i];
+        char image[PATH_MAX];
         struct stat candidate;
-        snprintf(root, sizeof(root), formats[i], id);
         snprintf(image, sizeof(image), "%s/eboot.bin", root);
         /* Do not select a different installation just because its title ID
          * matches. These aliases must name the very same executable. */
-        if (stat(image, &candidate) != 0 || candidate.st_ino != original.st_ino ||
-            candidate.st_dev != original.st_dev)
+        if (stat(image, &candidate) != 0 ||
+            !is_same_executable("/app0/eboot.bin", &original, image, &candidate))
             continue;
         strcpy(install_root, root);
         if (chdir(root) != 0)
