@@ -31,6 +31,7 @@ def main():
         'deterministic-build', 'resident-log')]
     patches += [ROOT / 'evidence/network-elevation/daemon-sdk-and-log.patch',
                 ROOT / 'evidence/installed-paths/daemon-readiness.patch']
+    patches += [ROOT / 'evidence/installed-paths/daemon-mounted-title.patch']
     for patch in patches:
         subprocess.run(['patch', '--batch', '-p1', '-i', str(patch)],
                        cwd=source, check=True)
