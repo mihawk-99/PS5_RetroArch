@@ -8,7 +8,7 @@ function guide(category, key, label, description, control = 'toggle', choices = 
 const globalCategories = [
   ['video', 'Video', 'Shape the picture on your TV.'], ['audio', 'Audio', 'Volume and sound playback.'],
   ['input', 'Input', 'Controller feel and response.'], ['saving', 'Saving', 'Game saves, save states and resuming play.'],
-  ['system', 'System', 'Playback speed and configuration behavior.'], ['interface', 'Interface', 'The RetroArch menu on your console.'],
+  ['system', 'System', 'Playback speed and configuration behavior.'], ['interface', 'Interface', 'The RetroArch menu and ES-DE library on your console.'],
   ['achievements', 'Achievements', 'Earn RetroAchievements in the games that have them.'], ['netplay', 'Netplay', 'Play together over the network.']
 ].map(([key, label, description]) => ({ key, label, description }));
 guide('video', 'video_smooth', 'Smooth image scaling', 'Soften pixels when the picture is enlarged. Turn off for crisp pixel art.');
@@ -44,6 +44,7 @@ guide('saving', 'autosave_interval', 'Save RAM backup interval', 'Periodically w
 guide('system', 'fastforward_ratio', 'Fast-forward speed', 'Limit how fast games run while fast-forwarding. Actual speed depends on the game and core.', 'select', [['0','Unlimited'],['1.5','1.5×'],['2','2×'],['3','3×'],['4','4×'],['5','5×'],['10','10×']] );
 guide('system', 'slowmotion_ratio', 'Slow-motion speed', 'Choose how much to slow gameplay when slow motion is active.', 'select', [['2','Half speed'],['3','One-third speed'],['4','Quarter speed'],['5','One-fifth speed']] );
 guide('system', 'pause_nonactive', 'Pause when inactive', 'Pause emulation when RetroArch loses focus, where supported by the platform.');
+guide('interface', 'esde_separate_systems', 'Separate ES-DE systems by playlist', 'Show each source playlist as its own ES-DE system and game list, reusing the shared artwork library. Turn this off to keep the combined view. Applies the next time ES-DE starts.');
 guide('system', 'auto_overrides_enable', 'Load core and game preferences', 'Automatically apply saved RetroArch overrides when opening content. Enable this to use the core overrides edited here.');
 guide('system', 'game_specific_options', 'Use game-specific core options', 'Allow game and content-folder option files to take priority over the core’s shared options.');
 guide('system', 'global_core_options', 'Share one core-options file', 'Store options in one global file. Turn off to use separate core profiles such as those edited by this WebUI.');

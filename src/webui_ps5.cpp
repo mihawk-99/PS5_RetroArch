@@ -66,6 +66,7 @@ const Setting settings[] = {
     {"savestate_auto_load", "Load state when opening content", "bool", "false", 0, 0},
     {"menu_show_advanced_settings", "Show advanced settings", "bool", "false", 0, 0},
     {"menu_driver", "Console menu", "menu", "xmb", 0, 0},
+    {"esde_separate_systems", "Separate ES-DE systems by playlist", "bool", "false", 0, 0},
 };
 // RetroArch's online settings the guided editor offers before RetroArch has written them
 // to its configuration (RetroAchievements, netplay): RetroArch's own defaults.

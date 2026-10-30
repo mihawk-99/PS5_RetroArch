@@ -36,14 +36,18 @@
 #include <pugixml.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <sys/stat.h>
+#include <utility>
+#include <vector>
 
 namespace
 {
@@ -51,6 +55,68 @@ struct Reference
 {
     std::string fullname, platform, theme;
 };
+
+struct SystemView
+{
+    const struct ps5_library_system *system;
+    std::string id, playlist, source_playlist;
+    std::vector<const struct ps5_library_game *> games;
+};
+
+std::string playlist_label(const std::string &playlist)
+{
+    if (playlist.size() > 4 && playlist.substr(playlist.size() - 4) == ".lpl")
+        return playlist.substr(0, playlist.size() - 4);
+    return playlist;
+}
+
+std::string playlist_slug(const std::string &playlist)
+{
+    std::string slug;
+    bool separator = false;
+    for (unsigned char c : playlist)
+    {
+        if (std::isalnum(c))
+        {
+            slug += static_cast<char>(std::tolower(c));
+            separator = false;
+        }
+        else if (!slug.empty() && !separator)
+        {
+            slug += '-';
+            separator = true;
+        }
+    }
+    if (!slug.empty() && slug.back() == '-')
+        slug.pop_back();
+    return slug.empty() ? "playlist" : slug;
+}
+
+bool webui_separate_systems()
+{
+    std::ifstream input("/app0/config/webui.cfg");
+    for (std::string line; std::getline(input, line);)
+    {
+        const size_t equals = line.find('=');
+        if (equals == std::string::npos)
+            continue;
+        const auto trim = [](std::string value)
+        {
+            const size_t first = value.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos)
+                return std::string();
+            const size_t last = value.find_last_not_of(" \t\r\n");
+            return value.substr(first, last - first + 1);
+        };
+        if (trim(line.substr(0, equals)) != "esde_separate_systems")
+            continue;
+        std::string value = trim(line.substr(equals + 1));
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+            value = value.substr(1, value.size() - 2);
+        return value == "true" || value == "1";
+    }
+    return false;
+}
 
 /* ES-DE's own systems: name -> full name, platform, theme. */
 std::map<std::string, Reference> read_reference(const std::string &path)
@@ -338,19 +404,63 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
     pugi::xml_node list = systems.append_child("systemList");
     std::set<std::string> names;
     size_t games_written = 0, games_kept = 0, failures = 0;
+    std::vector<SystemView> views;
+    std::vector<SystemView> split_views;
     for (size_t s = 0; s < library.system_count; s++)
     {
         const struct ps5_library_system &system = library.systems[s];
-        std::string name = system.id;
-        for (int suffix = 2; names.count(name); suffix++)
-            name = std::string(system.id) + "-" + std::to_string(suffix);
+        std::map<std::string, std::vector<const struct ps5_library_game *>> playlists;
+        for (size_t g = 0; g < system.game_count; g++)
+        {
+            const struct ps5_library_game *game = &library.games[system.first_game + g];
+            playlists[game->playlist].push_back(game);
+        }
+        for (const auto &playlist : playlists)
+        {
+            const std::string label = playlist_label(playlist.first);
+            const std::string id = playlist.first.empty()
+                                       ? std::string(system.id)
+                                       : std::string(system.id) + "-" + playlist_slug(label);
+            split_views.push_back({&system, id, label, playlist.first, playlist.second});
+        }
+        if (!paths->separate_systems)
+        {
+            SystemView view{&system, system.id, "", "", {}};
+            for (size_t g = 0; g < system.game_count; g++)
+                view.games.push_back(&library.games[system.first_game + g]);
+            views.push_back(std::move(view));
+        }
+    }
+    /* Retain exactly the names that separate mode uses so combined mode can
+     * carry gamelist details back from the playlist-specific files. */
+    std::map<std::pair<std::string, std::string>, std::string> split_names;
+    std::set<std::string> split_system_names;
+    for (SystemView &view : split_views)
+    {
+        std::string name = view.id;
+        for (int suffix = 2; split_system_names.count(name); suffix++)
+            name = view.id + "-" + std::to_string(suffix);
+        split_system_names.insert(name);
+        view.id = name;
+        split_names[{view.system->id, view.source_playlist}] = name;
+    }
+    if (paths->separate_systems)
+        views = std::move(split_views);
+    for (const SystemView &view : views)
+    {
+        const struct ps5_library_system &system = *view.system;
+        std::string name = view.id;
+        if (!paths->separate_systems)
+            for (int suffix = 2; names.count(name); suffix++)
+                name = view.id + "-" + std::to_string(suffix);
         names.insert(name);
         const auto known = reference.find(system.id);
         pugi::xml_node entry = list.append_child("system");
         entry.append_child("name").text().set(name.c_str());
-        entry.append_child("fullname")
-            .text()
-            .set(known != reference.end() ? known->second.fullname.c_str() : system.name);
+        std::string fullname = known != reference.end() ? known->second.fullname : system.name;
+        if (!view.playlist.empty() && view.playlist != fullname && view.playlist != system.name)
+            fullname += " (" + view.playlist + ")";
+        entry.append_child("fullname").text().set(fullname.c_str());
         entry.append_child("path").text().set(system.folder);
         entry.append_child("extension").text().set(extensions(system.extensions).c_str());
         const std::string command =
@@ -370,19 +480,49 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
         const std::string gamelist = folder + "/gamelist.xml";
         mkdir(folder.c_str(), 0777);
         chmod(folder.c_str(), 0777);
-        pugi::xml_document previous, games;
+        pugi::xml_document previous, legacy, games;
         previous.load_file(gamelist.c_str());
+        /* A new playlist-specific list should inherit the existing combined entry
+         * once, so enabling this setting does not hide ES-DE's scraped details,
+         * images, play counts, or favourites. Keep the canonical file untouched. */
+        if (!view.playlist.empty() && name != system.id)
+            legacy.load_file((data + "/gamelists/" + system.id + "/gamelist.xml").c_str());
         std::map<std::string, pugi::xml_node> known_games;
-        for (pugi::xml_node game : previous.child("gameList").children("game"))
-            known_games[absolute(system.folder, game.child_value("path"))] = game;
+        const auto remember_games = [&](pugi::xml_node game_list)
+        {
+            for (pugi::xml_node game : game_list.children("game"))
+            {
+                const std::string path = absolute(system.folder, game.child_value("path"));
+                if (known_games.find(path) == known_games.end())
+                    known_games[path] = game;
+            }
+        };
+        std::map<std::string, std::unique_ptr<pugi::xml_document>> split_lists;
+        if (!paths->separate_systems)
+            for (const struct ps5_library_game *game : view.games)
+            {
+                const auto split = split_names.find({system.id, game->playlist});
+                if (split == split_names.end())
+                    continue;
+                auto &split_list = split_lists[split->second];
+                if (!split_list)
+                {
+                    split_list = std::make_unique<pugi::xml_document>();
+                    split_list->load_file(
+                        (data + "/gamelists/" + split->second + "/gamelist.xml").c_str());
+                    remember_games(split_list->child("gameList"));
+                }
+            }
+        remember_games(previous.child("gameList"));
+        remember_games(legacy.child("gameList"));
         pugi::xml_node root = games.append_child("gameList");
         for (pugi::xml_node node : previous.child("gameList").children("folder"))
             root.append_copy(node);
         const std::string prefix =
             std::string(system.folder) == "/" ? "/" : std::string(system.folder) + "/";
-        for (size_t g = 0; g < system.game_count; g++)
+        for (const struct ps5_library_game *game_ptr : view.games)
         {
-            const struct ps5_library_game &game = library.games[system.first_game + g];
+            const struct ps5_library_game &game = *game_ptr;
             const std::string path = game.path;
             const std::string relative =
                 "./" + (path.rfind(prefix, 0) == 0 ? path.substr(prefix.size())
@@ -424,7 +564,7 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
         if (std::rename((favorites_record + ".tmp").c_str(), favorites_record.c_str()) != 0)
             failures++;
     }
-    const size_t system_count = library.system_count;
+    const size_t system_count = views.size();
     std::snprintf(
         summary, summary_size,
         "%zu systems, %zu games (%zu with ES-DE's details kept), %zu cores, %zu favourites, "
@@ -446,6 +586,6 @@ extern "C" int ps5_esde_write_library(char *summary, size_t summary_size)
         PS5_LIBRARY_PLAYLISTS, PS5_LIBRARY_INFO,
         PS5_LIBRARY_CORES,     "/app0/es-de/resources/systems/unix/es_systems.xml",
         "/app0/es-de/ES-DE",   content,
-        PS5_LIBRARY_MEDIA};
+        PS5_LIBRARY_MEDIA,      webui_separate_systems() ? 1 : 0};
     return ps5_esde_write_library_to(&paths, summary, summary_size);
 }

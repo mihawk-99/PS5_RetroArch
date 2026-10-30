@@ -439,7 +439,7 @@ let editorProfile = '', editorKind = 'core-options', editorMode = 'guided', edit
 let editorMetadata = {}, editorCategories = [], metadataUnavailable = false;
 const pageSize = 40;
 function settingTitle(key) {
-  const known = { audio_volume: 'Audio volume', input_rumble_gain: 'Rumble strength', video_smooth: 'Smooth image scaling', video_vsync: 'Vertical sync', menu_driver: 'Console menu' };
+  const known = { audio_volume: 'Audio volume', input_rumble_gain: 'Rumble strength', video_smooth: 'Smooth image scaling', video_vsync: 'Vertical sync', menu_driver: 'Console menu', esde_separate_systems: 'Separate ES-DE systems by playlist' };
   return known[key] || key.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(ppsspp|snes|nes|gba|gpu|cpu|msaa|fps|vsync|xmb|rgui)\b/gi, word => word.toUpperCase());
 }
 function editorUrl() { return '/api/config?scope=' + (editorProfile ? editorKind : 'global') + '&core=' + encodeURIComponent(editorProfile); }
