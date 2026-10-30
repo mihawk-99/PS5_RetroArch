@@ -1,0 +1,166 @@
+diff --git a/libopera/opera_cdrom.c b/libopera/opera_cdrom.c
+--- a/libopera/opera_cdrom.c
++++ b/libopera/opera_cdrom.c
+@@ -859,8 +859,10 @@ static
+ void
+ cdrom_data_publish_read_status_if_ready(cdrom_device_t *cd_)
+ {
+-  /* MEI DIPIR consumes read data only when data is ready with the status. */
+-  if(!g_CDROM_STATE.data.read_status_pending || (cd_->data_len == 0))
++  // Portfolio keeps read-ahead active until the transfer, not a sector, completes.
++  if(!g_CDROM_STATE.data.read_status_pending ||
++     (cd_->blocks_requested != 0) ||
++     (cd_->data_len != 0))
+     return;
+ 
+   g_CDROM_STATE.data.read_status_pending = false;
+@@ -1150,7 +1152,6 @@ cdrom_data_load_next_if_ready(cdrom_device_t *cd_)
+   cd_->blocks_requested--;
+   cd_->poll |= POLDT;
+   g_CDROM_STATE.data.sectors_queued++;
+-  cdrom_data_publish_read_status_if_ready(cd_);
+ 
+   if(audio_burst)
+     g_CDROM_STATE.data.next_ready_cycle = cycles;
+@@ -4363,6 +4364,7 @@ opera_cdrom_fifo_get_data(cdrom_device_t *cd_)
+               cd_->blocks_requested  = 0;
+               cd_->data_len          = 0;
+               cd_->data_idx          = 0;
++              cdrom_data_publish_read_status_if_ready(cd_);
+             }
+         }
+     }
+diff --git a/libopera/opera_clio.c b/libopera/opera_clio.c
+--- a/libopera/opera_clio.c
++++ b/libopera/opera_clio.c
+@@ -40,6 +40,7 @@
+ #include "boolean.h"
+ #include "prng32.h"
+ 
++#include <assert.h>
+ #include <string.h>
+ 
+ #define DECREMENT    0x1
+@@ -1098,50 +1099,49 @@ dma_channel_enabled(uint32_t const channel_)
+   return (CLIO.regs[0x304] & (1 << channel_));
+ }
+ 
+-uint16_t
+-opera_clio_fifo_ei(uint16_t channel_)
++static
++void
++_clio_fifo_ei_complete(uint16_t channel_)
+ {
+-  uint16_t val_;
+-
+-  if(CLIO.fifo_i[channel_].start.addr == 0)
+-    return 0;
+-
+-  if((CLIO.fifo_i[channel_].start.len - CLIO.fifo_i[channel_].idx) > 0)
+-    {
+-      val_ = opera_clio_fifo_ei_read(channel_);
+-      CLIO.fifo_i[channel_].idx += sizeof(uint16_t);
+-    }
++  clio_fifo_t *fifo = &CLIO.fifo_i[channel_];
++
++  assert(fifo->idx >= fifo->start.len);
++  fifo->idx = 0;
++  opera_clio_fiq_generate((1U << (channel_ + 16)),0);
++  // Reload is enabled by the channel request bit (WO1994010641A1, p. 49).
++  if((fifo->next.addr != 0) && dma_channel_enabled(channel_))
++    fifo->start = fifo->next;
+   else
+-    {
+-      CLIO.fifo_i[channel_].idx = 0;
+-      opera_clio_fiq_generate(1<<(channel_+16),0);
++    fifo->start.addr = 0;
++}
+ 
+-      /* reload enabled see patent WO09410641A1, 49.16 */
+-      if((CLIO.fifo_i[channel_].next.addr != 0) && dma_channel_enabled(channel_))
+-        {
+-          CLIO.fifo_i[channel_].start.addr = CLIO.fifo_i[channel_].next.addr;
+-          CLIO.fifo_i[channel_].start.len  = CLIO.fifo_i[channel_].next.len;
+ 
+-          val_ = opera_clio_fifo_ei_read(channel_);
+-          CLIO.fifo_i[channel_].idx += sizeof(uint16_t);
+-        }
+-      else
+-        {
+-          CLIO.fifo_i[channel_].start.addr = 0;
+-          val_ = 0;
+-        }
+-    }
++uint16_t
++opera_clio_fifo_ei(uint16_t channel_)
++{
++  uint16_t val;
++  clio_fifo_t *fifo;
+ 
+-  return val_;
++  assert(channel_ < (sizeof(CLIO.fifo_i) / sizeof(CLIO.fifo_i[0])));
++  fifo = &CLIO.fifo_i[channel_];
++  // A restored state can still have completion waiting on the next DSP read.
++  if((fifo->start.addr != 0) && (fifo->idx >= fifo->start.len))
++    _clio_fifo_ei_complete(channel_);
+ 
++  if(fifo->start.addr == 0)
++    return 0;
+ 
+-  // JMK SEZ: What is this? It was commented out along with this whole "else"
+-  //          block, but I had to bring this else block back from the dead
+-  //          in order to initialize val appropriately.
++  val = opera_clio_fifo_ei_read(channel_);
++  fifo->idx += sizeof(uint16_t);
+ 
+-  // opera_clio_fiq_generate(1<<(channel_+16),0);
++  // Complete before the CPU can observe the end address and detach the sample.
++  if(fifo->idx >= fifo->start.len)
++    _clio_fifo_ei_complete(channel_);
++
++  return val;
+ }
+ 
++
+ void
+ opera_clio_fifo_eo(uint16_t channel_,
+                    uint16_t val_)
+diff --git a/libretro_core_options.c b/libretro_core_options.c
+--- a/libretro_core_options.c
++++ b/libretro_core_options.c
+@@ -162,7 +162,7 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
+         { "32x", "32x - 4800KB/s" },
+         { NULL, NULL },
+       },
+-      "unbounded"
++      "2x"
+     },
+     {
+       "opera_region",
+@@ -471,7 +471,7 @@ static struct retro_core_option_definition option_defs_us[] =
+         { "32x", "32x - 4800KB/s" },
+         { NULL, NULL },
+       },
+-      "unbounded"
++      "2x"
+     },
+     {
+       "opera_region",
+diff --git a/opera_lr_opts.c b/opera_lr_opts.c
+--- a/opera_lr_opts.c
++++ b/opera_lr_opts.c
+@@ -493,7 +493,13 @@ opera_lr_opts_get_cd_speed(opera_lr_opts_t *opts_)
+ {
+   const char *val = getval("cd_speed");
+ 
+-  if((val == NULL) || !strcmp(val,"unbounded"))
++  if(val == NULL)
++    {
++      opts_->cd_speed = 2;
++      return;
++    }
++
++  if(!strcmp(val,"unbounded"))
+     {
+       opts_->cd_speed = 0;
+       return;
