@@ -5230,6 +5230,18 @@ EDITS += [
      '      return 0;\n',
      SMB + ' (flush)'),
     (VFS,
+     'int retro_vfs_stat_64_impl(const char *path, int64_t *size)\n'
+     '{\n'
+     '   return retro_vfs_stat_full(path, size, NULL);\n'
+     '}\n',
+     'int retro_vfs_stat_64_impl(const char *path, int64_t *size)\n'
+     '{\n'
+     '   if (PS5_SMB_PATH(path)) /* ' + SMB + ' (stat_64) */\n'
+     '      return ps5_smb_stat(path, size);\n'
+     '   return retro_vfs_stat_full(path, size, NULL);\n'
+     '}\n',
+     SMB + ': smb:// thumbnails use the 64-bit stat path'),
+    (VFS,
      'int retro_vfs_stat_impl(const char *path, int32_t *size)\n{\n   int ret                   = RETRO_VFS_STAT_IS_VALID;\n\n'
      '   if (!path || !*path)\n      return 0;\n',
      'int retro_vfs_stat_impl(const char *path, int32_t *size)\n{\n   int ret                   = RETRO_VFS_STAT_IS_VALID;\n\n'
