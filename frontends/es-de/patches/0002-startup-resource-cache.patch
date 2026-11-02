@@ -10,7 +10,7 @@ index a60159a..5fffe7e 100644
  //
  //  ES-DE is a frontend for browsing and launching games from your multi-platform collection.
 @@ -1172,9 +1175,16 @@ int main(int argc, char* argv[])
- 
+
      SystemStatus::getInstance();
      MameNames::getInstance();
 +#if defined(__PROSPERO__)
@@ -19,7 +19,7 @@ index a60159a..5fffe7e 100644
 +#endif
      ThemeData::populateThemes();
      loadSystemsReturnCode loadSystemsStatus {loadSystemConfigFile()};
- 
+
 +#if defined(__PROSPERO__)
 +    const auto startupViewsAt = SDL_GetTicks();
 +#endif
@@ -29,7 +29,7 @@ index a60159a..5fffe7e 100644
 @@ -1196,6 +1206,11 @@ int main(int argc, char* argv[])
          ViewController::getInstance()->preload();
      }
- 
+
 +#if defined(__PROSPERO__)
 +    std::printf("[ES-DE startup] systems=%u ms views=%u ms\n",
 +                startupViewsAt - startupResourcesAt, SDL_GetTicks() - startupViewsAt);
@@ -88,7 +88,7 @@ index 5b91645..ea2d82e 100644
  //
  //  ES-DE Frontend
 @@ -977,6 +980,11 @@ namespace Utils
- 
+
          bool exists(const std::string& path)
          {
 +#if defined(__PROSPERO__)
@@ -100,7 +100,7 @@ index 5b91645..ea2d82e 100644
              try {
  #if defined(_WIN64)
 @@ -1042,6 +1050,11 @@ namespace Utils
- 
+
          bool isDirectory(const std::string& path)
          {
 +#if defined(__PROSPERO__)
