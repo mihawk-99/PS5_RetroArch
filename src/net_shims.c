@@ -230,7 +230,7 @@ int __wrap_mbedtls_platform_entropy_poll(void *data, unsigned char *output, size
 }
 #endif
 
-#ifdef __PROSPERO__
+#if defined(__PROSPERO__) && !defined(NET_SHIMS_RESOLVER_ONLY)
 /* What each step of an HTTPS request returned, in retroarch.log: RetroArch itself only
  * says "http_task returned -1". Bound by --wrap (tools/build-title.sh). */
 #include <errno.h>
