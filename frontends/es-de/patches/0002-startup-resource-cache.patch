@@ -1,0 +1,113 @@
+diff --git a/es-app/src/main.cpp b/es-app/src/main.cpp
+index a60159a..5fffe7e 100644
+--- a/es-app/src/main.cpp
++++ b/es-app/src/main.cpp
+@@ -1,3 +1,6 @@
++#if defined(__PROSPERO__)
++#include "StartupResources.h"
++#endif
+ //  SPDX-License-Identifier: MIT
+ //
+ //  ES-DE is a frontend for browsing and launching games from your multi-platform collection.
+@@ -1172,9 +1175,16 @@ int main(int argc, char* argv[])
+ 
+     SystemStatus::getInstance();
+     MameNames::getInstance();
++#if defined(__PROSPERO__)
++    StartupResources::begin();
++    const auto startupResourcesAt = SDL_GetTicks();
++#endif
+     ThemeData::populateThemes();
+     loadSystemsReturnCode loadSystemsStatus {loadSystemConfigFile()};
+ 
++#if defined(__PROSPERO__)
++    const auto startupViewsAt = SDL_GetTicks();
++#endif
+     if (!SystemData::sStartupExitSignal) {
+         if (loadSystemsStatus) {
+             // If there was an issue parsing the es_systems.xml file, display an error message.
+@@ -1196,6 +1206,11 @@ int main(int argc, char* argv[])
+         ViewController::getInstance()->preload();
+     }
+ 
++#if defined(__PROSPERO__)
++    std::printf("[ES-DE startup] systems=%u ms views=%u ms\n",
++                startupViewsAt - startupResourcesAt, SDL_GetTicks() - startupViewsAt);
++    StartupResources::end();
++#endif
+     if (!SystemData::sStartupExitSignal) {
+         if (loadSystemsStatus == loadSystemsReturnCode::LOADING_OK)
+             ThemeData::themeLoadedLogOutput();
+diff --git a/es-core/src/ThemeData.cpp b/es-core/src/ThemeData.cpp
+index ec7abc4..4a1539e 100644
+--- a/es-core/src/ThemeData.cpp
++++ b/es-core/src/ThemeData.cpp
+@@ -1,3 +1,6 @@
++#if defined(__PROSPERO__)
++#include "StartupResources.h"
++#endif
+ //  SPDX-License-Identifier: MIT
+ //
+ //  ES-DE Frontend
+@@ -677,6 +680,8 @@ void ThemeData::loadFile(const std::map<std::string, std::string>& sysDataMap,
+     pugi::xml_document doc;
+ #if defined(_WIN64)
+     pugi::xml_parse_result res {doc.load_file(Utils::String::stringToWideString(path).c_str())};
++#elif defined(__PROSPERO__)
++    pugi::xml_parse_result res {StartupResources::loadXml(doc, path)};
+ #else
+     pugi::xml_parse_result res {doc.load_file(path.c_str())};
+ #endif
+@@ -1209,6 +1214,8 @@ ThemeData::ThemeCapability ThemeData::parseThemeCapabilities(const std::string&
+ #if defined(_WIN64)
+         const pugi::xml_parse_result& res {
+             doc.load_file(Utils::String::stringToWideString(capFile).c_str())};
++#elif defined(__PROSPERO__)
++        const pugi::xml_parse_result& res {StartupResources::loadXml(doc, capFile)};
+ #else
+         const pugi::xml_parse_result& res {doc.load_file(capFile.c_str())};
+ #endif
+@@ -1874,6 +1881,8 @@ void ThemeData::parseIncludes(const pugi::xml_node& root)
+ #if defined(_WIN64)
+         pugi::xml_parse_result result {
+             includeDoc.load_file(Utils::String::stringToWideString(path).c_str())};
++#elif defined(__PROSPERO__)
++        pugi::xml_parse_result result {StartupResources::loadXml(includeDoc, path)};
+ #else
+         pugi::xml_parse_result result {includeDoc.load_file(path.c_str())};
+ #endif
+diff --git a/es-core/src/utils/FileSystemUtil.cpp b/es-core/src/utils/FileSystemUtil.cpp
+index 5b91645..ea2d82e 100644
+--- a/es-core/src/utils/FileSystemUtil.cpp
++++ b/es-core/src/utils/FileSystemUtil.cpp
+@@ -1,3 +1,6 @@
++#if defined(__PROSPERO__)
++#include "StartupResources.h"
++#endif
+ //  SPDX-License-Identifier: MIT
+ //
+ //  ES-DE Frontend
+@@ -977,6 +980,11 @@ namespace Utils
+ 
+         bool exists(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (path.empty()) return false;
++            bool cached;
++            if (StartupResources::query(path, false, cached)) return cached;
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
+@@ -1042,6 +1050,11 @@ namespace Utils
+ 
+         bool isDirectory(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (path.empty()) return false;
++            bool cached;
++            if (StartupResources::query(path, true, cached)) return cached;
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
