@@ -38,6 +38,9 @@ if [[ $mode == ps5 ]]; then
     # A title's link binds getaddrinfo to the platform layer's, which resolves nothing
     # (PS5_Vulkan's tools/radv-link.sh): libsmb2 asks src/ps5_smb.c's instead.
     flags+=" -march=znver2 -Dgetaddrinfo=ps5_smb_getaddrinfo -Dfreeaddrinfo=ps5_smb_freeaddrinfo"
+    # Only libsmb2 sockets: per-call MSG_DONTWAIT keeps its reply-draining loop
+    # bounded even if the descriptor's O_NONBLOCK setting is ineffective.
+    flags+=" -Dreadv=ps5_smb_socket_readv -Dwritev=ps5_smb_socket_writev"
 fi
 
 archive="$root/.deps/downloads/libsmb2-$revision.tar.gz"

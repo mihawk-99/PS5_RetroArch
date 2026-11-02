@@ -7,6 +7,7 @@
  * GPL-3.0-or-later), with libsmb2's synchronous share listing.
  */
 #include "ps5_smb.h"
+#include "ps5_smb_socket.h"
 
 #include <ctype.h>
 #include <pthread.h>
@@ -22,6 +23,47 @@
 #include <smb2/libsmb2-share-enum.h>
 
 static pthread_mutex_t contexts = PTHREAD_MUTEX_INITIALIZER;
+
+/* libsmb2 drains replies until EAGAIN, including after its completion callback.
+ * A blocking scalar read there prevents the synchronous wait loop from checking
+ * its five-second timeout. Enforce nonblocking I/O per socket call rather than
+ * relying solely on the library's unchecked fcntl(O_NONBLOCK). These symbols
+ * replace readv/writev only inside the PS5 libsmb2 build; regular files and other
+ * title callers keep their existing semantics.
+ */
+ssize_t ps5_smb_socket_readv(int fd, const struct iovec *vectors, int count)
+{
+    ssize_t total = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        if (!vectors[i].iov_len)
+            continue;
+        const ssize_t got = recv(fd, vectors[i].iov_base, vectors[i].iov_len, MSG_DONTWAIT);
+        if (got < 0)
+            return total ? total : got;
+        total += got;
+        if ((size_t)got < vectors[i].iov_len)
+            break;
+    }
+    return total;
+}
+
+ssize_t ps5_smb_socket_writev(int fd, const struct iovec *vectors, int count)
+{
+    ssize_t total = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        if (!vectors[i].iov_len)
+            continue;
+        const ssize_t sent = send(fd, vectors[i].iov_base, vectors[i].iov_len, MSG_DONTWAIT);
+        if (sent < 0)
+            return total ? total : sent;
+        total += sent;
+        if ((size_t)sent < vectors[i].iov_len)
+            break;
+    }
+    return total;
+}
 
 /* libsmb2's resolver on the PS5 (tools/build-libsmb2.sh): getaddrinfo itself in the WebUI's
  * daemon; the title has its own (src/platform_wraps.c). */
