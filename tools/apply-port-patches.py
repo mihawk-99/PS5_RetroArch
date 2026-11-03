@@ -5371,6 +5371,35 @@ EDITS += [(
 )]
 
 
+# A core may play sound on each controller's own speaker (patches/series, 0139):
+# src/pad_speaker_ps5.cpp, handed over by environment call 0x20000 | 3, and closed with the core.
+EDITS += [(
+    'runloop.c',
+    '      case 0x20000 | 2:\n',
+    '      /* patches/series, 0139: the controllers\' speakers (src/pad_speaker_ps5.h). */\n'
+    '      case 0x20000 | 3:\n'
+    '         {\n'
+    '            extern const void *ps5_pad_speaker_interface(void);\n'
+    '            if (!data)\n'
+    '               return false;\n'
+    '            *(const void**)data = ps5_pad_speaker_interface();\n'
+    '         }\n'
+    '         break;\n'
+    '      case 0x20000 | 2:\n',
+    'patches/series, 0139: the controllers\' speakers',
+), (
+    'runloop.c',
+    'void runloop_event_deinit_core(void)\n{\n',
+    'void runloop_event_deinit_core(void)\n{\n'
+    '   /* patches/series, 0139: a core\'s controller speakers close with it. */\n'
+    '   {\n'
+    '      extern void ps5_pad_speaker_close_all(void);\n'
+    '      ps5_pad_speaker_close_all();\n'
+    '   }\n',
+    'patches/series, 0139: a core\'s controller speakers close with it',
+)]
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
