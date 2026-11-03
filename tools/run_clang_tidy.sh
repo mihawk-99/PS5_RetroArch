@@ -38,6 +38,7 @@ declare -A test_flags=(
     [memory_ps5_test.cpp]="-std=c++17 -I$root"
     [memory_vulkan_test.cpp]="-std=c++20 -I$root -I$root/vendor/retroarch -DPS5_MEMORY_DIAGNOSTICS"
     [menu_memory_test.cpp]="-std=c++17 -I$root"
+    [pad_speaker_ps5_test.cpp]="-std=c++17"
     [input_ps5_test.cpp]="skip"
 )
 for source in "$root"/tests/*.cpp; do
