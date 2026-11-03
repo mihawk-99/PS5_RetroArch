@@ -5342,6 +5342,35 @@ EDITS += [
 ]
 
 
+# Cores ask hardcore and the savestate folder (patches/series, 0138): RetroArch keeps its own
+# states from hardcore, but a core's own (Dolphin's integrated GBA) never reach it. Two
+# port-private environment calls, RETRO_ENVIRONMENT_PRIVATE (0x20000) + 1 and + 2.
+EDITS += [(
+    'runloop.c',
+    '      case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:\n',
+    '      /* patches/series, 0138: a core asks whether hardcore is on, and for the\n'
+    '       * savestate folder (as RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY gives saves). */\n'
+    '      case 0x20000 | 1:\n'
+    '         if (data)\n'
+    '#ifdef HAVE_CHEEVOS\n'
+    '            *(bool*)data = rcheevos_hardcore_active();\n'
+    '#else\n'
+    '            *(bool*)data = false;\n'
+    '#endif\n'
+    '         break;\n'
+    '      case 0x20000 | 2:\n'
+    '         if (!data)\n'
+    '            return false;\n'
+    '         *(const char**)data = dir_get_ptr(RARCH_DIR_CURRENT_SAVESTATE);\n'
+    '         if (!*(const char**)data || !**(const char**)data)\n'
+    '            return false;\n'
+    '         break;\n'
+    '\n'
+    '      case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:\n',
+    'patches/series, 0138: a core asks whether hardcore is on',
+)]
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
