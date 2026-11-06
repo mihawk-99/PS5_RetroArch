@@ -1592,7 +1592,13 @@ void process_libretro(Http &http, Job &job, unsigned index, const Options &optio
         return finish(item.candidates.empty() ? State::unmatched : State::ambiguous,
                       item.candidates.empty() ? "No match at libretro. Search by name or skip."
                                               : "Choose the right game, search, or skip.");
-    if (options.mode == "pc")
+    /* A game identified by an earlier pass can find nothing left to fetch either:
+     * the name it was matched by may hold none of what the source still lacks (a
+     * logo it never had). There is then no task to hand out, and a transferring
+     * item with no tasks waits on a helper forever (a resumed PC-mode job hung
+     * exactly this way on the console, 2026-11-06): with nothing found, the item
+     * finishes like any other miss. */
+    if (options.mode == "pc" && !found.empty())
     {
         std::lock_guard<std::mutex> guard(lock);
         auto &target = job.items[index];

@@ -332,6 +332,27 @@ class Scraper(unittest.TestCase):
             rows = list(self.source.log)
         self.assertEqual([a for _, a, _ in rows if 'Helper' not in a], [])
 
+    def test_pc_mode_a_matched_game_with_nothing_left_to_fetch(self):
+        # (console, 2026-11-06) A game whose media is all stored but one kind the
+        # source has never carried: once the user has chosen its name, the probes
+        # answer nothing, the hand-off has no tasks, and the item must finish
+        # rather than wait "for the PC helper" forever behind an empty queue.
+        tv = 'Time Voyager Special Edition'
+        job_id = self.start(mode='pc', kinds='logo', lines=[f'snes\t{self.games[tv]}'])
+        helper = self.run_helper(job_id)
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        job = self.wait(job_id)
+        ambiguous = next(p for p in job['problems'] if p['state'] == 'ambiguous')
+        status, body = self.request('POST', f'/api/scraper/resolve?id={job_id}&item={ambiguous["item"]}&action=choose&value='
+                                    + urllib.parse.quote('Time Voyager (USA)'))
+        self.assertEqual(status, 200, body)
+        helper = self.run_helper(job_id)  # the probe that answers "no logo under this name"
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        job = self.wait(job_id, lambda j: j['state'] == 'done' and not j['counts'].get('transferring'), timeout=30)
+        self.assertEqual(job['counts'].get('done'), 1)
+
     def test_pc_mode_helper_killed_then_resumed(self):
         games = {f'Filler Game {i:02} (USA)': f'/app0/content/SNES/Filler Game {i:02} (USA).sfc' for i in range(24)}
         self.games = games
