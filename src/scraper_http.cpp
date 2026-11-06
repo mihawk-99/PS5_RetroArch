@@ -177,17 +177,11 @@ Http::~Http()
 Response Http::get(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel, int fd,
                    std::function<void(uint64_t)> progress)
 {
-    return request("GET", url, limit, cancel, fd, progress);
+    return request(url, limit, cancel, fd, progress);
 }
 
-Response Http::head(const std::string &url, const std::atomic<bool> *cancel)
-{
-    return request("HEAD", url, 0, cancel, -1);
-}
-
-Response Http::request(const char *method, const std::string &url, uint64_t limit,
-                       const std::atomic<bool> *cancel, int fd,
-                       const std::function<void(uint64_t)> &progress)
+Response Http::request(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel,
+                       int fd, const std::function<void(uint64_t)> &progress)
 {
     Response response;
     CURL *curl = state_->handle;
@@ -197,12 +191,9 @@ Response Http::request(const char *method, const std::string &url, uint64_t limi
         return response;
     }
     Sink sink{&response, limit, fd, cancel, &progress};
-    const bool head = std::strcmp(method, "HEAD") == 0;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_USERAGENT, state_->agent.c_str());
-    curl_easy_setopt(curl, CURLOPT_NOBODY, head ? 1L : 0L);
-    if (!head)
-        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     /* An https request is never redirected to http: its address may carry an account. */
     if (url.rfind("https://", 0) == 0)
@@ -279,17 +270,11 @@ Http::~Http()
 Response Http::get(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel, int fd,
                    std::function<void(uint64_t)> progress)
 {
-    return request("GET", url, limit, cancel, fd, progress);
+    return request(url, limit, cancel, fd, progress);
 }
 
-Response Http::head(const std::string &url, const std::atomic<bool> *cancel)
-{
-    return request("HEAD", url, 0, cancel, -1);
-}
-
-Response Http::request(const char *method, const std::string &url, uint64_t limit,
-                       const std::atomic<bool> *cancel, int fd,
-                       const std::function<void(uint64_t)> &progress)
+Response Http::request(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel,
+                       int fd, const std::function<void(uint64_t)> &progress)
 {
     Response response;
 #ifdef __PROSPERO__
@@ -312,8 +297,7 @@ Response Http::request(const char *method, const std::string &url, uint64_t limi
             state_->connections.erase(host);
             return response;
         }
-        const int request = sceHttpCreateRequestWithURL(
-            connection, std::strcmp(method, "HEAD") == 0 ? 2 : 0, url.c_str(), 0);
+        const int request = sceHttpCreateRequestWithURL(connection, 0 /* GET */, url.c_str(), 0);
         if (request < 0)
         {
             response.error = code("sceHttpCreateRequestWithURL", request);
@@ -335,19 +319,18 @@ Response Http::request(const char *method, const std::string &url, uint64_t limi
         // one, 2026-10-07: SIGSEGV writing just below the stack).
         std::vector<char> buffer(65536);
         int n = 0;
-        if (std::strcmp(method, "HEAD") != 0)
-            while ((n = sceHttpReadData(request, buffer.data(), buffer.size())) > 0)
+        while ((n = sceHttpReadData(request, buffer.data(), buffer.size())) > 0)
+        {
+            if (cancel && cancel->load())
             {
-                if (cancel && cancel->load())
-                {
-                    response.cancelled = true;
-                    break;
-                }
-                if (!take(response, buffer.data(), size_t(n), limit, fd))
-                    break;
-                if (progress)
-                    progress(response.bytes);
+                response.cancelled = true;
+                break;
             }
+            if (!take(response, buffer.data(), size_t(n), limit, fd))
+                break;
+            if (progress)
+                progress(response.bytes);
+        }
         if (n < 0 && !response.cancelled && !response.too_large)
             response.error = code("sceHttpReadData", n);
         sceHttpDeleteRequest(request);
@@ -394,7 +377,7 @@ Response Http::request(const char *method, const std::string &url, uint64_t limi
         response.error = "The server did not answer (network or DNS).";
         return response;
     }
-    const std::string request = std::string(method) + ' ' + path + " HTTP/1.0\r\nHost: " + host +
+    const std::string request = "GET " + path + " HTTP/1.0\r\nHost: " + host +
                                 "\r\nUser-Agent: " + state_->agent + "\r\n\r\n";
     write_all(sock, request.data(), request.size());
     std::string head;
