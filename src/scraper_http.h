@@ -39,13 +39,10 @@ class Http
      * cancel, when set, stops the transfer between reads. */
     Response get(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel,
                  int fd = -1, std::function<void(uint64_t)> progress = {});
-    /* HEAD url: the status alone, no body (whether a source has a file). */
-    Response head(const std::string &url, const std::atomic<bool> *cancel);
 
   private:
-    Response request(const char *method, const std::string &url, uint64_t limit,
-                     const std::atomic<bool> *cancel, int fd,
-                     const std::function<void(uint64_t)> &progress = {});
+    Response request(const std::string &url, uint64_t limit, const std::atomic<bool> *cancel,
+                     int fd, const std::function<void(uint64_t)> &progress);
     struct State;
     std::unique_ptr<State> state_;
 };

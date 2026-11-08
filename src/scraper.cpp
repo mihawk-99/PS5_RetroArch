@@ -424,6 +424,19 @@ struct Task
 {
     unsigned id, item;
     std::string kind, url, destination;
+    /* Media is a file to store; a probe asks the source whether an address has a file
+     * (a HEAD) and a fetch brings the source's own bytes (a folder's listing, a
+     * database) to destination for the console to read; neither is stored. PC mode
+     * sends all three to the helper: the console may have no route to the internet at
+     * all, and the helper answers its questions about the source too (src/scraper.h).
+     * `result`: 1 when answered (the file is there, the bytes arrived), 0 when the
+     * source has nothing, -1 while no answer came. */
+    enum Work
+    {
+        media,
+        probe,
+        fetch
+    } work = media;
     enum
     {
         queued,
@@ -431,6 +444,7 @@ struct Task
         done
     } state = queued;
     std::time_t lease = 0;
+    int result = -1;
 };
 struct Job
 {
@@ -466,6 +480,53 @@ std::shared_ptr<Job> active;
 std::vector<pthread_t> workers;
 std::atomic<bool> stopping{false}, cancelling{false};
 std::map<std::string, std::vector<std::string>> indexes; /* database -> libretro names */
+
+/* PC mode: a question for the helper, given out and leased like a download task.
+ * A probe asks the source whether an address has a file (the helper sends a HEAD);
+ * a fetch brings the source's own bytes (a folder's listing, a database) to
+ * destination, which the caller reads and removes. The worker that asks waits here
+ * for the answer: the console keeps no route to the internet of its own in PC mode
+ * (src/scraper.h). Returns 1 (answered: the file is there, the bytes arrived), 0
+ * (the source has nothing) or -1 with why when the job was cut short underneath;
+ * a resume clears the tasks, so the question is asked again. */
+int ask_helper(Job &job, unsigned item, Task::Work work, const std::string &url,
+               const std::string &destination, std::string &why)
+{
+    std::unique_lock<std::mutex> guard(lock);
+    auto queue = [&]
+    {
+        Task task;
+        task.id = unsigned(job.tasks.size());
+        task.item = item;
+        task.kind = work == Task::probe ? "probe" : "fetch";
+        task.url = url;
+        task.destination = destination;
+        task.work = work;
+        job.tasks.push_back(task);
+        return task.id;
+    };
+    unsigned id = queue();
+    for (;;)
+    {
+        bool open = false;
+        for (auto &task : job.tasks)
+            if (task.id == id)
+            {
+                if (task.state == Task::done)
+                    return task.result;
+                open = true;
+                break;
+            }
+        if (stopping || cancelling || job.state != "running")
+        {
+            why = cancelling ? "Cancelled." : "The job stopped.";
+            return -1;
+        }
+        if (!open)
+            id = queue(); /* resumed: the cleared tasks are asked again */
+        wake.wait_for(guard, std::chrono::seconds(1));
+    }
+}
 
 std::string jobs_folder()
 {
@@ -722,9 +783,41 @@ std::string percent_decode(const std::string &text)
             out += text[i];
     return out;
 }
-/* The names libretro has covers for, from the folder's listing (once a session). */
+/* The names in an Apache-style folder listing: its .png links, decoded. */
+std::vector<std::string> names_from_listing(const std::string &body)
+{
+    std::vector<std::string> names;
+    size_t at = 0;
+    while ((at = body.find("href=\"", at)) != std::string::npos)
+    {
+        at += 6;
+        const size_t end = body.find('"', at);
+        if (end == std::string::npos)
+            break;
+        const std::string href = body.substr(at, end - at);
+        if (href.size() > 4 && href.compare(href.size() - 4, 4, ".png") == 0 &&
+            href.find('/') == std::string::npos)
+            names.push_back(percent_decode(href.substr(0, href.size() - 4)));
+    }
+    return names;
+}
+/* A stable hidden name for one database's listing, kept where the job files live (the
+ * .jobs folder): a second fetch overwrites it, and a restart leaves nothing else. */
+std::string listing_name(const std::string &database)
+{
+    uint64_t hash = 1469598103934665603ull;
+    for (unsigned char c : database)
+        hash = (hash ^ c) * 1099511628211ull;
+    char text[32];
+    std::snprintf(text, sizeof text, "listing-%016llx.html", static_cast<unsigned long long>(hash));
+    return text;
+}
+/* The names libretro has covers for, from the folder's listing (once a session).
+ * PC mode asks the helper for the listing: the console may have no route to the
+ * source at all, and without it a game no name matches offers no candidates. */
 std::mutex index_fetch_lock; /* one fetch of a listing at a time: never the same twice */
-const std::vector<std::string> &libretro_index(Http &http, const std::string &database)
+const std::vector<std::string> &libretro_index(Http &http, const std::string &database,
+                                               const Job *job)
 {
     std::lock_guard<std::mutex> fetching(index_fetch_lock);
     {
@@ -733,29 +826,35 @@ const std::vector<std::string> &libretro_index(Http &http, const std::string &da
         if (it != indexes.end())
             return it->second;
     }
-    std::vector<std::string> names;
-    const Response listing = http.get(
-        libretro_base + '/' + url_encode(database) + "/Named_Boxarts/", 32 << 20, &cancelling);
-    if (listing.status == 200)
+    const std::string url = libretro_base + '/' + url_encode(database) + "/Named_Boxarts/";
+    std::string body;
+    if (job && job->options.mode == "pc")
     {
-        size_t at = 0;
-        while ((at = listing.body.find("href=\"", at)) != std::string::npos)
+        const std::string destination = jobs_folder() + '/' + listing_name(database);
+        std::string why;
+        unlink(destination.c_str());
+        if (ask_helper(*const_cast<Job *>(job), 0, Task::fetch, url, destination, why) != 1)
         {
-            at += 6;
-            const size_t end = listing.body.find('"', at);
-            if (end == std::string::npos)
-                break;
-            const std::string href = listing.body.substr(at, end - at);
-            if (href.size() > 4 && href.compare(href.size() - 4, 4, ".png") == 0 &&
-                href.find('/') == std::string::npos)
-                names.push_back(percent_decode(href.substr(0, href.size() - 4)));
+            unlink(destination.c_str());
+            static const std::vector<std::string> none;
+            return none;
         }
+        body = read_text(destination, 32 << 20);
+        unlink(destination.c_str());
     }
+    else
+    {
+        const Response listing = http.get(url, 32 << 20, &cancelling);
+        if (listing.status != 200)
+        {
+            static const std::vector<std::string> none;
+            return none;
+        }
+        body = listing.body;
+    }
+    const std::vector<std::string> names = names_from_listing(body);
     std::lock_guard<std::mutex> guard(lock);
-    if (listing.status == 200)
-        return indexes[database] = names;
-    static const std::vector<std::string> none;
-    return none;
+    return indexes[database] = names;
 }
 std::vector<std::string> words(const std::string &text)
 {
@@ -957,25 +1056,6 @@ int download(Http &http, const Game &game, const std::string &kind, const std::s
     }
     if (cancelling)
         why = "Cancelled.";
-    return -1;
-}
-/* A source probe without the bytes (PC mode identifies on the console). */
-int probe(Http &http, const std::string &url, std::string &why)
-{
-    for (int attempt = 0; attempt < 4 && !cancelling; ++attempt)
-    {
-        if (attempt)
-            std::this_thread::sleep_for(std::chrono::seconds(1 << attempt));
-        const Response response = http.head(url, &cancelling);
-        if (response.status == 200)
-            return 1;
-        if (response.status == 404)
-            return 0;
-        why = response.status ? "The server answered " + std::to_string(response.status) + '.'
-                              : response.error;
-        if (response.status >= 400 && response.status < 500 && response.status != 429)
-            return -1;
-    }
     return -1;
 }
 /* ---- ScreenScraper ------------------------------------------------------------------ */
@@ -1470,7 +1550,7 @@ void process_libretro(Http &http, Job &job, unsigned index, const Options &optio
             {
                 const std::string url = libretro_url(item.game.database, kind, name);
                 const int result = options.mode == "pc"
-                                       ? probe(http, url, why)
+                                       ? ask_helper(job, index, Task::probe, url, "", why)
                                        : download(http, item.game, kind, url, job, index, why);
                 if (result < 0)
                     return -1;
@@ -1495,8 +1575,8 @@ void process_libretro(Http &http, Job &job, unsigned index, const Options &optio
         return finish(State::failed, why.empty() ? "The download failed." : why);
     if (item.matched.empty() && !cancelling)
     {
-        item.candidates =
-            closest(libretro_index(http, item.game.database), item.game.label, options.region);
+        item.candidates = closest(libretro_index(http, item.game.database, &job), item.game.label,
+                                  options.region);
         /* The same title once tags are set aside ("Awesome Golf (1991)" and "Awesome Golf
          * (USA, Europe)") is the game: taken without asking, the region asked for first.
          * Only titles that differ wait for the user. */
@@ -1512,7 +1592,13 @@ void process_libretro(Http &http, Job &job, unsigned index, const Options &optio
         return finish(item.candidates.empty() ? State::unmatched : State::ambiguous,
                       item.candidates.empty() ? "No match at libretro. Search by name or skip."
                                               : "Choose the right game, search, or skip.");
-    if (options.mode == "pc")
+    /* A game identified by an earlier pass can find nothing left to fetch either:
+     * the name it was matched by may hold none of what the source still lacks (a
+     * logo it never had). There is then no task to hand out, and a transferring
+     * item with no tasks waits on a helper forever (a resumed PC-mode job hung
+     * exactly this way on the console, 2026-11-06): with nothing found, the item
+     * finishes like any other miss. */
+    if (options.mode == "pc" && !found.empty())
     {
         std::lock_guard<std::mutex> guard(lock);
         auto &target = job.items[index];
@@ -1866,22 +1952,39 @@ bool launchbox_prepare(Http &http, Job &job, std::string &why,
     make_folders(folder);
     const std::string zip = folder + "/Metadata.zip", partial = folder + "/.partial-metadata";
     say("Getting the LaunchBox database (about 110 MB, once a month)…");
-    const int fd = open(partial.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
+    if (job.options.mode == "pc")
     {
-        why = "The console could not write to its storage.";
-        return false;
+        /* The console may have no route to LaunchBox at all: the helper on the PC
+         * fetches the database and sends the bytes over, as it does every media file
+         * (src/scraper.h). It lands on its final name; the reading below is shared. */
+        std::string reason;
+        unlink(zip.c_str());
+        if (ask_helper(job, 0, Task::fetch, launchbox_metadata, zip, reason) != 1 || !is_file(zip))
+        {
+            unlink(zip.c_str());
+            why = "LaunchBox could not be reached through the PC helper.";
+            return false;
+        }
     }
-    const Response response = http.get(launchbox_metadata, uint64_t(1) << 30, &cancel, fd);
-    const bool complete =
-        response.status == 200 && response.error.empty() && !response.cancelled && fsync(fd) == 0;
-    close(fd);
-    if (!complete || rename(partial.c_str(), zip.c_str()) != 0)
+    else
     {
-        unlink(partial.c_str());
-        why = response.status ? "LaunchBox answered " + std::to_string(response.status) + '.'
-                              : "LaunchBox could not be reached: " + response.error;
-        return false;
+        const int fd = open(partial.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd < 0)
+        {
+            why = "The console could not write to its storage.";
+            return false;
+        }
+        const Response response = http.get(launchbox_metadata, uint64_t(1) << 30, &cancel, fd);
+        const bool complete = response.status == 200 && response.error.empty() &&
+                              !response.cancelled && fsync(fd) == 0;
+        close(fd);
+        if (!complete || rename(partial.c_str(), zip.c_str()) != 0)
+        {
+            unlink(partial.c_str());
+            why = response.status ? "LaunchBox answered " + std::to_string(response.status) + '.'
+                                  : "LaunchBox could not be reached: " + response.error;
+            return false;
+        }
     }
     say("Reading the LaunchBox database…");
     /* The platforms the library can have, a file each: G (a game), A (another name of
@@ -3788,7 +3891,7 @@ bool resolve(const std::string &id, unsigned index, const std::string &action,
             return false;
     }
     else
-        found = closest(libretro_index(http, database), value, region);
+        found = closest(libretro_index(http, database, job.get()), value, region);
     std::lock_guard<std::mutex> guard(lock);
     auto &item = job->items[index];
     item.candidates = found;
@@ -3867,6 +3970,20 @@ void pc_downloaded(const std::string &id, unsigned task, bool found, uint64_t by
     auto job = jobs.count(id) ? jobs.at(id) : nullptr;
     if (!job || task >= job->tasks.size())
         return;
+    auto &asked = job->tasks[task];
+    if (asked.work != Task::media)
+    {
+        /* A probe's answer, or a fetch the source does not have: the worker waiting
+         * on it can go on. A whole fetch ends with its bytes (pc_delivered), not
+         * here, and neither kind moves the item's or the job's media counters. */
+        if (asked.state != Task::done && !(asked.work == Task::fetch && found))
+        {
+            asked.state = Task::done;
+            asked.result = found ? 1 : 0;
+        }
+        wake.notify_all();
+        return;
+    }
     if (found)
     {
         ++job->downloaded_files;
@@ -3874,7 +3991,7 @@ void pc_downloaded(const std::string &id, unsigned task, bool found, uint64_t by
         return;
     }
     /* The source had nothing after all: the task ends without bytes. */
-    auto &t = job->tasks[task];
+    auto &t = asked;
     if (t.state == Task::done)
         return;
     t.state = Task::done;
@@ -3895,6 +4012,19 @@ void pc_delivered(const std::string &id, unsigned task, bool ok, uint64_t bytes)
         if (!job || task >= job->tasks.size() || job->tasks[task].state == Task::done)
             return;
         auto &t = job->tasks[task];
+        if (t.work == Task::probe)
+            return; /* a probe is answered by pc_downloaded, never by bytes */
+        if (t.work == Task::fetch)
+        {
+            /* A database or listing the console asked for: its bytes are in place at
+             * the destination the waiting worker reads. The media's own counters are
+             * not moved by the console's questions. */
+            t.state = ok ? Task::done : Task::queued;
+            if (ok)
+                t.result = 1;
+            wake.notify_all();
+            return;
+        }
         if (!ok)
         {
             t.state = Task::queued; /* handed out again */
