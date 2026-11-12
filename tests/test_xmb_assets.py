@@ -1,5 +1,6 @@
-"""The default XMB menu must ship every fixed icon and its usable font."""
+"""The XMB menu and graphics widgets ship their pinned icons and fonts."""
 
+import fnmatch
 import hashlib
 import json
 from pathlib import Path
@@ -16,7 +17,9 @@ class XmbAssets(unittest.TestCase):
                                         cwd=ROOT, text=True).splitlines()
         self.assertIn('--enable-xmb', flags)
         self.assertIn('--enable-rgui', flags)
+        self.assertIn('--enable-gfx_widgets', flags)
         self.assertNotIn('--disable-xmb', flags)
+        self.assertNotIn('--disable-gfx_widgets', flags)
 
     def test_complete_pinned_theme(self):
         base = ROOT / 'assets/xmb'
@@ -34,12 +37,56 @@ class XmbAssets(unittest.TestCase):
         self.assertEqual((base / 'monochrome/font.ttf').read_bytes()[:4], b'\0\1\0\0')
         self.assertTrue((base / 'monochrome/FONT-LICENSE.txt').is_file())
 
+    def test_widget_icons_are_present_and_pinned(self):
+        base = ROOT / 'assets/xmb'
+        manifest = json.loads((base / 'source.json').read_text())
+        arrays = [
+            ('gfx/gfx_widgets.c', 'gfx_widgets_icons_names'),
+            ('gfx/widgets/gfx_widget_volume.c', 'ICONS_NAMES'),
+        ]
+        for filename, array in arrays:
+            source = (ROOT / 'vendor/retroarch' / filename).read_text()
+            body = re.search(r'\b' + array + r'\[[^]]+\]\s*=\s*\{([^}]+)\}', source)
+            self.assertIsNotNone(body, filename)
+            names = re.findall(r'"([^"/]+\.png)"', body.group(1))
+            self.assertTrue(names, filename)
+            for name in names:
+                with self.subTest(asset=name):
+                    path = 'monochrome/png/' + name
+                    self.assertIn(path, manifest['files'])
+                    data = (base / path).read_bytes()
+                    self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
+                    self.assertEqual(hashlib.sha256(data).hexdigest(), manifest['files'][path])
+
+    def test_widget_fonts_are_pinned_and_licensed(self):
+        base = ROOT / 'assets/ozone'
+        manifest = json.loads((base / 'source.json').read_text())
+        xmb = json.loads((ROOT / 'assets/xmb/source.json').read_text())
+        self.assertEqual(manifest['revision'], xmb['revision'])
+        required = {'regular.ttf', 'bold.ttf', 'README.md', 'INTER-LICENSE.txt', 'MPLUS-LICENSE.txt'}
+        self.assertEqual(set(manifest['files']), required)
+        for name, expected in manifest['files'].items():
+            with self.subTest(asset=name):
+                self.assertEqual(hashlib.sha256((base / name).read_bytes()).hexdigest(), expected)
+        for name in ('regular.ttf', 'bold.ttf'):
+            self.assertEqual((base / name).read_bytes()[:4], b'\0\1\0\0')
+
+        components = json.loads((ROOT / 'tooling/notices/components.json').read_text())['components']
+        component = next(c for c in components if c['id'] == 'retroarch-widget-fonts')
+        for name in required | {'source.json'}:
+            path = 'assets/ozone/' + name
+            self.assertTrue(any(fnmatch.fnmatchcase(path, pattern)
+                                for pattern in component['artifacts']), path)
+        texts = {entry['from'] for entry in component['texts']}
+        self.assertIn('assets/ozone/INTER-LICENSE.txt', texts)
+        self.assertIn('assets/ozone/MPLUS-LICENSE.txt', texts)
+        self.assertIn('assets/ozone/README.md', texts)
+
 
 class XmbSystemIcons(unittest.TestCase):
     """Issue 35: each playlist tab shows its system's hardware (tools/xmb-system-icons.py)."""
 
     def test_one_icon_per_database_and_owned_by_its_licence(self):
-        import fnmatch
         import sys
         import tempfile
         from PIL import Image
