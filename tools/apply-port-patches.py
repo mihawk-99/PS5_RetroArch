@@ -4691,6 +4691,8 @@ EDITS += [('configuration.c',
 WITHDRAWN = (
     # 0019's debug-utils block, replaced by 0095's, which allocates its list.
     'VK_EXT_debug_utils, when the',
+    # RetroArch 1.22.2 initializes the display context inside gfx_widgets_init().
+    'patches/series, 0042',
     'patches/series, 0075: matching',
     'patches/series, 0075: libretro XRGB',
     'patches/series, 0077: decode menu images for sampled RGBA',

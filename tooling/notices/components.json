@@ -291,6 +291,17 @@
       "modifications": "A selection of files, unmodified; assets/xmb/source.json lists each with its digest."
     },
     {
+      "id": "retroarch-widget-fonts",
+      "name": "RetroArch graphics widget fonts (Ozone)",
+      "kind": "asset",
+      "artifacts": ["assets/ozone/regular.ttf", "assets/ozone/bold.ttf", "assets/ozone/README.md", "assets/ozone/INTER-LICENSE.txt", "assets/ozone/MPLUS-LICENSE.txt", "assets/ozone/source.json"],
+      "licence": "OFL-1.1 AND mplus",
+      "copyright": ["Copyright (c) 2016-2018 The Inter UI Project Authors (me@rsms.me)", "Copyright (C) 2002-2019 M+ FONTS PROJECT"],
+      "texts": [{"from": "assets/ozone/INTER-LICENSE.txt", "to": "INTER-LICENSE.txt"}, {"from": "assets/ozone/MPLUS-LICENSE.txt", "to": "MPLUS-LICENSE.txt"}, {"from": "assets/ozone/README.md", "to": "README.md"}, {"from": "assets/ozone/source.json", "to": "source.json"}],
+      "source": {"kind": "json", "file": "assets/ozone/source.json", "key": "revision", "remote": "https://github.com/libretro/retroarch-assets"},
+      "modifications": "Unmodified files selected from retroarch-assets. The fonts were merged upstream from Inter UI and M+ as documented in ozone/README.md."
+    },
+    {
       "id": "core-info",
       "name": "libretro-core-info metadata (.info files)",
       "kind": "metadata",

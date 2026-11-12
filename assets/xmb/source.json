@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/libretro/retroarch-assets",
   "revision": "73106363e14e34c08a5854b4cfbc29f184e3b783",
-  "selection": "All 120 fixed icons named by RetroArch 1.22.2 xmb_texture_path, monochrome font, theme attribution and licenses. Per-system playlist icons are not included; default icons remain available.",
+  "selection": "All 120 fixed icons named by RetroArch 1.22.2 xmb_texture_path, five additional graphics widget icons, monochrome font, theme attribution and licenses. Default icons are available for playlist tabs.",
   "files": {
     "COPYING": "469faa8457ffed7428f1c150f4d8682ce25f2d991a694eec544e661f43452f50",
     "monochrome/font.ttf": "d3cb714e4202e783236b955653f7369c0fa38e098b11c31775e7c1c3ea5e0730",
@@ -126,6 +126,11 @@
     "monochrome/png/subsetting.png": "e39bd236780b7d98b4a813d4d103f84d68440bd35d1292f9a35f951eff0f7662",
     "monochrome/png/undo.png": "788c16b933d21376ab8ab23be356360d05162ff19d26e825e434094b35559ff7",
     "monochrome/png/wifi.png": "67e5bd4710896b038ab0582491b1df9da94ebab5703428b0e469298884bfe5c1",
-    "monochrome/png/zip.png": "45bda9519a79067f00ca75f0770363bc11b8fdbcded8db7b77d8be559cd188c7"
+    "monochrome/png/zip.png": "45bda9519a79067f00ca75f0770363bc11b8fdbcded8db7b77d8be559cd188c7",
+    "monochrome/png/menu_hourglass.png": "fe0bcc0f16df71503a40adfa9a2e86b6c8e7cae063162daaf20025694768b9ec",
+    "monochrome/png/menu_volume_max.png": "5d627488504881a49cb08737254c7f0a34c7b4a9c545a0560219062e9097536e",
+    "monochrome/png/menu_volume_med.png": "cf164e08f1fc414a97c522c4fe6c06dc7abe822ffb0ea32fef20a9f71d44f4b1",
+    "monochrome/png/menu_volume_min.png": "c14001ded436619a5175affda6fdceb371ac5a0d8bd9257e71b2f64545d4d884",
+    "monochrome/png/menu_volume_mute.png": "64d937f6be7c7b53412b28eafc5711ea1e8ff5ddf5a7f09988397c4710405e28"
   }
 }

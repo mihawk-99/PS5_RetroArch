@@ -324,18 +324,55 @@ class PortPatches(unittest.TestCase):
         frame upload and 0077's menu colour and cached-frame ownership were all
         answers to a B8G8R8A8 entry that was not sampled. Withdrawing another block means
         re-checking that claim. 0019's debug-utils block is withdrawn for 0095's,
-        which does the same with its extension list on the heap.
+        which does the same with its extension list on the heap. 0042 is withdrawn
+        because the 1.22.2 widget path initializes the display context.
         """
         self.assertEqual(
             sorted(self.withdrawn()),
             sorted([
                 'VK_EXT_debug_utils, when the',
+                'patches/series, 0042',
                 'patches/series, 0075: matching',
                 'patches/series, 0075: libretro XRGB',
                 'patches/series, 0077: decode menu images for sampled RGBA',
                 'patches/series, 0077: upload decoded menu images as RGBA',
                 'patches/series, 0077: preserve original core pixels across cached frames',
             ]))
+
+    def test_widget_withdrawal_restores_existing_and_fresh_trees(self) -> None:
+        import importlib.util
+        import io
+        import sys
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+
+        spec = importlib.util.spec_from_file_location('widget_patches', self.script)
+        patches = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(patches)
+        edit = next(edit for edit in patches.EDITS if edit[3] == 'patches/series, 0042')
+        name, anchor, replacement, marker = edit
+        self.assertIn(marker, patches.WITHDRAWN)
+        for initial in (anchor, replacement):
+            with self.subTest(previously_patched=initial == replacement), tempfile.TemporaryDirectory() as work:
+                tree = Path(work)
+                source = tree / name
+                source.parent.mkdir(parents=True)
+                source.write_text(initial)
+                with patch.object(patches, 'EDITS', [edit]), \
+                        patch.object(sys, 'argv', [str(self.script), str(tree)]), \
+                        redirect_stdout(io.StringIO()):
+                    self.assertEqual(patches.main(), 0)
+                    self.assertEqual(source.read_text(), anchor)
+                    modified = source.stat().st_mtime_ns
+                    self.assertEqual(patches.main(), 0)
+                    self.assertEqual(source.read_text(), anchor)
+                    self.assertEqual(source.stat().st_mtime_ns, modified)
+                probe = tree / 'widgets.c'
+                probe.write_text('#include <stdbool.h>\n#include "gfx/drivers/vulkan.c"\n'
+                                 'int main(void) { return vulkan_gfx_widgets_enabled(0) ? 0 : 1; }\n')
+                binary = tree / 'widgets'
+                subprocess.run(['cc', str(probe), '-o', str(binary)], check=True)
+                subprocess.run([str(binary)], check=True)
 
     def test_the_patch_set_is_the_size_it_should_be(self) -> None:
         """Pinned so an accidental addition or deletion is a visible diff.

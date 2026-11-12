@@ -33,7 +33,7 @@ configure_flags=(
     --prefix=/user/homebrew
     # XMB is the compiled default when enabled; retain RGUI as a menu fallback.
     --enable-menu --enable-xmb --enable-rgui
-    --disable-materialui --disable-ozone --disable-gfx_widgets
+    --disable-materialui --disable-ozone --enable-gfx_widgets
     # Vulkan is ON. ../PS5_Vulkan is the graphics backend this project consumes
     # (docs/PLAN.md, M2 and the "no direct hardware access" invariant), and the
     # path to it is now measured rather than assumed:
