@@ -1092,8 +1092,9 @@ struct scanning
     size_t added;
 };
 
-/* A file is firmware when a core's info names it, a variant of one (panafz10-patched.bin
- * of panafz10.bin), or its name says so ([BIOS] ..., Kickstart ..., Lynx Boot Image). */
+/* A file is firmware when a core's info names its whole stem, or a named variant (for
+ * example panafz10-patched.bin of panafz10.bin), or its name says so ([BIOS] ..., Kickstart
+ * ..., Lynx Boot Image). A game whose title merely starts with a firmware stem is not one. */
 static int is_firmware(const struct scanning *scanning, const char *name)
 {
     char lower[512], stem[512];
@@ -1104,6 +1105,8 @@ static int is_firmware(const struct scanning *scanning, const char *name)
     if (strstr(lower, "bios") || strstr(lower, "kickstart") || strstr(lower, "boot image") ||
         strstr(lower, "boot rom"))
         return 1;
+    const char *extension = strrchr(lower, '.');
+    const size_t name_stem_length = extension ? (size_t)(extension - lower) : strlen(lower);
     for (const char *at = scanning->firmware; at && *at;)
     {
         const char *bar = strchr(at, '|');
@@ -1112,7 +1115,10 @@ static int is_firmware(const struct scanning *scanning, const char *name)
         char *dot = strrchr(stem, '.');
         if (dot && dot != stem)
             *dot = '\0';
-        if (stem[0] && strncmp(lower, stem, strlen(stem)) == 0)
+        const size_t stem_length = strlen(stem);
+        if (stem_length && name_stem_length >= stem_length &&
+            strncmp(lower, stem, stem_length) == 0 &&
+            (name_stem_length == stem_length || lower[stem_length] == '-'))
             return 1;
         at = bar ? bar + 1 : NULL;
     }
@@ -1268,16 +1274,46 @@ static void scan_scummvm(struct scanning *scanning, const char *path)
     free_listing(&listing);
 }
 
-/* The firmware every core's info names: its firmwareN_path values' file names. */
-static char *read_firmware(const char *info)
+/* Whether a core's database metadata associates it with this platform. */
+static int core_runs_platform(const struct ps5_library_core *core, const struct platform *platform)
 {
-    char **names = folder_names(info, ".info");
+    char databases[512];
+    snprintf(databases, sizeof(databases), "%s%s%s", platform->database ? platform->database : "",
+             platform->database && platform->core_databases ? "|" : "",
+             platform->core_databases ? platform->core_databases : "");
+    for (const char *at = databases; at && *at;)
+    {
+        const char *bar = strchr(at, '|');
+        char database[256];
+        snprintf(database, sizeof(database), "%.*s",
+                 (int)(bar ? (size_t)(bar - at) : strlen(at)), at);
+        if (list_has(core->databases, database))
+            return 1;
+        at = bar ? bar + 1 : NULL;
+    }
+    return 0;
+}
+
+/* The firmware files named by the installed cores that run this platform. */
+static char *read_firmware(const struct ps5_library *library, const char *info,
+                           const char *platform_id)
+{
+    const struct platform *platform = platform_by_id(platform_id);
     size_t size = 4096, length = 0;
     char *list = (char *)calloc(size, 1);
-    for (size_t i = 0; list && names && names[i]; i++)
+    for (size_t i = 0; list && platform && i < library->core_count; i++)
     {
-        char path[PS5_LIBRARY_PATH_MAX + 512], line[1024], value[512];
-        if (!joined(path, sizeof(path), info, names[i]))
+        const struct ps5_library_core *core = &library->cores[i];
+        if (!core_runs_platform(core, platform))
+            continue;
+        const char *base = strrchr(core->path, '/');
+        base = base ? base + 1 : core->path;
+        const size_t core_name_length = strlen(base);
+        if (core_name_length <= 3 || strcmp(base + core_name_length - 3, ".so") != 0)
+            continue;
+        char filename[512], path[PS5_LIBRARY_PATH_MAX + 512], line[1024], value[512];
+        snprintf(filename, sizeof(filename), "%.*s.info", (int)(core_name_length - 3), base);
+        if (!joined(path, sizeof(path), info, filename))
             continue;
         FILE *file = fopen(path, "r");
         while (file && fgets(line, sizeof(line), file))
@@ -1304,7 +1340,6 @@ static char *read_firmware(const char *info)
         if (file)
             fclose(file);
     }
-    free_names(names);
     return list;
 }
 
@@ -1317,30 +1352,14 @@ static void platform_extensions(const struct ps5_library *library, const char *i
     const struct platform *platform = platform_by_id(id);
     if (!platform)
         return;
-    char databases[512];
-    snprintf(databases, sizeof(databases), "%s%s%s", platform->database ? platform->database : "",
-             platform->database && platform->core_databases ? "|" : "",
-             platform->core_databases ? platform->core_databases : "");
     for (size_t c = 0; c < library->core_count; c++)
-        for (const char *at = databases; at && *at;)
-        {
-            const char *bar = strchr(at, '|');
-            char database[256];
-            snprintf(database, sizeof(database), "%.*s",
-                     (int)(bar ? (size_t)(bar - at) : strlen(at)), at);
-            if (list_has(library->cores[c].databases, database))
-            {
-                add_extensions(out, size, library->cores[c].extensions);
-                break;
-            }
-            at = bar ? bar + 1 : NULL;
-        }
+        if (core_runs_platform(&library->cores[c], platform))
+            add_extensions(out, size, library->cores[c].extensions);
 }
 
 /* One content root: each folder at its top that names a platform the title has a core
  * for is that system's; anything else at the top is left alone. */
-static void scan_root(struct loading *loading, const char *root, const char *firmware,
-                      size_t *added)
+static void scan_root(struct loading *loading, const char *root, const char *info, size_t *added)
 {
     struct listing listing;
     if (list_folder(root, &listing) != 0)
@@ -1357,11 +1376,12 @@ static void scan_root(struct loading *loading, const char *root, const char *fir
         scanning.loading = loading;
         scanning.system = listing.names[i];
         scanning.platform = platform;
-        scanning.firmware = firmware;
         platform_extensions(loading->library, platform, scanning.extensions,
                             sizeof(scanning.extensions));
         if (!scanning.extensions[0])
             continue; /* no core for it */
+        char *firmware = read_firmware(loading->library, info, platform);
+        scanning.firmware = firmware;
         /* RetroArch opens a .zip or .7z itself for a core that does not take one, so a
          * cartridge system's archives are games. A disc system's are not: an archived
          * disc is a .cue and its tracks, and RetroArch extracts only the file it loads.
@@ -1379,6 +1399,7 @@ static void scan_root(struct loading *loading, const char *root, const char *fir
         else
             scan_games(&scanning, path, 0);
         *added += scanning.added;
+        free(firmware);
     }
     free_listing(&listing);
 }
@@ -1455,13 +1476,11 @@ int ps5_library_load_content_at(struct ps5_library *library, const char *playlis
     /* Then the games in the content folders no playlist lists. */
     if (content && content[0] && !loading.failed)
     {
-        char *firmware = read_firmware(info);
         loading.playlist = "";
         loading.default_core = "";
         size_t added = 0;
         for (size_t i = 0; content[i] && !loading.failed; i++)
-            scan_root(&loading, content[i], firmware, &added);
-        free(firmware);
+            scan_root(&loading, content[i], info, &added);
     }
     if (loading.failed)
         return -1;
