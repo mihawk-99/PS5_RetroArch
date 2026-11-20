@@ -5342,6 +5342,114 @@ EDITS += [
 ]
 
 
+# The 7zip SDK bypassed RetroArch's VFS with stdio, so SMB archives failed
+# before the core ever received the ROM. Keep the SDK's status conventions (seek
+# returns zero, not a position) and propagate negative reads without size_t wrap.
+EDITS += [
+    ('deps/7zip/7zFile.h',
+     '#include "7zTypes.h"',
+     '#include "7zTypes.h"\n'
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS file type */\n'
+     '#include <streams/file_stream.h>\n'
+     '#endif',
+     'PS5 7zip VFS file type'),
+    ('deps/7zip/7zFile.h',
+     '  FILE *file;',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS handle */\n'
+     '  RFILE *file;\n'
+     '#else\n'
+     '  FILE *file;\n'
+     '#endif',
+     'PS5 7zip VFS handle'),
+    ('deps/7zip/7zFile.c',
+     '  p->file = fopen(name, writeMode ? "wb+" : "rb");',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS open */\n'
+     '  p->file = filestream_open(name, writeMode ? RETRO_VFS_FILE_ACCESS_READ_WRITE\n'
+     '      : RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);\n'
+     '  if (!p->file) return errno ? errno : EIO;\n'
+     '#else\n'
+     '  p->file = fopen(name, writeMode ? "wb+" : "rb");\n'
+     '#endif',
+     'PS5 7zip VFS open'),
+    ('deps/7zip/7zFile.c',
+     '    int res = fclose(p->file);',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS close */\n'
+     '    int res = filestream_close(p->file);\n'
+     '#else\n'
+     '    int res = fclose(p->file);\n'
+     '#endif',
+     'PS5 7zip VFS close'),
+    ('deps/7zip/7zFile.c',
+     '  *size = fread(data, 1, originalSize, p->file);\n'
+     '  if (*size == originalSize)\n'
+     '    return 0;\n'
+     '  return ferror(p->file);',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS read */\n'
+     '  int64_t got = filestream_read(p->file, data, originalSize);\n'
+     '  *size = got < 0 ? 0 : (size_t)got;\n'
+     '  return got < 0 ? EIO : 0;\n'
+     '#else\n'
+     '  *size = fread(data, 1, originalSize, p->file);\n'
+     '  if (*size == originalSize)\n'
+     '    return 0;\n'
+     '  return ferror(p->file);\n'
+     '#endif',
+     'PS5 7zip VFS read'),
+    ('deps/7zip/7zFile.c',
+     '  *size = fwrite(data, 1, originalSize, p->file);\n'
+     '  if (*size == originalSize)\n'
+     '    return 0;\n'
+     '  return ferror(p->file);',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS write */\n'
+     '  int64_t put = filestream_write(p->file, data, originalSize);\n'
+     '  *size = put < 0 ? 0 : (size_t)put;\n'
+     '  return put < 0 ? EIO : 0;\n'
+     '#else\n'
+     '  *size = fwrite(data, 1, originalSize, p->file);\n'
+     '  if (*size == originalSize)\n'
+     '    return 0;\n'
+     '  return ferror(p->file);\n'
+     '#endif',
+     'PS5 7zip VFS write'),
+    ('deps/7zip/7zFile.c',
+     '  res = fseek(p->file, (long)*pos, moveMethod);\n'
+     '  *pos = ftell(p->file);\n'
+     '  return res;',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS seek: SDK status, not position */\n'
+     '  (void)res;\n'
+     '  if (filestream_seek(p->file, *pos, moveMethod) < 0) return EIO;\n'
+     '  int64_t at = filestream_tell(p->file);\n'
+     '  if (at < 0) return EIO;\n'
+     '  *pos = at;\n'
+     '  return 0;\n'
+     '#else\n'
+     '  res = fseek(p->file, (long)*pos, moveMethod);\n'
+     '  *pos = ftell(p->file);\n'
+     '  return res;\n'
+     '#endif',
+     'PS5 7zip VFS seek: SDK status, not position'),
+    ('deps/7zip/7zFile.c',
+     '  long pos = ftell(p->file);\n'
+     '  int res = fseek(p->file, 0, SEEK_END);\n'
+     '  *length = ftell(p->file);\n'
+     '  fseek(p->file, pos, SEEK_SET);\n'
+     '  return res;',
+     '#ifdef __PROSPERO__ /* PS5 7zip VFS size preserves position */\n'
+     '  int64_t size = filestream_get_size(p->file);\n'
+     '  if (size < 0) return EIO;\n'
+     '  *length = (uint64_t)size;\n'
+     '  return 0;\n'
+     '#else\n'
+     '  long pos = ftell(p->file);\n'
+     '  int res = fseek(p->file, 0, SEEK_END);\n'
+     '  *length = ftell(p->file);\n'
+     '  fseek(p->file, pos, SEEK_SET);\n'
+     '  return res;\n'
+     '#endif',
+     'PS5 7zip VFS size preserves position'),
+]
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
@@ -5405,4 +5513,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
