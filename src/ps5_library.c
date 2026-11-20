@@ -1285,8 +1285,8 @@ static int core_runs_platform(const struct ps5_library_core *core, const struct 
     {
         const char *bar = strchr(at, '|');
         char database[256];
-        snprintf(database, sizeof(database), "%.*s",
-                 (int)(bar ? (size_t)(bar - at) : strlen(at)), at);
+        snprintf(database, sizeof(database), "%.*s", (int)(bar ? (size_t)(bar - at) : strlen(at)),
+                 at);
         if (list_has(core->databases, database))
             return 1;
         at = bar ? bar + 1 : NULL;

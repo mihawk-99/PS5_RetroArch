@@ -37,7 +37,9 @@ int main(void)
     int small = 4096;
     assert(setsockopt(fd[0], SOL_SOCKET, SO_SNDBUF, &small, sizeof(small)) == 0);
     char block[8192] = {0};
-    while (send(fd[0], block, sizeof(block), MSG_DONTWAIT) > 0) {}
+    while (send(fd[0], block, sizeof(block), MSG_DONTWAIT) > 0)
+    {
+    }
     errno = 0;
     assert(ps5_smb_socket_writev(fd[0], vectors, 3) == -1);
     assert(errno == EAGAIN || errno == EWOULDBLOCK);

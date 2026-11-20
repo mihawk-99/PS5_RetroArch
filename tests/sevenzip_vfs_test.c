@@ -9,7 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct RFILE { FILE *file; };
+struct RFILE
+{
+    FILE *file;
+};
 static const char *fixture;
 static const char *url = "smb://fixture/archive.7z";
 static int fault;
@@ -20,9 +23,15 @@ RFILE *filestream_open(const char *path, unsigned mode, unsigned hints)
     RFILE *stream;
     (void)hints;
     ++opens;
-    if (fault == 1) { errno = 0; return NULL; }
-    if (!strncmp(path, "smb://", 6)) {
-        if (strcmp(path, url) || mode != RETRO_VFS_FILE_ACCESS_READ) {
+    if (fault == 1)
+    {
+        errno = 0;
+        return NULL;
+    }
+    if (!strncmp(path, "smb://", 6))
+    {
+        if (strcmp(path, url) || mode != RETRO_VFS_FILE_ACCESS_READ)
+        {
             errno = EACCES;
             return NULL;
         }
@@ -31,7 +40,11 @@ RFILE *filestream_open(const char *path, unsigned mode, unsigned hints)
     stream = malloc(sizeof(*stream));
     assert(stream);
     stream->file = fopen(path, mode == RETRO_VFS_FILE_ACCESS_READ ? "rb" : "wb+");
-    if (!stream->file) { free(stream); return NULL; }
+    if (!stream->file)
+    {
+        free(stream);
+        return NULL;
+    }
     return stream;
 }
 
@@ -54,7 +67,8 @@ int64_t filestream_write(RFILE *stream, const void *data, int64_t size)
 
 int64_t filestream_seek(RFILE *stream, int64_t at, int origin)
 {
-    if (fault == 3 || fseek(stream->file, at, origin)) return -1;
+    if (fault == 3 || fseek(stream->file, at, origin))
+        return -1;
     return ftell(stream->file);
 }
 
@@ -66,7 +80,8 @@ int64_t filestream_tell(RFILE *stream)
 int64_t filestream_get_size(RFILE *stream)
 {
     long at = ftell(stream->file), size;
-    if (fault == 5) return -1;
+    if (fault == 5)
+        return -1;
     assert(fseek(stream->file, 0, SEEK_END) == 0);
     size = ftell(stream->file);
     assert(fseek(stream->file, at, SEEK_SET) == 0);
@@ -115,7 +130,8 @@ int main(int argc, char **argv)
     fault = 2;
     assert(File_Read(&file, data, &size) != 0 && size == 0);
     assert(File_Read(&file, data, &size) == 0); /* zero-length request */
-    for (fault = 3; fault <= 4; ++fault) {
+    for (fault = 3; fault <= 4; ++fault)
+    {
         int64_t at = 1;
         assert(File_Seek(&file, &at, SZ_SEEK_SET) != 0 && at == 1);
     }
