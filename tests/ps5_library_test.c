@@ -298,6 +298,14 @@ int main(int argc, char **argv)
     }
     core(dir, "dosbox_pure", "DOS", "zip|dosz|exe|com|bat|iso|cue");
     core(dir, "scummvm", "ScummVM", "scummvm");
+    /* Issue 88 (PR 101): another system's core naming quest.dat and jungle.dat hides neither
+     * Quest.zip nor Jungle Jump.a26, which ScummVM does not run. */
+    snprintf(path, sizeof(path), "%s/info/scummvm_libretro.info", dir);
+    {
+        FILE *info_file = fopen(path, "a");
+        fputs("firmware0_path = \"quest.dat\"\nfirmware1_path = \"jungle.dat\"\n", info_file);
+        fclose(info_file);
+    }
     /* a cartridge system whose core also runs a disc system (Sega CD) */
     core(dir, "genesis_plus_gx", "Sega - Mega Drive - Genesis|Sega - Mega-CD - Sega CD",
          "md|bin|cue|chd");
