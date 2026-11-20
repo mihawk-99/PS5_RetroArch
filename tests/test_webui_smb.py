@@ -113,6 +113,18 @@ class SmbRoutes(unittest.TestCase):
 
     @unittest.skipUnless(PLAYWRIGHT and shutil.which('node') and Path('/usr/bin/chromium').exists(),
                          'needs node, Playwright and Chromium')
+    def test_save_without_a_config_folder(self):
+        """Issue 84 (PR 103): on a title that has never written config/, saving still works."""
+        guest = {'server': self.samba.address, 'user': '', 'password': '', 'workgroup': ''}
+        shutil.rmtree(self.root / 'config')
+        try:
+            status, body = self.request('POST', '/api/smb', {**guest, 'share': 'games', 'folder': 'Games'})
+            self.assertEqual(status, 200, body)
+            self.assertTrue((self.root / 'config/smb.cfg').is_file())
+        finally:
+            (self.root / 'config').mkdir(exist_ok=True)
+            (self.root / 'config/smb.cfg').unlink(missing_ok=True)
+
     def test_page_in_chromium(self):
         run = subprocess.run(['node', 'tests/webui_smb_browser.cjs'], cwd=ROOT, capture_output=True, text=True,
                              timeout=300, env={**os.environ, 'PLAYWRIGHT_PATH': PLAYWRIGHT,
