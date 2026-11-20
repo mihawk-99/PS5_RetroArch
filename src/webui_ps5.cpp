@@ -382,6 +382,14 @@ void overlay(Config &to, const Config &from)
 }
 bool write_config(const std::string &path, const Config &values, std::string text = {})
 {
+    // The WebUI may be the first title component to save a setting. Do not rely on
+    // the frontend having created the title's config directory already.
+    const std::string config_dir = root_path + "/config";
+    if (mkdir(config_dir.c_str(), 0755) != 0 && errno != EEXIST)
+        return false;
+    struct stat config_stat{};
+    if (content_stat(config_dir.c_str(), &config_stat) || !S_ISDIR(config_stat.st_mode))
+        return false;
     for (const auto &entry : values)
         text += entry.first + " = \"" + entry.second + "\"\n";
     const std::string temporary = path + ".webui-" + nonce();
