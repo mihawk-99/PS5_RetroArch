@@ -18,16 +18,16 @@ extern "C"
                                  std::uint32_t len, std::uint32_t freq, std::uint32_t param);
     std::int32_t sceAudioOutOutput(std::int32_t handle, const void *data);
     std::int32_t sceAudioOutClose(std::int32_t handle);
-    int ps5_input_user_id(unsigned port);       /* src/input_ps5.cpp */
+    int ps5_input_user_id(unsigned port); /* src/input_ps5.cpp */
     void ps5_input_trace(const char *line) noexcept;
 }
 
 namespace
 {
-constexpr std::int32_t pad_speaker_type = 4;   /* SCE_AUDIO_OUT_PORT_TYPE_PADSPK */
-constexpr std::uint32_t mono_s16 = 0;          /* SCE_AUDIO_OUT_PARAM_FORMAT_S16_MONO */
-constexpr std::uint32_t grain = 256;           /* samples per sceAudioOutOutput, ~5.3 ms */
-constexpr std::size_t queue_size = 9600;       /* 200 ms */
+constexpr std::int32_t pad_speaker_type = 4; /* SCE_AUDIO_OUT_PORT_TYPE_PADSPK */
+constexpr std::uint32_t mono_s16 = 0;        /* SCE_AUDIO_OUT_PARAM_FORMAT_S16_MONO */
+constexpr std::uint32_t grain = 256;         /* samples per sceAudioOutOutput, ~5.3 ms */
+constexpr std::size_t queue_size = 9600;     /* 200 ms */
 constexpr unsigned ports = 4;
 
 struct Speaker

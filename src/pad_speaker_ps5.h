@@ -15,31 +15,32 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #define PS5_PAD_SPEAKER_ENVIRONMENT (0x20000 | 3)
 #define PS5_PAD_SPEAKER_VERSION 1
 #define PS5_PAD_SPEAKER_RATE 48000
 
-struct ps5_pad_speaker
-{
-   unsigned version; /* PS5_PAD_SPEAKER_VERSION */
-   /* Opens the speaker of the controller in RetroArch port `port` (0-3); false when that port has
-    * no signed-in controller or its speaker does not open. Opening an open one is true. */
-   bool (*open)(unsigned port);
-   /* Queues `count` samples (48 kHz mono S16) for it; returns how many were taken (a queue of
-    * about a fifth of a second: the rest would only add delay). Any thread. */
-   size_t (*write)(unsigned port, const int16_t *samples, size_t count);
-   /* Stops and closes it. */
-   void (*close)(unsigned port);
-};
+    struct ps5_pad_speaker
+    {
+        unsigned version; /* PS5_PAD_SPEAKER_VERSION */
+        /* Opens the speaker of the controller in RetroArch port `port` (0-3); false when that port
+         * has no signed-in controller or its speaker does not open. Opening an open one is true. */
+        bool (*open)(unsigned port);
+        /* Queues `count` samples (48 kHz mono S16) for it; returns how many were taken (a queue of
+         * about a fifth of a second: the rest would only add delay). Any thread. */
+        size_t (*write)(unsigned port, const int16_t *samples, size_t count);
+        /* Stops and closes it. */
+        void (*close)(unsigned port);
+    };
 
-/* The table (the environment call's answer). */
-const struct ps5_pad_speaker *ps5_pad_speaker_interface(void);
+    /* The table (the environment call's answer). */
+    const struct ps5_pad_speaker *ps5_pad_speaker_interface(void);
 
-/* Closes every open speaker (the core went away). */
-void ps5_pad_speaker_close_all(void);
+    /* Closes every open speaker (the core went away). */
+    void ps5_pad_speaker_close_all(void);
 
 #ifdef __cplusplus
 }

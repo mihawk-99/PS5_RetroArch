@@ -12,13 +12,13 @@
 
 extern "C"
 {
-std::int32_t sceAudioOutInit();
-std::int32_t sceAudioOutOpen(std::int32_t, std::int32_t, std::int32_t, std::uint32_t, std::uint32_t,
-                             std::uint32_t);
-std::int32_t sceAudioOutOutput(std::int32_t, const void *);
-std::int32_t sceAudioOutClose(std::int32_t);
-int ps5_input_user_id(unsigned port);
-void ps5_input_trace(const char *line) noexcept;
+    std::int32_t sceAudioOutInit();
+    std::int32_t sceAudioOutOpen(std::int32_t, std::int32_t, std::int32_t, std::uint32_t,
+                                 std::uint32_t, std::uint32_t);
+    std::int32_t sceAudioOutOutput(std::int32_t, const void *);
+    std::int32_t sceAudioOutClose(std::int32_t);
+    int ps5_input_user_id(unsigned port);
+    void ps5_input_trace(const char *line) noexcept;
 }
 
 #include "../src/pad_speaker_ps5.cpp"
@@ -58,43 +58,43 @@ bool traced(const char *text)
 
 extern "C"
 {
-std::int32_t sceAudioOutInit()
-{
-    return 0;
-}
-std::int32_t sceAudioOutOpen(std::int32_t user, std::int32_t type, std::int32_t index,
-                             std::uint32_t len, std::uint32_t freq, std::uint32_t param)
-{
-    std::lock_guard<std::mutex> lock(mock);
-    opens.push_back({user, type, index, len, freq, param});
-    return open_result;
-}
-std::int32_t sceAudioOutOutput(std::int32_t, const void *data)
-{
-    std::unique_lock<std::mutex> lock(mock);
-    changed.wait(lock, [] { return !hold; });
-    const auto *samples = static_cast<const std::int16_t *>(data);
-    grains.emplace_back(samples, samples + grain);
-    changed.notify_all();
-    lock.unlock();
-    std::this_thread::sleep_for(std::chrono::microseconds(200));
-    return output_result;
-}
-std::int32_t sceAudioOutClose(std::int32_t handle)
-{
-    std::lock_guard<std::mutex> lock(mock);
-    closes.push_back(handle);
-    return 0;
-}
-int ps5_input_user_id(unsigned port)
-{
-    return port < 4 ? users[port] : -1;
-}
-void ps5_input_trace(const char *line) noexcept
-{
-    std::lock_guard<std::mutex> lock(mock);
-    lines.emplace_back(line);
-}
+    std::int32_t sceAudioOutInit()
+    {
+        return 0;
+    }
+    std::int32_t sceAudioOutOpen(std::int32_t user, std::int32_t type, std::int32_t index,
+                                 std::uint32_t len, std::uint32_t freq, std::uint32_t param)
+    {
+        std::lock_guard<std::mutex> lock(mock);
+        opens.push_back({user, type, index, len, freq, param});
+        return open_result;
+    }
+    std::int32_t sceAudioOutOutput(std::int32_t, const void *data)
+    {
+        std::unique_lock<std::mutex> lock(mock);
+        changed.wait(lock, [] { return !hold; });
+        const auto *samples = static_cast<const std::int16_t *>(data);
+        grains.emplace_back(samples, samples + grain);
+        changed.notify_all();
+        lock.unlock();
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        return output_result;
+    }
+    std::int32_t sceAudioOutClose(std::int32_t handle)
+    {
+        std::lock_guard<std::mutex> lock(mock);
+        closes.push_back(handle);
+        return 0;
+    }
+    int ps5_input_user_id(unsigned port)
+    {
+        return port < 4 ? users[port] : -1;
+    }
+    void ps5_input_trace(const char *line) noexcept
+    {
+        std::lock_guard<std::mutex> lock(mock);
+        lines.emplace_back(line);
+    }
 }
 
 int main()
@@ -134,12 +134,14 @@ int main()
         hold = false;
     }
     changed.notify_all();
-    wait_for([] {
-        for (const auto &g : grains)
-            if (g[0] == static_cast<std::int16_t>(grain + 1))
-                return true;
-        return false;
-    });
+    wait_for(
+        []
+        {
+            for (const auto &g : grains)
+                if (g[0] == static_cast<std::int16_t>(grain + 1))
+                    return true;
+            return false;
+        });
     {
         std::lock_guard<std::mutex> lock(mock);
         /* The grain that took the ramp's start (one may have gone out, silent, before it). */
