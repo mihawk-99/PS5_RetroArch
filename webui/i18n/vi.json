@@ -465,6 +465,8 @@
  "Otherwise your frontend opens after the game. A new tile, name or picture reaches the home screen once RetroArch closes.": "Nếu không, giao diện của bạn sẽ mở sau trò chơi. Biểu tượng, tên hoặc hình mới sẽ xuất hiện trên màn hình chính khi RetroArch đóng.",
  "Override the emulated PSP clock speed. Higher values may help some games but require more processing power. Disabled lets the game choose.": "Ghi đè xung nhịp PSP giả lập. Giá trị cao giúp một số trò chơi nhưng cần nhiều sức xử lý hơn. Tắt để trò chơi tự chọn.",
  "Overview": "Tổng quan",
+ "Ozone": "Ozone",
+ "Ozone — sidebar menu": "Ozone — menu thanh bên",
  "PS5 RetroArch has closed for installation. Reopen it from your launcher when installation finishes, then check the version above.": "PS5 RetroArch đã đóng để cài đặt. Mở lại từ trình khởi chạy khi cài xong, rồi kiểm tra phiên bản ở trên.",
  "PS5 RetroArch is closed": "PS5 RetroArch đã đóng",
  "PS5 RetroArch is starting": "PS5 RetroArch đang khởi động",

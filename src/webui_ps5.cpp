@@ -829,7 +829,8 @@ MHD_Result config_editor(MHD_Connection *c, const std::string &method, const std
             for (const auto &s : settings)
                 if (key == s.key)
                 {
-                    if (std::strcmp(s.kind, "menu") == 0 && value != "xmb" && value != "rgui")
+                    if (std::strcmp(s.kind, "menu") == 0 && value != "xmb" && value != "ozone" &&
+                        value != "rgui")
                         return error(c, 400, "Choose XMB or RGUI for the console menu.");
                     if (std::strcmp(s.kind, "number") == 0 &&
                         (std::strtod(value.c_str(), nullptr) < s.min ||
@@ -961,7 +962,7 @@ MHD_Result save_settings(MHD_Connection *c, const std::string &body)
         if (std::strcmp(setting->kind, "bool") == 0)
             valid = value == "true" || value == "false";
         else if (std::strcmp(setting->kind, "menu") == 0)
-            valid = value == "xmb" || value == "rgui";
+            valid = value == "xmb" || value == "ozone" || value == "rgui";
         else
         {
             char *tail = nullptr;

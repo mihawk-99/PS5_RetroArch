@@ -18,6 +18,7 @@ class XmbAssets(unittest.TestCase):
         self.assertIn('--enable-xmb', flags)
         self.assertIn('--enable-rgui', flags)
         self.assertIn('--enable-gfx_widgets', flags)
+        self.assertIn('--enable-ozone', flags)  # issue 91
         self.assertNotIn('--disable-xmb', flags)
         self.assertNotIn('--disable-gfx_widgets', flags)
 
@@ -64,7 +65,7 @@ class XmbAssets(unittest.TestCase):
         xmb = json.loads((ROOT / 'assets/xmb/source.json').read_text())
         self.assertEqual(manifest['revision'], xmb['revision'])
         required = {'regular.ttf', 'bold.ttf', 'README.md', 'INTER-LICENSE.txt', 'MPLUS-LICENSE.txt'}
-        self.assertEqual(set(manifest['files']), required)
+        self.assertEqual({name for name in manifest['files'] if not name.startswith('png/')}, required)
         for name, expected in manifest['files'].items():
             with self.subTest(asset=name):
                 self.assertEqual(hashlib.sha256((base / name).read_bytes()).hexdigest(), expected)
@@ -81,6 +82,39 @@ class XmbAssets(unittest.TestCase):
         self.assertIn('assets/ozone/INTER-LICENSE.txt', texts)
         self.assertIn('assets/ozone/MPLUS-LICENSE.txt', texts)
         self.assertIn('assets/ozone/README.md', texts)
+
+    def test_ozone_has_every_image_it_names(self):
+        """Issue 91: the Ozone menu, with each image RetroArch's ozone.c loads, pinned."""
+        base = ROOT / 'assets/ozone'
+        manifest = json.loads((base / 'source.json').read_text())
+        source = (ROOT / 'vendor/retroarch/menu/drivers/ozone.c').read_text()
+        themes = re.findall(r'^   "([a-z_]+)" +/\* name \*/', source, re.M)
+        self.assertEqual(len(themes), 11)
+        tabs = source[source.index('OZONE_TAB_TEXTURES_FILES[OZONE_TAB_TEXTURE_LAST] = {'):]
+        tabs = re.findall(r'"([a-z]+\.png)"', tabs[:tabs.index('};')])
+        self.assertEqual(len(tabs), 11)
+        wanted = {'png/retroarch.png', 'png/cursor_border.png'}
+        # Two of the sidebar's come from the icons folder, as ozone.c says.
+        wanted |= {'png/sidebar/' + name for name in tabs if name not in ('core.png', 'database.png')}
+        wanted |= {f'png/{theme}/{name}' for theme in themes
+                   for name in ('switch.png', 'check.png', 'cursor_noborder.png', 'cursor_static.png')}
+        self.assertEqual({name for name in manifest['files'] if name.startswith('png/')}, wanted)
+        self.assertEqual({p.relative_to(base).as_posix() for p in (base / 'png').rglob('*') if p.is_file()}, wanted)
+        for name in sorted(wanted):
+            data = (base / name).read_bytes()
+            self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n', name)
+            self.assertEqual(hashlib.sha256(data).hexdigest(), manifest['files'][name], name)
+        # Its entry icons and those two sidebar icons are the XMB monochrome theme's.
+        start = source.index('static const char *ozone_entries_icon_texture_path')
+        icons = set(re.findall(r'return "([^"]+\.png)"', source[start:source.index('\n}\n', start)]))
+        shipped = {p.name for p in (ROOT / 'assets/xmb/monochrome/png').glob('*.png')}
+        self.assertEqual((icons | {'core.png', 'database.png'}) - shipped, set())
+        component = next(c for c in json.loads((ROOT / 'tooling/notices/components.json').read_text())['components']
+                         if c['id'] == 'retroarch-widget-fonts')
+        for name in wanted:
+            self.assertTrue(any(fnmatch.fnmatchcase('assets/ozone/' + name, pattern)
+                                for pattern in component['artifacts']), name)
+        self.assertIn('assets/xmb/COPYING', {entry['from'] for entry in component['texts']})
 
 
 class XmbSystemIcons(unittest.TestCase):

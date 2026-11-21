@@ -498,7 +498,7 @@ function renderSettings() {
     const description = element('p', meta?.description || 'No description is available for this technical setting. Keep its value unless you know the configuration change you need.', 'setting-description');
     description.id = id + '-help'; details.append(label, description);
     let input, control = element('div', undefined, 'setting-control'), output;
-    const choices = guided ? meta.choices : setting.key === 'menu_driver' ? [['xmb', 'XMB'], ['rgui', 'RGUI']] : null;
+    const choices = guided ? meta.choices : setting.key === 'menu_driver' ? [['xmb', 'XMB'], ['ozone', 'Ozone'], ['rgui', 'RGUI']] : null;
     if (choices?.length) {
       input = document.createElement('select');
       for (const [value, text] of choices) input.add(new Option(choiceLabel(value, text), value));

@@ -465,6 +465,8 @@
  "Otherwise your frontend opens after the game. A new tile, name or picture reaches the home screen once RetroArch closes.": "Sinon, votre interface s’ouvre après le jeu. Une nouvelle vignette, un nouveau nom ou une nouvelle image arrive sur l’écran d’accueil une fois RetroArch fermé.",
  "Override the emulated PSP clock speed. Higher values may help some games but require more processing power. Disabled lets the game choose.": "Remplacer la vitesse d’horloge de la PSP émulée. Des valeurs plus élevées aident certains jeux mais demandent plus de puissance. Désactivé laisse le jeu choisir.",
  "Overview": "Vue d’ensemble",
+ "Ozone": "Ozone",
+ "Ozone — sidebar menu": "Ozone — menu à barre latérale",
  "PS5 RetroArch has closed for installation. Reopen it from your launcher when installation finishes, then check the version above.": "PS5 RetroArch s’est fermé pour l’installation. Rouvrez-le depuis votre lanceur une fois l’installation terminée, puis vérifiez la version ci-dessus.",
  "PS5 RetroArch is closed": "PS5 RetroArch est fermé",
  "PS5 RetroArch is starting": "PS5 RetroArch démarre",

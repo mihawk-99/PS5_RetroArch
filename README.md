@@ -67,7 +67,7 @@ Press **Square** to remember your choice. Hold **L1** during startup to return t
 ## <img src="webui/assets/fluent/arrow-square-down.svg" width="26" height="26" alt=""> Get started
 
 1. **Install the complete title folder.** Extract a release and copy `PPSA99169` to your homebrew launcher’s location, usually `/data/homebrew/PPSA99169/`. A compatible jailbreak and launcher must already be set up.
-2. **Choose your frontend.** Start RetroArch or EmulationStation from the picker. Press **Square** to remember your choice; hold **L1** during startup to return to the picker. XMB and RGUI are available in RetroArch.
+2. **Choose your frontend.** Start RetroArch or EmulationStation from the picker. Press **Square** to remember your choice; hold **L1** during startup to return to the picker. XMB, Ozone and RGUI are available in RetroArch (Settings → User Interface → Menu, or **Console menu style** in the WebUI).
 3. **Open the WebUI.** Scan its QR code or visit `http://<PS5-IP>:6769` from a device on the same network.
 4. **Add your games.** Use **Games → + Add Game** for one game backup, or **Content** for folders and multi-file games. Install any required BIOS files in the [system folders](#your-files), then load your game on the console.
 
@@ -82,6 +82,7 @@ is not condoned; requests for these files are not welcome in issues or discussio
 | **Picker** | Press **Triangle**; Triangle again or Circle closes it |
 | **RetroArch XMB** | **WebUI** tab to the left of Settings |
 | **RetroArch RGUI** | **WebUI** at the top of the main menu |
+| **RetroArch Ozone** | Not shown in Ozone; the WebUI runs all the same, at the address the other menus show |
 | **EmulationStation** | **WebUI** in the main menu |
 
 <a id="webui"></a>
@@ -475,7 +476,7 @@ lists and original notices.
 | [BlackBearReloaded — ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl) | Shader-compiler and graphics foundations consumed by PS5_Vulkan; not the active RetroArch video backend |
 | [Mesa contributors](https://gitlab.freedesktop.org/mesa/mesa) | RADV, the Vulkan driver the title renders through, with its ACO compiler, NIR, the Vulkan runtime and utilities |
 | [Khronos Group](https://github.com/KhronosGroup/Vulkan-Headers) | Vulkan API headers and [specification](https://github.com/KhronosGroup/Vulkan-Docs) |
-| [RetroArch assets contributors](https://github.com/libretro/retroarch-assets) and the [M+ Fonts project](https://mplusfonts.github.io/) | Packaged XMB assets and font; original notices retained |
+| [RetroArch assets contributors](https://github.com/libretro/retroarch-assets) and the [M+ Fonts project](https://mplusfonts.github.io/) | Packaged XMB and Ozone assets and fonts; original notices retained |
 | [LLVM / Clang contributors](https://github.com/llvm/llvm-project), [zlib authors Jean-loup Gailly and Mark Adler](https://github.com/madler/zlib) | Compilation and compression tooling |
 
 ### Frontends and interface artwork
@@ -553,7 +554,7 @@ The cores keep their own licences, and they differ:
 
 The Alekfull NX theme also carries non-commercial restrictions. Artwork credits and licence texts for the WebUI’s icons, flags, and system images are in [ICON-CREDITS.txt](webui/assets/ICON-CREDITS.txt).
 
-Assets and fonts keep their licences too: the XMB theme is CC-BY-4.0 with the M+
+Assets and fonts keep their licences too: the XMB theme and the Ozone menu's images are CC-BY-4.0 with the M+
 font licence, PPSSPP's fonts are OFL-1.1, and Dolphin's `Sys` files carry theirs.
 The launcher backgrounds (`sce_sys/pic0.dds`, `pic1.dds`) are drawn by
 `tools/make-title-art.py`, under this repository's licence.

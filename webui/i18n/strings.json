@@ -465,6 +465,8 @@
  "Otherwise your frontend opens after the game. A new tile, name or picture reaches the home screen once RetroArch closes.",
  "Override the emulated PSP clock speed. Higher values may help some games but require more processing power. Disabled lets the game choose.",
  "Overview",
+ "Ozone",
+ "Ozone — sidebar menu",
  "PS5 RetroArch has closed for installation. Reopen it from your launcher when installation finishes, then check the version above.",
  "PS5 RetroArch is closed",
  "PS5 RetroArch is starting",

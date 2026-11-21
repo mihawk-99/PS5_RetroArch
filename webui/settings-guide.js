@@ -50,7 +50,7 @@ guide('system', 'game_specific_options', 'Use game-specific core options', 'Allo
 guide('system', 'global_core_options', 'Share one core-options file', 'Store options in one global file. Turn off to use separate core profiles such as those edited by this WebUI.');
 guide('system', 'config_save_on_exit', 'Save console menu changes on exit', 'Write changes made in RetroArch to its configuration when it closes.');
 guide('system', 'rewind_enable', 'Rewind', 'Keep recent game states so you can rewind. This uses additional memory and processing time, and requires core support.');
-guide('interface', 'menu_driver', 'Console menu style', 'Choose the menu you see on your PS5. This does not change the WebUI theme.', 'select', [['xmb','XMB — horizontal menu'],['rgui','RGUI — compact text menu']] );
+guide('interface', 'menu_driver', 'Console menu style', 'Choose the menu you see on your PS5. This does not change the WebUI theme.', 'select', [['xmb','XMB — horizontal menu'],['ozone','Ozone — sidebar menu'],['rgui','RGUI — compact text menu']] );
 guide('interface', 'menu_show_advanced_settings', 'Advanced console settings', 'Show additional technical settings in the console menu. The WebUI’s Advanced mode is separate.');
 guide('interface', 'menu_pause_libretro', 'Pause when the menu opens', 'Pause the game while browsing the RetroArch menu.');
 guide('interface', 'menu_enable_widgets', 'On-screen notifications', 'Use graphical notifications for supported messages such as saves and achievements.');

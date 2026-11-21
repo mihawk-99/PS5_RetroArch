@@ -465,6 +465,8 @@
  "Otherwise your frontend opens after the game. A new tile, name or picture reaches the home screen once RetroArch closes.": "끄면 게임이 끝난 뒤 프런트엔드가 열립니다. 새 아이콘, 이름, 이미지는 RetroArch를 닫으면 홈 화면에 반영됩니다.",
  "Override the emulated PSP clock speed. Higher values may help some games but require more processing power. Disabled lets the game choose.": "에뮬레이션되는 PSP 클럭 속도를 덮어씁니다. 높은 값은 일부 게임에 도움이 되지만 처리 성능이 더 필요합니다. 꺼짐은 게임이 고르게 합니다.",
  "Overview": "개요",
+ "Ozone": "Ozone",
+ "Ozone — sidebar menu": "Ozone — 사이드바 메뉴",
  "PS5 RetroArch has closed for installation. Reopen it from your launcher when installation finishes, then check the version above.": "설치를 위해 PS5 RetroArch가 종료되었습니다. 설치가 끝나면 런처에서 다시 열고 위의 버전을 확인하세요.",
  "PS5 RetroArch is closed": "PS5 RetroArch가 닫혀 있습니다",
  "PS5 RetroArch is starting": "PS5 RetroArch가 시작되는 중",
