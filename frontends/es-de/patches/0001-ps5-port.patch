@@ -98,10 +98,17 @@ index fdebe01..66c6792 100644
  if(WIN32)
      install(TARGETS ES-DE RUNTIME DESTINATION .)
 diff --git a/es-app/src/FileData.cpp b/es-app/src/FileData.cpp
-index 67bd3c5..0f708de 100644
+index 67bd3c5..1a44873 100644
 --- a/es-app/src/FileData.cpp
 +++ b/es-app/src/FileData.cpp
-@@ -34,6 +34,12 @@
+@@ -1,3 +1,6 @@
++#if defined(__PROSPERO__)
++#include "SmbCatalog.h"
++#endif
+ //  SPDX-License-Identifier: MIT
+ //
+ //  ES-DE Frontend
+@@ -34,6 +37,12 @@
  #include <assert.h>
  #include <regex>
  
@@ -114,7 +121,27 @@ index 67bd3c5..0f708de 100644
  FileData::FileData(FileType type,
                     const std::string& path,
                     SystemEnvironmentData* envData,
-@@ -2301,7 +2307,25 @@ void FileData::launchGame()
+@@ -337,6 +346,9 @@ const std::string FileData::getMediaDirectory()
+
+ const std::string FileData::getMediafilePath(const std::string& subdirectory) const
+ {
++#if defined(__PROSPERO__)
++    if (SmbCatalog::remote(mPath)) return SmbCatalog::media(mPath, subdirectory);
++#endif
+     std::string subFolders;
+
+     // Extract possible subfolders from the path.
+@@ -441,6 +453,9 @@ const std::string FileData::getCustomImagePath() const
+
+ const std::string FileData::getVideoPath() const
+ {
++#if defined(__PROSPERO__)
++    if (SmbCatalog::remote(mPath)) return SmbCatalog::media(mPath, "videos");
++#endif
+     std::string subFolders;
+
+     // Extract possible subfolders from the path.
+@@ -2301,7 +2316,25 @@ void FileData::launchGame()
          androidExtrasInteger, androidExtrasBool, androidActivityFlags, launchOnOtherScreen);
  #else
  
@@ -141,8 +168,25 @@ index 67bd3c5..0f708de 100644
  // Deinit both the AudioManager and the window which allows emulators to launch in KMS mode.
  AudioManager::getInstance().deinit();
  window->deinit();
+diff --git a/es-app/src/SystemData.cpp b/es-app/src/SystemData.cpp
+index ee9feba..9dbc041 100644
+--- a/es-app/src/SystemData.cpp
++++ b/es-app/src/SystemData.cpp
+@@ -983,7 +983,12 @@ bool SystemData::loadConfig()
+ #if defined(_WIN64)
+             path = Utils::String::replace(path, "\\", "/");
+ #endif
++#if defined(__PROSPERO__)
++            // Keep the SMB scheme intact before the first directory/catalog lookup.
++            path = Utils::FileSystem::getGenericPath(path);
++#else
+             path = Utils::String::replace(path, "//", "/");
++#endif
+
+             // In case ~ is used, expand it to the home directory path.
+             path = Utils::FileSystem::expandHomePath(path);
 diff --git a/es-app/src/guis/GuiMenu.cpp b/es-app/src/guis/GuiMenu.cpp
-index a23c64a..1d602df 100644
+index a23c64a..134f446 100644
 --- a/es-app/src/guis/GuiMenu.cpp
 +++ b/es-app/src/guis/GuiMenu.cpp
 @@ -8,6 +8,10 @@
@@ -156,7 +200,7 @@ index a23c64a..1d602df 100644
  
  #if defined(_WIN64)
  // Why this is needed here is anyone's guess but without it the compilation fails.
-@@ -38,7 +41,9 @@
+@@ -38,7 +42,9 @@
  #include "guis/GuiSystemStatusOptions.h"
  #include "guis/GuiTextEditKeyboardPopup.h"
  #include "guis/GuiTextEditPopup.h"
@@ -182,7 +226,7 @@ index a23c64a..1d602df 100644
  
      if (isFullUI)
          addEntry(_("UI SETTINGS"), mMenuColorPrimary, true, [this] { openUIOptions(); });
-@@ -136,6 +145,8 @@ void GuiMenu::openUIOptions()
+@@ -136,6 +150,8 @@ void GuiMenu::openUIOptions()
  
      auto theme = std::make_shared<OptionListComponent<std::string>>(_("THEME"), false);
  
@@ -191,7 +235,7 @@ index a23c64a..1d602df 100644
      ComponentListRow themeDownloaderInputRow;
      themeDownloaderInputRow.elements.clear();
      themeDownloaderInputRow.addElement(std::make_shared<TextComponent>(_("THEME DOWNLOADER"),
-@@ -147,6 +158,7 @@ void GuiMenu::openUIOptions()
+@@ -147,6 +163,7 @@ void GuiMenu::openUIOptions()
      themeDownloaderInputRow.makeAcceptInputHandler(
          std::bind(&GuiMenu::openThemeDownloader, this, s));
      s->addRow(themeDownloaderInputRow);
@@ -199,7 +243,7 @@ index a23c64a..1d602df 100644
  
      // Theme.
      if (!themes.empty()) {
-@@ -2609,7 +2621,9 @@ void GuiMenu::openThemeDownloader(GuiSettings* settings)
+@@ -2609,7 +2626,9 @@ void GuiMenu::openThemeDownloader(GuiSettings* settings)
          }
      };
  
@@ -210,10 +254,21 @@ index a23c64a..1d602df 100644
  
  void GuiMenu::openSystemStatusOptions()
 diff --git a/es-app/src/main.cpp b/es-app/src/main.cpp
-index c7ed13a..a60159a 100644
+index c7ed13a..3509536 100644
 --- a/es-app/src/main.cpp
 +++ b/es-app/src/main.cpp
-@@ -577,6 +577,11 @@ void applicationLoop()
+@@ -12,6 +12,10 @@
+ //  starts listening to SDL events.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "ApplicationUpdater.h"
+ #include "ApplicationVersion.h"
+ #include "AudioManager.h"
+@@ -577,6 +581,11 @@ void applicationLoop()
  #endif
  }
  
@@ -225,6 +280,16 @@ index c7ed13a..a60159a 100644
  int main(int argc, char* argv[])
  {
      const auto applicationStartTime {std::chrono::system_clock::now()};
+@@ -1297,6 +1306,9 @@ int main(int argc, char* argv[])
+     window->deinit();
+
+     HttpReq::cleanupCurlMulti();
++#if defined(__PROSPERO__)
++    SmbImages::stop();
++#endif
+     TextureResource::setExit();
+     CollectionSystemsManager::getInstance()->deinit(true);
+     SystemData::deleteSystems();
 diff --git a/es-app/src/views/ViewController.cpp b/es-app/src/views/ViewController.cpp
 index a9af826..f911a41 100644
 --- a/es-app/src/views/ViewController.cpp
@@ -338,6 +403,243 @@ index d0c8264..cfeadd0 100644
      mStringMap["CollectionSystemsCustom"] = {"", ""};
      mStringMap["CollectionCustomGrouping"] = {"unthemed", "unthemed"};
      mBoolMap["FavFirstCustom"] = {false, false};
+diff --git a/es-core/src/Window.cpp b/es-core/src/Window.cpp
+index fa3763f..fba2b93 100644
+--- a/es-core/src/Window.cpp
++++ b/es-core/src/Window.cpp
+@@ -7,6 +7,10 @@
+ //  The input stack starts here as well, as this is the first instance called by InputManager.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "Window.h"
+
+ #include "InputManager.h"
+@@ -396,6 +400,9 @@ void Window::logInput(InputConfig* config, Input input)
+
+ void Window::update(int deltaTime)
+ {
++#if defined(__PROSPERO__)
++    SmbImages::beginFrame();
++#endif
+     if (mInvalidateCacheTimer > 0) {
+         mInvalidateCacheTimer = glm::clamp(mInvalidateCacheTimer - deltaTime, 0, 500);
+         if (mHelpComponents != nullptr) {
+diff --git a/es-core/src/components/ImageComponent.cpp b/es-core/src/components/ImageComponent.cpp
+index bfa082a..7266177 100644
+--- a/es-core/src/components/ImageComponent.cpp
++++ b/es-core/src/components/ImageComponent.cpp
+@@ -6,6 +6,10 @@
+ //  Handles images: loading, resizing, cropping, color shifting etc.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "components/ImageComponent.h"
+
+ #include "Log.h"
+@@ -53,10 +57,42 @@ ImageComponent::ImageComponent(bool forceLoad, bool dynamic)
+ }
+
+ void ImageComponent::setImage(const std::string& path, bool tile)
++{
++#if defined(__PROSPERO__)
++    mPendingRemotePath.clear();
++    if (SmbImages::remote(path)) {
++        // Do not fetch during construction of every system's view at startup.
++        mPendingRemotePath = path;
++        mPendingRemoteTile = tile;
++        mTexture.reset();
++        mSize = glm::vec2 {0.0f, 0.0f};
++        mFadeOpacity = 0.0f;
++        mFading = false;
++        return;
++    }
++#endif
++    setImageFromPath(path, tile);
++}
++
++#if defined(__PROSPERO__)
++void ImageComponent::prepareRemoteTexture(bool warm, bool foreground)
++{
++    if (!mPendingRemotePath.empty()) {
++        const auto ready = SmbImages::get(mPendingRemotePath, foreground);
++        if (!ready || !SmbImages::takeInstall()) return;
++        setImageFromPath(mPendingRemotePath, mPendingRemoteTile);
++        if (mTexture && mTexture->getSize().x > 0 && mTexture->getSize().y > 0)
++            mPendingRemotePath.clear();
++    }
++    if (warm && mTexture) mTexture->bind(0);
++}
++#endif
++
++void ImageComponent::setImageFromPath(const std::string& path, bool tile)
+ {
+     // Always load bundled graphic resources statically, unless mForceLoad has been set.
+     // This eliminates annoying texture pop-in problems that would otherwise occur.
+-    if (!mForceLoad && (path[0] == ':') && (path[1] == '/')) {
++    if (!mForceLoad && path.size() >= 2 && (path[0] == ':') && (path[1] == '/')) {
+         mDynamic = false;
+     }
+     else if (Utils::FileSystem::isDirectory(path)) {
+@@ -120,6 +156,9 @@ void ImageComponent::setImage(const std::string& path, bool tile)
+
+ void ImageComponent::setImage(const char* data, size_t length, bool tile)
+ {
++#if defined(__PROSPERO__)
++    mPendingRemotePath.clear();
++#endif
+     mTexture.reset();
+
+     mTexture = TextureResource::get("", tile);
+@@ -130,6 +169,9 @@ void ImageComponent::setImage(const char* data, size_t length, bool tile)
+
+ void ImageComponent::setImage(const std::shared_ptr<TextureResource>& texture, bool resizeTexture)
+ {
++#if defined(__PROSPERO__)
++    mPendingRemotePath.clear();
++#endif
+     mTexture = texture;
+     if (resizeTexture)
+         resize();
+@@ -137,6 +179,9 @@ void ImageComponent::setImage(const std::shared_ptr<TextureResource>& texture, b
+
+ void ImageComponent::setRawImage(const unsigned char* data, size_t width, size_t height)
+ {
++#if defined(__PROSPERO__)
++    mPendingRemotePath.clear();
++#endif
+     mTexture.reset();
+     mTexture = TextureResource::get("", false, false, true, mLinearInterpolation);
+     mTexture->initFromPixels(data, width, height);
+@@ -424,6 +469,9 @@ glm::vec2 ImageComponent::getSize() const
+
+ void ImageComponent::render(const glm::mat4& parentTrans)
+ {
++#if defined(__PROSPERO__)
++    if (isVisible() && mThemeOpacity != 0.0f) prepareRemoteTexture();
++#endif
+     if (!isVisible() || mThemeOpacity == 0.0f || mTexture == nullptr ||
+         mTargetSize == glm::vec2 {0.0f, 0.0f} || mSize == glm::vec2 {0.0f, 0.0f})
+         return;
+diff --git a/es-core/src/components/ImageComponent.h b/es-core/src/components/ImageComponent.h
+index 5cabacb..3bcc277 100644
+--- a/es-core/src/components/ImageComponent.h
++++ b/es-core/src/components/ImageComponent.h
+@@ -21,6 +21,9 @@ public:
+     virtual ~ImageComponent() {}
+
+     void setDefaultImage(const std::string& path) { mDefaultPath = path; }
++#if defined(__PROSPERO__)
++    void prepareRemoteTexture(bool warm = false, bool foreground = true);
++#endif
+
+     // Loads the image at the given filepath. Will tile if tile is true (retrieves texture
+     // as tiling, creates vertices accordingly).
+@@ -168,6 +171,11 @@ private:
+         "image", "miximage",  "marquee", "screenshot",    "titlescreen",
+         "cover", "backcover", "3dbox",   "physicalmedia", "fanart"};
+
++    void setImageFromPath(const std::string& path, bool tile);
++#if defined(__PROSPERO__)
++    std::string mPendingRemotePath;
++    bool mPendingRemoteTile = false;
++#endif
+     std::shared_ptr<TextureResource> mTexture;
+     float mFadeOpacity;
+     float mCornerRadius;
+diff --git a/es-core/src/components/VideoFFmpegComponent.cpp b/es-core/src/components/VideoFFmpegComponent.cpp
+index 3752c17..33b9935 100644
+--- a/es-core/src/components/VideoFFmpegComponent.cpp
++++ b/es-core/src/components/VideoFFmpegComponent.cpp
+@@ -7,6 +7,12 @@
+ //
+
+ #include "components/VideoFFmpegComponent.h"
++#if defined(__PROSPERO__)
++#include "SmbCatalog.h"
++#include "SmbMedia.h"
++#define avformat_open_input SmbMedia::openVideo
++#define avformat_close_input SmbMedia::closeVideo
++#endif
+
+ #include "AudioManager.h"
+ #include "Settings.h"
+@@ -1466,6 +1472,9 @@ void VideoFFmpegComponent::startVideoStream()
+         std::queue<AudioFrame>().swap(mAudioFrameQueue);
+
+         std::string filePath {"file:" + mVideoPath};
++#if defined(__PROSPERO__)
++        if (SmbCatalog::remote(mVideoPath)) filePath = mVideoPath;
++#endif
+
+         // This will disable the FFmpeg logging, so comment this out if debug info is needed.
+         av_log_set_callback(nullptr);
+diff --git a/es-core/src/components/primary/GridComponent.h b/es-core/src/components/primary/GridComponent.h
+index 604581e..9a160af 100644
+--- a/es-core/src/components/primary/GridComponent.h
++++ b/es-core/src/components/primary/GridComponent.h
+@@ -9,6 +9,11 @@
+ #ifndef ES_CORE_COMPONENTS_PRIMARY_GRID_COMPONENT_H
+ #define ES_CORE_COMPONENTS_PRIMARY_GRID_COMPONENT_H
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#include "SmbCatalog.h"
++#endif
++
+ #include "components/IList.h"
+ #include "components/primary/PrimaryComponent.h"
+
+@@ -475,6 +480,13 @@ template <typename T> void GridComponent<T>::onDemandTextureLoad()
+             }
+         }
+
++#if defined(__PROSPERO__)
++        if (mGamelistView && SmbCatalog::enabled()) {
++            const int top = std::max(0, mCursor / mColumns - visibleRows + 1);
++            startPos = std::max(0, top - 1) * mColumns;
++            loadItems = std::min(size(), (top + visibleRows + 2) * mColumns) - startPos;
++        }
++#endif
+         for (int i {startPos}; i < size(); ++i) {
+             if (loadedItems == loadItems)
+                 break;
+@@ -657,6 +669,29 @@ template <typename T> void GridComponent<T>::update(int deltaTime)
+     mEntries.at(mCursor).data.item->update(deltaTime);
+     List::listUpdate(deltaTime);
+     GuiComponent::update(deltaTime);
++#if defined(__PROSPERO__)
++    if (mGamelistView && mColumns > 0 && !mEntries.empty() && SmbCatalog::enabled()) {
++        const int rows = static_cast<int>(std::ceil(mVisibleRows));
++        const int top = std::max(0, static_cast<int>(std::floor(mScrollPos)));
++        std::vector<int> indices;
++        std::vector<std::string> paths;
++        auto append = [&](int i) {
++            if (i < 0 || i >= size() || !SmbImages::remote(mEntries[i].data.imagePath)) return;
++            if (std::find(indices.begin(), indices.end(), i) != indices.end()) return;
++            indices.push_back(i); paths.push_back(mEntries[i].data.imagePath);
++        };
++        append(mCursor);
++        for (int i = top * mColumns; i < std::min(size(), (top + rows) * mColumns); ++i) append(i);
++        const size_t visible = indices.size();
++        for (int i = (top + rows) * mColumns; i < std::min(size(), (top + rows + 2) * mColumns); ++i) append(i);
++        for (int i = std::max(0, top - 1) * mColumns; i < top * mColumns; ++i) append(i);
++        SmbImages::window(paths, visible);
++        for (size_t n = 0; n < indices.size(); ++n) {
++            auto image = std::dynamic_pointer_cast<ImageComponent>(mEntries[indices[n]].data.item);
++            if (image) image->prepareRemoteTexture(true, n < visible);
++        }
++    }
++#endif
+ }
+
+ template <typename T> void GridComponent<T>::render(const glm::mat4& parentTrans)
 diff --git a/es-core/src/renderers/RendererOpenGL.cpp b/es-core/src/renderers/RendererOpenGL.cpp
 index 6e78440..3216de8 100644
 --- a/es-core/src/renderers/RendererOpenGL.cpp
@@ -367,11 +669,220 @@ index 6e78440..3216de8 100644
  }
  
  unsigned int RendererOpenGL::createTexture(const unsigned int texUnit,
+diff --git a/es-core/src/resources/ResourceManager.cpp b/es-core/src/resources/ResourceManager.cpp
+index dcba408..c923004 100644
+--- a/es-core/src/resources/ResourceManager.cpp
++++ b/es-core/src/resources/ResourceManager.cpp
+@@ -8,6 +8,10 @@
+ //
+
+ #include "ResourceManager.h"
++#if defined(__PROSPERO__)
++#include "SmbCatalog.h"
++#include "SmbMedia.h"
++#endif
+
+ #include "Log.h"
+ #include "utils/FileSystemUtil.h"
+@@ -107,6 +111,13 @@ std::string ResourceManager::getResourcePath(const std::string& path, bool termi
+
+ const ResourceData ResourceManager::getFileData(const std::string& path) const
+ {
++#if defined(__PROSPERO__)
++    if (SmbCatalog::remote(path)) {
++        size_t size = 0;
++        auto data = SmbMedia::readImage(path, size);
++        return ResourceData{data, size};
++    }
++#endif
+     // Check if its a resource.
+     const std::string respath {getResourcePath(path)};
+
+diff --git a/es-core/src/resources/TextureData.cpp b/es-core/src/resources/TextureData.cpp
+index 4e0a6de..b50eba0 100644
+--- a/es-core/src/resources/TextureData.cpp
++++ b/es-core/src/resources/TextureData.cpp
+@@ -6,6 +6,10 @@
+ //  Low-level texture data functions.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "resources/TextureData.h"
+
+ #include "ImageIO.h"
+@@ -173,6 +177,18 @@ bool TextureData::initFromRGBA(const unsigned char* dataRGBA, size_t width, size
+
+ bool TextureData::load()
+ {
++#if defined(__PROSPERO__)
++    if (SmbImages::remote(mPath)) {
++        // A cache miss schedules CPU work and returns immediately. This is also
++        // safe when old dimension/memory-accounting getters call load().
++        if (isLoaded()) return true;
++        const auto image = SmbImages::get(mPath);
++        if (!image) return false;
++        mSourceWidth = static_cast<float>(image->sourceWidth ? image->sourceWidth : image->width);
++        mSourceHeight = static_cast<float>(image->sourceHeight ? image->sourceHeight : image->height);
++        return initFromRGBA(image->pixels.data(), image->width, image->height);
++    }
++#endif
+     if (mInvalidSVGFile)
+         return false;
+
+@@ -218,12 +234,21 @@ bool TextureData::uploadAndBind(const unsigned int texUnit)
+         if (mWidth == 0 || mHeight == 0 || mDataRGBA.empty())
+             return false;
+
++#if defined(__PROSPERO__)
++        if (SmbImages::remote(mPath) && !SmbImages::takeUpload()) return false;
++#endif
+         // Upload texture.
+         mTextureID =
+             mRenderer->createTexture(texUnit, Renderer::TextureType::BGRA, true, mLinearMagnify,
+                                      mMipmapping, mTile, static_cast<const unsigned int>(mWidth),
+                                      static_cast<const unsigned int>(mHeight), mDataRGBA.data());
+     }
++#if defined(__PROSPERO__)
++    if (mTextureID != 0 && SmbImages::remote(mPath)) {
++        std::vector<unsigned char>().swap(mDataRGBA);
++        mHasRGBAData = false;
++    }
++#endif
+     return true;
+ }
+
+diff --git a/es-core/src/resources/TextureDataManager.cpp b/es-core/src/resources/TextureDataManager.cpp
+index 295c705..4dc4d12 100644
+--- a/es-core/src/resources/TextureDataManager.cpp
++++ b/es-core/src/resources/TextureDataManager.cpp
+@@ -6,6 +6,10 @@
+ //  Loading and unloading of texture data.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "resources/TextureDataManager.h"
+
+ #include "Log.h"
+@@ -101,6 +105,11 @@ size_t TextureDataManager::getQueueSize()
+
+ void TextureDataManager::load(std::shared_ptr<TextureData> tex, bool block)
+ {
++#if defined(__PROSPERO__)
++    // Network data already has its own CPU-only worker. Poll its ready cache
++    // here, without enqueuing GPU-owning TextureData on the legacy loader.
++    if (SmbImages::remote(tex->getTextureFilePath())) block = true;
++#endif
+     // See if it's already loaded.
+     if (tex->isLoaded())
+         return;
+diff --git a/es-core/src/resources/TextureResource.cpp b/es-core/src/resources/TextureResource.cpp
+index dc66efd..162a236 100644
+--- a/es-core/src/resources/TextureResource.cpp
++++ b/es-core/src/resources/TextureResource.cpp
+@@ -6,6 +6,10 @@
+ //  Handles textures including loading, unloading and cache management.
+ //
+
++#if defined(__PROSPERO__)
++#include "SmbImages.h"
++#endif
++
+ #include "resources/TextureResource.h"
+
+ #include "utils/FileSystemUtil.h"
+@@ -31,8 +35,14 @@ TextureResource::TextureResource(const std::string& path,
+         // If there is a path then the 'dynamic' flag tells us whether to use the texture
+         // data manager to manage loading/unloading of this texture.
+         std::shared_ptr<TextureData> data;
++#if defined(__PROSPERO__)
++        if (SmbImages::remote(path)) dynamic = true;
++#endif
+         if (dynamic) {
+             data = sTextureDataManager.add(this, tile);
++#if defined(__PROSPERO__)
++            if (SmbImages::remote(path)) mRemoteData = data;
++#endif
+             data->initFromPath(path);
+             data->setTileSize(tileWidth, tileHeight);
+             data->setLinearMagnify(linearMagnify);
+diff --git a/es-core/src/resources/TextureResource.h b/es-core/src/resources/TextureResource.h
+index 357f9ff..fad8cc6 100644
+--- a/es-core/src/resources/TextureResource.h
++++ b/es-core/src/resources/TextureResource.h
+@@ -60,7 +60,10 @@ public:
+     std::string getTextureFilePath();
+
+     void rasterizeAt(float width, float height);
+-    glm::vec2 getSourceImageSize() const { return mSourceSize; }
++    glm::vec2 getSourceImageSize() const
++    {
++        return mRemoteData ? glm::vec2 {mRemoteData->sourceWidth(), mRemoteData->sourceHeight()} : mSourceSize;
++    }
+     const bool getIsInvalidSVGFile() const { return mInvalidSVGFile; }
+
+     virtual ~TextureResource();
+@@ -72,7 +75,10 @@ public:
+         mSize.y = static_cast<int>(std::round(height));
+     }
+
+-    const glm::ivec2 getSize() const { return mSize; }
++    const glm::ivec2 getSize() const
++    {
++        return mRemoteData ? glm::ivec2(mRemoteData->getSize()) : mSize;
++    }
+     bool bind(const unsigned int texUnit);
+
+     // Returns an approximation of total VRAM used by textures (in bytes).
+@@ -98,6 +104,8 @@ private:
+     // mTextureData is used for textures that are not loaded from a file - these ones
+     // are permanently allocated and cannot be loaded and unloaded based on resources.
+     std::shared_ptr<TextureData> mTextureData;
++    // Non-null only for PS5 network raster images; ownership still uses the manager.
++    std::shared_ptr<TextureData> mRemoteData;
+
+     // The texture data manager manages loading and unloading of filesystem based textures.
+     static inline TextureDataManager sTextureDataManager;
 diff --git a/es-core/src/utils/FileSystemUtil.cpp b/es-core/src/utils/FileSystemUtil.cpp
-index ba0a43f..5b91645 100644
+index ba0a43f..cfa23c7 100644
 --- a/es-core/src/utils/FileSystemUtil.cpp
 +++ b/es-core/src/utils/FileSystemUtil.cpp
-@@ -576,6 +576,12 @@ namespace Utils
+@@ -18,6 +18,9 @@
+ #endif
+
+ #include "utils/FileSystemUtil.h"
++#if defined(__PROSPERO__)
++#include "SmbCatalog.h"
++#endif
+
+ #include "Log.h"
+ #include "utils/PlatformUtil.h"
+@@ -454,6 +457,9 @@ namespace Utils
+
+         std::string getGenericPath(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return SmbCatalog::canonical(path);
++#endif
+             std::string genericPath {path};
+             size_t offset {std::string::npos};
+
+@@ -512,6 +518,9 @@ namespace Utils
+
+         std::string getCanonicalPath(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return SmbCatalog::canonical(path);
++#endif
+             // Hack for builtin resources.
+             if ((path[0] == ':') && (path[1] == '/'))
+                 return path;
+@@ -576,6 +585,12 @@ namespace Utils
          std::string getAbsolutePath(const std::string& path, const std::string& base)
          {
              const std::string& absolutePath {getGenericPath(path)};
@@ -384,6 +895,66 @@ index ba0a43f..5b91645 100644
              const std::string& baseVar {isAbsolute(base) ? getGenericPath(base) :
                                                             getAbsolutePath(base)};
  
+@@ -648,6 +663,9 @@ namespace Utils
+
+         long getFileSize(const std::filesystem::path& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path.string())) return SmbCatalog::size(path.string());
++#endif
+             try {
+ #if defined(_WIN64)
+                 return static_cast<long>(std::filesystem::file_size(
+@@ -971,6 +989,9 @@ namespace Utils
+
+         bool exists(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return SmbCatalog::exists(path);
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
+@@ -1004,6 +1025,9 @@ namespace Utils
+
+         bool isAbsolute(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return !SmbCatalog::canonical(path).empty();
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
+@@ -1019,6 +1043,9 @@ namespace Utils
+
+         bool isRegularFile(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return SmbCatalog::size(path) != 0;
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
+@@ -1036,6 +1063,9 @@ namespace Utils
+
+         bool isDirectory(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return SmbCatalog::directory(path);
++#endif
+             const std::string& genericPath {getGenericPath(path)};
+             try {
+ #if defined(_WIN64)
+@@ -1053,6 +1083,9 @@ namespace Utils
+
+         bool isSymlink(const std::string& path)
+         {
++#if defined(__PROSPERO__)
++            if (SmbCatalog::remote(path)) return false;
++#endif
+ #if defined(__ANDROID__)
+             // Symlinks are generally not supported on Android due to the Storage Access Framework
+             // and the use of FAT/exFAT and NTFS filesystems.
 diff --git a/es-core/src/utils/LocalizationUtil.cpp b/es-core/src/utils/LocalizationUtil.cpp
 index 757b8bc..872e0f3 100644
 --- a/es-core/src/utils/LocalizationUtil.cpp

@@ -10,6 +10,11 @@
 #endif
 #include "ps5_game.h"
 #include "ps5_library.h"
+#if defined(__PROSPERO__) || defined(PS5_GAME_SMB_TEST)
+#include "ps5_smb_vfs.h"
+/* Other frontend executables may not link the optional SMB transport. */
+extern int ps5_smb_stat(const char *, int64_t *) __attribute__((weak));
+#endif
 
 #include <ctype.h>
 #include <dirent.h>
@@ -214,7 +219,17 @@ int ps5_game_check(struct ps5_game *game)
         set_error(game, "a value has a line break");
         return -1;
     }
-    if (game->content[0] != '/' || !is_file(game->content))
+    int content_is_file = game->content[0] == '/' && is_file(game->content);
+#if defined(__PROSPERO__) || defined(PS5_GAME_SMB_TEST)
+    if (ps5_smb_stat && strncmp(game->content, "smb://", 6) == 0)
+    {
+        /* The VFS verifies the saved server and opens read-only. These are
+         * RETRO_VFS_STAT_IS_VALID (1) and RETRO_VFS_STAT_IS_DIRECTORY (2). */
+        const int flags = ps5_smb_stat(game->content, NULL);
+        content_is_file = (flags & 3) == 1;
+    }
+#endif
+    if (!content_is_file)
     {
         set_error(game, "the content is not a file");
         return -1;
