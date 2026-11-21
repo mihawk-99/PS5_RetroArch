@@ -30,11 +30,18 @@
  * start (klog/frontend-20261004-161318/es_log.txt). A title has no symbolic links
  * (the platform refuses symlink and finds none with readlink), so lstat answers
  * as stat. The platform's getcwd walks the tree with it too.
+ *
+ * ps5_smb_stat: game mode (src/ps5_game.c, linked into every frontend) asks it of
+ * smb:// content through a weak reference, and in a program without the SMB client
+ * that reference became an import of a name no module exports, which
+ * tools/build-frontend.sh refuses. This weak default is the answer there: not on the
+ * share. ES-DE's client (frontends/es-de/ps5/smb_client.c) replaces it.
  */
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -120,4 +127,11 @@ char *getcwd(char *buffer, size_t size)
 int lstat(const char *path, struct stat *status)
 {
     return stat(path, status);
+}
+
+__attribute__((weak)) int ps5_smb_stat(const char *url, int64_t *size)
+{
+    (void)url;
+    (void)size;
+    return 0;
 }
