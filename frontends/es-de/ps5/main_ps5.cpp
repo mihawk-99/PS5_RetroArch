@@ -1,4 +1,3 @@
-#include <chrono>
 /* PS5 RetroArch - EmulationStation's entry point on the PS5.
  *
  * Copyright (C) 2026 Mihawk
@@ -42,6 +41,7 @@
  */
 #include <SDL.h>
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <sys/stat.h>
 #include <cstdlib>
@@ -144,9 +144,10 @@ int main(int argc, char **argv)
     char library[256] = "";
     const auto library_started = std::chrono::steady_clock::now();
     const int systems = ps5_esde_write_library(library, sizeof(library));
-    std::printf("[ES-DE startup] library=%lld ms\n", static_cast<long long>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - library_started).count()));
+    std::printf("[ES-DE startup] library=%lld ms\n",
+                static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                           std::chrono::steady_clock::now() - library_started)
+                                           .count()));
     if (std::FILE *log = std::fopen(start_log, "a"))
     {
         std::fprintf(log, "%lld start: library from RetroArch's playlists: %s\n",

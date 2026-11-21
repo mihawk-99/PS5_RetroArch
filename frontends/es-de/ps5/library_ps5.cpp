@@ -299,15 +299,21 @@ bool save_bytes(const std::string &bytes, const std::string &path)
                std::memcmp(block, bytes.data() + at, count) == 0;
         at += count;
     }
-    if (same && input.peek() == std::char_traits<char>::eof()) return true;
+    if (same && input.peek() == std::char_traits<char>::eof())
+        return true;
     input.close();
     const std::string temporary = path + ".tmp";
     std::FILE *output = std::fopen(temporary.c_str(), "wb");
-    if (!output) return false;
+    if (!output)
+        return false;
     const bool written = std::fwrite(bytes.data(), 1, bytes.size(), output) == bytes.size();
     const bool closed = std::fclose(output) == 0;
-    if (!written || !closed) { std::remove(temporary.c_str()); return false; }
-    chmod(temporary.c_str(), 0777);
+    if (!written || !closed)
+    {
+        std::remove(temporary.c_str());
+        return false;
+    }
+    chmod(temporary.c_str(), 0777); /* FTP's reach: the title's files are 0777 */
     if (std::rename(temporary.c_str(), path.c_str()) != 0)
     {
         std::remove(temporary.c_str());

@@ -584,7 +584,8 @@ static void index_game(struct game_paths *index, const struct ps5_library *libra
         for (size_t i = 0; i < game; ++i)
         {
             size_t at = path_hash(library->games[i].path) & (capacity - 1);
-            while (slots[at]) at = (at + 1) & (capacity - 1);
+            while (slots[at])
+                at = (at + 1) & (capacity - 1);
             slots[at] = i + 1;
         }
         free(index->slots);
@@ -592,12 +593,13 @@ static void index_game(struct game_paths *index, const struct ps5_library *libra
         index->capacity = capacity;
     }
     size_t at = path_hash(library->games[game].path) & (index->capacity - 1);
-    while (index->slots[at]) at = (at + 1) & (index->capacity - 1);
+    while (index->slots[at])
+        at = (at + 1) & (index->capacity - 1);
     index->slots[at] = game + 1;
 }
 
 static struct ps5_library_game *indexed_game(struct ps5_library *library,
-                                            const struct game_paths *index, const char *path)
+                                             const struct game_paths *index, const char *path)
 {
     if (index->capacity)
     {
@@ -605,13 +607,15 @@ static struct ps5_library_game *indexed_game(struct ps5_library *library,
         while (index->slots[at])
         {
             struct ps5_library_game *game = &library->games[index->slots[at] - 1];
-            if (strcmp(game->path, path) == 0) return game;
+            if (strcmp(game->path, path) == 0)
+                return game;
             at = (at + 1) & (index->capacity - 1);
         }
         return NULL;
     }
     for (size_t i = 0; i < library->game_count; ++i)
-        if (strcmp(library->games[i].path, path) == 0) return &library->games[i];
+        if (strcmp(library->games[i].path, path) == 0)
+            return &library->games[i];
     return NULL;
 }
 
@@ -1058,7 +1062,8 @@ static void read_play(struct ps5_library *library, const char *playlists)
 {
     time_t history_written = 0;
     struct game_paths index = {0};
-    for (size_t i = 0; i < library->game_count; ++i) index_game(&index, library, i);
+    for (size_t i = 0; i < library->game_count; ++i)
+        index_game(&index, library, i);
     read_builtin(library, playlists, "content_favorites.lpl", 0, NULL, &index);
     read_builtin(library, playlists, "content_history.lpl", 1, &history_written, &index);
     free(index.slots);
