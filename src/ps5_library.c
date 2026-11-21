@@ -603,6 +603,28 @@ static void strip_lpl(const char *name, char *out, size_t size)
         out[length - 4] = '\0';
 }
 
+size_t ps5_library_file_length(const char *path)
+{
+    /* RetroArch's own rule (path_get_archive_delim): a "#" straight after .zip, .apk or .7z. */
+    for (const char *hash = path ? strchr(path, '#') : NULL; hash; hash = strchr(hash + 1, '#'))
+    {
+        const size_t before = (size_t)(hash - path);
+        if ((before >= 4 &&
+             (strncasecmp(hash - 4, ".zip", 4) == 0 || strncasecmp(hash - 4, ".apk", 4) == 0)) ||
+            (before >= 3 && strncasecmp(hash - 3, ".7z", 3) == 0))
+            return before;
+    }
+    return path ? strlen(path) : 0;
+}
+
+int ps5_library_same_game(const char *a, const char *b)
+{
+    const size_t length = ps5_library_file_length(a);
+    if (!a || !b || length != ps5_library_file_length(b) || strncmp(a, b, length) != 0)
+        return 0;
+    return !a[length] || !b[length] || strcmp(a + length, b + length) == 0;
+}
+
 /* The system of an entry: a platform id and its name (*known 1), or a key of its own. */
 static void entry_system(const struct ps5_library *library, const struct ps5_playlist_entry *entry,
                          const char *playlist, const char *core, char *id, size_t id_size,
@@ -674,8 +696,8 @@ static void add_entry(void *context, const struct ps5_playlist_entry *entry)
         }
     }
     for (size_t i = 0; i < library->game_count; i++)
-        if (strcmp(library->games[i].path, entry->path) == 0)
-            return; /* a game in two playlists is one game */
+        if (ps5_library_same_game(library->games[i].path, entry->path))
+            return; /* a game in two playlists is one game, and an archive its one file */
     if (library->game_count == loading->game_capacity)
     {
         const size_t capacity = loading->game_capacity ? loading->game_capacity * 2 : 64;
@@ -866,11 +888,24 @@ static void finish_systems(struct ps5_library *library)
             const struct ps5_library_game *game = &library->games[i];
             if (game->system != s)
                 continue;
-            const char *slash = strrchr(game->path, '/');
-            const char *dot = strrchr(game->path, '.');
-            if (dot && (!slash || dot > slash))
-                add_extensions(system->extensions, sizeof(system->extensions), dot + 1);
-            const size_t folder_length = slash ? (size_t)(slash - game->path) : 0;
+            /* The file's folder and extension: for a file inside an archive, the archive's
+             * (the folder a frontend lists) and both (issue 108). */
+            const size_t file_length = ps5_library_file_length(game->path);
+            size_t folder_length = file_length;
+            while (folder_length > 0 && game->path[folder_length] != '/')
+                folder_length--;
+            const char *const ends[] = {game->path + file_length, game->path + strlen(game->path)};
+            for (size_t e = game->path[file_length] ? 0 : 1; e < 2; e++)
+            {
+                char extension[32] = "";
+                const char *start = ends[e];
+                while (start > game->path + folder_length && !strchr("./#", start[-1]))
+                    start--;
+                if (start > game->path && start[-1] == '.' &&
+                    (size_t)(ends[e] - start) < sizeof(extension))
+                    memcpy(extension, start, (size_t)(ends[e] - start));
+                add_extensions(system->extensions, sizeof(system->extensions), extension);
+            }
             if (first)
             {
                 snprintf(system->folder, sizeof(system->folder), "%.*s", (int)folder_length,
@@ -910,7 +945,7 @@ static void finish_systems(struct ps5_library *library)
 static struct ps5_library_game *game_by_path(struct ps5_library *library, const char *path)
 {
     for (size_t i = 0; i < library->game_count; i++)
-        if (strcmp(library->games[i].path, path) == 0)
+        if (ps5_library_same_game(library->games[i].path, path))
             return &library->games[i];
     return NULL;
 }

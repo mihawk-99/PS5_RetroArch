@@ -108,6 +108,11 @@ int main(int argc, char **argv)
     snprintf(game.core, sizeof(game.core), "%s", content);
     assert(ps5_game_check(&game) != 0); /* not in the cores folder */
     snprintf(game.core, sizeof(game.core), "%s", core);
+    /* A file inside an archive that is there (issue 108), and inside one that is not. */
+    snprintf(game.content, sizeof(game.content), "%.900s#inside/game.sfc", content);
+    assert(ps5_game_check(&game) == 0);
+    snprintf(game.content, sizeof(game.content), "%.900s/none.zip#game.sfc", dir);
+    assert(ps5_game_check(&game) != 0);
     snprintf(game.content, sizeof(game.content), "%s", "relative.zip");
     assert(ps5_game_check(&game) != 0);
     snprintf(game.content, sizeof(game.content), "%s", content);
@@ -127,7 +132,9 @@ int main(int argc, char **argv)
         "    {\"path\": \"/app0/content/a.zip\", \"label\": \"A\", \"core_path\": \"DETECT\"},\n"
         "    {\"label\": \"Caf\\u00e9 \\\"B\\\"\", \"subsystem_roms\": [\"x\", {\"y\": [1, 2]}],\n"
         "     \"path\": \"/app0/content/Caf\\u00e9\\/b.zip\", \"crc32\": \"00000000|crc\",\n"
-        "     \"core_path\": \"/app0/cores/snes9x_libretro.so\", \"core_name\": \"Snes9x\"}\n"
+        "     \"core_path\": \"/app0/cores/snes9x_libretro.so\", \"core_name\": \"Snes9x\"},\n"
+        "    {\"path\": \"/app0/content/d.zip#d.sfc\", \"label\": \"D\",\n"
+        "     \"core_path\": \"/app0/cores/bsnes_libretro.so\"}\n"
         "  ]\n}\n");
     snprintf(path, sizeof(path), "%s/notes.txt", playlists);
     write_text(path, "not a playlist");
@@ -138,6 +145,9 @@ int main(int argc, char **argv)
     assert(ps5_game_playlist_core(playlists, "/app0/content/a.zip", found, sizeof(found)) ==
            0); /* DETECT */
     assert(ps5_game_playlist_core(playlists, "/app0/content/none.zip", found, sizeof(found)) == 0);
+    /* A playlist names a file inside an archive; a frontend starts the archive (issue 108). */
+    assert(ps5_game_playlist_core(playlists, "/app0/content/d.zip", found, sizeof(found)) == 1 &&
+           strcmp(found, "/app0/cores/bsnes_libretro.so") == 0);
     snprintf(path, sizeof(path), "%s/broken.lpl", playlists);
     write_text(path, "{\"items\": [{\"path\": \"/app0/content/c.zip\", \"core_path\": ");
     assert(ps5_game_playlist_core(playlists, "/app0/content/c.zip", found, sizeof(found)) == 0);
