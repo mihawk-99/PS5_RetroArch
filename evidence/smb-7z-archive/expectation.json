@@ -1,0 +1,17 @@
+{
+  "step": "smb-7z-archive",
+  "note": "PRs 111, 103 and 115 on the Base PS5: the WebUI lists the PC's shares and saves the guest share; RetroArch opens a .7z on the share through its file layer, extracts the ROM (its CRC matches the file on the PC) and runs it.",
+  "must_contain": [
+    "RetroArch starts fceumm with smb://<pc>/share/smb-test/claude-fg-test.7z",
+    "Loading content file: \"smb://<pc>/share/smb-test/claude-fg-test.7z#homebrew.nes\"",
+    "CRC32: 0x41852f72",
+    "the file on the PC: CRC32 0x41852f72",
+    "POST /api/smb 200",
+    "SET_PIXEL_FORMAT"
+  ],
+  "must_not_contain": [
+    "crash: signal",
+    "Failed to load content"
+  ],
+  "human_check": "Load Content > SMB, choose a .7z: the game starts."
+}

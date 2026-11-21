@@ -1,0 +1,25 @@
+{
+  "step": "lapy-relaunch-granted",
+  "note": "PR 51 on the Base PS5: the SDK elevation client waits for root before opening its proof file. Before it, the third launch on a boot was refused (cred_refs=3, target_preflight error 16; issues 64, 124). With it, 10 launches and 5 self-relaunches in a row: all 20 requests granted with cred_refs=2.",
+  "must_contain": [
+    "before, build e04cab10",
+    "plain-10 | it ran for 20s",
+    "relaunch-5 | it ran for 40s",
+    "plain-1 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-2 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-3 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-4 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-5 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-6 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-7 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-8 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-9 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-10 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0"
+  ],
+  "must_not_contain": [
+    "cred_refs=3 stage=complete",
+    "refused |",
+    "error=16\n"
+  ],
+  "human_check": "Start a game from ES-DE (game mode) several times without restarting the console: RetroArch starts every time."
+}

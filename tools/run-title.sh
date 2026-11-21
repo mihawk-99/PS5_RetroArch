@@ -200,8 +200,8 @@ fi
 # path as the title sees it (/app0/content/...). With --retroarch-frames it quits
 # after that many frames and pictures the last one, collected as klog/game-<stamp>.png.
 if [[ -n $game ]]; then
-    [[ $game =~ ^[a-z0-9_]+:(/.+)?$ ]] ||
-        { echo "--game takes CORE:PATH, PATH as the title sees it (/app0/...), or CORE: for a core without content" >&2; exit 2; }
+    [[ $game =~ ^[a-z0-9_]+:((/|smb://).+)?$ ]] ||
+        { echo "--game takes CORE:PATH, PATH as the title sees it (/app0/... or smb://...), or CORE: for a core without content" >&2; exit 2; }
 fi
 
 # The pad script (src/input_ps5.cpp): presses and actions timed from RetroArch's

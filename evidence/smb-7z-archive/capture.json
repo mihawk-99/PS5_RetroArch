@@ -1,0 +1,25 @@
+{
+  "step": "smb-7z-archive",
+  "recorded": "2026-11-21T01:18:24Z",
+  "console_run": "201642",
+  "revision": "0411ea5",
+  "command": "tools/run-title.sh --no-build --no-deploy \"--game=fceumm:smb://<pc>/share/smb-test/<archive>.7z\" --pad-script=<\"20 SCREENSHOT\", \"28 STOP\"> --watch 60, after the WebUI saved the guest share",
+  "raw_capture": "klog/evidence-smb-7z.txt",
+  "raw_lines": 13,
+  "raw_bytes": 723,
+  "lines": [
+    "build identity: 8ecb2e43",
+    "    RetroArch starts fceumm with smb://<pc>/share/smb-test/claude-fg-test.7z",
+    "    armed pad script <\"20 SCREENSHOT\", \"28 STOP\">",
+    "    input: pad script loaded, 0 presses",
+    "    input: pad script SCREENSHOT at 20.01 s: /app0/pad-shot-1.png 1",
+    "    input: pad script STOP at 28.00 s",
+    "    pad script: 1 picture(s) saved to klog/pad-201642",
+    "==> [run] VERDICT: it exited on its own before 60s",
+    "[INFO] [Content] Loading content file: \"smb://<pc>/share/smb-test/claude-fg-test.7z#homebrew.nes\".",
+    "[INFO] [Content] CRC32: 0x41852f72.",
+    "[INFO] [Environ] SET_PIXEL_FORMAT: XRGB8888.",
+    "the file on the PC: CRC32 0x41852f72",
+    "WebUI: POST /api/smb/shares 200 {\"shares\":[\"share\",\"locked\"]}; POST /api/smb 200 share/smb-test, guest"
+  ]
+}

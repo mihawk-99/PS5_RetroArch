@@ -1,0 +1,29 @@
+{
+  "step": "lapy-relaunch-granted",
+  "recorded": "2026-11-21T01:18:24Z",
+  "console_run": "lapy-51",
+  "revision": "0411ea5",
+  "command": "bash <scratch>/lapy_loop.sh 10 5 klog/lapy-51 (tools/run-title.sh --no-build --no-deploy --watch 20, then --relaunch-test=1 --watch 40; Lapy's lapy-service.log and startup-paths.log read after each)",
+  "raw_capture": "klog/evidence-lapy-51.txt",
+  "raw_lines": 17,
+  "raw_bytes": 2031,
+  "lines": [
+    "build identity: 8ecb2e43 (PR 51 merged)",
+    "before, build e04cab10, the third launch on this boot: cred_refs=3 stage=target_preflight error=16; startup refused: elevation or installation could not be verified",
+    "plain-1 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-2 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-3 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-4 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-5 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-6 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-7 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-8 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-9 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "plain-10 | it ran for 20s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0",
+    "relaunch-1 | it ran for 40s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0 cred_refs=2 stage=complete error=0",
+    "relaunch-2 | it ran for 40s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0 cred_refs=2 stage=complete error=0",
+    "relaunch-3 | it ran for 40s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0 cred_refs=2 stage=complete error=0",
+    "relaunch-4 | it ran for 40s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0 cred_refs=2 stage=complete error=0",
+    "relaunch-5 | it ran for 40s and this script closed it | elevation=ok uid=0 | cred_refs=2 stage=complete error=0 cred_refs=2 stage=complete error=0"
+  ]
+}
