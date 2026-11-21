@@ -28,8 +28,12 @@
  *     job goes on with no browser open (the WebUI daemon stays up while one runs);
  *   - "pc": the console identifies each game and hands out downloads as tasks; a
  *     helper on the PC (webui/ps5-media-helper.py) fetches each file and sends the
- *     bytes to the console, which writes them into the store. The bytes pass through
- *     the PC. A task not delivered within its lease goes back to the queue.
+ *     bytes to the console, which writes them into the store. The bytes pass
+ *     through the PC, and so does every question the identifying asks: a probe
+ *     (does the source have this file) and a listing or database the console
+ *     reads itself are tasks too, answered by the helper, so a console with no
+ *     route to the internet still runs a PC-mode job. A task not delivered within
+ *     its lease goes back to the queue.
  * A job's items are saved as they finish (library/.jobs/<id>.job), so a job cut short
  * (a restart, a closed helper, a cancel) resumes without redoing finished items. */
 #pragma once

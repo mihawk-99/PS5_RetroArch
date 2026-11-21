@@ -258,14 +258,16 @@ class LaunchBox(unittest.TestCase):
         self.start_server()
 
     def test_pc_mode_through_the_helper(self):
+        # The helper answers every question the source is asked, the database with
+        # them: a console with no route to the internet runs this job unchanged.
         job_id = self.start(mode='pc', kinds='cover,logo', details=False)
-        self.wait(job_id, lambda j: j['tasks']['queued'] >= 4)
         helper = subprocess.run([sys.executable, str(ROOT / 'webui/ps5-media-helper.py'), f'http://127.0.0.1:{self.port}', job_id],
                                 capture_output=True, text=True, timeout=120)
         self.assertEqual(helper.returncode, 0, helper.stdout + helper.stderr)
         job = self.wait(job_id)
         self.assertEqual(job['transferred']['files'], 7)  # 4 covers, 3 logos
         self.assertEqual(self.stored('runner3', 'marquees').read_bytes(), picture('runner3-logo.png'))
+        self.assertEqual(len(self.fetched('/Metadata.zip')), 1)  # the database came through the PC too
 
     def test_a_chain_asks_launchbox_only_for_what_libretro_lacks(self):
         job_id = self.start(sources='libretro,launchbox', kinds='cover,logo', details=False, lines=('snes\t',))

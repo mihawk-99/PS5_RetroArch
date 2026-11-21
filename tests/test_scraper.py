@@ -2,7 +2,8 @@
 libretro thumbnail server, in both download modes. A match, an ambiguous game resolved
 by the user, an unmatched one, cached browsing that fetches nothing again, overwrite,
 cancel and resume without repeating work, a server restart mid-job, and PC mode
-through the real helper (webui/ps5-media-helper.py), including a helper killed mid-job.
+through the real helper (webui/ps5-media-helper.py) — including a helper killed mid-job
+and a console that reaches nothing but its LAN — and the shared store layout.
 The shared store's layout is checked as RetroArch's lookup (src/ps5_library.c) and
 EmulationStation read it."""
 from pathlib import Path
@@ -127,8 +128,13 @@ class Scraper(unittest.TestCase):
                  for l, p in games.items()]
         (self.root / f'playlists/{DB}.lpl').write_text(json.dumps({'version': '1.5', 'items': items}))
 
-    def start_server(self, lease=None):
-        env = {**os.environ, 'PS5_SCRAPER_LIBRETRO_BASE': f'http://127.0.0.1:{self.source.server_port}'}
+    def start_server(self, lease=None, extra=None):
+        # The developer's own proxy has no say here: a test that wants to make the
+        # console networkless says so with extra (the helper is always given none).
+        env = {k: v for k, v in os.environ.items()
+               if k.lower() not in ('http_proxy', 'https_proxy', 'no_proxy')}
+        env['PS5_SCRAPER_LIBRETRO_BASE'] = f'http://127.0.0.1:{self.source.server_port}'
+        env.update(extra or {})
         if lease:
             env['PS5_SCRAPER_LEASE_SECONDS'] = str(lease)
         self.server, self.port, self.token = webui_build.start(self.binary, self.root, env)
@@ -277,7 +283,9 @@ class Scraper(unittest.TestCase):
 
     def run_helper(self, job_id, timeout=120):
         return subprocess.Popen([sys.executable, str(ROOT / 'webui/ps5-media-helper.py'), f'http://127.0.0.1:{self.port}', job_id],
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                env={k: v for k, v in os.environ.items()
+                                     if k.lower() not in ('http_proxy', 'https_proxy', 'no_proxy')})
 
     def test_pc_mode_bytes_pass_through_the_helper(self):
         job_id = self.start(mode='pc')
@@ -289,10 +297,61 @@ class Scraper(unittest.TestCase):
         self.assertEqual((job['downloaded']['files'], job['transferred']['files']), (8, 8))
         dk = 'Jungle Run 2 - Partner\'s Island Quest (USA)'
         self.assertEqual(self.stored(dk, 'title').read_bytes(), image(dk, 'Named_Titles'))
-        # The console only asked whether files exist; every byte came through the helper.
-        self.assertEqual(self.media_gets('Scraper'), [])
+        # The console asked the source nothing at all: the probes, the folder's listing
+        # and every byte came through the helper. (A console without any route to the
+        # internet runs the very same job: test_pc_mode_a_console_without_internet.)
+        with self.source.lock:
+            rows = list(self.source.log)
+        self.assertEqual([m for m, a, _ in rows if 'Scraper' in a], [])
+        self.assertTrue(any(m == 'HEAD' and 'Helper' in a for m, a, _ in rows))
         self.assertEqual(len(self.media_gets('Helper')), 8)
         self.assertFalse(list((self.root / 'library').rglob('.partial-*')))
+
+    def test_pc_mode_a_console_without_internet(self):
+        # The reported case (2026-11-05): the PS5 reaches only its LAN. Every question
+        # PC mode asks the source now goes through the helper, so the job runs exactly
+        # as it does with an online console; the probe used to answer "Could not
+        # connect to server (curl 7)." for every game and the helper saw no task.
+        self.stop_server()
+        with socket.socket() as dead:  # a port nothing listens on (the LAN's internet is gone)
+            dead.bind(('127.0.0.1', 0))
+            dead_port = dead.getsockname()[1]
+        proxy = f'http://127.0.0.1:{dead_port}'
+        self.start_server(extra={'http_proxy': proxy, 'https_proxy': proxy})
+        job_id = self.start(mode='pc')
+        helper = self.run_helper(job_id)
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        job = self.wait(job_id)
+        self.assertEqual(job['counts'], {'ambiguous': 1, 'done': 2, 'partial': 1, 'unmatched': 1})
+        dk = 'Jungle Run 2 - Partner\'s Island Quest (USA)'
+        self.assertEqual(self.stored(dk, 'cover').read_bytes(), image(dk, 'Named_Boxarts'))
+        self.assertEqual(self.stored('Time Voyager (1995)', 'title').read_bytes(),
+                         image('Time Voyager (USA)', 'Named_Titles'))  # the listing, asked through the PC
+        with self.source.lock:
+            rows = list(self.source.log)
+        self.assertEqual([a for _, a, _ in rows if 'Helper' not in a], [])
+
+    def test_pc_mode_a_matched_game_with_nothing_left_to_fetch(self):
+        # (console, 2026-11-06) A game whose media is all stored but one kind the
+        # source has never carried: once the user has chosen its name, the probes
+        # answer nothing, the hand-off has no tasks, and the item must finish
+        # rather than wait "for the PC helper" forever behind an empty queue.
+        tv = 'Time Voyager Special Edition'
+        job_id = self.start(mode='pc', kinds='logo', lines=[f'snes\t{self.games[tv]}'])
+        helper = self.run_helper(job_id)
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        job = self.wait(job_id)
+        ambiguous = next(p for p in job['problems'] if p['state'] == 'ambiguous')
+        status, body = self.request('POST', f'/api/scraper/resolve?id={job_id}&item={ambiguous["item"]}&action=choose&value='
+                                    + urllib.parse.quote('Time Voyager (USA)'))
+        self.assertEqual(status, 200, body)
+        helper = self.run_helper(job_id)  # the probe that answers "no logo under this name"
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        job = self.wait(job_id, lambda j: j['state'] == 'done' and not j['counts'].get('transferring'), timeout=30)
+        self.assertEqual(job['counts'].get('done'), 1)
 
     def test_pc_mode_helper_killed_then_resumed(self):
         games = {f'Filler Game {i:02} (USA)': f'/app0/content/SNES/Filler Game {i:02} (USA).sfc' for i in range(24)}

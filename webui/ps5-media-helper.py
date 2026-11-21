@@ -5,9 +5,11 @@
 #   python3 ps5-media-helper.py http://<PS5-IP>:6769 <job id>
 #
 # The console identifies the games and hands out downloads; this PC fetches each file
-# from the media source and sends the bytes to the console, which stores them. Keep it
-# running until the job is done; stop it with Ctrl+C and run it again to resume: the
-# console never hands out a file it already has.
+# from the media source and sends the bytes to the console, which stores them; when a
+# console has no route to the internet at all, it asks this PC those questions too (a
+# probe is a HEAD to the source, a fetch a file the console reads itself, such as a
+# folder's listing). Keep it running until the job is done; stop it with Ctrl+C and run
+# it again to resume: the console never hands out a file it already has.
 #
 # Copyright (C) 2026 Mihawk; SPDX-License-Identifier: GPL-3.0-or-later
 import http.client
@@ -73,6 +75,8 @@ class Helper:
 
     def run_task(self, task):
         query = f'id={self.job}&task={task["task"]}'
+        if task['kind'] == 'probe':
+            return self.run_probe(task, query)
         path = os.path.join(self.temp, f'{task["task"]}.part')
         try:
             # Download: streamed to a temporary file on this PC, in 1 MiB pieces.
@@ -112,6 +116,27 @@ class Helper:
             if os.path.exists(path):
                 os.remove(path)
             self.note()
+
+    def run_probe(self, task, query):
+        # The console asks whether the source has a file; the answer decides which
+        # name its game matches, so anything but a 404 or an answer is trouble to
+        # retry when the lease runs out, not a miss.
+        found = None
+        try:
+            request = urllib.request.Request(task['url'], headers={'User-Agent': 'PS5-RetroArch-Helper/1'},
+                                             method='HEAD')
+            with urllib.request.urlopen(request, timeout=60):
+                found = 1
+        except urllib.error.HTTPError as error:
+            found = 0 if error.code == 404 else None
+        except Exception:
+            found = None
+        if found is None:  # the lease runs out and the console asks again
+            with self.lock:
+                self.failed += 1
+            return
+        console_request(self.base, 'POST', f'/api/scraper/pc/downloaded?{query}&found={found}&bytes=0',
+                        token=self.token)
 
     def run(self):
         print(f'Job {self.job} on {self.base}: downloading on this PC, sending to the PS5.')
