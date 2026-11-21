@@ -1,0 +1,27 @@
+{
+  "step": "merged-prs-console",
+  "recorded": "2026-11-21T21:51:04Z",
+  "console_run": "prs2",
+  "revision": "0f08668",
+  "command": "bash prs_check.sh klog/prs2 start|esde1|launch|restore and klog/prs start|esde1|esde2|launch|separate|combined|restore (tools/run-title.sh); the cap32 and Lapy runs by hand, as the lines say",
+  "raw_capture": "klog/prs-summary.txt",
+  "raw_lines": 15,
+  "raw_bytes": 3349,
+  "lines": [
+    "==> eleven merged pull requests on the Base PS5 (firmware 6.02); bash prs_check.sh klog/prs2 start|esde1|launch|restore on build 69075ee2 (all eleven; main at 0f08668), and klog/prs start|esde1|esde2|launch|separate|combined|restore on build 14243e3e (49, 60, 98, 114, 105, 112, 99; main at 4f43af9); tools/run-title.sh each time",
+    "start | build identity: 69075ee2 | VERDICT: it ran for 20s and this script closed it | crash 0",
+    "start | startup-paths.log: original=/app0/eboot.bin dev=N ino=N | elevation=ok uid=0 | candidate=/data/homebrew/PPSA99169 dev=N ino=N same_executable=1 | root=/data/homebrew/PPSA99169 same_executable=1 (PR 49, PR 60)",
+    "start | Lapy: stage=complete error=0 | the game: Geometry: 256x224 | 'pad speaker' lines in the run: 0 (PR 114: no core asks)",
+    "lapy | after the owner restarted the console, build 14243e3e: lapy_autostart sent=156656 size=156656 errno=0 | 27 lines of build=b21fd618 in /data/homebrew/PPSA99169/lapy-service.log, the last request_result build=b21fd618 stage=complete error=0 | lapy-ready beside the title: 1 | elevation=ok uid=0 (PR 98; before the restart the service of an earlier build, e4aea17d, was still the one running)",
+    "esde1 | build identity: 69075ee2 | crash 0 | [ES-DE startup] library=245 ms | systems=217 ms views=2665 ms | resource reuse: 17778 stat hits, 264 XML hits, 78901 XML bytes (PR 112)",
+    "esde1 | library from RetroArch's playlists: 35 systems, 284 games (284 with ES-DE's details kept), 35 cores, 0 favourites, 35 played, 0 failures | '[ES-DE SMB]' lines in ES-DE's stdout: 0 | smb or dns lines in the run: 0 (PR 113 with no share's catalogue: nothing of it runs)",
+    "esde2 | build 14243e3e, a second start with nothing changed: gamelists/nes/gamelist.xml and es_systems.xml keep their listed time (Nov_21_20:39 after both starts) (PR 112)",
+    "launch | build identity: 69075ee2 | game mode: /app0/content/nes/0 Zip Test 108.zip with /app0/cores/fceumm_libretro.so, for /app0/es-de/es-de.bin | game mode: RetroArch quit (status 0) after 11 s; back to the frontend | frontend capture PASS: 3 pictures from 2 process(es)",
+    "launch | es-de-ps5.log: library from RetroArch's playlists: unchanged (skipped after game return) | [ES-DE startup] library=0 ms | es_systems.xml keeps its listed time (PR 99)",
+    "separate | build 14243e3e, esde_separate_systems = \"true\" added to config/webui.cfg: 36 systems, 284 games, 0 failures | those named nes*: nes (10 games, the content folder's) and nes-nintendo-nintendo-entertainment-system (1 game, the playlist's), both with the nes theme (PR 105)",
+    "combined | build 14243e3e, the owner's webui.cfg back: 35 systems, 284 games (284 with ES-DE's details kept), 0 failures | gamelists/nes: 11 games (PR 105)",
+    "cap32 | build 14243e3e, the core of PR 72's script put beside it by hand: tools/run-title.sh --no-build --no-deploy --game=cap32:<the owner's .dsk> ran for 40s, crash 0, Geometry: 768x272, FPS: 50.08, a picture in the recorded frames; the core and what the run wrote removed. Not shipped (the owner, 2026-11-21: it holds Amstrad's system ROMs)",
+    "not run | PR 102's Opera (no 3DO disc on the console); PR 113 with a share, SMB playlists and a catalogue; PR 117 in PC mode; PR 49 and PR 60 on a firmware that numbers the sandbox folder otherwise; PR 98 on a USB install",
+    "restore | the owner's files put back byte for byte: 7 of 7 | the test's files left on the console: 0"
+  ]
+}

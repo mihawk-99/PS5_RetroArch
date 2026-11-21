@@ -1,0 +1,16 @@
+{
+  "step": "release-v4.5.0-console",
+  "note": "v4.5.0-beta-4's release build starts elevated from its own folder with contentVersion 04.005.000 and is byte for byte the build; ES-DE reads 35 systems and 284 games, starts a zipped game and, back from it, skips the rescan; the owner's files are put back.",
+  "must_contain": [
+    "start | \"contentVersion\": \"04.005.000\" | the console's copy is byte for byte this build",
+    "start | startup-paths.log: root=/data/homebrew/PPSA99169 same_executable=1",
+    "start | Lapy: stage=complete error=0",
+    "launch | es-de-ps5.log: start: library from RetroArch's playlists: unchanged (skipped after game return)",
+    "launch | game mode: RetroArch quit (status 0) after 10 s; back to the frontend",
+    "restore | the owner's files put back byte for byte: 7 of 7"
+  ],
+  "must_not_contain": [
+    "crash 1"
+  ],
+  "human_check": ""
+}

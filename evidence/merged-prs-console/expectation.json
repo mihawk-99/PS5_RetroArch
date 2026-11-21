@@ -1,0 +1,14 @@
+{
+  "step": "merged-prs-console",
+  "note": "The eleven merged pull requests on the Base PS5: what each one's change shows on a normal install, and what could not be run here.",
+  "must_contain": [
+    "esde1 | build identity: 69075ee2 | crash 0 | [ES-DE startup] library=245 ms",
+    "request_result build=b21fd618 stage=complete error=0",
+    "library from RetroArch's playlists: unchanged (skipped after game return)",
+    "nes-nintendo-nintendo-entertainment-system (1 game, the playlist's)",
+    "'[ES-DE SMB]' lines in ES-DE's stdout: 0",
+    "restore | the owner's files put back byte for byte: 7 of 7 | the test's files left on the console: 0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}
