@@ -1,0 +1,21 @@
+{
+  "step": "esde-archive-games",
+  "recorded": "2026-11-21T20:11:42Z",
+  "console_run": "zip-108",
+  "revision": "78d27e9",
+  "command": "bash zip108_check.sh klog/zip-108 before|launch-before|after|launch|restore (tools/run-title.sh --relaunch-test=1 --relaunch-image=es-de/es-de.bin --frontend-capture, --frontend-launch --retroarch-frames=600)",
+  "raw_capture": "klog/zip-108-summary.txt",
+  "raw_lines": 9,
+  "raw_bytes": 1800,
+  "lines": [
+    "==> issue 108 on the Base PS5: a zipped NES game RetroArch's playlist names \"0 Zip Test 108.zip#0 Zip Test 108.nes\" (the owner's backup, renamed for the test), in EmulationStation; bash zip108_check.sh klog/zip-108 before|launch-before|after|launch|restore",
+    "before | v4.4.0-beta-4 (build 752e8a8b), the archive where only the playlist lists it: ES-DE's NES game list holds './zip-test-108/a/b/c/d/0 Zip Test 108.zip#0 Zip Test 108.nes', which is no file (not started on the console in this layout; by src/ps5_game.c, ps5_game_check refuses a content that is not a file, as tests/ps5_game_test.c shows)",
+    "before | v4.4.0-beta-4 (build 752e8a8b), the archive in content/nes: ES-DE's NES game list 12 games, the test's twice: './0 Zip Test 108.zip#0 Zip Test 108.nes' and './0 Zip Test 108.zip' | the WebUI's games with the test's name: 2",
+    "after | build identity: bb4dcebe | the archive where only the playlist lists it | ES-DE's NES system lists .zip: yes | its game list: 11 games | the test's: ['./zip-test-108/a/b/c/d/0 Zip Test 108.zip'] | crash 0",
+    "launch | build identity: bb4dcebe | the archive in content/nes | ES-DE's NES game list: 11 games | the test's: ['./0 Zip Test 108.zip'] | the WebUI's games with the test's name: 1 | crash 0",
+    "launch | ES-DE started its first NES game | game mode: /app0/content/nes/0 Zip Test 108.zip with /app0/cores/fceumm_libretro.so, for /app0/es-de/es-de.bin",
+    "launch | retroarch-game.log: [Content] Loading content file: \"/app0/content/nes/0 Zip Test 108.zip#0 Zip Test 108.nes\". | [Core] Geometry: 256x224, Aspect: 1.306, FPS: 60.10",
+    "launch | game mode: RetroArch quit (status 0) after 10 s; back to the frontend | frontend capture PASS: 3 pictures from 2 process(es)",
+    "restore | the owner's files put back byte for byte: 6 of 6 | the test's files left on the console: 0"
+  ]
+}
