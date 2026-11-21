@@ -549,6 +549,79 @@ static void free_names(char **names)
 
 /* --- the library ------------------------------------------------------------------ */
 
+/* Transient path index. Slots store indices, not pointers into reallocating games.
+ * Discard before sorting/removing games; allocation failure retains linear lookup.
+ * It finds what ps5_library_same_game calls one game, so it hashes only the part two
+ * such paths always share: the file's own, without the "#file" inside an archive. */
+struct game_paths
+{
+    size_t *slots, capacity;
+    int disabled;
+};
+
+static size_t path_hash(const char *path)
+{
+    size_t hash = (size_t)2166136261U;
+    const size_t length = ps5_library_file_length(path);
+    for (size_t i = 0; i < length; ++i)
+        hash = (hash ^ (unsigned char)path[i]) * (size_t)16777619U;
+    return hash;
+}
+
+static void index_game(struct game_paths *index, const struct ps5_library *library, size_t game)
+{
+    if (index->disabled)
+        return;
+    if (game + 1 > index->capacity / 2)
+    {
+        size_t capacity = index->capacity ? index->capacity * 2 : 128;
+        size_t *slots = (size_t *)calloc(capacity, sizeof(size_t));
+        if (!slots)
+        {
+            free(index->slots);
+            index->slots = NULL;
+            index->capacity = 0;
+            index->disabled = 1;
+            return;
+        }
+        for (size_t i = 0; i < game; ++i)
+        {
+            size_t at = path_hash(library->games[i].path) & (capacity - 1);
+            while (slots[at])
+                at = (at + 1) & (capacity - 1);
+            slots[at] = i + 1;
+        }
+        free(index->slots);
+        index->slots = slots;
+        index->capacity = capacity;
+    }
+    size_t at = path_hash(library->games[game].path) & (index->capacity - 1);
+    while (index->slots[at])
+        at = (at + 1) & (index->capacity - 1);
+    index->slots[at] = game + 1;
+}
+
+static struct ps5_library_game *indexed_game(struct ps5_library *library,
+                                             const struct game_paths *index, const char *path)
+{
+    if (index->capacity)
+    {
+        size_t at = path_hash(path) & (index->capacity - 1);
+        while (index->slots[at])
+        {
+            struct ps5_library_game *game = &library->games[index->slots[at] - 1];
+            if (ps5_library_same_game(game->path, path))
+                return game;
+            at = (at + 1) & (index->capacity - 1);
+        }
+        return NULL;
+    }
+    for (size_t i = 0; i < library->game_count; ++i)
+        if (ps5_library_same_game(library->games[i].path, path))
+            return &library->games[i];
+    return NULL;
+}
+
 struct loading
 {
     struct ps5_library *library;
@@ -557,6 +630,7 @@ struct loading
     size_t game_capacity;
     int failed;
     const char *title_root; /* the title's real folder, recorded as /app0; or NULL */
+    struct game_paths paths;
 };
 
 static const struct ps5_library_core *core_by_path(const struct ps5_library *library,
@@ -695,9 +769,8 @@ static void add_entry(void *context, const struct ps5_playlist_entry *entry)
             entry = &mapped;
         }
     }
-    for (size_t i = 0; i < library->game_count; i++)
-        if (ps5_library_same_game(library->games[i].path, entry->path))
-            return; /* a game in two playlists is one game, and an archive its one file */
+    if (indexed_game(library, &loading->paths, entry->path))
+        return; /* a game in two playlists is one game, and an archive its one file */
     if (library->game_count == loading->game_capacity)
     {
         const size_t capacity = loading->game_capacity ? loading->game_capacity * 2 : 64;
@@ -753,6 +826,7 @@ static void add_entry(void *context, const struct ps5_playlist_entry *entry)
         library->system_count++;
     }
     game->system = system;
+    index_game(&loading->paths, library, library->game_count);
     library->game_count++;
 }
 
@@ -942,26 +1016,19 @@ static void finish_systems(struct ps5_library *library)
 
 /* --- what RetroArch remembers of play ---------------------------------------------- */
 
-static struct ps5_library_game *game_by_path(struct ps5_library *library, const char *path)
-{
-    for (size_t i = 0; i < library->game_count; i++)
-        if (ps5_library_same_game(library->games[i].path, path))
-            return &library->games[i];
-    return NULL;
-}
-
 struct marking
 {
     struct ps5_library *library;
     int history; /* 0: the favourites, 1: the history */
     unsigned place;
+    const struct game_paths *paths;
 };
 
 static void mark_entry(void *context, const struct ps5_playlist_entry *entry)
 {
     struct marking *marking = (struct marking *)context;
     marking->place++;
-    struct ps5_library_game *game = game_by_path(marking->library, entry->path);
+    struct ps5_library_game *game = indexed_game(marking->library, marking->paths, entry->path);
     if (!game)
         return;
     if (!marking->history)
@@ -973,14 +1040,14 @@ static void mark_entry(void *context, const struct ps5_playlist_entry *entry)
 /* A builtin playlist, from builtin/ (where RetroArch keeps them) or beside the others;
  * its file's time in *written. */
 static void read_builtin(struct ps5_library *library, const char *playlists, const char *name,
-                         int history, time_t *written)
+                         int history, time_t *written, const struct game_paths *index)
 {
     static const char *const places[] = {"builtin/", ""};
     for (size_t i = 0; i < sizeof(places) / sizeof(places[0]); i++)
     {
         char path[PS5_LIBRARY_PATH_MAX + 256];
         snprintf(path, sizeof(path), "%s/%s%s", playlists, places[i], name);
-        struct marking marking = {library, history, 0};
+        struct marking marking = {library, history, 0, index};
         if (ps5_playlist_read(path, NULL, 0, mark_entry, &marking) >= 0)
         {
             struct stat status;
@@ -1032,8 +1099,12 @@ static void read_runtime(struct ps5_library *library, struct ps5_library_game *g
 static void read_play(struct ps5_library *library, const char *playlists)
 {
     time_t history_written = 0;
-    read_builtin(library, playlists, "content_favorites.lpl", 0, NULL);
-    read_builtin(library, playlists, "content_history.lpl", 1, &history_written);
+    struct game_paths index = {0};
+    for (size_t i = 0; i < library->game_count; ++i)
+        index_game(&index, library, i);
+    read_builtin(library, playlists, "content_favorites.lpl", 0, NULL, &index);
+    read_builtin(library, playlists, "content_history.lpl", 1, &history_written, &index);
+    free(index.slots);
     for (size_t i = 0; i < library->game_count; i++)
     {
         struct ps5_library_game *game = &library->games[i];
@@ -1499,7 +1570,7 @@ int ps5_library_load_content_at(struct ps5_library *library, const char *playlis
     memset(library, 0, sizeof(*library));
     load_cores(library, info, cores);
     char **names = folder_names(playlists, ".lpl");
-    struct loading loading = {library, NULL, NULL, 0, 0, title_root};
+    struct loading loading = {library, NULL, NULL, 0, 0, title_root, {0}};
     for (size_t i = 0; names && names[i] && !loading.failed; i++)
     {
         if (is_builtin_playlist(names[i]))
@@ -1520,6 +1591,7 @@ int ps5_library_load_content_at(struct ps5_library *library, const char *playlis
         for (size_t i = 0; content[i] && !loading.failed; i++)
             scan_root(&loading, content[i], info, &added);
     }
+    free(loading.paths.slots);
     if (loading.failed)
         return -1;
     drop_listed_tracks(library);
