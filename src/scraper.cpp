@@ -3980,7 +3980,9 @@ bool pc_target(const std::string &id, unsigned task, std::string &temporary,
     std::lock_guard<std::mutex> guard(lock);
     auto job = jobs.count(id) ? jobs.at(id) : nullptr;
     Task *target = job && job->state == "running" ? job->task(task) : nullptr;
-    if (!target || target->state == Task::done)
+    /* A probe has no destination: it is answered, never sent bytes (with none, the
+     * hidden file below would be written in the server's own folder). */
+    if (!target || target->state == Task::done || target->destination.empty())
         return false;
     destination = target->destination;
     make_folders(destination.substr(0, destination.find_last_of('/')));

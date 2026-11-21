@@ -402,6 +402,8 @@ class Scraper(unittest.TestCase):
         new = self.pc_tasks(job_id)
         self.assertEqual([(t['kind'], t['url']) for t in new], [('probe', old['url'])])  # still asked
         self.assertNotEqual(new[0]['task'], old['task'])
+        # A probe is answered, never sent bytes: an upload for one is refused.
+        self.assertEqual(self.request('PUT', f'/api/scraper/pc/media?id={job_id}&task={new[0]["task"]}', b'x')[0], 409)
         helper = self.run_helper(job_id)
         out, _ = helper.communicate(timeout=120)
         self.assertEqual(helper.returncode, 0, out)
