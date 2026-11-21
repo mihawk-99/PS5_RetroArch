@@ -1,0 +1,14 @@
+{
+  "step": "ozone-menu",
+  "note": "The Ozone menu on the console: drawn at 3840x2160 with its sidebar, icons and cursor, walked with the pad, and its Quick Menu over a running game.",
+  "must_contain": [
+    "menu | build identity: 93c27f31",
+    "depth 1, list 'settings_tab', entry 0 of 19 'User Interface'",
+    "list 'quick_menu' 'Quick Menu', entry 0 of 18 'Resume'",
+    "the owner's retroarch.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [
+    "crash 1"
+  ],
+  "human_check": ""
+}

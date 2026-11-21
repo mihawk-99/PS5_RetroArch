@@ -1,0 +1,18 @@
+{
+  "step": "ozone-menu",
+  "recorded": "2026-11-21T23:28:03Z",
+  "console_run": "ozone",
+  "revision": "41f6abd",
+  "command": "bash ozone_check.sh klog/ozone (tools/run-title.sh --menu-capture=300, --pad-script, --game=fceumm:...; each with --retroarch-arg=--appendconfig=/app0/config/claude-ozone.cfg)",
+  "raw_capture": "klog/ozone-summary.txt",
+  "raw_lines": 6,
+  "raw_bytes": 1401,
+  "lines": [
+    "==> issue 91 on the Base PS5: the Ozone menu, build 93c27f31 (--enable-ozone, assets/ozone/png); menu_driver = \"ozone\" from an appended config (tools/run-title.sh --retroarch-arg=--appendconfig=/app0/config/claude-ozone.cfg); bash ozone_check.sh klog/ozone, then klog/ozone2",
+    "menu | build identity: 93c27f31 | VERDICT: it ran for 25s and this script closed it | crash 0 | menu capture: klog/menu-20261121-182450.png, 3840x2160 at 16:9: the sidebar (Main Menu, Settings, History, Favorites, Images, Import Content, Contentless Cores) with its icons, the list with its icons and sublabels, the cursor, the header and the footer drawn",
+    "walk | VERDICT: it exited on its own before 22s (the script's STOP) | crash 0 | pad script MENU at 3.00 s: depth 1, list 'main_menu', entry 0 of 7 'Load Core' | at 6.51 s: entry 3 of 7 'Netplay' | at 8.51 s: depth 2, list 'netplay', entry 0 of 6 'Host' | at 14.51 s: depth 1, list 'settings_tab', entry 0 of 19 'User Interface' (the sidebar reached with LEFT, DOWN)",
+    "game | fceumm with a game, the Quick Menu opened with L3+R3: pad script MENU at 7.50 s: depth 2, list 'quick_menu' 'Quick Menu', entry 0 of 18 'Resume' | drawn over the running game in the recorded frames | crash 0",
+    "webui | no \"WebUI\" entry in Ozone (patch 0115 adds it to XMB and RGUI only); the WebUI runs as before",
+    "restore | the owner's retroarch.cfg restored: byte-identical; claude-ozone.cfg removed"
+  ]
+}
