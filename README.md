@@ -99,6 +99,8 @@ Stay connected while switching between the picker, RetroArch, and EmulationStati
 | <img src="webui/assets/fluent/arrow-sync.svg" width="24" height="24" alt=""> **Transfers** | Follow uploads and their results. Downloads appear in your browser’s download manager. |
 | <img src="webui/assets/fluent/settings.svg" width="24" height="24" alt=""> **Settings** | Adjust global preferences, core options, controller mappings, and the startup frontend. |
 
+In **Settings**, turn on **Separate ES-DE systems by playlist** to split a system that is fed by more than one playlist or folder into one EmulationStation system for each. A split system has its own game list and looks for artwork in a folder of its own name; a system with a single source stays as it is. Leave it off for the combined view. The setting takes effect the next time EmulationStation starts.
+
 > The WebUI is a local HTTP service without a login. Use a trusted network and
 > do not forward port **6769** to the internet.
 
