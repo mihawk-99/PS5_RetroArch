@@ -410,6 +410,23 @@ class Scraper(unittest.TestCase):
         self.assertEqual(self.wait(job_id)['counts'], {'done': 1})
         self.assertEqual(self.stored(dk, 'cover').read_bytes(), image(dk, 'Named_Boxarts'))
 
+    def test_pc_mode_a_search_never_waits_for_the_helper(self):
+        # The page's search runs on one of the server's few request threads. With a PC
+        # job running and no helper, it answers from the source itself, as it did before
+        # the helper took the listing over: waiting for a helper held the thread for good.
+        job_id = self.start(mode='pc')
+        self.wait(job_id, lambda j: j['tasks']['queued'] >= 1)  # the workers wait on a helper nobody started
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=15)
+        conn.request('POST', f'/api/scraper/resolve?id={job_id}&item=0&action=search&value=hunter', None,
+                     {'X-RetroArch-Token': self.token})
+        response = conn.getresponse()
+        body = response.read()
+        conn.close()
+        self.assertEqual(response.status, 200, body)
+        found = next(p for p in json.loads(body)['job']['problems'] if p['item'] == 0)
+        self.assertEqual(found['candidates'], ['Space Hunter (Japan, USA) (En,Ja)'])
+        self.request('POST', f'/api/scraper/cancel?id={job_id}')
+
     def test_shared_layout_is_what_frontends_read(self):
         self.wait(self.start(lines=[f'snes\t{self.games["Jungle Run 2 - Partner\'s Island Quest (USA)"]}']))
         # The settings are remembered on the console.

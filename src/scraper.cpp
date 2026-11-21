@@ -834,12 +834,16 @@ std::string listing_name(const std::string &database)
 }
 /* The names libretro has covers for, from the folder's listing (once a session).
  * PC mode asks the helper for the listing: the console may have no route to the
- * source at all, and without it a game no name matches offers no candidates. */
+ * source at all, and without it a game no name matches offers no candidates.
+ * Only a job's worker passes its job. The page's search (resolve) runs on one of the
+ * server's few request threads and passes none: it asks the source itself and never
+ * waits for a helper, nor behind a worker that does (a lock for each way). */
 std::mutex index_fetch_lock; /* one fetch of a listing at a time: never the same twice */
-const std::vector<std::string> &libretro_index(Http &http, const std::string &database,
-                                               const Job *job)
+std::mutex index_helper_lock;
+const std::vector<std::string> &libretro_index(Http &http, const std::string &database, Job *job)
 {
-    std::lock_guard<std::mutex> fetching(index_fetch_lock);
+    const bool helper = job && job->options.mode == "pc";
+    std::lock_guard<std::mutex> fetching(helper ? index_helper_lock : index_fetch_lock);
     {
         std::lock_guard<std::mutex> guard(lock);
         auto it = indexes.find(database);
@@ -848,12 +852,12 @@ const std::vector<std::string> &libretro_index(Http &http, const std::string &da
     }
     const std::string url = libretro_base + '/' + url_encode(database) + "/Named_Boxarts/";
     std::string body;
-    if (job && job->options.mode == "pc")
+    if (helper)
     {
         const std::string destination = jobs_folder() + '/' + listing_name(database);
         std::string why;
         unlink(destination.c_str());
-        if (ask_helper(*const_cast<Job *>(job), 0, Task::fetch, url, destination, why) != 1)
+        if (ask_helper(*job, 0, Task::fetch, url, destination, why) != 1)
         {
             unlink(destination.c_str());
             static const std::vector<std::string> none;
@@ -874,7 +878,8 @@ const std::vector<std::string> &libretro_index(Http &http, const std::string &da
     }
     const std::vector<std::string> names = names_from_listing(body);
     std::lock_guard<std::mutex> guard(lock);
-    return indexes[database] = names;
+    /* The first to arrive stays: a reference handed out is never written again. */
+    return indexes.emplace(database, names).first->second;
 }
 std::vector<std::string> words(const std::string &text)
 {
@@ -3879,7 +3884,8 @@ bool resolve(const std::string &id, unsigned index, const std::string &action,
             return false;
         }
     }
-    /* A search runs here, on the request's thread: the index is cached after once. */
+    /* A search runs here, on the request's thread: the index is cached after once, and
+     * it is asked of the source itself, never of a PC helper (libretro_index). */
     Http http("PS5-RetroArch-Scraper/1");
     std::string database, region, source;
     {
@@ -3916,7 +3922,7 @@ bool resolve(const std::string &id, unsigned index, const std::string &action,
             return false;
     }
     else
-        found = closest(libretro_index(http, database, job.get()), value, region);
+        found = closest(libretro_index(http, database, nullptr), value, region);
     std::lock_guard<std::mutex> guard(lock);
     auto &item = job->items[index];
     item.candidates = found;
