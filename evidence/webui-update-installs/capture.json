@@ -1,0 +1,22 @@
+{
+  "step": "webui-update-installs",
+  "recorded": "2026-11-21T22:56:39Z",
+  "console_run": "upd75",
+  "revision": "ce0e006",
+  "command": "tools/run-title.sh --no-build --no-deploy --home-launch, then POST /api/update/download?tag=v4.5.0-beta-4, GET /api/update, POST /api/update/install (upd.py); three builds: v4.4.0-beta-4, 305144c6, 05053c2b",
+  "raw_capture": "klog/upd75-summary.txt",
+  "raw_lines": 10,
+  "raw_bytes": 2309,
+  "lines": [
+    "==> issue 75 on the Base PS5: the WebUI's update, from an installed build to the published v4.5.0-beta-4 (POST /api/update/download?tag=v4.5.0-beta-4, GET /api/update every 5 s, POST /api/update/install; the title started by tools/run-title.sh --home-launch)",
+    "before | v4.4.0-beta-4 (build 752e8a8b) installed: state downloading, .update/release.zip 1557399603 bytes after 3 minutes; then GET /api/update answers state idle, tag empty | webui-daemon.txt: daemon [145] served from 22:24:29 and wrote no stopping line; a new daemon [147] \"started\" at 22:27:07, the minute the download ended | the page offers the same update again (the three reports)",
+    "first fix | build 305144c6 (the worker's 64 KiB blocks on the heap, its thread with a 1 MiB stack): downloading 17:38:51, verifying 17:41:17, the daemon stays up | 17:41:37 state error, \"The release package or installation path is invalid. Nothing was installed.\"",
+    "package | PS5_RetroArch-v4.5.0-beta-4.zip: 19482 entries, 19432 manifest records, 49 folder entries (content/<system>/) that no manifest lists and the updater refused as invalid paths",
+    "installs | the updater's own list left out es-de/ (7120 files), picker/ (118), forwarder/ (2) and lapy-root-daemon.elf: an update would have kept them at the old version",
+    "after | build 05053c2b (the three fixes): downloading 17:50:44, verifying 17:53:15, \"Preparing the update\u2026 18176 files checked.\" 17:54:50, state ready 17:54:55 \"Download verified. Installing will close RetroArch. Save your game first.\"",
+    "after | POST /api/update/install: state installing; webui-daemon.txt: \"install requested: asking 1 linked program(s) to close the title\", \"unlinked: retroarch\", \"install: done\" 5 s later | .update-result: OK Update installed. Check the version above. | .update removed",
+    "after | the console's files against the release: eboot.bin 3549fadd600a = v4.5 release 3549fadd600a (the fixed build's was aa20b16c8c6f) | manifest.sha256 248a71714be4 = v4.5 release 248a71714be4 | es-de/es-de.bin, picker/picker.bin, lapy-root-daemon.elf, webui/app.js equal the release's",
+    "after | the title started again: build identity: 69075ee2 (v4.5.0-beta-4's), crash 0",
+    "host | the fixed updater over the real PS5_RetroArch-v4.5.0-beta-4.zip into an empty folder: installed, eboot.bin equal to the package's, 47 content folders made"
+  ]
+}

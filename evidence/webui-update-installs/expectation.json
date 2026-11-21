@@ -1,0 +1,13 @@
+{
+  "step": "webui-update-installs",
+  "note": "The WebUI's update from an installed build to v4.5.0-beta-4: on v4.4.0-beta-4 the daemon dies when verification starts; with the three fixes it verifies, installs and the title starts as the release's build.",
+  "must_contain": [
+    "state ready 17:54:55",
+    "\"install: done\" 5 s later | .update-result: OK Update installed.",
+    "eboot.bin 3549fadd600a = v4.5 release 3549fadd600a",
+    "the title started again: build identity: 69075ee2",
+    "a new daemon [147] \"started\" at 22:27:07"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}
