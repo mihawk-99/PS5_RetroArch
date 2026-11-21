@@ -65,6 +65,10 @@ if ! $skip_sdk && [[ ! -x "$sdk/bin/prospero-lld" || ! -d "$sdk/target/include" 
     exit 2
 fi
 
+if ! $skip_sdk; then
+    bash "$root/tools/patch-sdk-elevation.sh" >&2
+fi
+
 zlib_library=$(find "$zlib_root" -type f -name libz.a -print -quit 2>/dev/null || true)
 if [[ -z $zlib_library || ! -f $zlib_root/usr/include/zlib.h ||
     ! -f $zlib_stamp || $(<"$zlib_stamp") != "$zlib_version" ]]; then
