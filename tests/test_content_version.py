@@ -30,10 +30,14 @@ class ContentVersion(unittest.TestCase):
             self.assertIn('not higher than v4.3.0-beta-4', problems[0])
 
     def test_this_repository_s_releases(self):
-        # Every tag so far shipped 01.000.000 (or no param.json): the next release passes.
-        earlier = cv.tagged_versions('v4.3.0')
-        self.assertEqual(cv.check('v4.3.0', '04.003.000', earlier), [])
-        self.assertTrue(all(v == '01.000.000' for v in earlier.values()), earlier)
+        # Up to v4.2.0-beta-4 every tag shipped 01.000.000 (or no param.json);
+        # v4.3.0-beta-4 was the first to raise it. A later release passes, and one that
+        # would reuse v4.3.0-beta-4's value does not.
+        earlier = cv.tagged_versions('v99.0.0')
+        self.assertEqual(earlier['v4.2.0-beta-4'], '01.000.000')
+        self.assertEqual(earlier['v4.3.0-beta-4'], '04.003.000')
+        self.assertEqual(cv.check('v99.0.0', '99.000.000', earlier), [])
+        self.assertIn('not higher than v4.3.0-beta-4', cv.check('v4.3.0', '04.003.000', earlier)[0])
 
 
 if __name__ == '__main__':
