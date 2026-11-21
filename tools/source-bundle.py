@@ -106,7 +106,7 @@ def plan(component, root):
     steps = []
     if kind in ("git", "stamp", "provenance") or (kind == "core" and "tree" in spec):
         if kind == "git":
-            tree = root / spec["path"].replace("${VULKAN}", "../PS5_Vulkan")
+            tree = root / spec["path"].replace("${VULKAN}", ".deps/native/ps5-vulkan")
         elif kind == "stamp":
             tree = root / "../PS5_PayloadSDK"
         elif kind == "provenance":

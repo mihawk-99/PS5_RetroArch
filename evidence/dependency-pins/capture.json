@@ -1,0 +1,30 @@
+{
+  "step": "dependency-pins",
+  "recorded": "2026-11-21T03:24:22Z",
+  "console_run": "none: a host build; the console pass is the next step",
+  "revision": "b32ee8e",
+  "command": "bash tools/setup-vulkan.sh; PS5_FRONTENDS='es-de picker' PS5_WITH_SWANSTATION=1 PS5_WITH_MELONDSDS=1 tools/build-title.sh; python3 -c '(the five parts of dist/PPSA99169/licenses/components.json)'",
+  "raw_capture": "klog/dependency-pins/summary.txt",
+  "raw_lines": 18,
+  "raw_bytes": 1251,
+  "lines": [
+    "==> PS5_FRONTENDS='es-de picker' PS5_WITH_SWANSTATION=1 PS5_WITH_MELONDSDS=1 tools/build-title.sh (at b32ee8e plus this step's pins)",
+    "==> [radv] .deps/native/ps5-vulkan/.deps/native/radv-release is RADV (release) at 75238ae4db32",
+    "==> [title] build identity: c45a4e9d78ba219a1ca9dbcefe4872b1991b7c6aa768e9ffd36c38c6d8f09130",
+    "==> [title] built dist/PPSA99169 (19414 files, eboot.bin 40973107 bytes)",
+    "==> .deps/native/ps5-vulkan/.deps/native/radv-release/PROVENANCE.txt",
+    "revision: 75238ae4db3249803df3deeba47340f6de27962e",
+    "assertions: off",
+    "sdk: 88d6e41ec7ee7e76d871ff14cd78b5cc4c8e5989",
+    "archive sha256: 8460ed394a20234d094bd8d7fa59419bc6f8a4a69bd08b0848588894c5e99770",
+    "==> git -C .deps/native/ps5-vulkan rev-parse HEAD: 7f492b4c6f67a4e8c8c67a4272cfeef22abea9cc, local changes: 0",
+    "==> dist/PPSA99169/licenses/components.json",
+    "part payload-sdk: source 88d6e41ec7ee dirty False",
+    "part radv: source 75238ae4db32 dirty False",
+    "part ps5-vulkan: source 7f492b4c6f67 dirty False",
+    "part ps5-opengl: source ec06d8c2da03 dirty False",
+    "part frontend-picker: source b577e950684e dirty False",
+    "==> SDK headers v0.42 -> v0.45 (upstream release archives): only target/include/ps5/iommu.h added",
+    "==> tools/verify.sh format: PASS; unit: PASS (354s); evidence: 153 capture(s) replayed, 0 failed"
+  ]
+}

@@ -17,13 +17,13 @@ zlib_version="1.3.2"
 zlib_source="$zlib_directory/zlib-$zlib_version"
 zlib_archive="$zlib_directory/zlib-$zlib_version.tar.gz"
 zlib_stamp="$zlib_root/.source-version"
-# The payload SDK is my fork, ../PS5_PayloadSDK: the upstream v0.42 release with
+# The payload SDK is my fork, ../PS5_PayloadSDK: the upstream v0.45 release with
 # the PS5 platform layer (libps5platform.a, include/ps5platform) and the
 # console's machine-context layout installed over it (platform/README.md
 # there). The pinned revision is exported with git archive, so a build never
 # depends on the fork's working tree, and the SDK directory records it.
 sdk_fork="${PS5_PAYLOAD_SDK_FORK:-$root/../PS5_PayloadSDK}"
-sdk_revision=b5efad528e0ac1b8289f39d72a0e890ff68ff0a6
+sdk_revision=88d6e41ec7ee7e76d871ff14cd78b5cc4c8e5989
 zlib_url="https://zlib.net/fossils/zlib-$zlib_version.tar.gz"
 zlib_hash="bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
 skip_sdk=false

@@ -1,0 +1,13 @@
+{
+  "step": "dependency-pins",
+  "note": "The title is built against the newest SDK fork (88d6e41, upstream v0.45), PS5_Vulkan (7f492b4) and RADV (Mesa 75238ae), each pinned in this repository and recorded clean; RADV is built with the title's SDK in its own PS5_Vulkan clone.",
+  "must_contain": [
+    "part payload-sdk: source 88d6e41ec7ee dirty False",
+    "part radv: source 75238ae4db32 dirty False",
+    "part ps5-vulkan: source 7f492b4c6f67 dirty False",
+    "sdk: 88d6e41ec7ee7e76d871ff14cd78b5cc4c8e5989",
+    "local changes: 0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

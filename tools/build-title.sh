@@ -196,8 +196,14 @@ cp -f -- "$root/build/ra-conf/config.h" "$root/build/config.h"
 #   libvk_runtime.ps5.a   Mesa's Vulkan runtime (.deps/native/vulkan-runtime/lib/)
 #   libpsbc_driver.ps5.a  the shader compiler   (build/driver/ps5/)
 #   libpsbc_support.ps5.a the package writer    (.deps/native/psbc/lib/)
-# PS5_VULKAN_DIR overrides the sibling's root, so a release kept elsewhere works.
-vulkan_dir="${PS5_VULKAN_DIR:-$root/../PS5_Vulkan}"
+# PS5_Vulkan and RADV are the revisions tools/setup-vulkan.sh pins, built in their
+# own clone; PS5_VULKAN_DIR names another PS5_Vulkan instead (a driver being worked
+# on, or one with ps5vk's archives built). The frontends and the notices take it too.
+if [[ -z ${PS5_VULKAN_DIR:-} ]]; then
+    PS5_VULKAN_DIR=$(bash "$root/tools/setup-vulkan.sh") || exit 2
+fi
+export PS5_VULKAN_DIR
+vulkan_dir=$PS5_VULKAN_DIR
 vulkan_driver=${PS5_VULKAN_DRIVER:-radv}
 case $vulkan_driver in
     ps5vk | radv) ;;
@@ -212,7 +218,8 @@ vulkan_archives=(
 )
 vulkan_missing=()
 for archive in "${vulkan_archives[@]}"; do
-    [[ -f $archive ]] || vulkan_missing+=("$archive")
+    # RADV's build links its own archive (below), not ps5vk's.
+    [[ $vulkan_driver == radv || -f $archive ]] || vulkan_missing+=("$archive")
 done
 if (( ${#vulkan_missing[@]} )); then
     printf 'error: the Vulkan driver archives are missing; the title would link with\n' >&2
@@ -223,7 +230,7 @@ if (( ${#vulkan_missing[@]} )); then
 fi
 # The driver may be developed concurrently. A diagnostic link uses stable local
 # archive copies; hashes describe exactly which driver went into this build.
-if [[ $memory_diagnostics == 1 ]]; then
+if [[ $memory_diagnostics == 1 && $vulkan_driver == ps5vk ]]; then
     if ! snapshot_list=$(python3 - "$root" "${vulkan_archives[@]}" <<'PY_SNAPSHOT'
 import hashlib, json, pathlib, shutil, sys
 out = pathlib.Path(sys.argv[1]) / "build/memory-diagnostic-inputs"

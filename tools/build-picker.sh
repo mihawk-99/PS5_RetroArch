@@ -26,7 +26,7 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 template=$(cd -- "${PS5_VULKAN_TEMPLATE:-$root/../PS5_VulkanTemplate}" && pwd)
-vulkan=$(cd -- "${PS5_VULKAN_DIR:-$root/../PS5_Vulkan}" && pwd)
+vulkan=$(cd -- "${PS5_VULKAN_DIR:-$(bash "$root/tools/setup-vulkan.sh")}" && pwd)
 template_commit=b577e950684e8bb835746ad0e38495ebcb154fd0
 program=frontendpicker
 title_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' "$root/sce_sys/param.json")
@@ -92,9 +92,11 @@ PY
 
 # The template's notices step reads the repositories its title is built from beside
 # the title's folder; they are this project's neighbours, linked as they stand.
-for neighbour in PS5_VKHomebrewUI PS5_PayloadSDK PS5_Mesa PS5_LLVM PS5_Vulkan; do
+for neighbour in PS5_VKHomebrewUI PS5_PayloadSDK PS5_Mesa PS5_LLVM; do
     [[ ! -d $root/../$neighbour || -e $work/$neighbour ]] || ln -s "$(cd -- "$root/../$neighbour" && pwd)" "$work/$neighbour"
 done
+# PS5_Vulkan is the one the picker links (the pinned clone, tools/setup-vulkan.sh).
+ln -sfn "$vulkan" "$work/PS5_Vulkan"
 echo "==> [picker] building (log in build/picker/build.log)"
 PS5_VULKAN_DIR="$vulkan" bash "$generated/ps5/tools/build.sh" > "$work/build.log" 2>&1 ||
     { grep -E "error|Error" "$work/build.log" | head -20 >&2; exit 1; }
