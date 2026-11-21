@@ -263,8 +263,38 @@ int main(int argc, char **argv)
         ps5_esde_write_library_to(&fresh, summary, sizeof(summary));
         assert(value("ROMDirectory") == "/mnt/usb0/roms" && value("MediaDirectory") == media);
     }
+    /* Issue 108: RetroArch's scan lists a game inside an archive as "Game.zip#Game.md" for a
+     * core that does not open archives. That is not a file, so ES-DE listed nothing: its
+     * game is the archive, once, in a system that lists the archive's extension. */
+    {
+        const std::string lists = dir + "/playlists-archives", there = dir + "/data-archives";
+        mkdir(lists.c_str(), 0777);
+        write_text(lists + "/Nintendo - Super Nintendo Entertainment System.lpl",
+                   "{\"items\": ["
+                   "{\"path\": \"/mnt/usb0/roms/Alpha (USA).zip#Alpha (USA).sfc\", \"label\": "
+                   "\"Alpha (USA)\", \"core_path\": \"DETECT\"},"
+                   "{\"path\": \"/mnt/usb0/roms/Pack.7z#a.sfc\", \"label\": \"Pack A\", "
+                   "\"core_path\": \"DETECT\"},"
+                   "{\"path\": \"/mnt/usb0/roms/Pack.7z#b.sfc\", \"label\": \"Pack B\", "
+                   "\"core_path\": \"DETECT\"}]}");
+        const struct ps5_esde_library_paths archives = {
+            lists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
+            there.c_str(), nullptr,      media.c_str()};
+        ps5_esde_write_library_to(&archives, summary, sizeof(summary));
+        pugi::xml_document written, list;
+        assert(written.load_file((there + "/custom_systems/es_systems.xml").c_str()));
+        const pugi::xml_node system = written.child("systemList").child("system");
+        assert(std::string(system.child_value("path")) == "/mnt/usb0/roms");
+        const std::string listed = system.child_value("extension");
+        assert(listed.find(".zip") != std::string::npos && listed.find(".7z") != std::string::npos);
+        assert(list.load_file((there + "/gamelists/snes/gamelist.xml").c_str()));
+        std::string games;
+        for (pugi::xml_node game : list.child("gameList").children("game"))
+            games += std::string(game.child_value("path")) + "=" + game.child_value("name") + ";";
+        assert(games == "./Alpha (USA).zip=Alpha (USA);./Pack.7z=Pack A;");
+    }
     std::puts("esde_library: systems, full names, themes, commands, merged game lists, favourites "
-              "from both frontends, RetroArch's play records, the collections and the ROM and "
-              "media folders PASS");
+              "from both frontends, RetroArch's play records, the collections, the ROM and "
+              "media folders and games inside archives PASS");
     return 0;
 }

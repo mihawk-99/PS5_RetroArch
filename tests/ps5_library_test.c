@@ -583,8 +583,66 @@ int main(int argc, char **argv)
         snprintf(path, sizeof(path), "%s/none", root);
         assert(ps5_library_rename_system_folders(path, playlists, config) == -1);
     }
+    {
+        /* A file inside an archive, as RetroArch's scan lists a game for a core that does not
+         * open archives: one game with its archive, which is the file a frontend lists; two
+         * files inside one archive are two games (issue 108). */
+        assert(ps5_library_file_length("/a/Game.zip#Game.sfc") == 11);
+        assert(ps5_library_file_length("/a/Game.7Z#in.md") == 10);
+        assert(ps5_library_file_length("/a/Game #1.zip") == 14); /* a "#" in a name */
+        assert(ps5_library_file_length("/a/C#.zip#in.nes") == 9);
+        assert(ps5_library_same_game("/a/G.zip#x.sfc", "/a/G.zip") &&
+               ps5_library_same_game("/a/G.zip", "/a/G.zip#y.sfc") &&
+               ps5_library_same_game("/a/G.zip#x.sfc", "/a/G.zip#x.sfc") &&
+               ps5_library_same_game("/a/G.sfc", "/a/G.sfc"));
+        assert(!ps5_library_same_game("/a/G.zip#x.sfc", "/a/G.zip#y.sfc") &&
+               !ps5_library_same_game("/a/G.zip#x.sfc", "/a/H.zip#x.sfc") &&
+               !ps5_library_same_game("/a/G.zip", "/a/G.zip2") &&
+               !ps5_library_same_game(NULL, "/a"));
+
+        char root[1024], playlists[1100], info[1100], cores[1100];
+        snprintf(root, sizeof(root), "%s/archives", dir);
+        snprintf(playlists, sizeof(playlists), "%s/playlists", root);
+        snprintf(info, sizeof(info), "%s/info", root);
+        snprintf(cores, sizeof(cores), "%s/cores", root);
+        const char *made[] = {root, playlists, info, cores};
+        for (size_t i = 0; i < 4; i++)
+            mkdir(made[i], 0777);
+        core(root, "snes9x", "Nintendo - Super Nintendo Entertainment System", "smc|sfc");
+        snprintf(path, sizeof(path), "%s/Nintendo - Super Nintendo Entertainment System.lpl",
+                 playlists);
+        write_text(path, "{\"items\": ["
+                         "{\"path\": \"/app0/content/snes/Alpha.zip#Alpha.sfc\", \"label\": "
+                         "\"Alpha\", \"core_path\": \"DETECT\"},"
+                         "{\"path\": \"/app0/content/snes/Alpha.zip\", \"label\": \"Alpha's "
+                         "archive\", \"core_path\": \"DETECT\"},"
+                         "{\"path\": \"/app0/content/snes/Pack.7z#one/a.smc\", \"label\": "
+                         "\"Pack A\", \"core_path\": \"DETECT\"},"
+                         "{\"path\": \"/app0/content/snes/Pack.7z#two/b.smc\", \"label\": "
+                         "\"Pack B\", \"core_path\": \"DETECT\"}]}");
+        snprintf(path, sizeof(path), "%s/builtin", playlists);
+        mkdir(path, 0777);
+        /* Started by its archive, as ES-DE starts it. */
+        snprintf(path, sizeof(path), "%s/builtin/content_history.lpl", playlists);
+        write_text(path, "{\"items\": [{\"path\": \"/app0/content/snes/Alpha.zip\"}]}");
+        snprintf(path, sizeof(path), "%s/builtin/content_favorites.lpl", playlists);
+        write_text(path, "{\"items\": [{\"path\": \"/app0/content/snes/Pack.7z#two/b.smc\"}]}");
+        struct ps5_library archives;
+        assert(ps5_library_load(&archives, playlists, info, cores) == 0);
+        const struct ps5_library_system *snes = system_of(&archives, "snes");
+        assert(archives.game_count == 3 && snes && snes->game_count == 3);
+        const struct ps5_library_game *games = &archives.games[snes->first_game];
+        assert(strcmp(games[0].path, "/app0/content/snes/Alpha.zip#Alpha.sfc") == 0 &&
+               strcmp(games[0].label, "Alpha") == 0 && games[0].history == 1);
+        assert(strcmp(games[1].label, "Pack A") == 0 && !games[1].favorite &&
+               strcmp(games[2].label, "Pack B") == 0 && games[2].favorite);
+        /* ES-DE lists a system's folder by its extensions: the archives' are among them. */
+        assert(strcmp(snes->folder, "/app0/content/snes") == 0);
+        assert(strcmp(snes->extensions, "zip|sfc|7z|smc") == 0);
+        ps5_library_free(&archives);
+    }
     puts("ps5_library: platforms, playlists, systems, cores, folders, labels, favourites, history, "
          "runtime logs, game mode commands, content folders, system folders and their ES-DE "
-         "names PASS");
+         "names, archive members PASS");
     return 0;
 }

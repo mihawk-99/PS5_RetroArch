@@ -214,7 +214,7 @@ void use_title_folders(const std::string &data, const char *roms, const char *me
     if (!changed)
         return;
     mkdir(folder.c_str(), 0777);
-    chmod(folder.c_str(), 0777); /* FTP's reach: the title's folders are 0777 */
+    chmod(folder.c_str(), 0777);              /* FTP's reach: the title's folders are 0777 */
     if (document.save_file(settings.c_str())) // as ES-DE saves it (Settings::saveFile)
         chmod(settings.c_str(), 0777);
 }
@@ -411,10 +411,14 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
             root.append_copy(node);
         const std::string prefix =
             std::string(system.folder) == "/" ? "/" : std::string(system.folder) + "/";
+        std::set<std::string> listed;
         for (size_t g = 0; g < system.game_count; g++)
         {
             const struct ps5_library_game &game = library.games[system.first_game + g];
-            const std::string path = game.path;
+            /* ES-DE lists files: a game inside an archive is its archive, once (issue 108). */
+            const std::string path(game.path, ps5_library_file_length(game.path));
+            if (!listed.insert(path).second)
+                continue;
             const std::string relative =
                 "./" + (path.rfind(prefix, 0) == 0 ? path.substr(prefix.size())
                                                    : path.substr(path.rfind('/') + 1));

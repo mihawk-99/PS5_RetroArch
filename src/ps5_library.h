@@ -119,6 +119,15 @@ extern "C"
                                     const char *title_root);
     void ps5_library_free(struct ps5_library *library);
 
+    /* How much of a content path names the file itself: all of it, or what comes before
+     * the "#" when RetroArch means a file inside an archive ("Game.zip#Game.sfc", as its
+     * scan lists a game for a core that does not open archives). A frontend that lists
+     * files, as ES-DE does, lists and starts the archive (issue 108). */
+    size_t ps5_library_file_length(const char *path);
+    /* Whether two content paths name one game: the same path, or an archive and a file
+     * inside it. Two files inside one archive are two games. */
+    int ps5_library_same_game(const char *a, const char *b);
+
     /* The platform a name stands for (a RetroArch database, a playlist's or a folder's
      * name: "Sony - PlayStation", "PS1.lpl", "Nintendo - Game Boy"): its id, or NULL. */
     const char *ps5_library_platform(const char *name);

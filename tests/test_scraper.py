@@ -469,6 +469,17 @@ class Scraper(unittest.TestCase):
         self.assertFalse(json.loads(self.request('GET', '/api/library/files?' + query)[1])['state'][0]['preview'])
         self.assertEqual(self.request('GET', export + '&preview=1')[0], 404)
 
+    def test_a_playlist_s_file_inside_an_archive_and_the_archive_are_one_game(self):
+        # RetroArch's scan lists "Game.zip#Game.sfc" for a core that does not open archives;
+        # the content scan lists Game.zip. That was two cards for one game (issue 108).
+        folder = self.root / 'content' / DB
+        folder.mkdir(parents=True)
+        member = f'/app0/content/{DB}/Arch (USA).zip#Arch (USA).sfc'
+        self.write_playlist({'Arch (USA)': member})
+        (folder / 'Arch (USA).zip').write_bytes(b'rom')
+        games = [g for s in json.loads(self.request('GET', '/api/library')[1])['systems'] for g in s['games']]
+        self.assertEqual([g['path'] for g in games], [member])
+
     def test_game_files_and_edited_metadata(self):
         path = next(iter(self.games.values()))
         rom = self.root / path.removeprefix('/app0/')

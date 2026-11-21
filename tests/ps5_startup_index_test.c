@@ -47,6 +47,19 @@ int main(void)
     index_game(&index, &lib, 64);
     assert(index.disabled && !index.slots);
     assert(indexed_game(&lib, &index, lib.games[199].path) == &lib.games[199]);
+    /* The index finds what ps5_library_same_game calls one game (issue 108): an archive
+     * and a file inside it, never two files of one archive. */
+    fail_index = 0;
+    index = (struct game_paths){0};
+    strcpy(lib.games[0].path, "/a/G.zip#x.sfc");
+    strcpy(lib.games[1].path, "/a/H.zip");
+    for (size_t i = 0; i < lib.game_count; i++)
+        index_game(&index, &lib, i);
+    assert(index.capacity && indexed_game(&lib, &index, "/a/G.zip") == &lib.games[0]);
+    assert(indexed_game(&lib, &index, "/a/G.zip#x.sfc") == &lib.games[0]);
+    assert(!indexed_game(&lib, &index, "/a/G.zip#y.sfc"));
+    assert(indexed_game(&lib, &index, "/a/H.zip#in.sfc") == &lib.games[1]);
+    free(index.slots);
     free(lib.games);
     puts("PASS: collision probing, rehashing, absent paths and allocation-failure fallback");
 }
