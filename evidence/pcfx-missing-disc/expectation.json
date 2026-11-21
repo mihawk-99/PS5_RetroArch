@@ -1,0 +1,15 @@
+{
+  "step": "pcfx-missing-disc",
+  "note": "Beetle PC-FX died with signal 11 on a .cue that is not there (v4.1.0-beta-4 too: the console's file layer hands the core a handle at 0 of size -1, which MemoryStream turned into a NULL buffer); patched, the load fails with 'Could not open the disc image' and the title stays up, and an image that is there still opens.",
+  "must_contain": [
+    "old-pcfx | build identity: 8ecb2e43 |  | crash 1",
+    "missing | build identity: 243d316e",
+    "Could not open the disc image: /app0/content/pcfx/no-such-file.cue",
+    "made-disc | build identity: 243d316e |  | it exited on its own before 30s | crash 0 | rarch_main 1",
+    "Loading SBI file"
+  ],
+  "must_not_contain": [
+    "243d316e | the console's copy is byte for byte this build | it started and then died"
+  ],
+  "human_check": ""
+}

@@ -1,0 +1,106 @@
+--- a/libretro.cpp
++++ b/libretro.cpp
+@@ -1221,6 +1221,8 @@
+          image_label[0] = '\0';
+ 
+          CDIF *cdif   = CDIF_Open(disk_control_ext_info.image_paths[i].c_str(), cdimagecache);
++         if (!cdif)
++            break;
+          CDInterfaces.push_back(cdif);
+ 
+          extract_basename(
+@@ -1234,14 +1236,20 @@
+       char image_label[4096];
+       image_label[0] = '\0';
+       CDIF *cdif   = CDIF_Open(devicename, cdimagecache);
+-      CDInterfaces.push_back(cdif);
++      if (cdif)
++         CDInterfaces.push_back(cdif);
+ 
+       disk_control_ext_info.image_paths.push_back(devicename);
+       extract_basename(image_label, devicename, sizeof(image_label));
+       disk_control_ext_info.image_labels.push_back(image_label);
+    }
+ 
+-   if (!(LoadCD(&CDInterfaces)))
++   /* A disc that did not open fails the load rather than the core (PS5). */
++   const bool opened = !CDInterfaces.empty() &&
++      CDInterfaces.size() == disk_control_ext_info.image_paths.size();
++   if (!opened)
++      log_cb(RETRO_LOG_ERROR, "Could not open the disc image: %s\n", devicename);
++   if (!opened || !(LoadCD(&CDInterfaces)))
+    {
+       for (unsigned i = 0; i < CDInterfaces.size(); i++)
+          delete CDInterfaces[i];
+--- a/mednafen/cdrom/CDAccess.cpp
++++ b/mednafen/cdrom/CDAccess.cpp
+@@ -44,7 +44,15 @@
+       ret = new CDAccess_CHD(path, image_memcache);
+ #endif
+    else
+-      ret = new CDAccess_Image(path, image_memcache);
++   {
++      CDAccess_Image *image = new CDAccess_Image(path, image_memcache);
++      if(!image->Opened())
++      {
++         delete image;
++         return NULL;
++      }
++      ret = image;
++   }
+ 
+    return ret;
+ }
+--- a/mednafen/cdrom/CDAccess_Image.cpp
++++ b/mednafen/cdrom/CDAccess_Image.cpp
+@@ -978,7 +978,7 @@
+ {
+    memset(Tracks, 0, sizeof(Tracks));
+ 
+-   ImageOpen(path, image_memcache);
++   opened = ImageOpen(path, image_memcache);
+ }
+ 
+ CDAccess_Image::~CDAccess_Image()
+--- a/mednafen/cdrom/CDAccess_Image.h
++++ b/mednafen/cdrom/CDAccess_Image.h
+@@ -64,8 +64,12 @@
+ 
+       virtual bool Read_TOC(TOC *toc);
+ 
++      /* Whether the image opened: a missing or unreadable one fails the load (PS5). */
++      bool Opened(void) const { return opened; }
++
+    private:
+ 
++      bool opened;
+       int32_t NumTracks;
+       int32_t FirstTrack;
+       int32_t LastTrack;
+--- a/mednafen/cdrom/cdromif.cpp
++++ b/mednafen/cdrom/cdromif.cpp
+@@ -589,6 +589,8 @@
+ CDIF *CDIF_Open(const std::string& path, bool image_memcache)
+ {
+    CDAccess *cda = CDAccess_Open(path, image_memcache);
++   if(!cda)
++      return NULL;
+ #ifdef HAVE_THREADS
+    if(!image_memcache)
+       return new CDIF_MT(cda);
+--- a/mednafen/MemoryStream.cpp
++++ b/mednafen/MemoryStream.cpp
+@@ -38,8 +38,13 @@
+       stream->seek(0, SEEK_SET);
+ 
+    data_buffer_size = stream->size();
++   /* A FileStream that did not open answers (uint64_t)-1: it holds nothing (PS5). */
++   if(data_buffer_size == (uint64_t)-1)
++      data_buffer_size = 0;
+    data_buffer_alloced = data_buffer_size;
+    data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced);
++   if(!data_buffer)
++      data_buffer_size = data_buffer_alloced = 0;
+ 
+    stream->read(data_buffer, data_buffer_size);
+ 

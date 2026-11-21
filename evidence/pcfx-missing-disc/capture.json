@@ -1,0 +1,28 @@
+{
+  "step": "pcfx-missing-disc",
+  "recorded": "2026-11-21T05:03:52Z",
+  "console_run": "missing-ab 2026-11-20 23:5x (c45a4e9d and v4.1.0-beta-4's 8ecb2e43), pcfx-fix 2026-11-21 00:0x (243d316e)",
+  "revision": "1466d6d",
+  "command": "tools/run-title.sh --no-build [--no-deploy] --game=mednafen_pcfx:/app0/content/pcfx/<missing or made>.cue --watch 30; python3 -m unittest tests.test_beetle_pcfx_missing_disc",
+  "raw_capture": "klog/pcfx-missing-disc/summary.txt",
+  "raw_lines": 16,
+  "raw_bytes": 1704,
+  "lines": [
+    "==> before the patch: tools/run-title.sh --no-build --no-deploy --game=mednafen_pcfx:/app0/content/pcfx/no-such-file.cue --watch 30, on each eboot.bin (the core file is the same in both)",
+    "new-fceumm | build identity: c45a4e9d | it exited on its own before 30s | crash 0 | rarch_main 1",
+    "    [ERROR] [Content] Could not read content file: \"/app0/content/nes/no-such-file.nes\".",
+    "new-pcfx | build identity: c45a4e9d | it started and then died; the signal bloc | crash 1 | rarch_main (none: killed)",
+    "old-fceumm | build identity: 8ecb2e43 |  | crash 0 | rarch_main 1",
+    "old-pcfx | build identity: 8ecb2e43 |  | crash 1 | rarch_main (none: killed)",
+    "    crash: signal 11 fault=0x0 rip=core+0x35806 MemoryStream::get_line <- CDAccess_Image::ImageOpen <- CDAccess_Image <- CDAccess_Open <- CDIF_Open <- retro_load_game; rax (position)=0 rcx (data_buffer)=0",
+    "==> after the patch (patches/beetle-pcfx/missing-disc.patch), same run, then a .cue and a blank MODE1/2048 track made by the run (removed afterwards)",
+    "missing | build identity: 243d316e | the console's copy is byte for byte this build | it exited on its own before 30s | crash 0 | rarch_main 1",
+    "    [libretro ERROR] No tracks found!",
+    "    [libretro ERROR] Could not open the disc image: /app0/content/pcfx/no-such-file.cue",
+    "    [ERROR] [Content] Failed to load content.",
+    "made-disc | build identity: 243d316e |  | it exited on its own before 30s | crash 0 | rarch_main 1",
+    "    [ERROR] [Content] Failed to load content.",
+    "    made-disc: Loading SBI file \"/app0/content/pcfx/claude-test-disc.sbi\"... (the image opened; no PC-FX BIOS on the console)",
+    "==> python3 -m unittest tests.test_beetle_pcfx_missing_disc: 3 tests OK (pinned source killed by a signal; patched stream empty)"
+  ]
+}
