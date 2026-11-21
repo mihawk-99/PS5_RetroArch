@@ -78,9 +78,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
     def reply(self, status, body, kind='application/json'):
+        # Answered: not busy from here, since the client sends its next request as soon as it
+        # has read this one, maybe before this thread gets back from writing it.
+        self.uncount()
         data = body if isinstance(body, bytes) else (json.dumps(body) if isinstance(body, dict) else body).encode()
         self.send_response(status); self.send_header('Content-Type', kind); self.send_header('Content-Length', str(len(data)))
         self.end_headers(); self.wfile.write(data)
+
+    def uncount(self):
+        with self.server.lock:
+            self.server.busy -= self.counted
+            self.counted = 0
 
     def do_GET(self):
         url = urllib.parse.urlsplit(self.path)
@@ -89,7 +97,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         server = self.server
         with server.lock:
             server.calls.append((endpoint, q)); server.urls.append(self.path); server.times.append(time.time())
-            server.busy += 1; server.most_busy = max(server.most_busy, server.busy)
+            server.busy += 1; server.most_busy = max(server.most_busy, server.busy); self.counted = 1
         try:
             time.sleep(0.05)
             if (q.get('devid'), q.get('devpassword')) != (DEV_ID, DEV_PASSWORD):
@@ -119,8 +127,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.reply(200, {'response': {'ssuser': user, 'jeux': hits}})
             return self.reply(404, 'Erreur', 'text/plain')
         finally:
-            with server.lock:
-                server.busy -= 1
+            self.uncount()
 
 
 class ScreenScraper(unittest.TestCase):
@@ -271,7 +278,7 @@ class ScreenScraper(unittest.TestCase):
         job = self.wait(job_id)
         self.assertEqual(job['state'], 'done', job)
         self.assertEqual(job['counts'], {'ambiguous': 1, 'done': 3, 'unmatched': 1})
-        self.assertLessEqual(self.source.most_busy, 2 + 3)  # two games at once (and their media downloads)
+        self.assertLessEqual(self.source.most_busy, 2)  # two games at once, their media downloads in their turn
         infos = [q for e, q in self.source.calls if e == 'jeuInfos.php']
         self.assertFalse(any(q.get('gameid') == '2002' for q in infos))
         self.assertTrue(any(q.get('crc') == 'D63ED5F8' and q.get('romtaille') == '300' for q in infos))
