@@ -1,0 +1,16 @@
+{
+  "step": "dependency-console-bios",
+  "note": "The newest SDK, PS5_Vulkan and RADV on the Base PS5, the last three cores, with the owner's BIOS dumps and discs: Flycast runs a Dreamcast disc on RADV, Beetle Saturn boots its BIOS and a Saturn disc to its title screen, Beetle PC-FX boots the owner's PC-FX GA BIOS; no crash. Judged by the pictures (looked at here, not committed) and the brightness of each recording.",
+  "must_contain": [
+    "core flycast (the owner's Dreamcast disc, dc_boot.bin): crash 0 | now 83.1/72.8",
+    "core mednafen_saturn (the owner's Saturn disc): crash 0 | now 68.3/45.2",
+    "core mednafen_pcfx (blank test disc, the owner's PC-FX GA BIOS as pcfx.rom): crash 0 | now 152.4/152.5",
+    "This is a Saturn disc.",
+    "Using GPU: \"PlayStation 5 GPU (RADV NAVI21)\"",
+    "content/pcfx empty, content/saturn holds only the owner's files"
+  ],
+  "must_not_contain": [
+    "crash: signal"
+  ],
+  "human_check": "No October baseline for these three (other content); the pictures were looked at locally: Flycast past the BIOS into the game, Saturn's CD player and a game's title screen, the PC-FX BIOS logo. A PC-FX game has not been run (no PC-FX disc)."
+}

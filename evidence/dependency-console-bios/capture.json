@@ -1,0 +1,25 @@
+{
+  "step": "dependency-console-bios",
+  "recorded": "2026-11-21T14:03:57Z",
+  "console_run": "085359-090052",
+  "revision": "1a386c8",
+  "command": "bash evidence/framegen-every-core/run.sh <flycast, mednafen_saturn and mednafen_pcfx rows> klog/deps-pass/cores-bios (and cores-saturn)",
+  "raw_capture": "klog/deps-pass/bios-summary.txt",
+  "raw_lines": 13,
+  "raw_bytes": 1934,
+  "lines": [
+    "==> build 243d316e (66e50e0's code: c45a4e9d, 1466d6d's SDK 88d6e41, PS5_Vulkan 7f492b4, RADV 75238ae, plus the patched PC-FX core) on the Base PS5",
+    "==> the owner put on the console: system/dc/dc_boot.bin (md5 e10c53c2f8b90bab96ead2d368858623, the dump flycast_libretro.info names), system/Saturn/mpr-17933.bin (512 KiB, md5 bde8d622..., not the dump the info names; the core checks name and size only), system/pcfxga.rom (the PC-FX GA BIOS, 1 MiB), a Dreamcast disc and a Saturn disc (zip) of their own",
+    "==> added for the runs, deleted after: a copy of pcfxga.rom as system/pcfx.rom (the core reads only that name, 1 MiB), a blank one-track test disc (.cue/.bin) in content/saturn and content/pcfx, the Saturn zip unpacked here (unzip -t: no errors) and its 22 files put in content/saturn/claude-saturn-test (each at its size)",
+    "==> evidence/framegen-every-core/run.sh with tests/pad/framegen-record.txt (brightness of each recording; October used other content, so no October figures)",
+    "core flycast (the owner's Dreamcast disc, dc_boot.bin): crash 0 | now 83.1/72.8 | past the BIOS into the game's opening, drawn in 3D",
+    "flycast: [INFO] [Vulkan] Using GPU: \"PlayStation 5 GPU (RADV NAVI21)\".",
+    "core mednafen_saturn (blank test disc, the owner's BIOS): crash 0 | now 65.2/65.9 | the BIOS's CD player screen",
+    "core mednafen_saturn (the owner's Saturn disc): crash 0 | now 68.3/45.2 | the game's title screen",
+    "mednafen_saturn: [libretro INFO] This is a Saturn disc.",
+    "mednafen_saturn: [libretro INFO] Disc Region: \"Europe\"",
+    "core mednafen_pcfx (blank test disc, the owner's PC-FX GA BIOS as pcfx.rom): crash 0 | now 152.4/152.5 | the BIOS's logo and its RUN prompt",
+    "runs: 4 ==> [run] VERDICT: it exited on its own before 95s",
+    "==> afterwards: the 34 files the runs added or made (the unpacked disc, the test disc, pcfx.rom, today's saves) deleted; content/pcfx empty, content/saturn holds only the owner's files, system/ holds pcfxga.rom and no pcfx.rom"
+  ]
+}
