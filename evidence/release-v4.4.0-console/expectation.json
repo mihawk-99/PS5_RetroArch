@@ -1,0 +1,14 @@
+{
+  "step": "release-v4.4.0-console",
+  "note": "v4.4.0-beta-4's release build starts elevated with contentVersion 04.004.000; graphics widgets a build without them saved off are turned on once (nothing else in the config changes), and a later choice of off stays.",
+  "must_contain": [
+    "first | elevation=ok uid=0 | same_executable=1 | Lapy stage=complete error=0 | \"contentVersion\": \"04.004.000\"",
+    "update | after the start: menu_enable_widgets = \"true\" | marker 1 | other lines changed: 0",
+    "choice | off again with the marker there, after the start: menu_enable_widgets = \"false\" | marker 1",
+    "the owner's retroarch.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [
+    "restored: DIFFERS"
+  ],
+  "human_check": ""
+}

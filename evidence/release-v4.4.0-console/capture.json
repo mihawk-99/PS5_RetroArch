@@ -1,0 +1,25 @@
+{
+  "step": "release-v4.4.0-console",
+  "recorded": "2026-11-21T18:21:58Z",
+  "console_run": "release-44",
+  "revision": "ecdf177",
+  "command": "bash release44_check.sh klog/release-44 (tools/run-title.sh --watch 20, three starts)",
+  "raw_capture": "klog/release-44-summary.txt",
+  "raw_lines": 13,
+  "raw_bytes": 1377,
+  "lines": [
+    "==> v4.4.0-beta-4's release build 752e8a8b (ecdf177) on the Base PS5, before it was published",
+    "before | the owner's setting: menu_enable_widgets = \"true\" | marker 0",
+    "first | build identity: 752e8a8b | the console's copy is byte for byte this build | ran for 20s and this script closed it | crash 0",
+    "first | elevation=ok uid=0 | same_executable=1 | Lapy stage=complete error=0 | \"contentVersion\": \"04.004.000\"",
+    "first | the owner's config unchanged: yes | marker 1",
+    "update | put: menu_enable_widgets = \"false\" | marker 0",
+    "update | build identity: 752e8a8b |  | ran for 20s and this script closed it | crash 0",
+    "update | after the start: menu_enable_widgets = \"true\" | marker 1 | other lines changed: 0",
+    "update | 1 frontend: widgets branch taken",
+    "choice | build identity: 752e8a8b |  | ran for 20s and this script closed it | crash 0",
+    "choice | off again with the marker there, after the start: menu_enable_widgets = \"false\" | marker 1",
+    "the owner's retroarch.cfg restored: byte-identical (menu_enable_widgets = \"true\")",
+    "==> with the owner's RetroAchievements account, build c443857c (the same RetroArch changes): sign-in with the password, the title closed from outside, the next start signed in with the token; a game's summary, its progress trackers and an achievement's unlock drawn as widgets, the achievement awarded (pictures kept local, one in the release note by the owner's exception)"
+  ]
+}
