@@ -427,6 +427,24 @@ class Scraper(unittest.TestCase):
         self.assertEqual(found['candidates'], ['Space Hunter (Japan, USA) (En,Ja)'])
         self.request('POST', f'/api/scraper/cancel?id={job_id}')
 
+    def test_pc_mode_a_lease_run_out_mid_download_starts_nothing_twice(self):
+        # A download longer than its lease (the LaunchBox database on a slow line) is
+        # handed out again while the helper still works on it. The helper used to start
+        # it a second time, into the same temporary file: now it asks the source once.
+        dk = 'Jungle Run 2 - Partner\'s Island Quest (USA)'
+        self.stop_server()
+        self.start_server(lease=1)
+        self.source.delay = 2.5
+        job_id = self.start(mode='pc', kinds='cover', lines=[f'snes\t{self.games[dk]}'])
+        helper = self.run_helper(job_id)
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        self.assertEqual(self.wait(job_id)['counts'], {'done': 1})
+        with self.source.lock:
+            rows = sorted((m, p) for m, a, p in self.source.log if 'Helper' in a)
+        self.assertEqual(rows, [('GET', f'Named_Boxarts/{dk}.png'), ('HEAD', f'Named_Boxarts/{dk}.png')])
+        self.assertEqual(self.stored(dk, 'cover').read_bytes(), image(dk, 'Named_Boxarts'))
+
     def test_shared_layout_is_what_frontends_read(self):
         self.wait(self.start(lines=[f'snes\t{self.games["Jungle Run 2 - Partner\'s Island Quest (USA)"]}']))
         # The settings are remembered on the console.

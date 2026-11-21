@@ -141,10 +141,10 @@ class Helper:
     def run(self):
         print(f'Job {self.job} on {self.base}: downloading on this PC, sending to the PS5.')
         print('Keep this window open until the job is done. Ctrl+C stops; run again to resume.')
-        threads = []
+        threads = {}  # a task's number: the thread working on it
         try:
             while True:
-                threads = [t for t in threads if t.is_alive()]
+                threads = {number: t for number, t in threads.items() if t.is_alive()}
                 if len(threads) >= WORKERS:
                     time.sleep(0.05)
                     continue
@@ -158,10 +158,15 @@ class Helper:
                     time.sleep(1)
                     continue
                 for task in result['tasks']:
+                    # A download longer than its lease (a database, a slow line) is handed
+                    # out again: it is still in hand here, and a second thread would write
+                    # over the first one's temporary file.
+                    if task['task'] in threads:
+                        continue
                     thread = threading.Thread(target=self.run_task, args=(task,), daemon=True)
                     thread.start()
-                    threads.append(thread)
-            for thread in threads:
+                    threads[task['task']] = thread
+            for thread in threads.values():
                 thread.join()
             self.note()
             print('\nDone.')
