@@ -741,12 +741,13 @@
     },
     {
       "id": "libsmb2",
-      "name": "libsmb2 (SMB shares: the file browser's SMB entry and the WebUI's SMB page)",
+      "name": "libsmb2 (SMB shares: the file browser's SMB entry, the WebUI's SMB page and EmulationStation's SMB media)",
       "kind": "code",
       "always": true,
       "artifacts": [
         "eboot.bin",
-        "webui/ps5-retroarch-webui.elf"
+        "webui/ps5-retroarch-webui.elf",
+        "es-de/es-de.bin"
       ],
       "licence": "LGPL-2.1-or-later",
       "copyright": [
