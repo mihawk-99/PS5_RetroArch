@@ -384,6 +384,30 @@ class Scraper(unittest.TestCase):
             for kind, folder in (('cover', 'Named_Boxarts'), ('screenshot', 'Named_Snaps'), ('title', 'Named_Titles')):
                 self.assertEqual(self.stored(label, kind).read_bytes(), image(label, folder))
 
+    def pc_tasks(self, job_id):
+        return json.loads(self.request('GET', f'/api/scraper/pc/tasks?id={job_id}&max=8&fresh=1')[1])['tasks']
+
+    def test_pc_mode_an_answer_to_a_cleared_task_is_dropped(self):
+        # A resume clears the tasks and the waiting worker asks again. The new question
+        # has a number of its own: a helper's late answer to the old one used to land on
+        # whichever task had taken its number, and answered a question nobody had asked it.
+        dk = 'Jungle Run 2 - Partner\'s Island Quest (USA)'
+        job_id = self.start(mode='pc', kinds='cover', lines=[f'snes\t{self.games[dk]}'])
+        self.wait(job_id, lambda j: j['tasks']['queued'] == 1)
+        old = self.pc_tasks(job_id)[0]
+        self.assertEqual(old['kind'], 'probe')
+        self.assertEqual(self.request('POST', f'/api/scraper/resume?id={job_id}')[0], 200)
+        self.wait(job_id, lambda j: j['tasks']['queued'] == 1)
+        self.request('POST', f'/api/scraper/pc/downloaded?id={job_id}&task={old["task"]}&found=0&bytes=0')
+        new = self.pc_tasks(job_id)
+        self.assertEqual([(t['kind'], t['url']) for t in new], [('probe', old['url'])])  # still asked
+        self.assertNotEqual(new[0]['task'], old['task'])
+        helper = self.run_helper(job_id)
+        out, _ = helper.communicate(timeout=120)
+        self.assertEqual(helper.returncode, 0, out)
+        self.assertEqual(self.wait(job_id)['counts'], {'done': 1})
+        self.assertEqual(self.stored(dk, 'cover').read_bytes(), image(dk, 'Named_Boxarts'))
+
     def test_shared_layout_is_what_frontends_read(self):
         self.wait(self.start(lines=[f'snes\t{self.games["Jungle Run 2 - Partner\'s Island Quest (USA)"]}']))
         # The settings are remembered on the console.

@@ -452,6 +452,27 @@ struct Job
     Options options;
     std::vector<Item> items;
     std::vector<Task> tasks;
+    /* A task's number is task_base plus its place in tasks, and task_base moves past
+     * every number given out when the tasks are cleared (a cancel, a resume). A number
+     * is never given twice: a helper's late answer to a cleared task finds nothing,
+     * where it used to land on whichever task had taken the number since.
+     * shortcut: the numbers start again with the server, which a helper does not
+     * outlive (its next request fails); seed task_base if a helper ever reconnects. */
+    unsigned task_base = 0;
+    unsigned next_task() const
+    {
+        return task_base + unsigned(tasks.size());
+    }
+    Task *task(unsigned number)
+    {
+        const unsigned at = number - task_base; /* below the base: wraps past the end */
+        return at < tasks.size() ? &tasks[at] : nullptr;
+    }
+    void clear_tasks()
+    {
+        task_base = next_task();
+        tasks.clear();
+    }
     std::string state = "running"; /* running, cancelled, done, interrupted, paused */
     unsigned pass = 0;             /* the funnel's source whose pass is running */
     std::string message;
@@ -496,7 +517,7 @@ int ask_helper(Job &job, unsigned item, Task::Work work, const std::string &url,
     auto queue = [&]
     {
         Task task;
-        task.id = unsigned(job.tasks.size());
+        task.id = job.next_task();
         task.item = item;
         task.kind = work == Task::probe ? "probe" : "fetch";
         task.url = url;
@@ -505,25 +526,24 @@ int ask_helper(Job &job, unsigned item, Task::Work work, const std::string &url,
         job.tasks.push_back(task);
         return task.id;
     };
-    unsigned id = queue();
+    bool asked = false;
+    unsigned id = 0;
     for (;;)
     {
-        bool open = false;
-        for (auto &task : job.tasks)
-            if (task.id == id)
-            {
-                if (task.state == Task::done)
-                    return task.result;
-                open = true;
-                break;
-            }
+        const Task *task = asked ? job.task(id) : nullptr;
+        if (task && task->state == Task::done)
+            return task->result;
+        /* Before the question is queued: a job cut short keeps no task nobody waits on. */
         if (stopping || cancelling || job.state != "running")
         {
             why = cancelling ? "Cancelled." : "The job stopped.";
             return -1;
         }
-        if (!open)
-            id = queue(); /* resumed: the cleared tasks are asked again */
+        if (!task)
+        {
+            id = queue(); /* the first time, or resumed: the cleared tasks are asked again */
+            asked = true;
+        }
         wake.wait_for(guard, std::chrono::seconds(1));
     }
 }
@@ -1610,7 +1630,7 @@ void process_libretro(Http &http, Job &job, unsigned index, const Options &optio
         for (const auto &entry : found)
         {
             Task task;
-            task.id = unsigned(job.tasks.size());
+            task.id = job.next_task();
             task.item = index;
             task.kind = entry.first;
             task.url = entry.second;
@@ -2385,7 +2405,7 @@ void process_launchbox(Http &http, Job &job, unsigned index, const Options &opti
         for (const auto &entry : tasks)
         {
             Task task;
-            task.id = unsigned(job.tasks.size());
+            task.id = job.next_task();
             task.item = index;
             task.kind = entry.first;
             task.url = entry.second;
@@ -3620,7 +3640,7 @@ bool resume(const std::string &id, std::string &why)
         if (active->pass == UINT_MAX)
             active->pass = 0;
     }
-    active->tasks.clear();
+    active->clear_tasks();
     active->state = "running";
     active->message.clear();
     save_job(*active, true);
@@ -3798,7 +3818,7 @@ bool cancel(const std::string &id)
     for (auto &item : job->items)
         if (item.state == State::working || item.state == State::transferring)
             item.state = State::pending;
-    job->tasks.clear();
+    job->clear_tasks();
     save_job(*job, true);
     wake.notify_all();
     return true;
@@ -3959,13 +3979,13 @@ bool pc_target(const std::string &id, unsigned task, std::string &temporary,
 {
     std::lock_guard<std::mutex> guard(lock);
     auto job = jobs.count(id) ? jobs.at(id) : nullptr;
-    if (!job || job->state != "running" || task >= job->tasks.size() ||
-        job->tasks[task].state == Task::done)
+    Task *target = job && job->state == "running" ? job->task(task) : nullptr;
+    if (!target || target->state == Task::done)
         return false;
-    destination = job->tasks[task].destination;
+    destination = target->destination;
     make_folders(destination.substr(0, destination.find_last_of('/')));
     temporary = destination.substr(0, destination.find_last_of('/') + 1) + ".partial-" + nonce();
-    job->tasks[task].lease = std::time(nullptr) + lease_seconds(); /* renewed as it arrives */
+    target->lease = std::time(nullptr) + lease_seconds(); /* renewed as it arrives */
     return true;
 }
 
@@ -3973,9 +3993,9 @@ void pc_downloaded(const std::string &id, unsigned task, bool found, uint64_t by
 {
     std::lock_guard<std::mutex> guard(lock);
     auto job = jobs.count(id) ? jobs.at(id) : nullptr;
-    if (!job || task >= job->tasks.size())
+    if (!job || !job->task(task))
         return;
-    auto &asked = job->tasks[task];
+    auto &asked = *job->task(task);
     if (asked.work != Task::media)
     {
         /* A probe's answer, or a fetch the source does not have: the worker waiting
@@ -4014,9 +4034,9 @@ void pc_delivered(const std::string &id, unsigned task, bool ok, uint64_t bytes)
     {
         std::lock_guard<std::mutex> guard(lock);
         auto job = jobs.count(id) ? jobs.at(id) : nullptr;
-        if (!job || task >= job->tasks.size() || job->tasks[task].state == Task::done)
+        if (!job || !job->task(task) || job->task(task)->state == Task::done)
             return;
-        auto &t = job->tasks[task];
+        auto &t = *job->task(task);
         if (t.work == Task::probe)
             return; /* a probe is answered by pc_downloaded, never by bytes */
         if (t.work == Task::fetch)
