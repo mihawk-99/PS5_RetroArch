@@ -17,7 +17,11 @@ class Update(unittest.TestCase):
         cls.work = tempfile.TemporaryDirectory()
         cls.binary = Path(cls.work.name) / 'update'
         archive = subprocess.check_output(['bash', 'tools/build-webui-update.sh', 'host'], cwd=ROOT, text=True).strip()
-        subprocess.run(['c++', '-std=c++17', '-pthread', '-I'+str(ROOT/'.deps/native/zlib/zlib-1.3.2/contrib/minizip'),
+        # No frame over 16 KiB: the updater runs on a thread of the WebUI daemon, a payload,
+        # whose stack is small. A 64 KiB buffer there killed the daemon as it began to
+        # verify a download, and the update started over at every try (issue 75).
+        subprocess.run(['c++', '-std=c++17', '-pthread', '-Wframe-larger-than=16384', '-Werror',
+                        '-I'+str(ROOT/'.deps/native/zlib/zlib-1.3.2/contrib/minizip'),
                         '-I'+str(ROOT/'vendor/retroarch/deps/mbedtls'), 'tests/webui_update_main.cpp',
                         'src/webui_update.cpp', archive, '-lz', '-o', str(cls.binary)], cwd=ROOT, check=True)
 
@@ -58,6 +62,35 @@ class Update(unittest.TestCase):
         self.assertEqual((self.root/'webui/app.js').read_bytes(),b'new contents')
         self.assertEqual((self.root/'eboot.bin').stat().st_mode & 0o777, 0o755)
         self.assertFalse((self.root/'.update').exists())
+
+    def test_every_program_of_a_release_is_installed(self):
+        # EmulationStation, the picker, the forwarder and the Lapy service came after the
+        # updater's list of what it installs: an update left them at the old version.
+        shipped = ['es-de/es-de.bin', 'es-de/resources/a.svg', 'es-de/themes/t/theme.xml', 'picker/picker.bin',
+                   'forwarder/launch.elf', 'lapy-root-daemon.elf']
+        own = {'es-de/ES-DE/settings/es_settings.xml': b'mine', 'es-de/ES-DE/gamelists/nes/gamelist.xml': b'mine'}
+        for p in shipped:
+            dest = self.root/p; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(b'old'); self.files[p] = b'new contents'
+        for p, v in own.items():
+            dest = self.root/p; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(v)
+        self.package(); self.run_update()
+        for p in shipped: self.assertEqual((self.root/p).read_bytes(), b'new contents', p)
+        for p, v in own.items(): self.assertEqual((self.root/p).read_bytes(), v, p)
+
+    def test_a_release_s_empty_folders_are_taken(self):
+        # A release carries content/<system>/ for every system: 49 folder entries, which are
+        # in no manifest. Every one was refused as an invalid path (issue 75).
+        (self.root/'content').mkdir(); (self.root/'content/game.bin').write_bytes(b'content')
+        self.package(extra=[('PPSA99169/content/snes/', b''), ('PPSA99169/content/naomi2/', b''), ('PPSA99169/assets/empty/', b'')])
+        self.run_update()
+        self.assertTrue((self.root/'content/snes').is_dir() and (self.root/'content/naomi2').is_dir())
+        self.assertEqual((self.root/'content/game.bin').read_bytes(), b'content')
+        self.assertFalse((self.root/'assets/empty').exists())
+        self.assertEqual((self.root/'webui/app.js').read_bytes(), b'new contents')
+        # A folder entry with bytes in it, or one that climbs out, is still refused.
+        for bad in [('PPSA99169/content/snes/', b'data'), ('PPSA99169/content/../outside/', b'')]:
+            self.package(extra=[bad]); self.run_update('verify', False)
+        self.assertFalse((self.root.parent/'outside').exists())
 
     def test_static_driver_release_and_hidden_asset_files(self):
         del self.files['libvulkan.so.1']  # RADV is statically linked in production.

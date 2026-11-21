@@ -170,10 +170,13 @@ std::string digest(const std::string &p)
     mbedtls_sha256_context c;
     mbedtls_sha256_init(&c);
     mbedtls_sha256_starts(&c, 0);
-    unsigned char buf[65536], sum[32];
+    // On the heap: the worker's stack in the WebUI daemon is a payload thread's, and a
+    // 64 KiB frame faulted there the moment a download was verified (issue 75).
+    std::vector<unsigned char> buf(65536);
+    unsigned char sum[32];
     ssize_t n = 0;
-    while (!cancel && (n = read(fd, buf, sizeof buf)) > 0)
-        mbedtls_sha256_update(&c, buf, size_t(n));
+    while (!cancel && (n = read(fd, buf.data(), buf.size())) > 0)
+        mbedtls_sha256_update(&c, buf.data(), size_t(n));
     close(fd);
     mbedtls_sha256_finish(&c, sum);
     mbedtls_sha256_free(&c);
@@ -212,11 +215,16 @@ std::map<std::string, std::string> manifest(const std::string &text)
 }
 bool managed(const std::string &p)
 {
-    const std::set<std::string> files = {"eboot.bin", "libvulkan.so.1", "LEGAL.txt",
-                                         "manifest.sha256", "video-assets.json"};
-    const std::set<std::string> dirs = {"assets",  "cores",      "info",  "licenses",
-                                        "sce_sys", "sce_module", "webui", "shaders",
-                                        "filters", "overlays",   "system"};
+    // Everything a release ships but the user's own: content/ and the default retroarch.cfg.
+    // es-de/, picker/, forwarder/ and the Lapy service came after this list was written,
+    // and an update left them at the old version (issue 75). ES-DE's own data is in
+    // es-de/ES-DE, which no release carries.
+    const std::set<std::string> files = {"eboot.bin",         "libvulkan.so.1",
+                                         "LEGAL.txt",         "manifest.sha256",
+                                         "video-assets.json", "lapy-root-daemon.elf"};
+    const std::set<std::string> dirs = {"assets",     "cores", "info",    "licenses", "sce_sys",
+                                        "sce_module", "webui", "shaders", "filters",  "overlays",
+                                        "system",     "es-de", "picker",  "forwarder"};
     return files.count(p) || dirs.count(p.substr(0, p.find('/')));
 }
 bool remove_tree(const std::string &p, bool interruptible = false)
@@ -320,13 +328,13 @@ bool fetch(const std::string &url, const std::string &file, uint64_t limit)
     h.fd = open(file.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
     if (h.fd < 0)
         return false;
-    char buf[65536];
+    std::vector<char> buf(65536);
     int n;
     uint64_t total = 0;
-    while (!cancel && (n = sceHttp2ReadData(h.req, buf, sizeof buf)) > 0)
+    while (!cancel && (n = sceHttp2ReadData(h.req, buf.data(), buf.size())) > 0)
     {
         total += unsigned(n);
-        if (total > limit || !write_all(h.fd, buf, size_t(n)))
+        if (total > limit || !write_all(h.fd, buf.data(), size_t(n)))
             return false;
         std::lock_guard<std::mutex> lock(guard);
         current.received = total;
@@ -414,12 +422,14 @@ bool prepare(const std::string &base, const std::string &zip, const std::string 
     // Read the verified package's manifest first. Unchanged files still pass
     // through the decompressor, CRC and SHA checks, but need no disk writes.
     std::string inventory;
-    char buffer[65536];
+    std::vector<char> block(65536); // on the heap, as digest()'s
+    char *const buffer = block.data();
+    const unsigned buffer_size = unsigned(block.size());
     int count = 0;
     if (unzLocateFile(z, "PPSA99169/manifest.sha256", 1) == UNZ_OK &&
         unzOpenCurrentFile(z) == UNZ_OK)
     {
-        while (!cancel && (count = unzReadCurrentFile(z, buffer, sizeof buffer)) > 0)
+        while (!cancel && (count = unzReadCurrentFile(z, buffer, buffer_size)) > 0)
         {
             inventory.append(buffer, size_t(count));
             if (inventory.size() > 4 * 1024 * 1024)
@@ -463,6 +473,21 @@ bool prepare(const std::string &base, const std::string &zip, const std::string 
         }
         p = p.substr(prefix.size());
         unsigned mode = (info.external_fa >> 16) & 0170000;
+        // An empty folder of the package (a release carries content/<system>/ for every
+        // system): not a file, so not in the manifest. Refusing it refused every release
+        // (issue 75). A content folder that is missing is made; nothing else is touched.
+        if (!p.empty() && p.back() == '/')
+        {
+            const std::string folder = p.substr(0, p.size() - 1);
+            if (!path_ok(folder) || (mode && mode != 0040000) || info.uncompressed_size ||
+                (folder.rfind("content/", 0) == 0 && !parents(base, p + '.')))
+            {
+                ok = false;
+                break;
+            }
+            step = unzGoToNextFile(z);
+            continue;
+        }
         if (!path_ok(p) || (mode && mode != 0100000) || !entries.insert(p).second ||
             entries.size() > 30000 || info.uncompressed_size > max_expanded - expanded)
         {
@@ -515,7 +540,7 @@ bool prepare(const std::string &base, const std::string &zip, const std::string 
         mbedtls_sha256_starts(&hash, 0);
         int n = 0;
         uint64_t size = 0;
-        while (!cancel && (n = unzReadCurrentFile(z, buffer, sizeof buffer)) > 0)
+        while (!cancel && (n = unzReadCurrentFile(z, buffer, buffer_size)) > 0)
         {
             size += unsigned(n);
             mbedtls_sha256_update(&hash, reinterpret_cast<unsigned char *>(buffer), size_t(n));
@@ -598,48 +623,52 @@ bool download(const std::string &tag)
         std::lock_guard<std::mutex> lock(guard);
         current = {"downloading", "Preparing space on your console…", tag, 0};
     }
-    if (pthread_create(
-            &worker, nullptr,
-            [](void *) -> void *
+    // A payload thread's default stack is small; the scraper's workers get the same.
+    pthread_attr_t attributes;
+    pthread_attr_init(&attributes);
+    pthread_attr_setstacksize(&attributes, 1u << 20);
+    const int created = pthread_create(
+        &worker, &attributes,
+        [](void *) -> void *
+        {
+            const auto tag = status().tag;
+            auto run = [&]
             {
-                const auto tag = status().tag;
-                auto run = [&]
+                if (!remove_tree(root + "/.update", true) ||
+                    mkdir((root + "/.update").c_str(), 0755))
                 {
-                    if (!remove_tree(root + "/.update", true) ||
-                        mkdir((root + "/.update").c_str(), 0755))
-                    {
-                        report(
-                            "error",
-                            "Could not prepare update storage. Check console storage and retry.");
-                        return;
-                    }
-                    report("downloading", "Downloading the release to your console…");
-                    const auto name = "PS5_RetroArch-" + tag + ".zip";
-                    const auto url =
-                        "https://github.com/mihawk-99/PS5_RetroArch/releases/download/" + tag +
-                        '/' + name;
-                    const auto zip = root + "/.update/release.zip",
-                               checksum = root + "/.update/checksum";
-                    if (!fetch(url + ".sha256", checksum, 4096) || !fetch(url, zip, max_zip))
-                    {
-                        report("error", "Download failed. Check the console internet connection "
-                                        "and available storage, then retry.");
-                        return;
-                    }
-                    auto sum = read_text(checksum, 4096);
-                    if (sum.size() < 66 || sum.find(name, 64) == std::string::npos)
-                    {
-                        report("error", "The release checksum file is invalid.");
-                        return;
-                    }
-                    report("verifying", "Verifying and preparing the update…");
-                    if (!prepare(root, zip, sum.substr(0, 64)) && status().state != "error")
-                        report("error", "Could not prepare the update. Check available storage.");
-                };
-                run();
-                return nullptr;
-            },
-            nullptr))
+                    report("error",
+                           "Could not prepare update storage. Check console storage and retry.");
+                    return;
+                }
+                report("downloading", "Downloading the release to your console…");
+                const auto name = "PS5_RetroArch-" + tag + ".zip";
+                const auto url = "https://github.com/mihawk-99/PS5_RetroArch/releases/download/" +
+                                 tag + '/' + name;
+                const auto zip = root + "/.update/release.zip",
+                           checksum = root + "/.update/checksum";
+                if (!fetch(url + ".sha256", checksum, 4096) || !fetch(url, zip, max_zip))
+                {
+                    report("error", "Download failed. Check the console internet connection "
+                                    "and available storage, then retry.");
+                    return;
+                }
+                auto sum = read_text(checksum, 4096);
+                if (sum.size() < 66 || sum.find(name, 64) == std::string::npos)
+                {
+                    report("error", "The release checksum file is invalid.");
+                    return;
+                }
+                report("verifying", "Verifying and preparing the update…");
+                if (!prepare(root, zip, sum.substr(0, 64)) && status().state != "error")
+                    report("error", "Could not prepare the update. Check available storage.");
+            };
+            run();
+            return nullptr;
+        },
+        nullptr);
+    pthread_attr_destroy(&attributes);
+    if (created)
     {
         report("error", "Could not start the download. Retry after closing content.");
         return false;
