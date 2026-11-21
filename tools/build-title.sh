@@ -94,6 +94,10 @@ if [[ -n ${PS5_REUSE_STAGED_CORES:-} && -n ${PS5_RELEASE_TAG:-} ]]; then
     echo "error: PS5_REUSE_STAGED_CORES with release $PS5_RELEASE_TAG; a release builds every core" >&2
     exit 2
 fi
+# A store offers the release only when its committed contentVersion rises (issue #77).
+if [[ -n ${PS5_RELEASE_TAG:-} ]]; then
+    python3 "$root/tools/content-version.py" check "$PS5_RELEASE_TAG" || exit 2
+fi
 echo "==> [title] step 1/3: the frontend"
 "$root/tools/build-retroarch.sh"
 core_files=()
