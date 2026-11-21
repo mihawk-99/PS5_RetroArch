@@ -1622,6 +1622,7 @@ const std::map<std::string, std::vector<std::string>> launchbox_platforms = {
     {"n3ds", {"Nintendo 3DS"}},
     {"n64", {"Nintendo 64"}},
     {"naomi", {"Sega Naomi", "Arcade"}},
+    {"naomi2", {"Sega Naomi 2", "Sega Naomi", "Arcade"}},
     {"nds", {"Nintendo DS"}},
     {"neogeo", {"SNK Neo Geo MVS", "SNK Neo Geo AES", "Arcade"}},
     {"neogeocd", {"SNK Neo Geo CD"}},
@@ -1666,8 +1667,8 @@ const std::map<std::string, std::vector<std::string>> launchbox_platforms = {
 /* Systems whose games are romsets ("runner3"): their titles come from MAME's names. */
 bool arcade_system(const std::string &system)
 {
-    static const std::set<std::string> arcade = {"arcade", "mame",  "fbneo",     "cps",
-                                                 "neogeo", "naomi", "atomiswave"};
+    static const std::set<std::string> arcade = {"arcade", "mame",  "fbneo",  "cps",
+                                                 "neogeo", "naomi", "naomi2", "atomiswave"};
     return arcade.count(system) > 0;
 }
 /* Its image types for each of our kinds, in order of preference. */

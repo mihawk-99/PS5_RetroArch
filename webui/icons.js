@@ -138,6 +138,7 @@ const SYSTEM_ICONS = {
   "saturn": "assets/systems/saturn.webp",
   "dreamcast": "assets/systems/dreamcast.webp",
   "naomi": "assets/systems/naomi.webp",
+  "naomi2": "assets/systems/naomi.webp",
   "atomiswave": "assets/systems/atomiswave.webp",
   "c64": "assets/systems/c64.webp",
   "amiga": "assets/systems/amiga.webp",

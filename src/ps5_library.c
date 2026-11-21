@@ -360,6 +360,9 @@ static const struct platform platforms[] = {
     {"sg-1000", "Sega - SG-1000", NULL, "sg1000", "sg1000"},
     {"saturn", "Sega - Saturn", NULL, "saturn", "segasaturn|saturn"},
     {"dreamcast", "Sega - Dreamcast", NULL, "dreamcast|dc", "dreamcast"},
+    /* before naomi, whose word it holds: its games were listed as Naomi's, and the
+     * system's folder became the one both folders are in (issue 109) */
+    {"naomi2", "Sega - Naomi 2", NULL, "naomi2", "naomi2"},
     {"naomi", "Sega - Naomi", NULL, "naomi", "naomi"},
     {"atomiswave", "Atomiswave", NULL, "atomiswave", "atomiswave"},
     {"c64", "Commodore - 64", NULL, "c64|commodore64", "commodore64"},

@@ -87,6 +87,7 @@
 {"n3ds", 17},
 {"n64", 14},
 {"naomi", 56},
+{"naomi2", 75}, /* as ES-DE scrapes it: its platform is arcade */
 {"nds", 15},
 {"neogeo", 142},
 {"neogeocd", 70},

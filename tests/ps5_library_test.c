@@ -75,6 +75,11 @@ int main(int argc, char **argv)
     assert(strcmp(ps5_library_platform("PS2.lpl"), "ps2") == 0);
     assert(strcmp(ps5_library_platform("Sony - PlayStation Portable"), "psp") == 0);
     assert(strcmp(ps5_library_platform("Nintendo 3DS.lpl"), "n3ds") == 0);
+    /* Naomi 2 is a system of its own, not Naomi's (issue 109). */
+    assert(strcmp(ps5_library_platform("naomi2.lpl"), "naomi2") == 0);
+    assert(strcmp(ps5_library_platform("Sega - Naomi 2"), "naomi2") == 0);
+    assert(strcmp(ps5_library_platform("naomi"), "naomi") == 0);
+    assert(strcmp(ps5_library_platform_database("naomi2"), "Sega - Naomi 2") == 0);
     assert(strcmp(ps5_library_platform("ARCADE - NeoGeo"), "neogeo") == 0);
     assert(strcmp(ps5_library_platform("ARCADE - CPS I, II & III"), "cps") == 0);
     assert(strcmp(ps5_library_platform("ARCADE - Others (FBNeo)"), "fbneo") == 0);
