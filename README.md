@@ -67,7 +67,7 @@ Press **Square** to remember your choice. Hold **L1** during startup to return t
 ## <img src="webui/assets/fluent/arrow-square-down.svg" width="26" height="26" alt=""> Get started
 
 1. **Install the complete title folder.** Extract a release and copy `PPSA99169` to your homebrew launcher’s location, usually `/data/homebrew/PPSA99169/`. A compatible jailbreak and launcher must already be set up.
-2. **Choose your frontend.** Start RetroArch or EmulationStation from the picker. Press **Square** to remember your choice; hold **L1** during startup to return to the picker. XMB, Ozone and RGUI are available in RetroArch (Settings → User Interface → Menu, or **Console menu style** in the WebUI).
+2. **Choose your frontend.** Start RetroArch or EmulationStation from the picker. Press **Square** to remember your choice; hold **L1** during startup to return to the picker. XMB, Ozone and RGUI are available in RetroArch (Settings → Drivers → Menu, or **Console menu style** in the WebUI).
 3. **Open the WebUI.** Scan its QR code or visit `http://<PS5-IP>:6769` from a device on the same network.
 4. **Add your games.** Use **Games → + Add Game** for one game backup, or **Content** for folders and multi-file games. Install any required BIOS files in the [system folders](#your-files), then load your game on the console.
 
