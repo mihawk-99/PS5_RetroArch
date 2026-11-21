@@ -9,6 +9,7 @@ import http.server
 import io
 import json
 import os
+import socket
 import subprocess
 import sys
 import tempfile
@@ -139,9 +140,9 @@ class LaunchBox(unittest.TestCase):
             self.libretro.log.clear()
         self.start_server()
 
-    def start_server(self):
+    def start_server(self, extra=None):
         env = {**os.environ, 'PS5_SCRAPER_LAUNCHBOX_BASE': f'http://127.0.0.1:{self.source.server_port}',
-               'PS5_SCRAPER_LIBRETRO_BASE': f'http://127.0.0.1:{self.libretro.server_port}'}
+               'PS5_SCRAPER_LIBRETRO_BASE': f'http://127.0.0.1:{self.libretro.server_port}', **(extra or {})}
         self.server, self.port, self.token = webui_build.start(self.binary, self.root, env)
 
     def tearDown(self):
@@ -258,13 +259,36 @@ class LaunchBox(unittest.TestCase):
         self.start_server()
 
     def test_pc_mode_through_the_helper(self):
+        # The helper answers every question the source is asked, the database with
+        # them: a console with no route to the internet runs this job unchanged.
         job_id = self.start(mode='pc', kinds='cover,logo', details=False)
-        self.wait(job_id, lambda j: j['tasks']['queued'] >= 4)
         helper = subprocess.run([sys.executable, str(ROOT / 'webui/ps5-media-helper.py'), f'http://127.0.0.1:{self.port}', job_id],
                                 capture_output=True, text=True, timeout=120)
         self.assertEqual(helper.returncode, 0, helper.stdout + helper.stderr)
         job = self.wait(job_id)
         self.assertEqual(job['transferred']['files'], 7)  # 4 covers, 3 logos
+        self.assertEqual(self.stored('runner3', 'marquees').read_bytes(), picture('runner3-logo.png'))
+        self.assertEqual(len(self.fetched('/Metadata.zip')), 1)  # the database came through the PC too
+
+    def test_pc_mode_a_console_without_internet(self):
+        # The same job on a console that reaches nothing but its LAN (every request of
+        # its own goes to a port nothing listens on): the database and the pictures
+        # still arrive, so the helper asked for all of them.
+        self.server.terminate(); self.server.wait(timeout=10)
+        with socket.socket() as dead:
+            dead.bind(('127.0.0.1', 0))
+            proxy = f'http://127.0.0.1:{dead.getsockname()[1]}'
+        self.start_server(extra={'http_proxy': proxy, 'https_proxy': proxy, 'no_proxy': ''})
+        cut_off = self.start(kinds='cover,logo', details=False)  # PS5 mode: the console really is cut off
+        self.assertIn('could not be reached', self.wait(cut_off, lambda j: j['state'] == 'paused')['message'])
+        job_id = self.start(mode='pc', kinds='cover,logo', details=False)
+        helper = subprocess.run([sys.executable, str(ROOT / 'webui/ps5-media-helper.py'), f'http://127.0.0.1:{self.port}', job_id],
+                                capture_output=True, text=True, timeout=120,
+                                env={k: v for k, v in os.environ.items()
+                                     if k.lower() not in ('http_proxy', 'https_proxy', 'no_proxy')})
+        self.assertEqual(helper.returncode, 0, helper.stdout + helper.stderr)
+        job = self.wait(job_id)
+        self.assertEqual((job['state'], job['transferred']['files']), ('done', 7))
         self.assertEqual(self.stored('runner3', 'marquees').read_bytes(), picture('runner3-logo.png'))
 
     def test_a_chain_asks_launchbox_only_for_what_libretro_lacks(self):
