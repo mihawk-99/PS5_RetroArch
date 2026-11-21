@@ -42,6 +42,7 @@
 #include <fstream>
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <sys/stat.h>
 
@@ -284,18 +285,42 @@ void add_meta(pugi::xml_node node, const char *media, const char *system,
     }
 }
 
-bool save(pugi::xml_document &document, const std::string &path)
+// Compare the freshly merged result, never skip reading current user state.
+bool save_bytes(const std::string &bytes, const std::string &path)
 {
+    std::ifstream input(path, std::ios::binary);
+    bool same = input.good();
+    char block[8192];
+    for (size_t at = 0; same && at < bytes.size();)
+    {
+        const size_t count = std::min(sizeof(block), bytes.size() - at);
+        input.read(block, static_cast<std::streamsize>(count));
+        same = input.gcount() == static_cast<std::streamsize>(count) &&
+               std::memcmp(block, bytes.data() + at, count) == 0;
+        at += count;
+    }
+    if (same && input.peek() == std::char_traits<char>::eof()) return true;
+    input.close();
     const std::string temporary = path + ".tmp";
-    if (!document.save_file(temporary.c_str(), "\t", pugi::format_default, pugi::encoding_utf8))
-        return false;
-    chmod(temporary.c_str(), 0777); /* FTP's reach: the title's files are 0777 */
+    std::FILE *output = std::fopen(temporary.c_str(), "wb");
+    if (!output) return false;
+    const bool written = std::fwrite(bytes.data(), 1, bytes.size(), output) == bytes.size();
+    const bool closed = std::fclose(output) == 0;
+    if (!written || !closed) { std::remove(temporary.c_str()); return false; }
+    chmod(temporary.c_str(), 0777);
     if (std::rename(temporary.c_str(), path.c_str()) != 0)
     {
         std::remove(temporary.c_str());
         return false;
     }
     return true;
+}
+
+bool save(pugi::xml_document &document, const std::string &path)
+{
+    std::ostringstream output;
+    document.save(output, "\t", pugi::format_default, pugi::encoding_utf8);
+    return save_bytes(output.str(), path);
 }
 } // namespace
 
@@ -417,13 +442,8 @@ extern "C" int ps5_esde_write_library_to(const struct ps5_esde_library_paths *pa
     }
     if (!save(systems, data + "/custom_systems/es_systems.xml"))
         failures++;
-    if (std::FILE *record = std::fopen((favorites_record + ".tmp").c_str(), "w"))
-    {
-        std::fputs(favorites_now.c_str(), record);
-        std::fclose(record);
-        if (std::rename((favorites_record + ".tmp").c_str(), favorites_record.c_str()) != 0)
-            failures++;
-    }
+    if (!save_bytes(favorites_now, favorites_record))
+        failures++;
     const size_t system_count = library.system_count;
     std::snprintf(
         summary, summary_size,
