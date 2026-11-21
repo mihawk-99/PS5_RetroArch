@@ -80,6 +80,48 @@ bool available(const Root &root)
     return entries != 0;
 }
 
+// Graphics widgets (patches/series, 0138) are RetroArch's default once built in, but a
+// build before them could only save menu_enable_widgets = "false", and RetroArch keeps
+// what it saved. A config from such a build gets them once: the marker is written when
+// that is done (or was not needed), and from then on the setting is the user's.
+constexpr const char *widgets_marker = "/app0/config/widgets-default.done";
+void widgets_on_once()
+{
+    struct stat st{};
+    if (stat(widgets_marker, &st) == 0)
+        return;
+    static const char off[] = "menu_enable_widgets = \"false\"";
+    std::string text;
+    if (FILE *in = std::fopen(saved_config, "rb"))
+    {
+        char buffer[4096];
+        size_t count;
+        while ((count = std::fread(buffer, 1, sizeof(buffer), in)) != 0)
+            text.append(buffer, count);
+        std::fclose(in);
+    }
+    size_t at = text.find(off);
+    while (at != std::string::npos && at != 0 && text[at - 1] != '\n')
+        at = text.find(off, at + 1);
+    bool ok = true;
+    if (at != std::string::npos)
+    {
+        text.replace(at, sizeof(off) - 1, "menu_enable_widgets = \"true\"");
+        FILE *out = std::fopen("/app0/config/retroarch.cfg.tmp", "wb");
+        ok = out && std::fwrite(text.data(), 1, text.size(), out) == text.size();
+        if (out && std::fclose(out) != 0)
+            ok = false;
+        ok = ok && std::rename("/app0/config/retroarch.cfg.tmp", saved_config) == 0;
+        if (!ok)
+            std::remove("/app0/config/retroarch.cfg.tmp");
+        std::fprintf(stderr, "frontend ps5: graphics widgets turned on once %s\n",
+                     ok ? "(saved off by a build without them)" : "FAILED");
+    }
+    if (ok)
+        if (FILE *marker = std::fopen(widgets_marker, "wb"))
+            std::fclose(marker);
+}
+
 void set_directory(default_dirs slot, const char *path)
 {
     std::snprintf(g_defaults.dirs[slot], sizeof(g_defaults.dirs[slot]), "%s", path);
@@ -133,6 +175,7 @@ void initialize(void *)
             std::remove("/app0/config/retroarch.cfg.tmp");
         std::fprintf(stderr, "frontend ps5: seed config %s\n", ok ? "installed" : "FAILED");
     }
+    widgets_on_once();
     std::snprintf(g_defaults.path_config, sizeof(g_defaults.path_config), "%s", saved_config);
     set_directory(DEFAULT_DIR_MENU_CONFIG, "/app0/config");
     set_directory(DEFAULT_DIR_MENU_CONTENT, "/app0");

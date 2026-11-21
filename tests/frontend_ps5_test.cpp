@@ -125,6 +125,24 @@ int main(int argc, char **argv)
     frontend_ctx_ps5.init(nullptr);
     assert(read(fixture + "/app0/config/retroarch.cfg") == "user settings\n");
     assert(!std::filesystem::exists(fixture + "/app0/config/retroarch.cfg.tmp"));
+    // Graphics widgets, on once: a config a build without them saved has them off. The
+    // first start above found no such line and left its marker, so the user's later
+    // choice of off stays; without the marker the line is turned on, once.
+    const std::string marker = fixture + "/app0/config/widgets-default.done";
+    assert(std::filesystem::exists(marker));
+    const std::string saved_off = "video_smooth = \"false\"\nmenu_enable_widgets = \"false\"\n"
+                                  "not_menu_enable_widgets = \"false\"\n";
+    std::ofstream(fixture + "/app0/config/retroarch.cfg") << saved_off;
+    frontend_ctx_ps5.init(nullptr);
+    assert(read(fixture + "/app0/config/retroarch.cfg") == saved_off);
+    std::filesystem::remove(marker);
+    frontend_ctx_ps5.init(nullptr);
+    assert(read(fixture + "/app0/config/retroarch.cfg") ==
+           "video_smooth = \"false\"\nmenu_enable_widgets = \"true\"\n"
+           "not_menu_enable_widgets = \"false\"\n");
+    assert(std::filesystem::exists(marker));
+    assert(!std::filesystem::exists(fixture + "/app0/config/retroarch.cfg.tmp"));
+    std::ofstream(fixture + "/app0/config/retroarch.cfg") << "user settings\n";
     assert(std::string(ps5_core_system_directory("Beetle Saturn", "/app0/system")) ==
            "/app0/system/Saturn");
     assert(std::string(ps5_core_system_directory("Beetle Saturn", "/mnt/usb0/bios")) ==
