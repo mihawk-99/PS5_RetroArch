@@ -17,7 +17,7 @@ core_stamp_skip opera \
     -- "$root/tools/build-opera.sh" "$root/tools/core-fork.sh"
 [[ $# == 0 ]] || { echo "usage: ${0##*/}" >&2; exit 2; }
 
-revision=ab5cb34feb169c4f65921c5ee433f7d29baccb29  # ../PS5_Opera main
+revision=020842ac778b55efb38f5c0a1c3a44dd2bc5cbf3  # ../PS5_Opera main
 core_fork_setup
 core_fork_checkout PS5_Opera "$revision"
 core_fork_info opera_libretro.info 3edce84cd4bd8afba0727a07a70fef7ccc44e7db7e1e0f00897ed6805087d94f
