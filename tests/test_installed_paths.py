@@ -10,6 +10,129 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class InstalledPaths(unittest.TestCase):
+    def test_launch_specific_sandbox_keeps_executable_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = pathlib.Path(directory)
+            (work / 'test.c').write_text(r'''
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#define PS5_PATHS_START_TEST
+enum ps5_elevation_status { PS5_ELEVATION_OK };
+#define PS5_ELEVATION_FILESYSTEM 1
+static enum ps5_elevation_status ps5_elevation_request(int c) { (void)c; abort(); }
+static const char *ps5_elevation_status_name(enum ps5_elevation_status s) {
+    (void)s; return "unexpected";
+}
+#include "ps5_paths.c"
+
+static const struct stat executable = { .st_dev = 41, .st_ino = 77 };
+static const char *wanted;
+static int scan_allowed, chdir_allowed, scans, closed, changed;
+static unsigned entry_index;
+static const char *entries[] = {
+    ".", "..", "OTHER0000_007", "PPSA99169", "PPSA99169_bad",
+    "PPSA99169_007.backup", "PPSA99169_../bad", "PPSA99169_001",
+    "PPSA99169_007", NULL
+};
+static char fake_directory;
+
+int __wrap_stat(const char *path, struct stat *st) {
+    char image[PATH_MAX];
+    if (wanted) {
+        snprintf(image, sizeof(image), "%s/eboot.bin", wanted);
+        if (!strcmp(path, image)) { *st = executable; return 0; }
+    }
+    if (!strcmp(path, "/data/homebrew/PPSA99169/eboot.bin")) {
+        *st = executable; st->st_dev++; return 0;
+    }
+    if (!strcmp(path, "/mnt/sandbox/PPSA99169_001/app0/eboot.bin")) {
+        *st = executable; st->st_ino++; return 0;
+    }
+    errno = ENOENT;
+    return -1;
+}
+int __wrap_chdir(const char *path) {
+    assert(wanted && !strcmp(path, wanted));
+    if (!chdir_allowed) { errno = EACCES; return -1; }
+    changed++;
+    return 0;
+}
+DIR *__wrap_opendir(const char *path) {
+    assert(!strcmp(path, "/mnt/sandbox"));
+    scans++;
+    if (!scan_allowed) { errno = EACCES; return NULL; }
+    entry_index = 0;
+    return (DIR *)&fake_directory;
+}
+struct dirent *__wrap_readdir(DIR *directory) {
+    static struct dirent entry;
+    assert(directory == (DIR *)&fake_directory);
+    if (!entries[entry_index]) { errno = 0; return NULL; }
+    memset(&entry, 0, sizeof(entry));
+    strcpy(entry.d_name, entries[entry_index++]);
+    return &entry;
+}
+int __wrap_closedir(DIR *directory) {
+    assert(directory == (DIR *)&fake_directory);
+    closed++;
+    return 0;
+}
+static void reset(const char *root) {
+    wanted = root;
+    scan_allowed = chdir_allowed = 1;
+    scans = closed = changed = 0;
+    strcpy(install_root, "/app0");
+}
+int main(void) {
+    FILE *log = tmpfile();
+    assert(log);
+    assert(sandbox_instance("PPSA99169_007", "PPSA99169"));
+    assert(!sandbox_instance("OTHER0000_007", "PPSA99169"));
+    assert(!sandbox_instance("PPSA99169_007.backup", "PPSA99169"));
+    assert(!sandbox_instance("PPSA99169_../bad", "PPSA99169"));
+
+    reset("/data/homebrew/PPSA99169");
+    assert(resolve_install_root("PPSA99169", &executable, log) == 1);
+    assert(!strcmp(install_root, wanted) && changed == 1 && scans == 0);
+
+    reset("/mnt/sandbox/PPSA99169_000/app0");
+    assert(resolve_install_root("PPSA99169", &executable, log) == 1);
+    assert(!strcmp(install_root, wanted) && changed == 1 && scans == 0);
+
+    reset("/mnt/sandbox/PPSA99169_007/app0");
+    assert(resolve_install_root("PPSA99169", &executable, log) == 1);
+    assert(!strcmp(install_root, wanted) && changed == 1 && scans == 1 && closed == 1);
+
+    /* Same inode on another device, or another inode on the same device, is
+     * not the executable we launched: never select a similarly named copy. */
+    reset(NULL);
+    assert(resolve_install_root("PPSA99169", &executable, log) == -1);
+    assert(!strcmp(install_root, "/app0") && changed == 0 && closed == 1);
+
+    reset(NULL); scan_allowed = 0;
+    assert(resolve_install_root("PPSA99169", &executable, log) == -1);
+    assert(!strcmp(install_root, "/app0") && changed == 0 && closed == 0);
+
+    reset("/mnt/sandbox/PPSA99169_007/app0"); chdir_allowed = 0;
+    assert(resolve_install_root("PPSA99169", &executable, log) == -1);
+    assert(!strcmp(install_root, "/app0") && changed == 0 && closed == 1);
+    fclose(log);
+    return 0;
+}
+''')
+            binary = str(work / 'test')
+            subprocess.run(['cc', '-DPS5_PATHS_HOST_TEST', '-I' + str(ROOT / 'src'),
+                            str(work / 'test.c'),
+                            *['-Wl,--wrap=' + name for name in
+                              ('stat', 'chdir', 'opendir', 'readdir', 'closedir')],
+                            '-o', binary], check=True)
+            subprocess.run([binary], check=True, timeout=10)
+
     def test_bundled_service_delivery_and_readiness(self):
         with tempfile.TemporaryDirectory() as directory, socket.socket() as server:
             work = pathlib.Path(directory)
