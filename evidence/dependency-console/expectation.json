@@ -1,0 +1,19 @@
+{
+  "step": "dependency-console",
+  "note": "The newest SDK, PS5_Vulkan and RADV on the Base PS5: every Lapy request granted, SMB .7z loads, picker and ES-DE start and hand a game to RetroArch, and every core that still has its content draws the pictures October's run did, with no crash; the cores whose test content was removed afterwards are named.",
+  "must_contain": [
+    "Lapy requests granted: 20 of 20",
+    "CRC32: 0x41852f72.",
+    "the file on the PC: CRC32 0x41852f72",
+    "picker-retroarch: picker test PASS",
+    "picker-es-de: frontend capture PASS",
+    "es-de-game: rarch_main returned = 0",
+    "core ppsspp: crash 0 | October 141.3/141.3 | now 141.3/141.3",
+    "core mupen64plus_next: crash 0 | October 4.8/149.6 | now 4.7/149.6",
+    "core melondsds: crash 0 | October 58.2/56.8 | now 58.3/56.8"
+  ],
+  "must_not_contain": [
+    "owner smb.cfg restored: DIFFERS"
+  ],
+  "human_check": "Content for flycast, mame, mednafen_saturn, ps5sx2, scummvm, dosbox_pure, fbneo and mednafen_pcfx, and the 3DO BIOS, put back to finish those cores."
+}
