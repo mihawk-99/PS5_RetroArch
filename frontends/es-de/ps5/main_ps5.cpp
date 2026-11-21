@@ -137,13 +137,22 @@ int main(int argc, char **argv)
     }
     note("start: working directory (errno if refused)", ps5_frontend_chdir(home) == 0 ? 0 : errno);
     /* Back from a game RetroArch ran (game mode, game_ps5.cpp)? ES-DE's start asks. */
-    note("start: back from a game", ps5_esde_take_game_result());
+    const int back_from_game = ps5_esde_take_game_result();
+    note("start: back from a game", back_from_game);
 
     /* Its systems and game lists, from RetroArch's playlists (library_ps5.cpp), then
-     * --gamelist-only: ES-DE holds exactly those games and scans for none. */
+     * --gamelist-only: ES-DE holds exactly those games and scans for none. On a return
+     * from a game, ES-DE updates that game's play count and time from the return record
+     * (patches/0001), so walking every content drive again is unnecessary (issue 87). */
     char library[256] = "";
     const auto library_started = std::chrono::steady_clock::now();
-    const int systems = ps5_esde_write_library(library, sizeof(library));
+    if (back_from_game)
+        std::snprintf(library, sizeof(library), "unchanged (skipped after game return)");
+    else
+    {
+        const int systems = ps5_esde_write_library(library, sizeof(library));
+        note("start: systems written", systems);
+    }
     std::printf("[ES-DE startup] library=%lld ms\n",
                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                            std::chrono::steady_clock::now() - library_started)
@@ -154,7 +163,6 @@ int main(int argc, char **argv)
                      static_cast<long long>(std::time(nullptr)), library);
         std::fclose(log);
     }
-    note("start: systems written", systems);
 
     std::vector<std::string> port_arguments;
     static char gamelist_only[] = "--gamelist-only";
