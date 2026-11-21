@@ -1,0 +1,64 @@
+diff --git a/source/owned_root_daemon.c b/source/owned_root_daemon.c
+index fb0b22a..8ec7b94 100644
+--- a/source/owned_root_daemon.c
++++ b/source/owned_root_daemon.c
+@@ -21,0 +22 @@
++#include <sys/mount.h>
+@@ -957,0 +959,24 @@ respond:
++#if !LAPY_ELF_HELPER
++/* Use the source of the mounted app, matching the WebUI daemon's title_folder(). */
++static int title_folder(char *out, size_t size)
++{
++    int n;
++#ifdef __PROSPERO__
++    struct statfs *mounts = NULL;
++    char app_mount[64];
++    n = snprintf(app_mount, sizeof(app_mount), "/system_ex/app/%s", TARGET_TITLE);
++    if (n > 0 && (size_t)n < sizeof(app_mount)) {
++        int count = getmntinfo(&mounts, MNT_NOWAIT);
++        for (int i = 0; i < count; ++i)
++            if (!strcmp(app_mount, mounts[i].f_mntonname) &&
++                mounts[i].f_mntfromname[0] == '/') {
++                n = snprintf(out, size, "%s", mounts[i].f_mntfromname);
++                return n > 0 && (size_t)n < size ? 0 : ENAMETOOLONG;
++            }
++    }
++#endif
++    n = snprintf(out, size, "/data/homebrew/%s", TARGET_TITLE);
++    return n > 0 && (size_t)n < size ? 0 : ENAMETOOLONG;
++}
++#endif
++
+@@ -961,0 +987,5 @@ int main(void)
++    char app_folder[PATH_MAX] = {0};
++    char ready_path[PATH_MAX] = {0};
++#if LAPY_SERVICE && !LAPY_MAX_REQUESTS
++    char service_log_path[PATH_MAX] = {0};
++#endif
+@@ -978,0 +1009,11 @@ int main(void)
++#if !LAPY_ELF_HELPER
++    int path_error = title_folder(app_folder, sizeof(app_folder));
++    int path_length = path_error ? -1 : snprintf(ready_path, sizeof(ready_path),
++                                                "%s/lapy-ready", app_folder);
++    if (path_error || path_length <= 0 || (size_t)path_length >= sizeof(ready_path)) return 2;
++#if LAPY_SERVICE && !LAPY_MAX_REQUESTS
++    path_length = snprintf(service_log_path, sizeof(service_log_path),
++                           "%s/lapy-service.log", app_folder);
++    if (path_length <= 0 || (size_t)path_length >= sizeof(service_log_path)) return 2;
++#endif
++#endif
+@@ -981 +1022 @@ int main(void)
+-    int log_fd = open("/data/homebrew/PPSA99169/lapy-service.log",
++    int log_fd = open(service_log_path,
+@@ -1065 +1106 @@ int main(void)
+-        FILE *ready = fopen("/data/homebrew/PPSA99169/lapy-ready", "w");
++        FILE *ready = fopen(ready_path, "w");
+@@ -1123 +1164 @@ int main(void)
+-            unlink("/data/homebrew/PPSA99169/lapy-ready");
++            unlink(ready_path);
+@@ -1157 +1198 @@ int main(void)
+-    unlink("/data/homebrew/PPSA99169/lapy-ready");
++    unlink(ready_path);
+@@ -1190 +1231 @@ done:
+-    if (readiness_published) unlink("/data/homebrew/PPSA99169/lapy-ready");
++    if (readiness_published) unlink(ready_path);
