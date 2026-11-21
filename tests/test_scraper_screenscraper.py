@@ -332,6 +332,14 @@ class ScreenScraper(unittest.TestCase):
         totals = json.loads(self.request('GET', f'/api/scraper/recap?id={second["id"]}')[1])['recap']['totals']
         self.assertEqual(totals['cover'], {'got': 3, 'had': 0, 'missed': 2})
         self.assertEqual(totals['screenshot'], {'got': 0, 'had': 4, 'missed': 1})
+        # A search from the page waits its turn too, while a chosen game is fetched.
+        item = {p['state']: p['item'] for p in second['problems']}
+        self.request('POST', f'/api/scraper/resolve?id={second["id"]}&item={item["ambiguous"]}&action=choose&value='
+                     + urllib.parse.quote('Time Voyager: Hover Race Special [1003]'))
+        status, body = self.request('POST', f'/api/scraper/resolve?id={second["id"]}&item={item["unmatched"]}&action=search&value=hunter')
+        self.assertEqual(status, 200, body)
+        self.wait(second['id'], lambda j: j['state'] == 'done' and not j['counts'].get('pending') and not j['counts'].get('working'))
+        self.assertEqual(self.source.most_busy, 1)
 
     def test_details_alone_or_media_alone(self):
         self.assertEqual(self.sign_in()[0], 200)
