@@ -1,0 +1,15 @@
+{
+  "step": "dependency-console-drive",
+  "note": "The newest SDK, PS5_Vulkan and RADV on the Base PS5, the cores whose files were on the owner's drive: FBNeo, MAME and Opera (3DO BIOS) draw the pictures October's run did, with no crash; the files are deleted from the console afterwards.",
+  "must_contain": [
+    "core fbneo: crash 0 | October 34.9/8.0 | now 34.7/7.9",
+    "core mame: crash 0 | October 55.6/50.8 | now 55.0/47.6",
+    "core opera: crash 0 | October 83.8/83.3 | now 84.0/83.1",
+    "[Opera]: loaded BIOS ROM - panafz10.bin",
+    "the four files deleted from the console"
+  ],
+  "must_not_contain": [
+    "crash: signal"
+  ],
+  "human_check": "Still not run against the update, for want of content: flycast, mednafen_saturn, ps5sx2, scummvm, dosbox_pure (ran without it) and mednafen_pcfx (no PC-FX BIOS)."
+}

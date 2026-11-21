@@ -1,0 +1,27 @@
+{
+  "step": "dependency-console-drive",
+  "recorded": "2026-11-21T10:29:54Z",
+  "console_run": "052318-052655",
+  "revision": "66e50e0",
+  "command": "bash evidence/framegen-every-core/run.sh <fbneo, mame and opera rows of the every-core list> klog/deps-pass/cores-drive",
+  "raw_capture": "klog/deps-pass/drive-summary.txt",
+  "raw_lines": 15,
+  "raw_bytes": 1188,
+  "lines": [
+    "==> build 243d316e (66e50e0's code: c45a4e9d, 1466d6d's SDK 88d6e41, PS5_Vulkan 7f492b4, RADV 75238ae, plus the patched PC-FX core) on the Base PS5",
+    "==> the owner's LaunchBox drive: FBNeo's and MAME's sets, the Neo Geo BIOS and the 3DO BIOS (panafz10.bin from 3dobios.zip) put on the console, each read back byte for byte",
+    "readback ok: FBNeo's set (content/fbneo)",
+    "readback ok: MAME's set (content/mame)",
+    "readback ok: the Neo Geo BIOS (content/mame)",
+    "readback ok: the 3DO BIOS panafz10.bin (system)",
+    "==> evidence/framegen-every-core/run.sh with October's content and pad scripts (frame generation off now: brightness of each recording, October / now)",
+    "core fbneo: crash 0 | October 34.9/8.0 | now 34.7/7.9",
+    "core mame: crash 0 | October 55.6/50.8 | now 55.0/47.6",
+    "core opera: crash 0 | October 83.8/83.3 | now 84.0/83.1",
+    "mame: [libretro INFO] Starting game: its set in /app0/content/mame",
+    "opera: [libretro INFO] [Opera]: loaded BIOS ROM - panafz10.bin",
+    "fbneo: [libretro INFO] [FBNeo] Romset found in /app0/content/fbneo",
+    "runs: 3 ==> [run] VERDICT: it exited on its own before 95s",
+    "==> afterwards: the four files deleted from the console; content/fbneo and content/mame empty, no panafz10.bin in system/"
+  ]
+}
