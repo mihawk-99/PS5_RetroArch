@@ -1,0 +1,27 @@
+{
+  "step": "dependency-console-downloads",
+  "recorded": "2026-11-21T13:40:26Z",
+  "console_run": "083328-083706",
+  "revision": "8c45552",
+  "command": "bash evidence/framegen-every-core/run.sh <ps5sx2, scummvm and dosbox_pure rows of the every-core list> klog/deps-pass/cores-dl",
+  "raw_capture": "klog/deps-pass/dl-summary.txt",
+  "raw_lines": 15,
+  "raw_bytes": 1758,
+  "lines": [
+    "==> build 243d316e (66e50e0's code: c45a4e9d, 1466d6d's SDK 88d6e41, PS5_Vulkan 7f492b4, RADV 75238ae, plus the patched PC-FX core) on the Base PS5",
+    "==> October's free test software downloaded again with the owner's yes (Open PS2 Loader v1.1.0 from its GitHub release, a freeware ScummVM game from downloads.scummvm.org, a DOS demo from files.scene.org) and the owner's PS2 BIOS dump from their drive, put on the console and read back byte for byte",
+    "readback ok: 7 of 7 files (content/ps2, system/pcsx2/bios, content/dos, content/scummvm: 4 files)",
+    "==> evidence/framegen-every-core/run.sh with October's content and pad scripts (frame generation off now: brightness of each recording, October / now)",
+    "core ps5sx2: crash 0 | October 58.0/62.8 | now 56.2/61.8",
+    "core scummvm: crash 0 | October 23.3/64.1 | now 23.3/64.1",
+    "core dosbox_pure: crash 0 | October 11.4/11.4, 3.2/3.2, 0.0/12.0 | now 0.0/6.7 (a demo: its pictures at the recording times vary run to run)",
+    "ps5sx2: [libretro INFO] [PS5SX2] loading /app0/content/ps2/OPNPS2LD-v1.1.0.ELF with BIOS scph39001.bin",
+    "ps5sx2: [libretro INFO] [PS5SX2] vulkan: PlayStation 5 GPU (RADV NAVI21) (RADV)",
+    "scummvm: [libretro INFO] ScummVM exited successfully.",
+    "dosbox_pure: [libretro INFO] [DOSBOX STATUS] Program: PUREMENU - Cycles: -1 - Frameskip: -1 - Paused: 0",
+    "dosbox_pure: [libretro INFO] [DOSBOX STATUS] Program: DOSBOX - Cycles: -1 - Frameskip: -1 - Paused: 0",
+    "dosbox_pure: [libretro INFO] [DOSBOX STATUS] Program: (the demo's executable) - Cycles: -1 - Frameskip: -1 - Paused: 0",
+    "runs: 3 ==> [run] VERDICT: it exited on its own before 95s",
+    "==> afterwards: the 7 files, the PS2 BIOS's NVRAM and memory cards, system/pcsx2 and content/scummvm's folder deleted; content/ps2, content/dos, content/scummvm empty, no system/pcsx2"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "step": "dependency-console-downloads",
+  "note": "The newest SDK, PS5_Vulkan and RADV on the Base PS5, the cores whose free test software was downloaded again: ps5sx2 (with the owner's BIOS dump), ScummVM and DOSBox Pure run their content as October's run did, with no crash; everything put on the console is deleted afterwards.",
+  "must_contain": [
+    "core ps5sx2: crash 0 | October 58.0/62.8 | now 56.2/61.8",
+    "core scummvm: crash 0 | October 23.3/64.1 | now 23.3/64.1",
+    "core dosbox_pure: crash 0",
+    "[PS5SX2] vulkan: PlayStation 5 GPU (RADV NAVI21) (RADV)",
+    "Program: (the demo's executable)",
+    "content/ps2, content/dos, content/scummvm empty, no system/pcsx2"
+  ],
+  "must_not_contain": [
+    "crash: signal"
+  ],
+  "human_check": "Still not run against the update: flycast (the Dreamcast 240p Test Suite: itch.io's download key fails in the built-in browser), mednafen_saturn (its sample needs the SH2 toolchain) and mednafen_pcfx (no PC-FX BIOS)."
+}
