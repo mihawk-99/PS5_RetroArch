@@ -2581,6 +2581,7 @@ MHD_Result route(MHD_Connection *c, const std::string &url, const std::string &m
         {"/assets/systems/n3ds.webp", "image/webp"},
         {"/assets/systems/n64.webp", "image/webp"},
         {"/assets/systems/naomi.webp", "image/webp"},
+        {"/assets/systems/naomi2.webp", "image/webp"},
         {"/assets/systems/nds.webp", "image/webp"},
         {"/assets/systems/neogeo.webp", "image/webp"},
         {"/assets/systems/neogeocd.webp", "image/webp"},
