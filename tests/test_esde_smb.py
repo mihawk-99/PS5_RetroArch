@@ -3,14 +3,32 @@ from pathlib import Path
 import os
 import shlex
 import struct
+import sys
 import zlib
 import subprocess
 import tempfile
 import unittest
 
+# Found as tests.test_esde_smb too, not only by discovery from tests/.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_esde_freeimage import SMALL_WEBP, STB  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 PORT = ROOT
 PUGIXML = ROOT / 'build/pugixml-ps5/src/src'
+GRID = PORT / 'build/es-de/src/es-core/src/components/primary/GridComponent.h'
+
+
+def need_patched_esde(test):
+    """The unit gate runs before the build: build/es-de/src may be absent, or still hold
+    the patches of the commit before this one. The integration gate runs this again."""
+    if not GRID.is_file() or 'SmbImages::window' not in GRID.read_text():
+        test.skipTest('build/es-de/src does not hold the SMB patch (tools/build-esde.sh exports it)')
+
+
+def need_pugixml(test):
+    if not (PUGIXML / 'pugixml.cpp').is_file():
+        test.skipTest('pugixml not fetched (tools/build-pugixml.sh fetches it)')
 
 
 def system_path_pipeline():
@@ -78,7 +96,6 @@ assert(ps5_game_check(&game)!=0); return 0; }''')
             subprocess.run([exe],check=True,timeout=5)
 
     def test_decoder_and_frame_budgets(self):
-        from test_esde_freeimage import SMALL_WEBP, STB
         if not (STB/'stb_image.h').exists(): self.skipTest('Run tools/build-esde.sh first')
         flags = os.environ.get('ESDE_HOST_WEBP_FLAGS')
         if flags is None:
@@ -102,7 +119,8 @@ assert(ps5_game_check(&game)!=0); return 0; }''')
             subprocess.run([exe,str(td/'small.png'),str(td/'large.png'),str(td/'small.webp')],check=True,timeout=20)
 
     def test_upstream_grid_window(self):
-        grid=(PORT/'build/es-de/src/es-core/src/components/primary/GridComponent.h').read_text()
+        need_patched_esde(self)
+        grid=GRID.read_text()
         start=grid.index('        const int rows',grid.index('template <typename T> void GridComponent<T>::update'))
         end=grid.index('        SmbImages::window(paths, visible);',start)
         code = '''#include "SmbImages.h"
@@ -135,6 +153,8 @@ int main() {
             subprocess.run([exe],check=True,timeout=5)
 
     def test_system_startup_preserves_smb_scheme(self):
+        need_patched_esde(self)
+        need_pugixml(self)
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             catalog = folder / 'catalog.xml'
@@ -170,6 +190,7 @@ int main() {
             subprocess.run([str(exe)], check=True)
 
     def test_catalog_exact_paths_and_namespace_boundaries(self):
+        need_pugixml(self)
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             catalog = folder / 'catalog.xml'
