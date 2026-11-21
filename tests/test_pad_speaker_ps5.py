@@ -1,11 +1,13 @@
 """The controllers' speakers (patch 0141): the real src/pad_speaker_ps5.cpp against a mocked
 AudioOut, and the environment call and close-all the port inserts into runloop.c."""
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from test_core_environment import ROOT, runloop_edits
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_core_environment import ROOT, runloop_edits  # noqa: E402
 
 
 class PadSpeakerPs5(unittest.TestCase):
