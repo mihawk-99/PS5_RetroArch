@@ -204,7 +204,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
     // Color artwork uses bundled assets; real flags and every known system resolve.
     assert.equal(await page.locator('.game-platform .system-icon img').count(),6);
     const artwork = await page.evaluate(() => ({ systems:Object.values(SYSTEM_ICONS), flags:['us','eu','jp','kr'].map(f => iconNode('flag-'+f).getAttribute('src')) }));
-    assert.equal(artwork.systems.length,50);
+    assert.equal(artwork.systems.length,51); // 50 pictures; Naomi 2 shows Naomi's (issue 109)
     for (const src of [...artwork.systems,...artwork.flags]) assert.equal((await page.request.get(process.env.WEBUI_TEST_URL+'/'+src)).status(),200,src);
     assert.equal((await page.request.get(process.env.WEBUI_TEST_URL+'/assets/systems/../../retroarch.cfg')).status(),404);
     // Adding with downloads stays in a live progress view and opens fresh artwork.
