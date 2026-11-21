@@ -162,7 +162,13 @@ static int try_install_root(const char *root, const struct stat *original, FILE 
             fprintf(log, "candidate=%s stat_errno=%d\n", root, errno);
         return 0;
     }
-    const int same = candidate.st_ino == original->st_ino && candidate.st_dev == original->st_dev;
+    /* The very executable that was started: the same inode on the same device. /app0 is a
+     * nullfs mount of the title's folder, and where the firmware gives that mount a device
+     * of its own (issue 59, PR 60) the same inode with the same size names it. A copy that
+     * merely looks alike (the same release installed twice) is never taken. */
+    const int same = candidate.st_ino == original->st_ino &&
+                     (candidate.st_dev == original->st_dev ||
+                      (candidate.st_size > 0 && candidate.st_size == original->st_size));
     if (log)
         fprintf(log, "candidate=%s dev=%llu ino=%llu same_executable=%d\n", root,
                 (unsigned long long)candidate.st_dev, (unsigned long long)candidate.st_ino, same);

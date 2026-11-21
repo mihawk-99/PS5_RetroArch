@@ -30,8 +30,9 @@ static const char *ps5_elevation_status_name(enum ps5_elevation_status s) {
 }
 #include "ps5_paths.c"
 
-static const struct stat executable = { .st_dev = 41, .st_ino = 77 };
+static const struct stat executable = { .st_dev = 41, .st_ino = 77, .st_size = 4096 };
 static const char *wanted;
+static int mounted_view; /* the wanted root reports another device, as a nullfs mount may */
 static int scan_allowed, chdir_allowed, scans, closed, changed;
 static unsigned entry_index;
 static const char *entries[] = {
@@ -45,10 +46,10 @@ int __wrap_stat(const char *path, struct stat *st) {
     char image[PATH_MAX];
     if (wanted) {
         snprintf(image, sizeof(image), "%s/eboot.bin", wanted);
-        if (!strcmp(path, image)) { *st = executable; return 0; }
+        if (!strcmp(path, image)) { *st = executable; st->st_dev += mounted_view; return 0; }
     }
     if (!strcmp(path, "/data/homebrew/PPSA99169/eboot.bin")) {
-        *st = executable; st->st_dev++; return 0;
+        *st = executable; st->st_dev++; st->st_size++; return 0;
     }
     if (!strcmp(path, "/mnt/sandbox/PPSA99169_001/app0/eboot.bin")) {
         *st = executable; st->st_ino++; return 0;
@@ -84,6 +85,7 @@ int __wrap_closedir(DIR *directory) {
 }
 static void reset(const char *root) {
     wanted = root;
+    mounted_view = 0;
     scan_allowed = chdir_allowed = 1;
     scans = closed = changed = 0;
     strcpy(install_root, "/app0");
@@ -108,8 +110,14 @@ int main(void) {
     assert(resolve_install_root("PPSA99169", &executable, log) == 1);
     assert(!strcmp(install_root, wanted) && changed == 1 && scans == 1 && closed == 1);
 
-    /* Same inode on another device, or another inode on the same device, is
-     * not the executable we launched: never select a similarly named copy. */
+    /* The same inode and size seen through a mount with a device of its own is the
+     * executable we launched (issue 59, PR 60). */
+    reset("/system_ex/app/PPSA99169"); mounted_view = 5;
+    assert(resolve_install_root("PPSA99169", &executable, log) == 1);
+    assert(!strcmp(install_root, wanted) && changed == 1 && scans == 0);
+
+    /* Same inode on another device with another size, or another inode on the same
+     * device, is not the executable we launched: never select a similarly named copy. */
     reset(NULL);
     assert(resolve_install_root("PPSA99169", &executable, log) == -1);
     assert(!strcmp(install_root, "/app0") && changed == 0 && closed == 1);
