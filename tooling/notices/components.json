@@ -190,7 +190,7 @@
         {"from": "${SDK_FORK}/platform/src/dlmalloc/SOURCE", "to": "dlmalloc-SOURCE.txt"}
       ],
       "source": {"kind": "stamp", "file": ".deps/native/ps5-payload-sdk/.ps5-sdk-revision", "pin": {"file": "tools/setup-native-dependencies.sh", "var": "sdk_revision"}, "remote": "https://github.com/mihawk-99/PS5_PayloadSDK"},
-      "modifications": "The fork installs over the ps5-payload-dev SDK v0.42 release binaries (tools/setup-native-dependencies.sh). The platform layer's regex is musl's (MIT, with TRE's BSD-2-Clause notice) and its heap is dlmalloc 2.8.6 (MIT)."
+      "modifications": "The fork installs over the ps5-payload-dev SDK v0.42 release binaries (tools/setup-native-dependencies.sh). The platform layer's regex is musl's (MIT, with TRE's BSD-2-Clause notice) and its heap is dlmalloc 2.8.6 (MIT). In the title, libps5platform.a's elevation.o is rebuilt from the pinned revision with platform/sdk/elevation-root-proof.patch (PS5_RetroArch, tools/patch-sdk-elevation.sh): the elevation client waits for root before it opens its proof file."
     },
     {
       "id": "dlmalloc",
