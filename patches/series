@@ -296,4 +296,6 @@
 
 0137  Frame generation: the clock-measured gap between new frames (0121) counts calls a core skipped only when the core itself runs faster than real time. A core slower than real time hands over a frame each call, so its groups are planned as the calls that come: the real frame is shown again, after its generated one, instead of two early blends (the doubled image, 2026-10-18).
 
+0138  Build graphics widgets and restore Vulkan's widget capability by withdrawing 0042. RetroArch 1.22.2 initializes the display context before loading widget fonts and textures. Bundle the pinned widget fonts and icons with their licenses and regression tests.
+
 0139  RetroAchievements: the account RetroArch signs in with (user name and token) is written into retroarch.cfg at sign-in (src/ps5_cheevos.c), and the password the WebUI saved is forgotten (0130) only once it is. RetroArch writes its token when it next saves its config, at quit; a title the console closes from the home screen never quits, and with the password already gone the next start had nothing to sign in with (issue 110).

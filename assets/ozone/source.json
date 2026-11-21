@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/libretro/retroarch-assets",
+  "revision": "73106363e14e34c08a5854b4cfbc29f184e3b783",
+  "selection": "Regular and bold fonts used by RetroArch graphics widgets, with upstream attribution and the Inter UI and M+ licenses. All selected files are unmodified.",
+  "files": {
+    "regular.ttf": "51331777219c638c8d1e911e17425598db8cae439ebab3a36a0a95b656139c8f",
+    "bold.ttf": "3dd102c01c7c0ce5434ef29ad55cdfa2b6f408085769eba5f2ffc122dadd7ee5",
+    "README.md": "d4cc5be3d005540c3721f955ea064076c306d20b552f96d3fd2a764a68bd6659",
+    "INTER-LICENSE.txt": "40cc017183821b3163b4ab30c186019f05573323fdacb1cd9563c97098f8183c",
+    "MPLUS-LICENSE.txt": "c9c9402a9d2d650d1ccdeb97ad82964774784095a1dd0f32f729d62b1ce9c69a"
+  },
+  "license_sources": {
+    "INTER-LICENSE.txt": {
+      "repository": "https://github.com/rsms/inter",
+      "revision": "86daccf7b1582192276413624633a5bccb11d857",
+      "path": "LICENSE.txt"
+    },
+    "MPLUS-LICENSE.txt": {
+      "repository": "https://github.com/libretro/retroarch-assets",
+      "revision": "73106363e14e34c08a5854b4cfbc29f184e3b783",
+      "path": "fonts/mplus-1pLICENSE_E.txt"
+    }
+  }
+}

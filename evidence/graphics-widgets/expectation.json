@@ -1,0 +1,14 @@
+{
+  "step": "graphics-widgets",
+  "note": "PR 122: graphics widgets built in. With the setting on, the menu still draws (0042's black screen does not return) and notifications are drawn as widgets over software and hardware frames; an install that saved menu_enable_widgets = false keeps the text notifications until the setting is turned on.",
+  "must_contain": [
+    "on | 3     frontend: widgets branch taken",
+    "off | 3     frontend: display-driver branch taken, video_driver=vulkan matched=yes",
+    "on | ppsspp | build identity: c443857c | exited on its own before 30s | crash 0",
+    "on | the owner's retroarch.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [
+    "restored: DIFFERS"
+  ],
+  "human_check": "An achievement's own unlock widget (needs a real account and game); the widgets' size on a 4K screen is the owner's to judge."
+}
