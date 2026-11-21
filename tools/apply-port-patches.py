@@ -91,6 +91,23 @@ EDITS = [
         "patches/series, 0130: the password the WebUI saved is not kept",
     ),
     (
+        # After 0130's edit, whose two calls this one replaces (a tree that already
+        # carries 0130 and a fresh one end the same).
+        "cheevos/cheevos.c",
+        "            ps5_cheevos_forget_password(\"/app0/config/webui.cfg\", 1);\n"
+        "            ps5_cheevos_forget_password(\"/app0/config/retroarch.cfg\", 0);\n",
+        "            /* patches/series, 0139: the account is written to retroarch.cfg now, not at\n"
+        "             * RetroArch's next save, which a title the console closes never reaches;\n"
+        "             * the saved password goes only once it is (issue 110). */\n"
+        "            extern int ps5_cheevos_keep_account(const char *path, const char *username,\n"
+        "                  const char *token);\n"
+        "            if (ps5_cheevos_keep_account(\"/app0/config/retroarch.cfg\",\n"
+        "                     settings->arrays.cheevos_username,\n"
+        "                     settings->arrays.cheevos_token) == 0)\n"
+        "               ps5_cheevos_forget_password(\"/app0/config/webui.cfg\", 1);\n",
+        "patches/series, 0139: the account is written to retroarch.cfg now",
+    ),
+    (
         "menu/drivers/xmb.c",
         "         /* If the playlist icon doesn't exist return default */\n"
         "         if (!path_is_valid(texturepath))\n",

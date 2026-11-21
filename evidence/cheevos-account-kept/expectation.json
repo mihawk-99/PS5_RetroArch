@@ -1,0 +1,15 @@
+{
+  "step": "cheevos-account-kept",
+  "note": "Issue 110: closed from the home screen, RetroArch never saves its config, so the RetroAchievements token it got at sign-in was lost and the saved password was already forgotten: the next start could not sign in. With 0139 the account is written to retroarch.cfg at sign-in, and the next start signs in with its token.",
+  "must_contain": [
+    "before launch 2 | retroarch.log: [INFO] [RCHEEVOS] RetroAchievements login failed: password is required",
+    "before after launch 1, closed from outside | retroarch.cfg: cheevos_username=\"\" cheevos_token=\"\"",
+    "after after launch 1, closed from outside | retroarch.cfg: cheevos_username=\"claudetester\" cheevos_token=\"claudefaketoken0123\" | webui.cfg: 0 password line(s), 0 token line(s)",
+    "after launch 2 | server: sign-in user=claudetester with=token -> accepted",
+    "after | the owner's retroarch.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [
+    "restored: DIFFERS"
+  ],
+  "human_check": "A real RetroAchievements account on the console: sign in, close RetroArch from the home screen, open it again and start a game."
+}
