@@ -3783,6 +3783,10 @@ bool resolve(const std::string &id, unsigned index, const std::string &action,
             system_id = job->items[index].game.system;
         }
         const auto system = screenscraper_systems.find(system_id);
+        /* The account's limit counts the page's searches too.
+         * shortcut: the request's thread waits for the slot (one game's downloads at
+         * most); hand the search to a worker if that wait shows on the page. */
+        ScreenscraperSlot slot;
         if (system != screenscraper_systems.end() &&
             screenscraper_search(http, system->second, value, region, found, why) < 0)
             return false;
