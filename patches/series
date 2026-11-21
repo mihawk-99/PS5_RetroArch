@@ -299,3 +299,7 @@
 0138  Build graphics widgets and restore Vulkan's widget capability by withdrawing 0042. RetroArch 1.22.2 initializes the display context before loading widget fonts and textures. Bundle the pinned widget fonts and icons with their licenses and regression tests.
 
 0139  RetroAchievements: the account RetroArch signs in with (user name and token) is written into retroarch.cfg at sign-in (src/ps5_cheevos.c), and the password the WebUI saved is forgotten (0130) only once it is. RetroArch writes its token when it next saves its config, at quit; a title the console closes from the home screen never quits, and with the password already gone the next start had nothing to sign in with (issue 110).
+
+0140  Cores may ask whether RetroAchievements hardcore is on (environment call 0x20000|1, a bool) and for the savestate folder (0x20000|2, as GET_SAVE_DIRECTORY gives saves). RetroArch keeps its own states, rewind and cheats from hardcore; a core's own (Dolphin's integrated GBA: state slots, save import) never reach it, so the core asks before each.
+
+0141  A core may play sound on each controller's own speaker: environment call 0x20000|3 hands it src/pad_speaker_ps5.h's table (open a RetroArch port's controller speaker, write 48 kHz mono, close), fed by a thread per speaker at AudioOut's pad-speaker pace with silence when nothing is queued; every speaker closes with the core. Dolphin's integrated GBA plays each GBA's sound on its player's controller with it.

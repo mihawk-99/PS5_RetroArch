@@ -20,6 +20,9 @@
 # The workspace is where the port is edited: change build/es-de/src, then export
 # its diff with
 #   git -C build/es-de/src diff > frontends/es-de/patches/0001-ps5-port.patch
+# That diff is the whole series applied: after such an export, remove the later patches
+# it now holds (0002-...) from frontends/es-de/patches/series, or the next fresh
+# workspace applies them twice and stops.
 # A workspace is re-exported only when the patches changed, and never while it
 # holds edits the patches do not (build/es-de/.stamp records the diff it was given).
 #

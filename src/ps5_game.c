@@ -219,13 +219,18 @@ int ps5_game_check(struct ps5_game *game)
         set_error(game, "a value has a line break");
         return -1;
     }
-    int content_is_file = game->content[0] == '/' && is_file(game->content);
+    /* A file, or RetroArch's name for a file inside one: "Game.zip#Game.sfc", as its scan
+     * lists a game for a core that does not open archives. Refusing those was issue 108. */
+    char file[PS5_GAME_PATH_MAX];
+    snprintf(file, sizeof(file), "%.*s", (int)ps5_library_file_length(game->content),
+             game->content);
+    int content_is_file = game->content[0] == '/' && is_file(file);
 #if defined(__PROSPERO__) || defined(PS5_GAME_SMB_TEST)
     if (ps5_smb_stat && strncmp(game->content, "smb://", 6) == 0)
     {
         /* The VFS verifies the saved server and opens read-only. These are
          * RETRO_VFS_STAT_IS_VALID (1) and RETRO_VFS_STAT_IS_DIRECTORY (2). */
-        const int flags = ps5_smb_stat(game->content, NULL);
+        const int flags = ps5_smb_stat(file, NULL);
         content_is_file = (flags & 3) == 1;
     }
 #endif
@@ -266,8 +271,9 @@ static void match_entry(void *context, const struct ps5_playlist_entry *entry)
 {
     struct core_search *search = (struct core_search *)context;
     /* "DETECT" (or nothing) leaves the choice to RetroArch at launch: no core. */
-    if (!search->found && strcmp(entry->path, search->content) == 0 && entry->core_path[0] &&
-        strcmp(entry->core_path, "DETECT") != 0)
+    /* The playlist may name a file inside the archive a frontend starts (issue 108). */
+    if (!search->found && ps5_library_same_game(entry->path, search->content) &&
+        entry->core_path[0] && strcmp(entry->core_path, "DETECT") != 0)
     {
         snprintf(search->core, search->size, "%s", entry->core_path);
         search->found = 1;

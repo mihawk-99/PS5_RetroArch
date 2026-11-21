@@ -47,6 +47,7 @@ def system_path_pipeline():
     end = systems.index('            // Check that the ROM directory', start)
     return r'''
 #include "SmbCatalog.h"
+#include "StartupResources.h"
 #include <cassert>
 #include <filesystem>
 #include <iostream>

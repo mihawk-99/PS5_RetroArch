@@ -1,0 +1,13 @@
+{
+  "step": "esde-archive-games",
+  "note": "A zipped game RetroArch's playlist names as a file inside its archive: EmulationStation lists it once, by the archive, and starts it; the WebUI lists it once. Before, on v4.4.0-beta-4, it was listed twice where the content scan saw the archive too.",
+  "must_contain": [
+    "after | build identity: bb4dcebe | the archive where only the playlist lists it | ES-DE's NES system lists .zip: yes | its game list: 11 games | the test's: ['./zip-test-108/a/b/c/d/0 Zip Test 108.zip']",
+    "the WebUI's games with the test's name: 1",
+    "[Content] Loading content file: \"/app0/content/nes/0 Zip Test 108.zip#0 Zip Test 108.nes\"",
+    "game mode: RetroArch quit (status 0) after 10 s; back to the frontend",
+    "the owner's files put back byte for byte: 6 of 6 | the test's files left on the console: 0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

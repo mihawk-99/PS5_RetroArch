@@ -104,9 +104,9 @@ int main(int argc, char **argv)
     write_text(media + "/snes/metadata/Mighty & Sidekick.meta",
                "developer = \"AlphaDream\"\nname = \"Mighty & Sidekick RPG\"\nrating = \"0.85\"\n"
                "released = \"2003-11-17\"\n");
-    const struct ps5_esde_library_paths paths = {playlists.c_str(), info.c_str(), cores.c_str(),
-                                                 reference.c_str(), data.c_str(), nullptr,
-                                                 media.c_str()};
+    const struct ps5_esde_library_paths paths = {
+        playlists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
+        data.c_str(),      nullptr,      media.c_str(), 0};
     char summary[256];
     assert(ps5_esde_write_library_to(&paths, summary, sizeof(summary)) == 2);
     assert(std::string(summary).find("2 systems, 3 games (1 with ES-DE's details kept)") == 0);
@@ -239,7 +239,7 @@ int main(int argc, char **argv)
         const char *const roots[] = {rom.c_str(), nullptr};
         const struct ps5_esde_library_paths fresh = {
             playlists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
-            first.c_str(),     roots,        media.c_str()};
+            first.c_str(),     roots,        media.c_str(), 0};
         auto value = [&](const char *name)
         {
             pugi::xml_document file;
@@ -263,8 +263,78 @@ int main(int argc, char **argv)
         ps5_esde_write_library_to(&fresh, summary, sizeof(summary));
         assert(value("ROMDirectory") == "/mnt/usb0/roms" && value("MediaDirectory") == media);
     }
+    /* Issue 108: RetroArch's scan lists a game inside an archive as "Game.zip#Game.md" for a
+     * core that does not open archives. That is not a file, so ES-DE listed nothing: its
+     * game is the archive, once, in a system that lists the archive's extension. */
+    {
+        const std::string lists = dir + "/playlists-archives", there = dir + "/data-archives";
+        mkdir(lists.c_str(), 0777);
+        write_text(lists + "/Nintendo - Super Nintendo Entertainment System.lpl",
+                   "{\"items\": ["
+                   "{\"path\": \"/mnt/usb0/roms/Alpha (USA).zip#Alpha (USA).sfc\", \"label\": "
+                   "\"Alpha (USA)\", \"core_path\": \"DETECT\"},"
+                   "{\"path\": \"/mnt/usb0/roms/Pack.7z#a.sfc\", \"label\": \"Pack A\", "
+                   "\"core_path\": \"DETECT\"},"
+                   "{\"path\": \"/mnt/usb0/roms/Pack.7z#b.sfc\", \"label\": \"Pack B\", "
+                   "\"core_path\": \"DETECT\"}]}");
+        const struct ps5_esde_library_paths archives = {
+            lists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
+            there.c_str(), nullptr,      media.c_str(), 0};
+        ps5_esde_write_library_to(&archives, summary, sizeof(summary));
+        pugi::xml_document written, list;
+        assert(written.load_file((there + "/custom_systems/es_systems.xml").c_str()));
+        const pugi::xml_node system = written.child("systemList").child("system");
+        assert(std::string(system.child_value("path")) == "/mnt/usb0/roms");
+        const std::string listed = system.child_value("extension");
+        assert(listed.find(".zip") != std::string::npos && listed.find(".7z") != std::string::npos);
+        assert(list.load_file((there + "/gamelists/snes/gamelist.xml").c_str()));
+        std::string games;
+        for (pugi::xml_node game : list.child("gameList").children("game"))
+            games += std::string(game.child_value("path")) + "=" + game.child_value("name") + ";";
+        assert(games == "./Alpha (USA).zip=Alpha (USA);./Pack.7z=Pack A;");
+    }
+    /* PR 105, issue 104: one system per source playlist when the setting asks for it. A
+     * system with a single source keeps its name (and so its artwork folder). */
+    {
+        const std::string there = dir + "/data-separate", lists = dir + "/playlists-separate";
+        mkdir(lists.c_str(), 0777);
+        write_text(lists + "/Nintendo - Super Nintendo Entertainment System.lpl",
+                   "{\"items\": [{\"path\": \"/roms/snes/One (USA).sfc\", \"label\": \"One\", "
+                   "\"core_path\": \"DETECT\"}]}");
+        write_text(lists + "/Imports.lpl",
+                   "{\"items\": [{\"path\": \"/roms/sfc/Two (Japan).sfc\", \"label\": \"Two\", "
+                   "\"core_path\": \"DETECT\", \"db_name\": \"Nintendo - Super Nintendo "
+                   "Entertainment System.lpl\"}]}");
+        write_text(lists + "/Homebrew.lpl",
+                   "{\"items\": [{\"path\": \"/roms/hb/Three.bin\", \"label\": \"Three\", "
+                   "\"core_path\": \"DETECT\"}]}");
+        const struct ps5_esde_library_paths separate = {
+            lists.c_str(), info.c_str(), cores.c_str(), reference.c_str(),
+            there.c_str(), nullptr,      media.c_str(), 1};
+        ps5_esde_write_library_to(&separate, summary, sizeof(summary));
+        pugi::xml_document written;
+        assert(written.load_file((there + "/custom_systems/es_systems.xml").c_str()));
+        std::string names, full;
+        size_t games = 0;
+        for (pugi::xml_node system : written.child("systemList").children("system"))
+        {
+            const std::string name = system.child_value("name");
+            names += name + ";";
+            full += std::string(system.child_value("fullname")) + ";";
+            assert(std::string(system.child_value("theme")) ==
+                   (name.rfind("snes", 0) == 0 ? "snes" : "homebrew"));
+            pugi::xml_document list;
+            assert(list.load_file((there + "/gamelists/" + name + "/gamelist.xml").c_str()));
+            for (pugi::xml_node game : list.child("gameList").children("game"))
+                games += game.child("path") ? 1 : 0;
+        }
+        assert(names == "homebrew;snes-imports;snes-nintendo-super-nintendo-entertainment-system;");
+        assert(full == "Homebrew;Nintendo SNES (Super Nintendo) (Imports);"
+                       "Nintendo SNES (Super Nintendo);");
+        assert(games == 3);
+    }
     std::puts("esde_library: systems, full names, themes, commands, merged game lists, favourites "
-              "from both frontends, RetroArch's play records, the collections and the ROM and "
-              "media folders PASS");
+              "from both frontends, RetroArch's play records, the collections, the ROM and "
+              "media folders and games inside archives PASS");
     return 0;
 }
