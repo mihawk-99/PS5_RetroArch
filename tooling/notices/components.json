@@ -291,6 +291,18 @@
       "modifications": "A selection of files, unmodified; assets/xmb/source.json lists each with its digest."
     },
     {
+      "id": "retroarch-sounds",
+      "name": "RetroArch's menu and achievement sounds",
+      "kind": "asset",
+      "noncommercial": true,
+      "artifacts": ["assets/sounds/*.ogg", "assets/sounds/Licence.txt", "assets/sounds/README.md", "assets/sounds/source.json"],
+      "licence": "CC-BY-NC-3.0",
+      "copyright": ["ViRiX Dreamcore (davidm@virixcore.net), for use in RetroArch"],
+      "texts": [{"from": "assets/sounds/Licence.txt", "to": "Licence.txt"}, {"from": "assets/sounds/README.md", "to": "README.md"}, {"from": "assets/sounds/source.json", "to": "source.json"}],
+      "source": {"kind": "json", "file": "assets/sounds/source.json", "key": "revision", "remote": "https://github.com/libretro/retroarch-assets"},
+      "modifications": "Unmodified files selected from retroarch-assets; assets/sounds/source.json lists each with its digest. The licence allows no commercial use."
+    },
+    {
       "id": "retroarch-widget-fonts",
       "name": "RetroArch's Ozone menu images, and the fonts it shares with the graphics widgets",
       "kind": "asset",

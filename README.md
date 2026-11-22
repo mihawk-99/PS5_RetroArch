@@ -476,7 +476,7 @@ lists and original notices.
 | [BlackBearReloaded — ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl) | Shader-compiler and graphics foundations consumed by PS5_Vulkan; not the active RetroArch video backend |
 | [Mesa contributors](https://gitlab.freedesktop.org/mesa/mesa) | RADV, the Vulkan driver the title renders through, with its ACO compiler, NIR, the Vulkan runtime and utilities |
 | [Khronos Group](https://github.com/KhronosGroup/Vulkan-Headers) | Vulkan API headers and [specification](https://github.com/KhronosGroup/Vulkan-Docs) |
-| [RetroArch assets contributors](https://github.com/libretro/retroarch-assets) and the [M+ Fonts project](https://mplusfonts.github.io/) | Packaged XMB and Ozone assets and fonts; original notices retained |
+| [RetroArch assets contributors](https://github.com/libretro/retroarch-assets) and the [M+ Fonts project](https://mplusfonts.github.io/) | Packaged XMB and Ozone assets and fonts, and the menu and achievement sounds (by ViRiX Dreamcore); original notices retained |
 | [LLVM / Clang contributors](https://github.com/llvm/llvm-project), [zlib authors Jean-loup Gailly and Mark Adler](https://github.com/madler/zlib) | Compilation and compression tooling |
 
 ### Frontends and interface artwork
@@ -550,7 +550,7 @@ The cores keep their own licences, and they differ:
 | LGPL-3.0-or-later | NeoCD |
 | Zlib | Handy |
 | MPL-2.0 | mGBA |
-| Non-commercial licences | Snes9x, FinalBurn Neo, Genesis Plus GX, PicoDrive, Opera (FreeDO's modified LGPL): they may not be sold or used commercially, and FBNeo's forbids asking for donations for a project that uses its code |
+| Non-commercial licences | Snes9x, FinalBurn Neo, Genesis Plus GX, PicoDrive, Opera (FreeDO's modified LGPL), and RetroArch's menu and achievement sounds (CC BY-NC 3.0, by ViRiX Dreamcore): they may not be sold or used commercially, and FBNeo's forbids asking for donations for a project that uses its code |
 
 The Alekfull NX theme also carries non-commercial restrictions. Artwork credits and licence texts for the WebUI’s icons, flags, and system images are in [ICON-CREDITS.txt](webui/assets/ICON-CREDITS.txt).
 

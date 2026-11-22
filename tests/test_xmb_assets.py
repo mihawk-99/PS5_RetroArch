@@ -116,6 +116,30 @@ class XmbAssets(unittest.TestCase):
                                 for pattern in component['artifacts']), name)
         self.assertIn('assets/xmb/COPYING', {entry['from'] for entry in component['texts']})
 
+    def test_sounds_are_the_ones_retroarch_looks_for(self):
+        """The menu's and the achievement unlock's sounds were in no release (issue 130's note)."""
+        base = ROOT / 'assets/sounds'
+        manifest = json.loads((base / 'source.json').read_text())
+        self.assertEqual(manifest['revision'], json.loads((ROOT / 'assets/xmb/source.json').read_text())['revision'])
+        source = (ROOT / 'vendor/retroarch/audio/audio_driver.c').read_text()
+        names = set(re.findall(r'string_is_equal_noncase\(basename_noext, "([a-z_]+)"\)', source))
+        self.assertEqual(names, {'ok', 'cancel', 'notice', 'notice_back', 'bgm', 'unlock', 'up', 'down'})
+        wanted = {name + '.ogg' for name in names} | {'Licence.txt', 'README.md'}
+        self.assertEqual(set(manifest['files']), wanted)
+        self.assertEqual({p.name for p in base.iterdir()}, wanted | {'source.json'})
+        for name, digest in manifest['files'].items():
+            data = (base / name).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), digest, name)
+            if name.endswith('.ogg'):
+                self.assertEqual(data[:4], b'OggS', name)
+        component = next(c for c in json.loads((ROOT / 'tooling/notices/components.json').read_text())['components']
+                         if c['id'] == 'retroarch-sounds')
+        self.assertTrue(component['noncommercial'])
+        for name in wanted | {'source.json'}:
+            self.assertTrue(any(fnmatch.fnmatchcase('assets/sounds/' + name, pattern)
+                                for pattern in component['artifacts']), name)
+        self.assertIn('ViRiX Dreamcore', (base / 'Licence.txt').read_text())
+
 
 class XmbSystemIcons(unittest.TestCase):
     """Issue 35: each playlist tab shows its system's hardware (tools/xmb-system-icons.py)."""
