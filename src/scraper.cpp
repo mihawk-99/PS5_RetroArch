@@ -250,16 +250,46 @@ bool safe_part(const std::string &part)
            part.find('/') == std::string::npos && part.find('\\') == std::string::npos;
 }
 /* A stored media file of a kind, whatever its extension, or "". */
+/* What a stored media file may end in, in the order it is looked for. */
+constexpr std::initializer_list<const char *> media_extensions = {".png", ".jpg", ".jpeg", ".webp",
+                                                                  ".gif", ".mp4", ".webm", ".pdf"};
 std::string stored_media(const std::string &system, const std::string &key, const std::string &kind)
 {
     const auto folder = kind_folders.find(kind);
     if (folder == kind_folders.end())
         return "";
     const std::string base = library_root() + '/' + system + '/' + folder->second + '/' + key;
-    for (const char *ext : {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".pdf"})
+    for (const char *ext : media_extensions)
         if (is_file(base + ext))
             return base + ext;
     return "";
+}
+/* The names, without their extension, of a folder's files that end in one of extensions:
+ * one listing, where asking for each game's file by name is a probe per game, kind and
+ * extension (up to 80 a game: with 15,000 games the library's answer outlasted the page's
+ * patience on the console, issue 78). */
+std::set<std::string> stems_in(const std::string &folder,
+                               std::initializer_list<const char *> extensions)
+{
+    std::set<std::string> stems;
+    if (DIR *dir = opendir(folder.c_str()))
+    {
+        while (const dirent *entry = readdir(dir))
+        {
+            const std::string name = entry->d_name;
+            const size_t dot = name.rfind('.');
+            if (dot == std::string::npos || dot == 0)
+                continue;
+            for (const char *extension : extensions)
+                if (name.compare(dot, std::string::npos, extension) == 0)
+                {
+                    stems.insert(name.substr(0, dot));
+                    break;
+                }
+        }
+        closedir(dir);
+    }
+    return stems;
 }
 std::string meta_path(const std::string &system, const std::string &key)
 {
@@ -3290,6 +3320,8 @@ std::string library_json()
     std::string out = "{\"systems\":[";
     std::string current;
     bool first_game = true;
+    std::set<std::string> details;
+    std::map<std::string, std::set<std::string>> stored;
     for (const auto &game : games)
     {
         if (game.system != current)
@@ -3299,11 +3331,18 @@ std::string library_json()
                    ",\"thumbnails\":" + (game.database.empty() ? "false" : "true") + ",\"games\":[";
             current = game.system;
             first_game = true;
+            /* What the system's folders hold, listed once each (stems_in). */
+            const std::string folder = library_root() + '/' + current + '/';
+            details = stems_in(folder + "metadata", {".meta"});
+            stored.clear();
+            for (const auto &kind : kind_folders)
+                stored[kind.first] = stems_in(folder + kind.second, media_extensions);
         }
-        const Fields meta = read_fields(meta_path(game.system, game.key));
+        const Fields meta =
+            details.count(game.key) ? read_fields(meta_path(game.system, game.key)) : Fields();
         std::string media;
         for (const auto &kind : kind_folders)
-            if (!stored_media(game.system, game.key, kind.first).empty())
+            if (stored[kind.first].count(game.key))
                 media += (media.empty() ? "" : ",") + quote(kind.first);
         out += std::string(first_game ? "" : ",") + "{\"path\":" + quote(game.path) +
                ",\"label\":" + quote(game.label) + ",\"key\":" + quote(game.key) +
