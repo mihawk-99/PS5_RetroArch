@@ -1,0 +1,27 @@
+{
+  "step": "release-v4.6.0-console",
+  "recorded": "2026-11-22T00:12:25Z",
+  "console_run": "release-46",
+  "revision": "de4d74c",
+  "command": "bash release46_check.sh klog/release-46 (tools/run-title.sh three times; upd.py for the update's routes)",
+  "raw_capture": "klog/release-46-summary.txt",
+  "raw_lines": 15,
+  "raw_bytes": 1565,
+  "lines": [
+    "==> v4.6.0-beta-4's release build 93c27f31 (de4d74c) on the Base PS5, before it was published; bash release46_check.sh klog/release-46 (tools/run-title.sh: a game, the Ozone menu from an appended config, then --home-launch with POST /api/update/download?tag=v4.5.0-beta-4)",
+    "start | build identity: 93c27f31 | VERDICT: it ran for 20s and this script closed it | crash 0",
+    "start | elevation=ok uid=0 | root=/data/homebrew/PPSA99169 same_executable=1 | Lapy stage=complete error=0 | \"contentVersion\": \"04.006.000\" | the console's copy is byte for byte this build",
+    "start | the game: Geometry: 256x224 | menu driver in the owner's config: menu_driver = \"xmb\"",
+    "ozone | build identity: 93c27f31 | VERDICT: it exited on its own before 25s | crash 0",
+    "ozone | pad script MENU at 3.00 s: depth 1, list 'main_menu' '', entry 0 of 7 'Load Core', pending ''",
+    "ozone | pad script MENU at 14.51 s: depth 1, list 'settings_tab' '', entry 0 of 19 'User Interface', pending ''",
+    "ozone | menu capture: klog/menu-20261121-190154.png",
+    "update | 19:02:30 200 {\"state\":\"downloading\",\"message\":\"Downloading the release to your console\u2026\",\"tag\":\"v4.5.0-beta-4\",\"received",
+    "update | 19:06:36 200 {\"state\":\"ready\",\"message\":\"Download verified. Installing will close RetroArch. Save your game first.\",\"tag\":\"v4.5.0-beta-4\",\"received\":1557399603}",
+    "update | daemons started during the run: 1",
+    "ok killed PPSA99169: PPSA99169 is gone (app id 24600, 1 proc",
+    "update | .update removed from the console (the download was not installed)",
+    "the owner's retroarch.cfg restored: byte-identical",
+    ".update left on the console: 0"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "step": "release-v4.6.0-console",
+  "note": "v4.6.0-beta-4's release build starts elevated with contentVersion 04.006.000, byte for byte the build; the Ozone menu draws and is walked with the pad; this build's updater downloads and verifies a published release to ready with one daemon throughout.",
+  "must_contain": [
+    "\"contentVersion\": \"04.006.000\" | the console's copy is byte for byte this build",
+    "start | elevation=ok uid=0 | root=/data/homebrew/PPSA99169 same_executable=1 | Lapy stage=complete error=0",
+    "list 'settings_tab' '', entry 0 of 19 'User Interface'",
+    "\"state\":\"ready\",\"message\":\"Download verified.",
+    "update | daemons started during the run: 1",
+    "the owner's retroarch.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [
+    "crash 1"
+  ],
+  "human_check": ""
+}
