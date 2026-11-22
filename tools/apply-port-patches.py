@@ -5364,6 +5364,16 @@ EDITS += [
      'patches/series, 0142: DOSBox Pure asks for the VFS and opens its content'),
 ]
 
+# The achievement unlock sound is on by default (patches/series, 0143): its file ships now
+# (assets/sounds/unlock.ogg), and it is the one sound RetroArch has for a notification.
+EDITS += [
+    ('configuration.c',
+     '   SETTING_BOOL("cheevos_unlock_sound_enable",   &settings->bools.cheevos_unlock_sound_enable, true, false, false);\n',
+     '   /* patches/series, 0143: the unlock sound is on unless the user turns it off. */\n'
+     '   SETTING_BOOL("cheevos_unlock_sound_enable",   &settings->bools.cheevos_unlock_sound_enable, true, true, false);\n',
+     'patches/series, 0143: the unlock sound is on unless the user turns it off'),
+]
+
 # A core slower than real time (patches/series, 0137): its frames are far apart on the clock,
 # but each call hands one over, so the clock's gap (0121) planned groups of calls that never
 # came; only their first pictures (t 0.25, 0.5) showed, never the real frame: a doubled image.

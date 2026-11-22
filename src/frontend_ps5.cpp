@@ -86,12 +86,19 @@ bool available(const Root &root)
 // what it saved. A config from such a build gets them once: the marker is written when
 // that is done (or was not needed), and from then on the setting is the user's.
 constexpr const char *widgets_marker = "/app0/config/widgets-default.done";
-void widgets_on_once()
+// The achievement unlock sound is on by default from the build that first ships its file
+// (patches/series, 0143; assets/sounds), and every config saved before could only hold
+// cheevos_unlock_sound_enable = "false", RetroArch's own default: the same once.
+constexpr const char *unlock_sound_marker = "/app0/config/unlock-sound-default.done";
+
+/* Turns a setting that retroarch.cfg holds as "false" to "true", once: marker is written
+ * when that is done or was not needed, and from then on the setting is the user's. */
+void on_once(const char *setting, const char *marker, const char *what)
 {
     struct stat st{};
-    if (stat(widgets_marker, &st) == 0)
+    if (stat(marker, &st) == 0)
         return;
-    static const char off[] = "menu_enable_widgets = \"false\"";
+    const std::string off = std::string(setting) + " = \"false\"";
     std::string text;
     if (FILE *in = std::fopen(saved_config, "rb"))
     {
@@ -107,7 +114,7 @@ void widgets_on_once()
     bool ok = true;
     if (at != std::string::npos)
     {
-        text.replace(at, sizeof(off) - 1, "menu_enable_widgets = \"true\"");
+        text.replace(at, off.size(), std::string(setting) + " = \"true\"");
         FILE *out = std::fopen("/app0/config/retroarch.cfg.tmp", "wb");
         ok = out && std::fwrite(text.data(), 1, text.size(), out) == text.size();
         if (out && std::fclose(out) != 0)
@@ -115,12 +122,12 @@ void widgets_on_once()
         ok = ok && std::rename("/app0/config/retroarch.cfg.tmp", saved_config) == 0;
         if (!ok)
             std::remove("/app0/config/retroarch.cfg.tmp");
-        std::fprintf(stderr, "frontend ps5: graphics widgets turned on once %s\n",
-                     ok ? "(saved off by a build without them)" : "FAILED");
+        std::fprintf(stderr, "frontend ps5: %s turned on once %s\n", what,
+                     ok ? "(saved off by a build without it)" : "FAILED");
     }
     if (ok)
-        if (FILE *marker = std::fopen(widgets_marker, "wb"))
-            std::fclose(marker);
+        if (FILE *file = std::fopen(marker, "wb"))
+            std::fclose(file);
 }
 
 void set_directory(default_dirs slot, const char *path)
@@ -176,7 +183,8 @@ void initialize(void *)
             std::remove("/app0/config/retroarch.cfg.tmp");
         std::fprintf(stderr, "frontend ps5: seed config %s\n", ok ? "installed" : "FAILED");
     }
-    widgets_on_once();
+    on_once("menu_enable_widgets", widgets_marker, "graphics widgets");
+    on_once("cheevos_unlock_sound_enable", unlock_sound_marker, "the achievement unlock sound");
     /* What the WebUI saved since the last start becomes RetroArch's own setting, once, so a
      * later change in the menu stays (issue 130; src/ps5_webui_settings.c). */
     {

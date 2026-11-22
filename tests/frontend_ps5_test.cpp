@@ -142,6 +142,19 @@ int main(int argc, char **argv)
            "not_menu_enable_widgets = \"false\"\n");
     assert(std::filesystem::exists(marker));
     assert(!std::filesystem::exists(fixture + "/app0/config/retroarch.cfg.tmp"));
+    // The achievement unlock sound, on once the same way (its own marker).
+    const std::string sound_marker = fixture + "/app0/config/unlock-sound-default.done";
+    assert(std::filesystem::exists(sound_marker));
+    const std::string sound_off = "cheevos_unlock_sound_enable = \"false\"\n"
+                                  "menu_enable_widgets = \"false\"\n";
+    std::ofstream(fixture + "/app0/config/retroarch.cfg") << sound_off;
+    frontend_ctx_ps5.init(nullptr);
+    assert(read(fixture + "/app0/config/retroarch.cfg") == sound_off); // both markers there
+    std::filesystem::remove(sound_marker);
+    frontend_ctx_ps5.init(nullptr);
+    assert(read(fixture + "/app0/config/retroarch.cfg") ==
+           "cheevos_unlock_sound_enable = \"true\"\nmenu_enable_widgets = \"false\"\n");
+    assert(std::filesystem::exists(sound_marker));
     // A setting the WebUI saved is RetroArch's own from this start on (issue 130): it moves
     // into retroarch.cfg, and the RetroAchievements account stays where its code reads it.
     std::ofstream(fixture + "/app0/config/retroarch.cfg") << "audio_volume = \"0.000000\"\n";
