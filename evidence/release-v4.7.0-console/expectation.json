@@ -1,0 +1,14 @@
+{
+  "step": "release-v4.7.0-console",
+  "note": "v4.7.0-beta-4's release build starts elevated with contentVersion 04.007.000, byte for byte the build; the library's answer for 15,283 games takes under a second; a config with the unlock sound off has it turned on once and nothing else changed.",
+  "must_contain": [
+    "library | /api/library: 200, 2950976 bytes, 0.94 s, 15283 games in 36 systems",
+    "start | build identity: 9ae18f68",
+    "the console's copy is byte for byte this build",
+    "Lapy stage=complete error=0 | \"contentVersion\": \"04.007.000\"",
+    "sound | after the start: cheevos_unlock_sound_enable = \"true\" | marker 1 | other lines changed: 0 | webui.cfg unchanged: yes",
+    "restore | test playlist left: 0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

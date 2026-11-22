@@ -1,0 +1,21 @@
+{
+  "step": "release-v4.7.0-console",
+  "recorded": "2026-11-22T02:36:15Z",
+  "console_run": "release-47",
+  "revision": "01abc2b",
+  "command": "bash release47_check.sh klog/release-47 (tools/run-title.sh --no-build --home-launch --watch 70; time_console.py)",
+  "raw_capture": "klog/release-47-summary.txt",
+  "raw_lines": 9,
+  "raw_bytes": 1032,
+  "lines": [
+    "==> v4.7.0-beta-4's release build 9ae18f68 (01abc2b) on the Base PS5, before it was published; bash release47_check.sh klog/release-47 (tools/run-title.sh --home-launch; a test playlist of 15,000 entries for the run; GET /api/library three times)",
+    "before | the owner's config: cheevos_unlock_sound_enable = \"false\" | marker 0",
+    "library | /api/library: 200, 2950976 bytes, 0.94 s, 15283 games in 36 systems",
+    "library | /api/library: 200, 2950976 bytes, 0.95 s, 15283 games in 36 systems",
+    "library | /api/library: 200, 2950976 bytes, 0.97 s, 15283 games in 36 systems",
+    "start | build identity: 9ae18f68 | VERDICT: it ran for 70s and this script closed it | crash 0 | the console's copy is byte for byte this build",
+    "start | elevation=ok uid=0 | root=/data/homebrew/PPSA99169 same_executable=1 | Lapy stage=complete error=0 | \"contentVersion\": \"04.007.000\"",
+    "sound | after the start: cheevos_unlock_sound_enable = \"true\" | marker 1 | other lines changed: 0 | webui.cfg unchanged: yes",
+    "restore | test playlist left: 0 | sounds on the console: 8 .ogg"
+  ]
+}
