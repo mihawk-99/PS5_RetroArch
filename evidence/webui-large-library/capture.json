@@ -1,0 +1,19 @@
+{
+  "step": "webui-large-library",
+  "recorded": "2026-11-22T00:37:21Z",
+  "console_run": "t78",
+  "revision": "406da7d",
+  "command": "tools/run-title.sh --no-build --no-deploy --home-launch, then GET /api/library three times (time_console.py); playlists/MAME.lpl of 15,000 entries and a webui.cfg line put for the test",
+  "raw_capture": "klog/t78-summary.txt",
+  "raw_lines": 7,
+  "raw_bytes": 1316,
+  "lines": [
+    "==> issues 78 and 130 on the Base PS5; a test playlist of 15,000 entries (playlists/MAME.lpl, paths that do not exist) beside the owner's 283 games; tools/run-title.sh --home-launch, GET /api/library three times from the PC (time_console.py)",
+    "before 78 | v4.6.0-beta-4 (build 93c27f31): /api/library: 200, 2950976 bytes, 10.80 s, 15283 games in 36 systems | 10.77 s | 10.75 s | /api/library/add-options 0.56 to 0.72 s",
+    "after 78 | build 847df8cf: /api/library: 200, 2950976 bytes, 0.94 s, 15283 games in 36 systems | 0.93 s | 0.92 s (the same bytes) | /api/library/add-options 0.56 to 0.67 s",
+    "host 78 | 15,000 games with artwork and details for nine in ten (big78.py): /api/library 1.27 s and 1.05 s before, 0.36 s and 0.35 s after, 3750069 bytes both",
+    "130 first start | config/webui.cfg as the owner's with audio_volume = \"12.000000\" added: after the start retroarch.cfg has 1 line, audio_volume = \"12.000000\" | webui.cfg: audio_volume lines 0, other lines kept: yes | other retroarch.cfg lines changed: 0",
+    "130 second start | retroarch.cfg put back with audio_volume = \"0.000000\" (as the menu would save it): after the start audio_volume = \"0.000000\", the file equal to what was put | webui.cfg as the owner's: yes",
+    "restore | retroarch.cfg restored byte for byte | webui.cfg restored byte for byte | test playlist left: 0"
+  ]
+}

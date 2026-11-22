@@ -1,0 +1,13 @@
+{
+  "step": "webui-large-library",
+  "note": "Issue 78: the library's answer for 15,283 games on the console, 10.8 s before and 0.93 s after, the same bytes. Issue 130: a setting saved from the WebUI moves into retroarch.cfg at a start, and a later value stays.",
+  "must_contain": [
+    "before 78 | v4.6.0-beta-4 (build 93c27f31): /api/library: 200, 2950976 bytes, 10.80 s, 15283 games",
+    "/api/library: 200, 2950976 bytes, 0.94 s, 15283 games in 36 systems",
+    "after the start audio_volume = \"0.000000\", the file equal to what was put",
+    "other retroarch.cfg lines changed: 0",
+    "test playlist left: 0"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}
