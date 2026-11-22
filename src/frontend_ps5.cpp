@@ -10,6 +10,7 @@ extern "C"
 #include <menu/menu_entries.h>
 }
 #include "ps5_smb.h"
+extern "C" int ps5_webui_settings_fold(const char *webui, const char *config);
 #include <cerrno>
 #include <cstdio>
 #include <climits>
@@ -176,6 +177,14 @@ void initialize(void *)
         std::fprintf(stderr, "frontend ps5: seed config %s\n", ok ? "installed" : "FAILED");
     }
     widgets_on_once();
+    /* What the WebUI saved since the last start becomes RetroArch's own setting, once, so a
+     * later change in the menu stays (issue 130; src/ps5_webui_settings.c). */
+    {
+        const int taken = ps5_webui_settings_fold("/app0/config/webui.cfg", saved_config);
+        if (taken)
+            std::fprintf(stderr, "frontend ps5: %d WebUI setting(s) taken into retroarch.cfg%s\n",
+                         taken < 0 ? 0 : taken, taken < 0 ? " FAILED" : "");
+    }
     std::snprintf(g_defaults.path_config, sizeof(g_defaults.path_config), "%s", saved_config);
     set_directory(DEFAULT_DIR_MENU_CONFIG, "/app0/config");
     set_directory(DEFAULT_DIR_MENU_CONTENT, "/app0");

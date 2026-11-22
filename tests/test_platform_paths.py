@@ -24,10 +24,14 @@ class PlatformPaths(unittest.TestCase):
             smb = str(Path(td) / 'ps5_smb.o')
             subprocess.run(['cc', '-std=c11', '-D_DEFAULT_SOURCE', '-O2', '-Wall', '-Werror', f'-I{smb2}/include',
                             '-c', 'src/ps5_smb.c', '-o', smb], cwd=ROOT, check=True)
+            # The WebUI's saved settings, taken into retroarch.cfg at a start (issue 130).
+            fold = str(Path(td) / 'ps5_webui_settings.o')
+            subprocess.run(['cc', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-c', 'src/ps5_webui_settings.c',
+                            '-o', fold], cwd=ROOT, check=True)
             subprocess.run(['c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-Ivendor/retroarch', '-Ivendor/retroarch/libretro-common/include',
                             f'-I{platform}', '-Isrc',
-                            'tests/frontend_ps5_test.cpp', smb, f'{smb2}/lib/libsmb2.a', '-lpthread', '-o', binary,
+                            'tests/frontend_ps5_test.cpp', smb, fold, f'{smb2}/lib/libsmb2.a', '-lpthread', '-o', binary,
                             *[f'-Wl,--wrap={name}' for name in functions]], cwd=ROOT, check=True)
             subprocess.run([binary, str(Path(td) / 'filesystem')], cwd=ROOT,
                            check=True, timeout=10)

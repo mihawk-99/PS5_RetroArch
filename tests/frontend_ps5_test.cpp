@@ -142,6 +142,18 @@ int main(int argc, char **argv)
            "not_menu_enable_widgets = \"false\"\n");
     assert(std::filesystem::exists(marker));
     assert(!std::filesystem::exists(fixture + "/app0/config/retroarch.cfg.tmp"));
+    // A setting the WebUI saved is RetroArch's own from this start on (issue 130): it moves
+    // into retroarch.cfg, and the RetroAchievements account stays where its code reads it.
+    std::ofstream(fixture + "/app0/config/retroarch.cfg") << "audio_volume = \"0.000000\"\n";
+    std::ofstream(fixture + "/app0/config/webui.cfg")
+        << "audio_volume = \"12\"\ncheevos_username = \"someone\"\n";
+    frontend_ctx_ps5.init(nullptr);
+    assert(read(fixture + "/app0/config/retroarch.cfg") == "audio_volume = \"12\"\n");
+    assert(read(fixture + "/app0/config/webui.cfg") == "cheevos_username = \"someone\"\n");
+    std::ofstream(fixture + "/app0/config/retroarch.cfg") << "audio_volume = \"0.000000\"\n";
+    frontend_ctx_ps5.init(nullptr); // the menu's later value stays
+    assert(read(fixture + "/app0/config/retroarch.cfg") == "audio_volume = \"0.000000\"\n");
+    std::filesystem::remove(fixture + "/app0/config/webui.cfg");
     std::ofstream(fixture + "/app0/config/retroarch.cfg") << "user settings\n";
     assert(std::string(ps5_core_system_directory("Beetle Saturn", "/app0/system")) ==
            "/app0/system/Saturn");
