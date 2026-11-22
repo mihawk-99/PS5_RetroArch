@@ -303,3 +303,5 @@
 0140  Cores may ask whether RetroAchievements hardcore is on (environment call 0x20000|1, a bool) and for the savestate folder (0x20000|2, as GET_SAVE_DIRECTORY gives saves). RetroArch keeps its own states, rewind and cheats from hardcore; a core's own (Dolphin's integrated GBA: state slots, save import) never reach it, so the core asks before each.
 
 0141  A core may play sound on each controller's own speaker: environment call 0x20000|3 hands it src/pad_speaker_ps5.h's table (open a RetroArch port's controller speaker, write 48 kHz mono, close), fed by a thread per speaker at AudioOut's pad-speaker pace with silence when nothing is queued; every speaker closes with the core. Dolphin's integrated GBA plays each GBA's sound on its player's controller with it.
+
+0142  SMB: DOSBox Pure gets the local copy of a file from the share too (tasks/task_content.c). It asks for the VFS interface, which told RetroArch it reads through the VFS, and opens its content with fopen on this console: a DOS game's zip on the share was "Unable to open ZIP file: smb://..." (issue 76).

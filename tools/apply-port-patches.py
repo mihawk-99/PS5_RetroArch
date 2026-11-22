@@ -5345,6 +5345,25 @@ EDITS += [
      SMB + ' (content)'),
 ]
 
+# DOSBox Pure asks for the VFS interface (for its system folder and its menu), which is how
+# RetroArch knows a core reads through the VFS, but on this console it opens its content with
+# fopen (its own VFS file layer needs funopen, which the console's libc lacks): a game's zip
+# on the SMB share was "Unable to open ZIP file: smb://..." (issue 76). It gets the local
+# copy too (patches/series, 0142).
+EDITS += [
+    ('tasks/task_content.c',
+     '            if (   string_starts_with(content_path, "smb://")\n'
+     '                && !runloop_state_get_ptr()->system.supports_vfs)\n',
+     '            /* patches/series, 0142: DOSBox Pure asks for the VFS and opens its content\n'
+     '             * with fopen all the same: it is copied as well. */\n'
+     '            if (   string_starts_with(content_path, "smb://")\n'
+     '                && (   !runloop_state_get_ptr()->system.supports_vfs\n'
+     '                    || string_is_equal(\n'
+     '                          runloop_state_get_ptr()->system.info.library_name,\n'
+     '                          "DOSBox-pure")))\n',
+     'patches/series, 0142: DOSBox Pure asks for the VFS and opens its content'),
+]
+
 # A core slower than real time (patches/series, 0137): its frames are far apart on the clock,
 # but each call hands one over, so the clock's gap (0121) planned groups of calls that never
 # came; only their first pictures (t 0.25, 0.5) showed, never the real frame: a doubled image.
