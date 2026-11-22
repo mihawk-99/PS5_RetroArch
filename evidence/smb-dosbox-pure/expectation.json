@@ -1,0 +1,12 @@
+{
+  "step": "smb-dosbox-pure",
+  "note": "A DOS program's zip on an SMB share with DOSBox Pure: refused before, copied and run after.",
+  "must_contain": [
+    "before | build identity: 847df8cf",
+    "Unable to open ZIP file: smb://<pc>/share/smb-test/claude-dos-test.zip",
+    "after | build identity: 9b2df90c | crash 0 | [INFO] [SMB] staged 2122910 of 2122910 bytes",
+    "the owner's smb.cfg restored: byte-identical"
+  ],
+  "must_not_contain": [],
+  "human_check": ""
+}

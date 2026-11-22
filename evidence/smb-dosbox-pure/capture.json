@@ -1,0 +1,16 @@
+{
+  "step": "smb-dosbox-pure",
+  "recorded": "2026-11-22T01:47:42Z",
+  "console_run": "smb76",
+  "revision": "169be0e",
+  "command": "bash smb76_check.sh klog/smb76 before|after (tools/run-title.sh --game=dosbox_pure:smb://<pc>/share/smb-test/claude-dos-test.zip --pad-script)",
+  "raw_capture": "klog/smb76-summary.txt",
+  "raw_lines": 4,
+  "raw_bytes": 1016,
+  "lines": [
+    "==> issue 76 on the Base PS5: a DOS program's zip on an SMB share (this PC's guest share, saved through the WebUI for the run), started with DOSBox Pure; bash smb76_check.sh klog/smb76 before|after (tools/run-title.sh --game=dosbox_pure:smb://<pc>/share/smb-test/claude-dos-test.zip)",
+    "before | build identity: 847df8cf | crash 0 | [INFO] [Environ] GET_VFS_INTERFACE. Core requested version >= V3, providing V3. | [ERROR] [Environ] SET_MESSAGE_EXT: Unable to open ZIP file: smb://<pc>/share/smb-test/claude-dos-test.zip | the recorded frame: DOSBox Pure's start menu, \"No executable file found\" | smb-cache on the console after the run: 0 file(s)",
+    "after | build identity: 9b2df90c | crash 0 | [INFO] [SMB] staged 2122910 of 2122910 bytes for a core that reads paths itself | no \"Unable to open ZIP file\" line | the recorded frame: the program's own first screen | smb-cache on the console after the run: 0 file(s)",
+    "restore | the owner's smb.cfg restored: byte-identical (both runs) | the test zip removed from the share"
+  ]
+}
