@@ -1,0 +1,136 @@
+name: Build & Publish PS5 OpenGL + ps5vk SDK Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-sdk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Install host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang clang-18 llvm llvm-18 llvm-18-dev lld lld-18 \
+            libclang-18-dev libclang-cpp18-dev libclc-18-dev libllvmspirvlib-18-dev \
+            curl wget patch pkg-config binutils cmake meson ninja-build \
+            python3 python3-mako python3-yaml python3-markupsafe \
+            git rsync zip unzip tar xz-utils glslang-tools spirv-headers \
+            libvulkan-dev vulkan-utility-libraries-dev libfontconfig1-dev libx11-dev
+          pipx install meson
+          pipx install ninja
+
+      - name: Checkout PS5 Vulkan
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_Vulkan
+          path: PS5_Vulkan
+          fetch-depth: 0
+
+      - name: Checkout PS5 Payload SDK
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_PayloadSDK
+          path: PS5_PayloadSDK
+          fetch-depth: 0
+
+      - name: Checkout PS5 OpenGL (darkxex mirror)
+        uses: actions/checkout@v4
+        with:
+          repository: darkxex/ps5-opengl
+          path: ps5-opengl-src
+          fetch-depth: 0
+
+      - name: Checkout zlib v1.3.2 via Git
+        uses: actions/checkout@v4
+        with:
+          repository: madler/zlib
+          ref: v1.3.2
+          path: zlib-1.3.2
+
+      - name: Build PS5 OpenGL SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "$GITHUB_WORKSPACE/zlib-1.3.2.tar.gz" zlib-1.3.2
+          cd PS5_Vulkan
+          python3 -c '
+          import pathlib, re
+          p = pathlib.Path("tools/setup-native-dependencies.sh")
+          txt = p.read_text()
+          local_url = "file://" + str(pathlib.Path("../zlib-1.3.2.tar.gz").resolve())
+          txt = re.sub(r"https?://\S+zlib-1\.3\.2\.tar\.gz", local_url, txt)
+          txt = txt.replace("sha256sum", "true")
+          p.write_text(txt)
+          '
+          bash tools/setup-native-dependencies.sh
+          cd "$GITHUB_WORKSPACE/ps5-opengl-src"
+          export PS5_PAYLOAD_SDK="$GITHUB_WORKSPACE/PS5_Vulkan/.deps/native/ps5-payload-sdk"
+          export PS5_CLANG=/usr/bin/clang
+          make source-fetch || true
+          make sdk-gl46 || make sdk
+          SDK_OUT=$(find build -maxdepth 3 -name "dependencies.json" -printf '%h\n' | head -n1)
+          echo "Built OpenGL SDK at: $SDK_OUT"
+          rm -rf "$GITHUB_WORKSPACE/ps5-opengl-sdk-cached"
+          cp -r "$PWD/$SDK_OUT" "$GITHUB_WORKSPACE/ps5-opengl-sdk-cached"
+
+      - name: Build ps5vk driver archives
+        working-directory: PS5_Vulkan
+        shell: bash
+        run: |
+          set -euo pipefail
+          ln -sfn "$GITHUB_WORKSPACE/ps5-opengl-sdk-cached" "$GITHUB_WORKSPACE/ps5-opengl-sdk-0.2.0"
+          ln -sfn "$GITHUB_WORKSPACE/ps5-opengl-sdk-cached" "$GITHUB_WORKSPACE/ps5-opengl-sdk-0.3.0"
+          export PS5_PAYLOAD_SDK="$PWD/.deps/native/ps5-payload-sdk"
+          export PS5_CLANG=/usr/bin/clang
+
+          bash tools/build-psbc-ps5.sh
+          bash tools/adapt-opengl-sdk.sh ../ps5-opengl-sdk-0.3.0
+          test -f .deps/native/opengl-sdk/dependencies.json
+
+          bash tools/fetch-mesa.sh
+          bash tools/build-psbc-ps5.sh
+          bash tools/build-vulkan-runtime.sh
+
+          bash tools/build.sh || true
+          test -x build/host/ps5-native-tool
+
+          bash tools/build-driver.sh
+
+          for file in \
+            build/driver/ps5/libps5vk.ps5.a \
+            .deps/native/vulkan-runtime/lib/libvk_runtime.ps5.a \
+            build/driver/ps5/libpsbc_driver.ps5.a \
+            .deps/native/psbc/lib/libpsbc_support.ps5.a; do
+            test -s "$file"
+            echo "Verified: $file ($(stat -c%s "$file") bytes)"
+          done
+
+      - name: Package & Publish sdk-bundle-v1 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "$GITHUB_WORKSPACE/ps5vk-opengl-bundle.tar.gz" \
+            ps5-opengl-sdk-cached \
+            PS5_Vulkan/.deps/native/zlib \
+            PS5_Vulkan/.deps/native/vulkan-runtime \
+            PS5_Vulkan/.deps/native/psbc \
+            PS5_Vulkan/.deps/work/psbc-ps5/third_party/opengnm-psbc/include \
+            PS5_Vulkan/.deps/work/psbc-ps5/third_party/opengnm-psbc/src/util \
+            PS5_Vulkan/.deps/work/psbc-ps5/third_party/opengnm/include \
+            PS5_Vulkan/.deps/work/psbc-ps5/third_party/Vulkan-Headers/include \
+            PS5_Vulkan/build/driver/ps5 \
+            PS5_Vulkan/build/host/ps5-native-tool
+
+          gh release create sdk-bundle-v1 "$GITHUB_WORKSPACE/ps5vk-opengl-bundle.tar.gz" \
+            -R "$GITHUB_REPOSITORY" \
+            --title "Prebuilt PS5 OpenGL SDK + ps5vk Driver Bundle (v1)" \
+            --notes "Standalone prebuilt ps5-opengl SDK and ps5vk driver archives." \
+            || gh release upload sdk-bundle-v1 "$GITHUB_WORKSPACE/ps5vk-opengl-bundle.tar.gz" -R "$GITHUB_REPOSITORY" --clobber

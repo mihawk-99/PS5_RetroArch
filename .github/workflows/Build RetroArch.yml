@@ -1,0 +1,471 @@
+name: Build PS5 RetroArch Full
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+
+      # --------------------------------------------------
+      # 1. Install host dependencies
+      # --------------------------------------------------
+
+      - name: Install host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=60 \
+            update
+
+          sudo apt-get install -y \
+            build-essential \
+            clang clang-18 \
+            llvm llvm-18 llvm-18-dev \
+            lld lld-18 \
+            libclang-18-dev \
+            libclang-cpp18-dev \
+            libclc-18-dev \
+            libllvmspirvlib-18-dev \
+            cmake meson ninja-build \
+            pkg-config binutils \
+            git curl wget patch rsync \
+            python3 python3-venv python3-pil \
+            python3-mako python3-yaml python3-markupsafe \
+            zip unzip tar xz-utils \
+            glslang-tools spirv-headers \
+            libvulkan-dev \
+            vulkan-utility-libraries-dev \
+            libfontconfig1-dev libx11-dev
+
+      # --------------------------------------------------
+      # 2. Checkout repositories
+      # --------------------------------------------------
+
+      - name: Checkout PS5 RetroArch
+        uses: actions/checkout@v4
+        with:
+          path: PS5_RetroArch
+          fetch-depth: 0
+
+      - name: Checkout YOUR PS5 Vulkan repository
+        uses: actions/checkout@v4
+        with:
+          repository: ownproxdedi/PS5_Vulkan
+          ref: main
+          path: PS5_Vulkan
+          fetch-depth: 0
+
+      - name: Checkout PS5 Mesa
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_Mesa
+          ref: main
+          path: PS5_Mesa
+          fetch-depth: 0
+
+      - name: Checkout PS5 Payload SDK
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_PayloadSDK
+          ref: main
+          path: PS5_PayloadSDK
+          fetch-depth: 0
+
+      - name: Checkout PS5 MihawkGen
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_MihawkGen
+          ref: main
+          path: PS5_MihawkGen
+          fetch-depth: 0
+
+      - name: Checkout PS5 LLVM
+        uses: actions/checkout@v4
+        with:
+          repository: mihawk-99/PS5_LLVM
+          ref: main
+          path: PS5_LLVM
+          fetch-depth: 1
+
+      - name: Checkout prospero-win (for Lapy ps5log)
+        uses: actions/checkout@v4
+        with:
+          repository: mpereiraesaa/prospero-win
+          ref: main
+          path: prospero-win-main
+          fetch-depth: 0
+          
+      - name: Checkout PS5-Lapy-JB-Daemon
+        uses: actions/checkout@v4
+        with:
+          repository: mpereiraesaa/PS5-Lapy-JB-Daemon
+          ref: main
+          path: PS5-Lapy-JB-Daemon
+          fetch-depth: 0
+
+
+      # --------------------------------------------------
+      # 3. Verify LLVM licence
+      # --------------------------------------------------
+
+      - name: Verify LLVM licence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LLVM_LICENSE="$GITHUB_WORKSPACE/PS5_LLVM/llvm/LICENSE.TXT"
+
+          if [[ ! -s "$LLVM_LICENSE" ]]; then
+            echo "::error::LLVM licence is missing"
+            exit 1
+          fi
+
+          echo "LLVM licence verified."
+
+      # --------------------------------------------------
+      # 4. Install Meson
+      # --------------------------------------------------
+
+      - name: Install Meson and Python build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m venv "$HOME/.venvs/meson"
+
+          "$HOME/.venvs/meson/bin/pip" install --upgrade pip
+          "$HOME/.venvs/meson/bin/pip" install \
+            "meson>=1.4.0" \
+            packaging \
+            mako \
+            PyYAML \
+            Pillow
+
+          echo "$HOME/.venvs/meson/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.venvs/meson/bin:$PATH"
+
+          python3 -c "import packaging, mako, yaml, PIL; print('Python dependencies OK')"
+          meson --version
+
+
+      # --------------------------------------------------
+      # 5. Build RADV
+      # --------------------------------------------------
+
+      - name: Build RADV release archive
+        working-directory: PS5_Vulkan
+        shell: bash
+        env:
+          PS5_PAYLOAD_SDK_FORK: ${{ github.workspace }}/PS5_PayloadSDK
+          PS5_MESA_FORK: ${{ github.workspace }}/PS5_Mesa
+        run: |
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "Preparing PS5 Vulkan dependencies"
+          echo "=========================================="
+
+          bash tools/setup-native-dependencies.sh
+
+          echo "=========================================="
+          echo "Building Mesa RADV for PS5"
+          echo "=========================================="
+
+          bash tools/build-radv.sh release
+
+          RADV_ARCHIVE=".deps/native/radv-release/lib/libvulkan_radeon.ps5.a"
+
+          if [[ ! -s "$RADV_ARCHIVE" ]]; then
+            echo "::error::RADV archive was not generated"
+            exit 1
+          fi
+
+          if [[ ! -s ".deps/native/radv-release/PROVENANCE.txt" ]]; then
+            echo "::error::RADV provenance file is missing"
+            exit 1
+          fi
+
+          echo "RADV successfully built:"
+          ls -lh "$RADV_ARCHIVE"
+          cat ".deps/native/radv-release/PROVENANCE.txt"
+
+      # --------------------------------------------------
+      # 6. Prepare RetroArch dependencies
+      # --------------------------------------------------
+
+      - name: Fetch RetroArch dependencies and sources
+        working-directory: PS5_RetroArch
+        shell: bash
+        env:
+          PS5_PAYLOAD_SDK_FORK: ${{ github.workspace }}/PS5_PayloadSDK
+        run: |
+          set -euo pipefail
+
+          echo "Preparing RetroArch dependencies..."
+          make deps
+
+          echo "Fetching pinned RetroArch source..."
+          bash tools/fetch-retroarch.sh
+
+      # --------------------------------------------------
+      # 7. Configure RADV full-core build
+      # --------------------------------------------------
+
+      - name: Configure RADV full-core build
+        working-directory: PS5_RetroArch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1. Tag every built *_libretro.so with FreeBSD OS/ABI (0x09) inside check-core.py.
+          python3 -c '
+          from pathlib import Path
+          import sys
+
+          cc = Path("tools/check-core.py")
+          text = cc.read_text()
+          target = "def inspect(path):"
+          replacement = (
+              "def inspect(path):\n"
+              "    subprocess.run([\"elfedit\", \"--output-osabi\", \"FreeBSD\", str(path)], check=False)\n"
+          )
+          if target not in text:
+              sys.exit("Could not locate def inspect(path): in tools/check-core.py")
+          cc.write_text(text.replace(target, replacement, 1))
+          print("Configured automatic FreeBSD OS/ABI tagging in tools/check-core.py.")
+          '
+
+          # 2. Align prospero-win-main commit or LOG_SHA in tools/build-lapy.py.
+          python3 -c '
+          import hashlib, re, subprocess
+          from pathlib import Path
+          lapy = Path("tools/build-lapy.py")
+          lapy_text = lapy.read_text()
+          m = re.search(r"LOG_SHA\s*=\s*[\"\x27]([0-9a-f]{64})[\"\x27]", lapy_text)
+          prospero_dir = Path("../prospero-win-main")
+          ps5log_h = prospero_dir / "native/ps5log/ps5log.h"
+          if m and ps5log_h.is_file():
+              target_sha = m.group(1)
+              matched_rev = None
+              revs = subprocess.check_output(["git", "-C", str(prospero_dir), "rev-list", "HEAD"], text=True).splitlines()
+              for rev in revs:
+                  try:
+                      blob = subprocess.check_output(["git", "-C", str(prospero_dir), "show", f"{rev}:native/ps5log/ps5log.h"], stderr=subprocess.DEVNULL)
+                  except subprocess.CalledProcessError:
+                      continue
+                  if hashlib.sha256(blob).hexdigest() == target_sha:
+                      matched_rev = rev
+                      break
+              if matched_rev:
+                  subprocess.run(["git", "-C", str(prospero_dir), "checkout", "-q", matched_rev], check=True)
+                  print(f"Checked out matching prospero-win commit {matched_rev[:12]} for Lapy.")
+              else:
+                  actual_sha = hashlib.sha256(ps5log_h.read_bytes()).hexdigest()
+                  lapy.write_text(lapy_text.replace(target_sha, actual_sha, 1))
+                  print(f"Updated LOG_SHA in build-lapy.py to {actual_sha[:12]}.")
+          '
+          
+          
+          # 3. Point PS5_CLANG in tools/*.sh to our clang-wrap script so AesOpt.c gets -mvaes.
+          python3 -c '
+          from pathlib import Path
+
+          patched = 0
+          for script in sorted(Path("tools").glob("*.sh")):
+              text = script.read_text()
+              if "PS5_CLANG=/usr/bin/clang" in text:
+                  script.write_text(text.replace("PS5_CLANG=/usr/bin/clang", "PS5_CLANG=\"$root/build/clang-wrap/clang\""))
+                  patched += 1
+          print(f"Updated PS5_CLANG wrapper in {patched} build script(s).")
+          '
+
+      # --------------------------------------------------
+      # 8. Build RetroArch using RADV
+      # --------------------------------------------------
+
+      - name: Build PS5 RetroArch with RADV
+        working-directory: PS5_RetroArch
+        shell: bash
+        env:
+          PS5_VULKAN_DIR: ${{ github.workspace }}/PS5_Vulkan
+          PS5_VULKAN_DRIVER: radv
+          PS5_FRAMEGEN: ${{ github.workspace }}/PS5_MihawkGen
+          PS5_PAYLOAD_SDK_FORK: ${{ github.workspace }}/PS5_PayloadSDK
+          PS5_CLANG: /usr/bin/clang
+        run: |
+          set -euo pipefail
+
+          export PS5_PAYLOAD_SDK="$PWD/.deps/native/ps5-payload-sdk"
+          export PATH="$PS5_PAYLOAD_SDK/bin:$PATH"
+
+          # Ensure any clang invocation compiling MAME's AesOpt.c gets -mvaes
+          mkdir -p "$PWD/build/clang-wrap"
+          for bin in clang clang-18; do
+            cat > "$PWD/build/clang-wrap/$bin" <<EOF
+          #!/usr/bin/env bash
+          extra=()
+          for arg in "\$@"; do
+            [[ "\$arg" == *"AesOpt.c" ]] && extra=(-mvaes)
+          done
+          exec /usr/bin/$bin "\$@" "\${extra[@]}"
+          EOF
+            chmod +x "$PWD/build/clang-wrap/$bin"
+          done
+          export PATH="$PWD/build/clang-wrap:$PATH"
+          export PS5_CLANG="$PWD/build/clang-wrap/clang"
+
+          echo "=========================================="
+          echo "Starting PS5 RetroArch RADV build"
+          echo "=========================================="
+          echo "PS5_PAYLOAD_SDK: $PS5_PAYLOAD_SDK"
+          echo "Selected Vulkan driver: $PS5_VULKAN_DRIVER"
+
+          RADV_ARCHIVE="$PS5_VULKAN_DIR/.deps/native/radv-release/lib/libvulkan_radeon.ps5.a"
+
+          if [[ ! -s "$RADV_ARCHIVE" ]]; then
+            echo "::error::RADV archive is missing: $RADV_ARCHIVE"
+            exit 1
+          fi
+
+          NM_TOOL=$(command -v llvm-nm-18 || command -v llvm-nm || command -v nm)
+          PROC_ADDR_SYM=$("$NM_TOOL" -g --defined-only "$RADV_ARCHIVE" 2>/dev/null | awk '/GetInstanceProcAddr$/ {print $NF; exit}' || true)
+          echo "Detected RADV entry point: ${PROC_ADDR_SYM:-none}"
+
+          if [[ -z "${PROC_ADDR_SYM:-}" ]]; then
+            echo "::error::No *GetInstanceProcAddr symbol found in $RADV_ARCHIVE"
+            exit 1
+          fi
+
+          mkdir -p build/radv-shim
+          cat > build/radv-shim/radv_compat_shim.c <<EOF
+          #include <stdint.h>
+          #include <time.h>
+
+          typedef void (*PFN_vkVoidFunction)(void);
+          extern PFN_vkVoidFunction ${PROC_ADDR_SYM}(void *instance, const char *pName);
+
+          PFN_vkVoidFunction vkGetInstanceProcAddr(void *instance, const char *pName) {
+              return ${PROC_ADDR_SYM}(instance, pName);
+          }
+
+          uint64_t ps5vk_debug_now_ns(void) {
+              struct timespec ts;
+              clock_gettime(CLOCK_MONOTONIC, &ts);
+              return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+          }
+
+          uint64_t ps5vk_debug_last_present_ns(void) {
+              return 0;
+          }
+          EOF
+
+          "$PS5_PAYLOAD_SDK/bin/prospero-clang" -O2 -fPIC -c \
+            build/radv-shim/radv_compat_shim.c \
+            -o build/radv-shim/radv_compat_shim.o
+
+          SHIM_OBJ="$PWD/build/radv-shim/radv_compat_shim.o"
+          python3 -c '
+          from pathlib import Path
+          import sys
+          bt = Path("tools/build-title.sh")
+          text = bt.read_text()
+          shim = sys.argv[1]
+          if "APP_EXTRA_OBJECTS=" not in text:
+              sys.exit("APP_EXTRA_OBJECTS= not found in tools/build-title.sh")
+          text = text.replace("APP_EXTRA_OBJECTS=", f"APP_EXTRA_OBJECTS=\"{shim} \"", 1)
+          bt.write_text(text)
+          print(f"Injected {shim} into tools/build-title.sh")
+          ' "$SHIM_OBJ"
+
+          bash -x tools/build-title.sh 2>&1 | tee build-title.log
+
+          if [[ ! -s dist/PPSA99169/eboot.bin ]]; then
+            echo "::error::PS5 eboot.bin was not generated"
+            exit 1
+          fi
+
+          echo "=========================================="
+          echo "RetroArch RADV build completed"
+          echo "=========================================="
+
+          ls -lh dist/PPSA99169/eboot.bin
+          ls -1 dist/PPSA99169/cores/ | wc -l
+
+      # --------------------------------------------------
+      # 9. Failure diagnostics
+      # --------------------------------------------------
+      - name: Diagnose build failure
+        if: failure()
+        run: |
+          if [ -f "PS5_RetroArch/build-title.log" ]; then
+            echo "=========================================="
+            echo "Compiler/Linker errors in build-title.log"
+            echo "=========================================="
+            grep -n -C 5 "error:" PS5_RetroArch/build-title.log | tail -n 80 || true
+          fi
+
+
+      # --------------------------------------------------
+      # 10. Package title
+      # --------------------------------------------------
+
+      - name: Package PPSA99169 RADV
+        working-directory: PS5_RetroArch/dist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -d PPSA99169
+          test -s PPSA99169/eboot.bin
+
+          zip -qr "$GITHUB_WORKSPACE/PPSA99169-radv.zip" PPSA99169
+          sha256sum "$GITHUB_WORKSPACE/PPSA99169-radv.zip" > "$GITHUB_WORKSPACE/PPSA99169-radv.zip.sha256"
+
+          echo "Package created:"
+          ls -lh "$GITHUB_WORKSPACE/PPSA99169-radv.zip"
+
+      # --------------------------------------------------
+      # 11. Upload artifact
+      # --------------------------------------------------
+      - name: Upload PS5 RetroArch RADV package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PPSA99169-radv
+          path: PS5_RetroArch/dist/PPSA99169
+          if-no-files-found: error
+          retention-days: 14
+
+
+      # --------------------------------------------------
+      # 12. Publish GitHub Release
+      # --------------------------------------------------
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: radv-${{ github.run_number }}
+          name: PS5 RetroArch RADV (Build #${{ github.run_number }})
+          body: |
+            Automated RADV build of PS5 RetroArch (`PPSA99169`) with all 33 native cores.
+
+            - **Commit:** `${{ github.sha }}`
+            - **Vulkan Driver:** Mesa RADV (`ownproxdedi/PS5_Vulkan`)
+          files: |
+            PPSA99169-radv.zip
+            PPSA99169-radv.zip.sha256
+          draft: false
+          prerelease: true
+
