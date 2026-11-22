@@ -159,22 +159,51 @@ static void destroy(struct smb2_context *context)
 struct smb2_context *ps5_smb_connect(const ps5_smb_config *config, const char *share, char *why,
                                      size_t why_size)
 {
+    struct smb2_context *context;
+    const char *user;
+    int connect_result;
+
     if (!config->server[0])
     {
         say(why, why_size, "Enter the server's name or address.");
+        fprintf(stderr, "[SMB] connect: aborted - server is empty\n");
+        fflush(stderr);
         return NULL;
     }
+
+    fprintf(stderr, "[SMB] connect: BEGIN server=%s share=%s\n",
+            config->server, share ? share : "IPC$");
+    fflush(stderr);
+
+    fprintf(stderr, "[SMB] connect: waiting for contexts mutex (init)\n");
+    fflush(stderr);
     pthread_mutex_lock(&contexts);
-    struct smb2_context *context = smb2_init_context();
+    fprintf(stderr, "[SMB] connect: contexts mutex acquired; calling smb2_init_context\n");
+    fflush(stderr);
+
+    context = smb2_init_context();
+
+    fprintf(stderr, "[SMB] connect: smb2_init_context returned %s\n",
+            context ? "a context" : "NULL");
+    fflush(stderr);
     pthread_mutex_unlock(&contexts);
+    fprintf(stderr, "[SMB] connect: contexts mutex released\n");
+    fflush(stderr);
+
     if (!context)
     {
         say(why, why_size, "There is not enough memory to connect.");
+        fprintf(stderr, "[SMB] connect: FAILED - smb2_init_context returned NULL\n");
+        fflush(stderr);
         return NULL;
     }
+
     /* No user name is the guest account: Samba's "map to guest = Bad User" and Windows
      * both take an unknown name with no password as the guest. */
-    const char *user = config->user[0] ? config->user : "guest";
+    user = config->user[0] ? config->user : "guest";
+    fprintf(stderr, "[SMB] connect: configuring authentication\n");
+    fflush(stderr);
+
     smb2_set_user(context, user);
     /* An empty password set is not no password: the guest sign-in then fails. */
     if (config->password[0])
@@ -184,15 +213,34 @@ struct smb2_context *ps5_smb_connect(const ps5_smb_config *config, const char *s
     smb2_set_timeout(context, (int)timeout_seconds);
     smb2_set_security_mode(context, SMB2_NEGOTIATE_SIGNING_ENABLED);
     smb2_set_authentication(context, SMB2_SEC_NTLMSSP);
-    if (smb2_connect_share(context, config->server, share ? share : "IPC$", user) < 0)
+
+    fprintf(stderr,
+            "[SMB] connect: authentication configured; timeout=%u seconds; "
+            "calling smb2_connect_share(server=%s, share=%s)\n",
+            timeout_seconds, config->server, share ? share : "IPC$");
+    fflush(stderr);
+
+    connect_result = smb2_connect_share(context, config->server,
+                                        share ? share : "IPC$", user);
+
+    fprintf(stderr, "[SMB] connect: smb2_connect_share returned %d\n", connect_result);
+    fflush(stderr);
+
+    if (connect_result < 0)
     {
         /* libsmb2's synchronous connect reports the socket it closed, not why: the
          * server's NT status says that. */
         const unsigned status = (unsigned)smb2_get_nterror(context);
         const char *error = smb2_get_error(context);
-        snprintf(last_detail, sizeof(last_detail), "%.*s", (int)strcspn(error ? error : "", "\r\n"),
+        snprintf(last_detail, sizeof(last_detail), "%.*s",
+                 (int)strcspn(error ? error : "", "\r\n"),
                  error ? error : "");
         char text[160];
+
+        fprintf(stderr, "[SMB] connect: FAILED; NT status=0x%08X; detail=%s\n",
+                status, last_detail);
+        fflush(stderr);
+
         if (status == 0xC000006Du || status == 0xC0000022u || status == 0xC000006Eu ||
             status == 0xC0000072u || status == 0xC0000071u)
             snprintf(text, sizeof(text),
@@ -204,14 +252,19 @@ struct smb2_context *ps5_smb_connect(const ps5_smb_config *config, const char *s
                      "The server did not answer. Check its address and that it shares files.");
         say(why, why_size, text);
         destroy(context);
+        fprintf(stderr, "[SMB] connect: failed context destroyed; END\n");
+        fflush(stderr);
         return NULL;
     }
+
 #ifdef SO_NOSIGPIPE
     /* A write to a connection the server dropped would raise SIGPIPE, which ends the
      * title: the write fails instead, and the reader reconnects (src/ps5_smb_vfs.c). */
     const int on = 1;
     setsockopt(smb2_get_fd(context), SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
+    fprintf(stderr, "[SMB] connect: SUCCESS fd=%d; END\n", smb2_get_fd(context));
+    fflush(stderr);
     return context;
 }
 
@@ -283,4 +336,21 @@ bool ps5_smb_root(const ps5_smb_config *config, char *path, size_t size)
             ? snprintf(path, size, "smb://%s/%s/%s", config->server, config->share, config->folder)
             : snprintf(path, size, "smb://%s/%s", config->server, config->share);
     return length > 0 && (size_t)length < size;
+}
+
+#include <stdlib.h>
+void ps5_smb_arc4random_buf(void *buf, size_t n) {
+    uint8_t *p = (uint8_t *)buf;
+    for (size_t i = 0; i < n; i++) p[i] = (uint8_t)(rand() & 0xff);
+}
+__attribute__((weak, visibility("hidden"))) void arc4random_buf(void *buf, size_t n) {
+    ps5_smb_arc4random_buf(buf, n);
+}
+
+__attribute__((weak, visibility("hidden"))) int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res) {
+    return ps5_smb_getaddrinfo(node, service, hints, res);
+}
+
+__attribute__((weak, visibility("hidden"))) void freeaddrinfo(struct addrinfo *res) {
+    ps5_smb_freeaddrinfo(res);
 }
